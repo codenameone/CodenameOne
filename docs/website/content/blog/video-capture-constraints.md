@@ -128,13 +128,13 @@ Javascript (Android) |  Yes |  Yes |  Yes |  No
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Gareth Murfin** — July 10, 2019 at 3:34 pm ([permalink](https://www.codenameone.com/blog/video-capture-constraints.html#comment-24059))
+### **Gareth Murfin** — July 10, 2019 at 3:34 pm ([permalink](/blog/video-capture-constraints/#comment-24059))
 
 > Gareth Murfin says:
 >
 > It would be awesome if you could use this same class and ust specify an array of pngs or something to also be able to export a video.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvideo-capture-constraints.html)
+
 
 ---
 

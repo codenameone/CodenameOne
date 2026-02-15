@@ -13,7 +13,7 @@ author: Shai Almog
 
 As part of the bootcamp we wrote a couple of cn1libs and the first one is the [Braintree cn1lib](https://github.com/codenameone/BraintreeCodenameOne) which allows us to do credit card payments within an app. If you aren’t familiar with [Braintree](https://www.braintreepayments.com/) it’s a PayPal company that provides payment integration for mobile devices.
 
-Notice that this differs from [In App Purchase](https://www.codenameone.com/blog/intro-to-in-app-purchase.html) which targets “virtual goods”. This is useful for things like paying for physical goods and services e.g. paying for a taxi.
+Notice that this differs from [In App Purchase](/blog/intro-to-in-app-purchase/) which targets “virtual goods”. This is useful for things like paying for physical goods and services e.g. paying for a taxi.
 
 In order to make a purchase with [this API](https://github.com/codenameone/BraintreeCodenameOne) we can use code such as:
     
@@ -50,45 +50,45 @@ This is one of those cn1libs where most of the work is done in the server and so
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Julien Sosin** — May 2, 2017 at 8:58 pm ([permalink](https://www.codenameone.com/blog/braintree-paypal-cn1lib.html#comment-23316))
+### **Julien Sosin** — May 2, 2017 at 8:58 pm ([permalink](/blog/braintree-paypal-cn1lib/#comment-23316))
 
 > Julien Sosin says:
 >
 > Looks good !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbraintree-paypal-cn1lib.html)
 
 
-### **salah Alhaddabi** — May 3, 2017 at 1:39 pm ([permalink](https://www.codenameone.com/blog/braintree-paypal-cn1lib.html#comment-23498))
+
+### **salah Alhaddabi** — May 3, 2017 at 1:39 pm ([permalink](/blog/braintree-paypal-cn1lib/#comment-23498))
 
 > salah Alhaddabi says:
 >
 > Extremely Excellent Work Shai. You guys always keep CN1 ahead of the game!!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbraintree-paypal-cn1lib.html)
 
 
-### **Edwin Quai Hoi** — May 4, 2017 at 6:53 am ([permalink](https://www.codenameone.com/blog/braintree-paypal-cn1lib.html#comment-21432))
+
+### **Edwin Quai Hoi** — May 4, 2017 at 6:53 am ([permalink](/blog/braintree-paypal-cn1lib/#comment-21432))
 
 > Edwin Quai Hoi says:
 >
 > hi is there a list of existing cn1libs anywhere
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbraintree-paypal-cn1lib.html)
 
 
-### **Shai Almog** — May 5, 2017 at 4:44 am ([permalink](https://www.codenameone.com/blog/braintree-paypal-cn1lib.html#comment-23306))
+
+### **Shai Almog** — May 5, 2017 at 4:44 am ([permalink](/blog/braintree-paypal-cn1lib/#comment-23306))
 
 > Shai Almog says:
 >
 > Sure. Right click project Codename One -> Codename One Settings -> Extensions.
 >
-> Also mirrored to [https://www.codenameone.com…](<https://www.codenameone.com/cn1libs.html>)
+> Also mirrored to [https://www.codenameone.com…](</cn1libs/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbraintree-paypal-cn1lib.html)
 
 
-### **salah Alhaddabi** — June 15, 2017 at 6:54 am ([permalink](https://www.codenameone.com/blog/braintree-paypal-cn1lib.html#comment-23395))
+
+### **salah Alhaddabi** — June 15, 2017 at 6:54 am ([permalink](/blog/braintree-paypal-cn1lib/#comment-23395))
 
 > salah Alhaddabi says:
 >
@@ -104,17 +104,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > is the CN1 library built using PayPal Mobile SDKs ??
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbraintree-paypal-cn1lib.html)
 
 
-### **Shai Almog** — June 16, 2017 at 6:59 am ([permalink](https://www.codenameone.com/blog/braintree-paypal-cn1lib.html#comment-24206))
+
+### **Shai Almog** — June 16, 2017 at 6:59 am ([permalink](/blog/braintree-paypal-cn1lib/#comment-24206))
 
 > Shai Almog says:
 >
 > Hi,  
 > it will fallback to paypal. The location restriction is for the payment receiver.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbraintree-paypal-cn1lib.html)
+
 
 ---
 

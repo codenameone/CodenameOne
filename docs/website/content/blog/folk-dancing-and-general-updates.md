@@ -43,40 +43,40 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — August 27, 2013 at 3:46 am ([permalink](https://www.codenameone.com/blog/folk-dancing-and-general-updates.html#comment-24253))
+### **Anonymous** — August 27, 2013 at 3:46 am ([permalink](/blog/folk-dancing-and-general-updates/#comment-24253))
 
 > Anonymous says:
 >
 > ImageViewer is deleted in new version have any class for instead for it ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffolk-dancing-and-general-updates.html)
 
 
-### **Anonymous** — August 27, 2013 at 4:51 am ([permalink](https://www.codenameone.com/blog/folk-dancing-and-general-updates.html#comment-21793))
+
+### **Anonymous** — August 27, 2013 at 4:51 am ([permalink](/blog/folk-dancing-and-general-updates/#comment-21793))
 
 > Anonymous says:
 >
 > No its not, its under components.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffolk-dancing-and-general-updates.html)
 
 
-### **Anonymous** — August 29, 2013 at 7:49 am ([permalink](https://www.codenameone.com/blog/folk-dancing-and-general-updates.html#comment-21736))
+
+### **Anonymous** — August 29, 2013 at 7:49 am ([permalink](/blog/folk-dancing-and-general-updates/#comment-21736))
 
 > Anonymous says:
 >
 > Tell me your scaled() works for j2me.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffolk-dancing-and-general-updates.html)
 
 
-### **Anonymous** — August 29, 2013 at 4:27 pm ([permalink](https://www.codenameone.com/blog/folk-dancing-and-general-updates.html#comment-21707))
+
+### **Anonymous** — August 29, 2013 at 4:27 pm ([permalink](/blog/folk-dancing-and-general-updates/#comment-21707))
 
 > Anonymous says:
 >
 > Sure, but it doesn’t feature this optimization.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffolk-dancing-and-general-updates.html)
+
 
 ---
 

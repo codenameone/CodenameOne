@@ -44,7 +44,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Mahmoud** — June 25, 2016 at 11:52 pm ([permalink](https://www.codenameone.com/blog/push-notification-tutorial.html#comment-22870))
+### **Mahmoud** — June 25, 2016 at 11:52 pm ([permalink](/blog/push-notification-tutorial/#comment-22870))
 
 > Mahmoud says:
 >
@@ -54,10 +54,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > any idea please  
 > thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpush-notification-tutorial.html)
 
 
-### **Shai Almog** — June 26, 2016 at 4:47 am ([permalink](https://www.codenameone.com/blog/push-notification-tutorial.html#comment-22792))
+
+### **Shai Almog** — June 26, 2016 at 4:47 am ([permalink](/blog/push-notification-tutorial/#comment-22792))
 
 > Shai Almog says:
 >
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > do you have anything in the register callback? Can you place some logging there so you will see if that method is reached and if so where does it get stuck?  
 > If you can reproduce this on one of your devices try connecting this with a cable and DDMS to see the printouts.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpush-notification-tutorial.html)
+
 
 ---
 

@@ -200,16 +200,16 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — July 15, 2013 at 10:22 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-24246))
+### **Anonymous** — July 15, 2013 at 10:22 am ([permalink](/blog/why-mobile-web-is-slow/#comment-24246))
 
 > Anonymous says:
 >
 > Note that the title of this post is not proper English.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 11:19 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21963))
+
+### **Anonymous** — July 15, 2013 at 11:19 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21963))
 
 > Anonymous says:
 >
@@ -221,10 +221,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Prove me wrong- but since you present absolutely no evidence for anything you’ve said, then I’m not really feeling the pressure here.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 11:27 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-24157))
+
+### **Anonymous** — July 15, 2013 at 11:27 am ([permalink](/blog/why-mobile-web-is-slow/#comment-24157))
 
 > Anonymous says:
 >
@@ -238,10 +238,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You are assuming the only ways to use manage memory is either raw C or fully GCed Java. How exactly is “pretty slow” for ARC we’re talking about? You seem to forget that deterministic destruction does exactly mean we can destruct when it’s convenient, not when the GC chooses so. As for crashes, I think you simply lack knowledge about alternatives to the extreme ends of the scale.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 11:30 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21888))
+
+### **Anonymous** — July 15, 2013 at 11:30 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21888))
 
 > Anonymous says:
 >
@@ -257,10 +257,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Notice that I don’t think this can be “proved”, perceived performance is too difficult to measure properly and the JIT overhead is a flaky hard to measure property. I would prefer that people understand the difference between “soft facts” and “hard facts” e.g. JavaScript as it is now is hard to optimize is a hard fact. JIT/GC’s are inherently slow is debateable (and I take the position that they are not).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 11:38 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21638))
+
+### **Anonymous** — July 15, 2013 at 11:38 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21638))
 
 > Anonymous says:
 >
@@ -272,19 +272,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > My point is that you can use GC and get both decent performance without a major memory overhead increase. Yes you would need to be aware of memory management, but you need to be even more aware of that when using ARC.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 11:51 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21784))
+
+### **Anonymous** — July 15, 2013 at 11:51 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21784))
 
 > Anonymous says:
 >
 > ARC does not “Immediately dealloc” the object unless you specifically gave it a weak (Auto zeroing) reference. A strong referenced object will be held onto until you zero it out yourself so if there’s a specifc reason not to dealloc an object while you’re executing then just *don’t* until you’re done doing whatever Uber important process. Now this is almost never an issue however I bring it up in reply to your equally unlikely case of specific object dealloc actually slowing something down. Also lets keep in mind you can jump in and out of C at any time so if you have some really low level stuff just write it in C, use the correct tool for the Job OR .. Why we don’t use JS to do jobs that C should be used for and don’t use C to do jobs JS should be used for. Got it? Kthx Bye.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 11:56 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21856))
+
+### **Anonymous** — July 15, 2013 at 11:56 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21856))
 
 > Anonymous says:
 >
@@ -296,19 +296,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > GC arguably has a bigger overhead and is less predictable than ARC, I never denied that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 11:56 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21908))
+
+### **Anonymous** — July 15, 2013 at 11:56 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21908))
 
 > Anonymous says:
 >
 > So, your response to a very well researched and documented post is to post your gut feeling, and then argue that the reader should be doing the research to back up your claim? Show us the numbers. And it is nonsense to say that it can’t be measured properly. Of course it can. Maybe *you* can’t. More likely you just *haven’t*. Which is fair, but it does mean that this post is just empty words.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 12:05 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21902))
+
+### **Anonymous** — July 15, 2013 at 12:05 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21902))
 
 > Anonymous says:
 >
@@ -324,10 +324,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I linked to Mark’s article in the blog where he provides some deeper technical assembly opcodes to back some of the claims of JIT overhead. What sort of proof are you looking for?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 1:11 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21971))
+
+### **Anonymous** — July 15, 2013 at 1:11 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21971))
 
 > Anonymous says:
 >
@@ -337,28 +337,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > And for the nonbelievers: Many malloc()/free() routines nowadays are multi-core aware and they do contain garbage-collection style tricks to speed them up. So even manual memory management uses some of the same tricks as state-of-the-art garbage collectors.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 1:50 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21695))
+
+### **Anonymous** — July 15, 2013 at 1:50 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21695))
 
 > Anonymous says:
 >
 > “ARC on the other hand doesn’t allow you to do that since ARC instantly deallocates an object you finished working with.”
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 3:09 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21760))
+
+### **Anonymous** — July 15, 2013 at 3:09 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21760))
 
 > Anonymous says:
 >
 > Arghhh, one doesn’t put an apostrophe with plural cases: GCs, JITs, VMs, etc.!!!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 3:14 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21894))
+
+### **Anonymous** — July 15, 2013 at 3:14 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21894))
 
 > Anonymous says:
 >
@@ -376,37 +376,37 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This certainly seems like a reasonable trade-off in all cases except the most performance-critical applications.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 3:20 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21752))
+
+### **Anonymous** — July 15, 2013 at 3:20 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21752))
 
 > Anonymous says:
 >
 > Perhaps the phrasing was wrong here, I didn’t want to get into the details of the reference counting algorithm and how it works internally.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 3:25 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21942))
+
+### **Anonymous** — July 15, 2013 at 3:25 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21942))
 
 > Anonymous says:
 >
 > Finally a comment I can answer with “fixed that”.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 3:26 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21749))
+
+### **Anonymous** — July 15, 2013 at 3:26 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21749))
 
 > Anonymous says:
 >
 > Terms like “perceived performance” and “speed” are too vague. Think: thoughput,latency and the jitter on them. Android does have at least one enormous problem relative to iOS, and it’s latency/jitter; which is really obvious when making real-time audio apps (ie: audio responds to finger movements within 5ms latency and jitter). Most of the Android devices I have used exhibit high latency in the user interface for everything, including the web browser. A lot of IOS apps use very little Objective-C and are mostly in C for the exact reasons you mentioned; to have the app stop doing alloc/free while the app runs (some places you have no control, like with touches coming in from the OS, etc). It’s really unfortunate that none of the popular operating systems are based on real-time operating systems, and none of the common languages are appropriate for making real-time applications; and actually kind of ironic given that mobile devices fit the profile of embeded devices doing signal processing (phone signals, accelerometers, audio, camera, etc).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 3:32 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21738))
+
+### **Anonymous** — July 15, 2013 at 3:32 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21738))
 
 > Anonymous says:
 >
@@ -414,10 +414,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > However, from my experience working with Android I’d bet this is more due to the shoddy work they did with media than anything else. They implemented the media in the native layer where you have to go back and forth from Dalvik to native for every little thing and those trips back and forth (and through threads) are just performance killers. Obviously this is a complete guess.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 3:32 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21755))
+
+### **Anonymous** — July 15, 2013 at 3:32 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21755))
 
 > Anonymous says:
 >
@@ -427,10 +427,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Of course you forgot to mention that a JIT compiler has access to information about the actual HW it is running on (memory, CPU type & version, cache size, …) and program hotspots that a static compiler have no access to. But it would not fit your story …
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 3:55 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21769))
+
+### **Anonymous** — July 15, 2013 at 3:55 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21769))
 
 > Anonymous says:
 >
@@ -442,19 +442,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The goal is not to run out your project’s budget due to being a perfectionist: “real artists ship.”
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 3:59 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-24232))
+
+### **Anonymous** — July 15, 2013 at 3:59 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-24232))
 
 > Anonymous says:
 >
 > Agreed, the biggest factor in performance is developer skill.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 4:32 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21698))
+
+### **Anonymous** — July 15, 2013 at 4:32 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21698))
 
 > Anonymous says:
 >
@@ -474,10 +474,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Between handling massive concurrency (to not bottleneck at any one core or resource), to the extra complexity in dealing with distributed computing… The current tools don’t resemble the problems we are dealing with now…. (… SIMD/Vector/GPU, co-routines, real-time deadlines, lock-free algorithms, message-passing, power reduction …). The underlying OS needs to be real-time to support any real-time applications. A lot of apps will need to be real-time. Most of them will need strong guarantees on resource consumption as well.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 4:34 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21842))
+
+### **Anonymous** — July 15, 2013 at 4:34 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21842))
 
 > Anonymous says:
 >
@@ -493,10 +493,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Particularly, I think we all benefit from free market and having more than one good device, but I stick with Apple for the moment [and it’s usability].
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 4:39 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21763))
+
+### **Anonymous** — July 15, 2013 at 4:39 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21763))
 
 > Anonymous says:
 >
@@ -504,10 +504,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If you will read Marks posts which I linked in the article you will see that a lot of the cost in Java VM is actually very low in terms of power supply.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 4:53 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21832))
+
+### **Anonymous** — July 15, 2013 at 4:53 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21832))
 
 > Anonymous says:
 >
@@ -525,10 +525,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > GC was invented in the 1950s, it’s ancient, unnecessarily slow, and limited; the world is moving on — let’s not be stuck in the GCed past! 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 4:54 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-24249))
+
+### **Anonymous** — July 15, 2013 at 4:54 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-24249))
 
 > Anonymous says:
 >
@@ -536,19 +536,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > >instantly
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 4:55 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21713))
+
+### **Anonymous** — July 15, 2013 at 4:55 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21713))
 
 > Anonymous says:
 >
 > I clarified that in the post, instantly when the ref count reaches 0.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 5:02 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21825))
+
+### **Anonymous** — July 15, 2013 at 5:02 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21825))
 
 > Anonymous says:
 >
@@ -558,10 +558,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Obviously we should throw away all ideas invented in the 20th century like that damn microprocessor and move forward to those optical quantum machines 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 5:08 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21665))
+
+### **Anonymous** — July 15, 2013 at 5:08 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21665))
 
 > Anonymous says:
 >
@@ -571,10 +571,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I wish we could move beyond that and consider more modern solutions, that’s all 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 5:21 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21810))
+
+### **Anonymous** — July 15, 2013 at 5:21 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21810))
 
 > Anonymous says:
 >
@@ -582,10 +582,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Actually a null pointer exception is an example of memory safety in action. In unmanaged languages, if you try to access uninitialized memory, you don’t get a null pointer exception. You just get access to the memory containing who knows what. This is the source of most serious software security exploits.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 5:53 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21775))
+
+### **Anonymous** — July 15, 2013 at 5:53 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21775))
 
 > Anonymous says:
 >
@@ -597,10 +597,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You have taken his point to ignore the issue of Javascript performance and launch another round of “rah rah Java is awesome; Objective C sux”. It’s your blog, you’re entitled to do that. But don’t be surprised when people who read this post and hope for something as informed as Drew’s post are disappointed to see yet another damn content-free argumentative post of the sort we’ve all read a million times in our lives.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 5:59 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21817))
+
+### **Anonymous** — July 15, 2013 at 5:59 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21817))
 
 > Anonymous says:
 >
@@ -610,10 +610,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > PS Sometimes memory must be freed and you don’t mention that you can null objects giving a clue to the GC to free memory now – I found it a huge boost in complex realtime Java UI.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 6:42 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21807))
+
+### **Anonymous** — July 15, 2013 at 6:42 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21807))
 
 > Anonymous says:
 >
@@ -635,10 +635,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > And I think it’s fair to characterize some of these as unmanaged, too.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 7:13 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-24252))
+
+### **Anonymous** — July 15, 2013 at 7:13 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-24252))
 
 > Anonymous says:
 >
@@ -658,10 +658,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nevertheless, WebApps are going to suck because they must render their UI’s through CSS/HTML and get them respond to user events by modifying the DOM with JavaScript. The only way out of this mess, is to not use CSS/HTML to format the UI, but rather bring up a canvas and draw the UI one self. Before anyone jumps up and down and says that is slow, it is only quasi-slow. For WebKit the 2D Canvas is implemented with the exact same stuff as the drawing of web page elements anyways. The only catch is that when doing the canvas thing, there might be an extra blit of your UI (from canvas offscreen buffer to screen or offscreen buffer of the layer of the canvas).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 9:20 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21792))
+
+### **Anonymous** — July 15, 2013 at 9:20 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21792))
 
 > Anonymous says:
 >
@@ -671,10 +671,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The languages you cite may be better. But maybe not. And you can’t tell yet.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 15, 2013 at 10:52 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21865))
+
+### **Anonymous** — July 15, 2013 at 10:52 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21865))
 
 > Anonymous says:
 >
@@ -682,10 +682,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > So yes, you are right about the cost of messaging, but the programmer can fix the problem where it matters. It’s pretty hard to bypass the JIT or GC if I would need to…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 1:13 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21744))
+
+### **Anonymous** — July 16, 2013 at 1:13 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21744))
 
 > Anonymous says:
 >
@@ -699,10 +699,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m surprised by the animosity from some people who seem to actually agree with most of my points?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 1:28 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21787))
+
+### **Anonymous** — July 16, 2013 at 1:28 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21787))
 
 > Anonymous says:
 >
@@ -716,10 +716,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Let’s agree to disagree on JITs 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 1:31 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21735))
+
+### **Anonymous** — July 16, 2013 at 1:31 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21735))
 
 > Anonymous says:
 >
@@ -727,10 +727,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Its also possible (although not as easy) in Java to invoke native C code and that is done for critical code.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 3:42 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21706))
+
+### **Anonymous** — July 16, 2013 at 3:42 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21706))
 
 > Anonymous says:
 >
@@ -738,10 +738,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Which might explain a bit of the other nonsense.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 4:35 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21692))
+
+### **Anonymous** — July 16, 2013 at 4:35 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21692))
 
 > Anonymous says:
 >
@@ -751,10 +751,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hopefully you will be less “anti” and more proactive.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 6:15 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21802))
+
+### **Anonymous** — July 16, 2013 at 6:15 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21802))
 
 > Anonymous says:
 >
@@ -764,10 +764,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Objective-C or should I say (Objective-C++?) really is in a different world here.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 6:15 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21956))
+
+### **Anonymous** — July 16, 2013 at 6:15 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21956))
 
 > Anonymous says:
 >
@@ -783,28 +783,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I admit though, from a get code out the door faster point of view, GC can be great and it stops memory leaks… but it has a huge performance penalty that is very spiky and unpredictable.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 6:18 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21880))
+
+### **Anonymous** — July 16, 2013 at 6:18 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21880))
 
 > Anonymous says:
 >
 > Calling C code(or other compiled languages) from a Java VM has a pretty high overhead though, so it needs to be done with care and taste. Additionally getting the data between the two is a pain.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 7:01 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21702))
+
+### **Anonymous** — July 16, 2013 at 7:01 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21702))
 
 > Anonymous says:
 >
 > I agreed with Sandy’s post and with both your comments. JNI is painful, doable but painful.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 7:09 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21871))
+
+### **Anonymous** — July 16, 2013 at 7:09 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21871))
 
 > Anonymous says:
 >
@@ -818,19 +818,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > For mobile game programming, if you need FPS nothing beats C.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 8:57 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21617))
+
+### **Anonymous** — July 16, 2013 at 8:57 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21617))
 
 > Anonymous says:
 >
 > Sorry, but thats the problem with your article. Too many guesses and wild claims with very 0 backup. You know, computer science is still considered ‘science’ for a reason 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 9:04 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21757))
+
+### **Anonymous** — July 16, 2013 at 9:04 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21757))
 
 > Anonymous says:
 >
@@ -842,19 +842,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Science also includes interpretation for the data, the facts here are still in the flexible stage where they can fit many different theories otherwise we would all be programming with the “best language” and “best OS”.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 9:27 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21929))
+
+### **Anonymous** — July 16, 2013 at 9:27 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21929))
 
 > Anonymous says:
 >
 > I would agree, if the option of semi-automatic GC were there. but, no!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 9:32 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21627))
+
+### **Anonymous** — July 16, 2013 at 9:32 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21627))
 
 > Anonymous says:
 >
@@ -866,10 +866,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You simply say it is negligible, while there are so many article already showing that that is not the case, and that is not the case with Java !!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 9:41 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21979))
+
+### **Anonymous** — July 16, 2013 at 9:41 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21979))
 
 > Anonymous says:
 >
@@ -879,19 +879,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The lovely part about a GC is that even if it is 5 times slower it runs on idle CPU. If you don’t have plenty of idle CPU on a mobile device then your problem isn’t GC, its battery life.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 10:17 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21964))
+
+### **Anonymous** — July 16, 2013 at 10:17 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21964))
 
 > Anonymous says:
 >
 > On that note, I know of companies that have spent millions of dollars building business critical applications with java and c# and have gotten a good return on investment for them.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 10:24 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-24158))
+
+### **Anonymous** — July 16, 2013 at 10:24 am ([permalink](/blog/why-mobile-web-is-slow/#comment-24158))
 
 > Anonymous says:
 >
@@ -903,10 +903,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Tiobe index: [http://www.tiobe.com/index….](<http://www.tiobe.com/index.php/content/paperinfo/tpci/index.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 12:27 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21889))
+
+### **Anonymous** — July 16, 2013 at 12:27 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21889))
 
 > Anonymous says:
 >
@@ -918,10 +918,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > But on mobile devices, the apps are small enough that C is usually ok, and there isn’t enough headroom for a nice language. Real-Time is the main issue, battery life the second issue. Maybe at some point, Go/Rust/Parasail might be alternatives; even thinking about Ada now. As ubiquitous as C is, every API you use has its own set of (possibly undocumented) rules on what it does with its pointers, and it’s basically a useless partner in peer-reviewing for the kind of bugs that any modern compiler would find given a properly designed language.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 1:19 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21639))
+
+### **Anonymous** — July 16, 2013 at 1:19 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21639))
 
 > Anonymous says:
 >
@@ -933,10 +933,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That situation still exists today, all over the world, in the corporate sector. And it even may apply in the mobile space, when building apps for less than some number of users. 100, say or 1000.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 1:39 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21785))
+
+### **Anonymous** — July 16, 2013 at 1:39 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21785))
 
 > Anonymous says:
 >
@@ -946,46 +946,46 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Lucas, most non-tech companies BUY C/C++ applications, but can’t afford or aren’t willing to pay for custom development in those languages. Java, yes, Objective-C probably not unless the company is very large and in a media related business. In June, 2013 total non-Windows OS use on the desktop was about 9%.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 3:29 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21857))
+
+### **Anonymous** — July 16, 2013 at 3:29 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21857))
 
 > Anonymous says:
 >
 > We all know that android has better hardware than iphone because is needed to run the crappy java at reasonable speed. So whatever you’ve tried to explain here is available only in theory if you don’t take everything into account, java is not native and will never run faster than objc.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 3:36 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21909))
+
+### **Anonymous** — July 16, 2013 at 3:36 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21909))
 
 > Anonymous says:
 >
 > Android is Dalvik not Java, the VM is completely different. OTOH pick any Asha device and play with it. Its no iPhone in terms of feel (no GPU) but its CPU also sucks and it has 3-4mb of RAM.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 5:51 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21903))
+
+### **Anonymous** — July 16, 2013 at 5:51 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21903))
 
 > Anonymous says:
 >
 > @Cristi, I’m not sure that Obj-C’s message passing is faster than Dalvik’s method invocation, after run through the Android JIT compiler. Obj-C is sort of its own animal, and you can’t compare it to other languages under the assumption that it’s exactly equivalent to C/C++. Performance sensitive Obj-C apps regularly drop into C or C++, just like performance sensitive Android Dalvik/”Java” apps do. It’s a bit easier to do that from Obj-C, but at that point it wouldn’t typically be referred to as Obj-C anymore. (Question of semantics, I suppose.)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 16, 2013 at 10:58 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21972))
+
+### **Anonymous** — July 16, 2013 at 10:58 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21972))
 
 > Anonymous says:
 >
 > I take issue with the supposition that it’s impossible to microoptimize when targeting the JVM. Take a look at the implementation of Bagwell’s hash tries used in Clojure — their design actually takes into account CPU cache line widths, and they’re crazy fast as a result.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 17, 2013 at 1:06 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21955))
+
+### **Anonymous** — July 17, 2013 at 1:06 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21955))
 
 > Anonymous says:
 >
@@ -993,19 +993,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > “To speed the messaging process, the runtime system caches the selectors and addresses of methods as they are used. There’s a separate cache for each class, and it can contain selectors for inherited methods as well as for methods defined in the class. Before searching the dispatch tables, the messaging routine first checks the cache of the receiving object’s class (on the theory that a method that was used once may likely be used again). If the method selector is in the cache, messaging is only slightly slower than a function call. Once a program has been running long enough to “warm up” its caches, almost all the messages it sends find a cached method. Caches grow dynamically to accommodate new messages as the program runs.”
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 17, 2013 at 1:24 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21761))
+
+### **Anonymous** — July 17, 2013 at 1:24 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21761))
 
 > Anonymous says:
 >
 > With all that caching message passing in objective c approaches about 3 times slower than java method invocations. It isn’t hard to set up benchmarks to verify this yourself. I’ve done several tests myself for pure curiosity’s sake.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 17, 2013 at 2:19 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21895))
+
+### **Anonymous** — July 17, 2013 at 2:19 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21895))
 
 > Anonymous says:
 >
@@ -1017,10 +1017,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Having done deep performance work for Apple, Sun, and many others in both the c layers and Java and objective c, I just say hey, it’s worth listening to our blogger here. If you would rather not, that’s ok. Just remember we tried to tell you 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 17, 2013 at 2:41 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-24247))
+
+### **Anonymous** — July 17, 2013 at 2:41 am ([permalink](/blog/why-mobile-web-is-slow/#comment-24247))
 
 > Anonymous says:
 >
@@ -1028,28 +1028,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://gist.github.com/ano…](<https://gist.github.com/anonymous/6017944>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 17, 2013 at 5:20 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21943))
+
+### **Anonymous** — July 17, 2013 at 5:20 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21943))
 
 > Anonymous says:
 >
 > I will attribute your statement to inexperience 😉 Static optimization is optimal only with a closed world assumption. As soon as you load an additional class, all bets are off. For example, a JIT might know that a method which may be overridden is actually NOT overridden and just inline the call. A static compiler cannot know that. Btw: AOT (ahead of time compilation) has been a feature in IBM’s J9 VM since the dawn of time.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 17, 2013 at 5:29 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21667))
+
+### **Anonymous** — July 17, 2013 at 5:29 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21667))
 
 > Anonymous says:
 >
 > Not true: Blackberry 10 is based on QNX. It doesn’t come more real time than that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 17, 2013 at 5:55 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21740))
+
+### **Anonymous** — July 17, 2013 at 5:55 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21740))
 
 > Anonymous says:
 >
@@ -1057,10 +1057,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Most modern (managed) languages use a GC and everyone using those seem perfectly fine with how they work (including me). So I can conclude, from asking for a half baked solution, that you indeed lack that “developer skill” to work with it properly.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 17, 2013 at 2:51 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21999))
+
+### **Anonymous** — July 17, 2013 at 2:51 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21999))
 
 > Anonymous says:
 >
@@ -1070,16 +1070,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Mobile music apps’ killer hardware platform would have: a real-time OS (QNX?) and a pressure-sensitive screen. Every existing hardware choice already has enough throughput, and most have a fast enough touch screen.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
 
 
-### **Anonymous** — July 24, 2013 at 12:54 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21770))
+
+### **Anonymous** — July 24, 2013 at 12:54 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21770))
 
 > Anonymous says:
 >
 > “Note that the title of this post is not [written in] proper English.”
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-mobile-web-is-slow.html)
+
 
 ---
 

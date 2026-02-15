@@ -35,7 +35,7 @@ Happy coding! and a Happy New Year!
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — December 31, 2020 at 3:35 pm ([permalink](https://www.codenameone.com/blog/codename-one-control-center-desktop-app.html#comment-24369))
+### **Francesco Galgani** — December 31, 2020 at 3:35 pm ([permalink](/blog/codename-one-control-center-desktop-app/#comment-24369))
 
 > Francesco Galgani says:
 >
@@ -45,38 +45,38 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Happy 2021!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-control-center-desktop-app.html)
 
 
-### **Javier Anton** — January 10, 2021 at 9:42 pm ([permalink](https://www.codenameone.com/blog/codename-one-control-center-desktop-app.html#comment-24375))
+
+### **Javier Anton** — January 10, 2021 at 9:42 pm ([permalink](/blog/codename-one-control-center-desktop-app/#comment-24375))
 
 > Javier Anton says:
 >
 > A bit late, but happy new year to you too Francesco. CN1 has also dug a hole in my heart, here’s to a great 2021 for all developers and of course for CN1!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-control-center-desktop-app.html)
 
 
-### **Javier Anton** — January 11, 2021 at 6:32 pm ([permalink](https://www.codenameone.com/blog/codename-one-control-center-desktop-app.html#comment-24376))
+
+### **Javier Anton** — January 11, 2021 at 6:32 pm ([permalink](/blog/codename-one-control-center-desktop-app/#comment-24376))
 
 > Javier Anton says:
 >
 > I can’t click on the “Control Center” link. I also can’t find the tool on the website
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-control-center-desktop-app.html)
 
 
-### **Chen Fishbein** — January 12, 2021 at 8:51 am ([permalink](https://www.codenameone.com/blog/codename-one-control-center-desktop-app.html#comment-24377))
+
+### **Chen Fishbein** — January 12, 2021 at 8:51 am ([permalink](/blog/codename-one-control-center-desktop-app/#comment-24377))
 
 > Chen Fishbein says:
 >
 > The “Control Center” App replaces the settings app, it is accessible from the IDE plugins.  
 > Select the “CodenameOne Settings” from the plugin.(notice if you still see the old settings do an “update” from the Settings app menu and restart the app).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-control-center-desktop-app.html)
 
 
-### **Colin Forster** — March 15, 2021 at 2:21 am ([permalink](https://www.codenameone.com/blog/codename-one-control-center-desktop-app.html#comment-24412))
+
+### **Colin Forster** — March 15, 2021 at 2:21 am ([permalink](/blog/codename-one-control-center-desktop-app/#comment-24412))
 
 > Colin Forster says:
 >
@@ -88,25 +88,25 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Let me know if you need any more clarification.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-control-center-desktop-app.html)
 
 
-### **Shai Almog** — March 15, 2021 at 3:34 pm ([permalink](https://www.codenameone.com/blog/codename-one-control-center-desktop-app.html#comment-24413))
+
+### **Shai Almog** — March 15, 2021 at 3:34 pm ([permalink](/blog/codename-one-control-center-desktop-app/#comment-24413))
 
 > Shai Almog says:
 >
 > Thanks for the headsup. We’ll try to fix it for the next update of the tool.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-control-center-desktop-app.html)
 
 
-### **Colin Forster** — March 17, 2021 at 6:48 am ([permalink](https://www.codenameone.com/blog/codename-one-control-center-desktop-app.html#comment-24415))
+
+### **Colin Forster** — March 17, 2021 at 6:48 am ([permalink](/blog/codename-one-control-center-desktop-app/#comment-24415))
 
 > Colin Forster says:
 >
 > I managed to get it working again by re-installing the ide (and therefore cn1 plugin). Thanks for the prompt reply.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-control-center-desktop-app.html)
+
 
 ---
 

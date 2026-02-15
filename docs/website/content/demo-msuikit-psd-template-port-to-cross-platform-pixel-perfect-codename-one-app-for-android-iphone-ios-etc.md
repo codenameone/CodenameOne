@@ -46,7 +46,7 @@ Since this isn’t a “real application” with functionality it can’t be dis
 
 Notice that the JavaScript HTML5 demo is not what we have on the device where applications are translated to native code!
 
-Blog Post: [link](/template-mobile-material-screens-ui-kit.html)
+Blog Post: [link](/blog/template-mobile-material-screens-ui-kit/)
 
 Source: [link](https://github.com/codenameone/MaterialScreensUIKit)
 

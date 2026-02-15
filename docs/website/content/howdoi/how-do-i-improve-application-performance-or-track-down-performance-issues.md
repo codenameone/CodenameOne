@@ -19,7 +19,7 @@ thumbnail: https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-28.j
 Some basic notes:
 
   * 90% of the performance problems we see relate to people using gradients. Don’t use gradients, use images.
-  * The video doesn’t mention image locking, that is something that could be important is some complex usages. The second part of [this blog post](https://www.codenameone.com/blog/in-a-pinch.html) discusses that.
+  * The video doesn’t mention image locking, that is something that could be important is some complex usages. The second part of [this blog post](/blog/in-a-pinch/) discusses that.
 
 ---
 

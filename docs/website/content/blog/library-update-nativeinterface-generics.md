@@ -58,9 +58,9 @@ result is really nice.
 We are on the brink of 700 pages for the developer guide and I think we’ll finish just shy of 1000 for this iteration.
 
 This work is taking some time but it’s totally worth the effort as the level of the documentation is at a league  
-of its own. E.g. check out the IO section in the guide [here](https://www.codenameone.com/manual/files-storage-networking.html).  
+of its own. E.g. check out the IO section in the guide [here](/manual/files-storage-networking/).  
 The original was remarkably bare and didn’t cover so many basic things that should be covered e.g.  
-the webservice wizard, [SliderBridge](https://www.codenameone.com/javadoc/com/codename1/components/SliderBridge.html)  
+the webservice wizard, [SliderBridge](/javadoc/com/codename1/components/SliderBridge/)  
 etc…​
 ---
 
@@ -69,34 +69,34 @@ etc…​
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — March 10, 2016 at 8:27 am ([permalink](https://www.codenameone.com/blog/library-update-nativeinterface-generics.html#comment-22391))
+### **Chidiebere Okwudire** — March 10, 2016 at 8:27 am ([permalink](/blog/library-update-nativeinterface-generics/#comment-22391))
 
 > Chidiebere Okwudire says:
 >
 > I’m really excited about the updates to the Android toolbar and will try it out as soon as the netbeans plugin is updated. Well done!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flibrary-update-nativeinterface-generics.html)
 
 
-### **znprojects** — March 10, 2016 at 11:33 am ([permalink](https://www.codenameone.com/blog/library-update-nativeinterface-generics.html#comment-22747))
+
+### **znprojects** — March 10, 2016 at 11:33 am ([permalink](/blog/library-update-nativeinterface-generics/#comment-22747))
 
 > znprojects says:
 >
 > The documentation looks fantastic. I remember this being one of the things that always made me hesitant to recommend CN1 to others in the past. Seeing what’s there now, that hesitation is gone.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flibrary-update-nativeinterface-generics.html)
 
 
-### **Nigel Chomba** — March 15, 2016 at 5:50 pm ([permalink](https://www.codenameone.com/blog/library-update-nativeinterface-generics.html#comment-22536))
+
+### **Nigel Chomba** — March 15, 2016 at 5:50 pm ([permalink](/blog/library-update-nativeinterface-generics/#comment-22536))
 
 > Nigel Chomba says:
 >
 > Netbeans plug in is taking too long, cant the plugin be hosted on your site as well since you updated us netbeans has issues for now.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flibrary-update-nativeinterface-generics.html)
 
 
-### **Shai Almog** — March 16, 2016 at 4:07 am ([permalink](https://www.codenameone.com/blog/library-update-nativeinterface-generics.html#comment-22351))
+
+### **Shai Almog** — March 16, 2016 at 4:07 am ([permalink](/blog/library-update-nativeinterface-generics/#comment-22351))
 
 > Shai Almog says:
 >
@@ -106,16 +106,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This isn’t a big deal since the libraries/simulator etc. are all updated instantly as we release them.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flibrary-update-nativeinterface-generics.html)
 
 
-### **Nigel Chomba** — March 16, 2016 at 12:05 pm ([permalink](https://www.codenameone.com/blog/library-update-nativeinterface-generics.html#comment-22692))
+
+### **Nigel Chomba** — March 16, 2016 at 12:05 pm ([permalink](/blog/library-update-nativeinterface-generics/#comment-22692))
 
 > Nigel Chomba says:
 >
 > Okay thanks for the clarity.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flibrary-update-nativeinterface-generics.html)
+
 
 ---
 

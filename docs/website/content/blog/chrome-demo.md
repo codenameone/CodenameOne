@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/chrome-demo/chrome-demo.png)
 
-This week we chose to modernize the very outdated [Chrome Demo](/demos-Chrome.html). This demo  
+This week we chose to modernize the very outdated [Chrome Demo](/chrome/). This demo  
 is one of our early demos developed during the iOS 4.x era. We licensed it’s original design from  
 [app design vault](http://www.appdesignvault.com/shop/chrome/) and created a Codename One version  
 of that original template. While the guys in app design vault modernized most of their templates to iOS 7  
@@ -59,16 +59,16 @@ more challenging and interesting demos that might be harder to adapt to newer co
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Ross Taylor** — May 17, 2016 at 4:35 pm ([permalink](https://www.codenameone.com/blog/chrome-demo.html#comment-22782))
+### **Ross Taylor** — May 17, 2016 at 4:35 pm ([permalink](/blog/chrome-demo/#comment-22782))
 
 > Ross Taylor says:
 >
 > Nice demo! However I wonder why it takes a while to load the app (around 15 – 30 seconds) is it line speed (I have 10Mbps), browser (Firefox v46) or your Javascript Port itself? What happens if the app is large around 23MB? Will it affect the load time in the browser?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fchrome-demo.html)
 
 
-### **Shai Almog** — May 18, 2016 at 3:54 am ([permalink](https://www.codenameone.com/blog/chrome-demo.html#comment-22702))
+
+### **Shai Almog** — May 18, 2016 at 3:54 am ([permalink](/blog/chrome-demo/#comment-22702))
 
 > Shai Almog says:
 >
@@ -78,16 +78,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 1.7MB is pretty small for what is effectively a full application with the JVM included but it does have a startup time overhead. This isn’t huge when compared to the many existing sites on the internet today in terms of data volume, but unlike those sites we need the whole thing to download before we can startup the VM.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fchrome-demo.html)
 
 
-### **Shai Almog** — May 18, 2016 at 5:09 am ([permalink](https://www.codenameone.com/blog/chrome-demo.html#comment-22669))
+
+### **Shai Almog** — May 18, 2016 at 5:09 am ([permalink](/blog/chrome-demo/#comment-22669))
 
 > Shai Almog says:
 >
 > Actually looking at this again it seems our CDN does gzip the file so it’s really 300kb or so which is pretty impressive… Looking at the firefox logs I think this might be the time taking to load the javascript and the resource files which are pretty large for this application (around 1.2mb). I think a lot of the resources can be optimized to reduce startup time further.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fchrome-demo.html)
+
 
 ---
 

@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/thread-errors/error-detected.jpg)
 
-I wrote before about [EasyThread](https://www.codenameone.com/blog/easy-thread.html) which makes it much easier to write multi-threaded code in Codename One. One problem in that scenario was the inability to define a generic exception handler for that scenario.
+I wrote before about [EasyThread](/blog/easy-thread/) which makes it much easier to write multi-threaded code in Codename One. One problem in that scenario was the inability to define a generic exception handler for that scenario.
 
 With the current version of Codename One we now have a new generic error handling API for easy threads:
     
@@ -56,13 +56,13 @@ This should provide you with all the details you need to handle an error in a ge
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Javier Anton** — April 14, 2020 at 9:42 am ([permalink](https://www.codenameone.com/blog/thread-errors.html#comment-21392))
+### **Javier Anton** — April 14, 2020 at 9:42 am ([permalink](/blog/thread-errors/#comment-21392))
 
 > [Javier Anton](https://lh3.googleusercontent.com/a-/AAuE7mDRjHkEvAZNXquh9p7Oo00ey1yOwNzZ0SrFwD0IVA) says:
 >
 > Great stuff. Is this wrapping an exception handler around the execution code or is it wrapping a threading exception around the EasyThread?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthread-errors.html)
+
 
 ---
 

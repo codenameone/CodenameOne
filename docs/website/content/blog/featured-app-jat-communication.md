@@ -20,7 +20,7 @@ Chat is a very common use case for developers in the Codename One community whic
 as one of our first highlighted apps. I highly recommend playing with the app to see some of the things you  
 can do in Codename One.
 
-You can see the app [featured page here](/featured-jat.html). You can check out the  
+You can see the app [featured page here](/blog/featured-app-jat-communication/). You can check out the  
 [ios version here](https://itunes.apple.com/il/app/jat-communication/id1094392187) and the  
 [android version here](https://play.google.com/store/apps/details?id=com.jat.app).
 
@@ -41,28 +41,28 @@ __ |  If you want to add your app to the featured app list just let us know here
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Stefan Eder** — April 25, 2016 at 7:17 am ([permalink](https://www.codenameone.com/blog/featured-app-jat-communication.html#comment-22621))
+### **Stefan Eder** — April 25, 2016 at 7:17 am ([permalink](/blog/featured-app-jat-communication/#comment-22621))
 
 > Apparently the app is only available in the israel app store
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffeatured-app-jat-communication.html)
 
 
-### **Shai Almog** — April 26, 2016 at 4:15 am ([permalink](https://www.codenameone.com/blog/featured-app-jat-communication.html#comment-22485))
+
+### **Shai Almog** — April 26, 2016 at 4:15 am ([permalink](/blog/featured-app-jat-communication/#comment-22485))
 
 > Thanks for the headsup. I didn’t notice this when I posted this, it seems they are still in tiered beta.  
 > I’ll try to update when this becomes available globally.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffeatured-app-jat-communication.html)
 
 
-### **Fabrizio Grassi** — June 15, 2016 at 4:45 pm ([permalink](https://www.codenameone.com/blog/featured-app-jat-communication.html#comment-21513))
+
+### **Fabrizio Grassi** — June 15, 2016 at 4:45 pm ([permalink](/blog/featured-app-jat-communication/#comment-21513))
 
 > Fabrizio Grassi says:
 >
 > Hi, I would like iJobClock to be in the a featured app list, is it possible? what should I do?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffeatured-app-jat-communication.html)
+
 
 ---
 

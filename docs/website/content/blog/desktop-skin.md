@@ -37,32 +37,32 @@ If you are looking to build desktop and web apps using Codename One let us know 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Carlos** — July 4, 2017 at 6:53 pm ([permalink](https://www.codenameone.com/blog/desktop-skin.html#comment-23359))
+### **Carlos** — July 4, 2017 at 6:53 pm ([permalink](/blog/desktop-skin/#comment-23359))
 
 > Good move.
 >
 > Is it possible to programmatically set the size of the window at startup? That is something that I’m missing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdesktop-skin.html)
 
 
-### **Shai Almog** — July 5, 2017 at 4:10 am ([permalink](https://www.codenameone.com/blog/desktop-skin.html#comment-23652))
+
+### **Shai Almog** — July 5, 2017 at 4:10 am ([permalink](/blog/desktop-skin/#comment-23652))
 
 > Thanks.  
 > Not at this time, we have the desktop.width and desktop.height build hints but not programmatically.
 >
 > You can use a native interface and just fine the JFrame then resize that using Swing code.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdesktop-skin.html)
 
 
-### **Gareth Murfin** — February 14, 2018 at 9:03 am ([permalink](https://www.codenameone.com/blog/desktop-skin.html#comment-23723))
+
+### **Gareth Murfin** — February 14, 2018 at 9:03 am ([permalink](/blog/desktop-skin/#comment-23723))
 
 > Gareth Murfin says:
 >
 > I love the desktop skin, it would definitely be great if when you resized it then remembered the size for next time, this skin makes the emulator very usable I think, and would be far cooler if it would remember resize too.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdesktop-skin.html)
+
 
 ---
 

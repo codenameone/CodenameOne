@@ -63,34 +63,34 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 16, 2014 at 12:01 am ([permalink](https://www.codenameone.com/blog/javaone-booth-ios-8-issues-more.html#comment-22155))
+### **Anonymous** — October 16, 2014 at 12:01 am ([permalink](/blog/javaone-booth-ios-8-issues-more/#comment-22155))
 
 > Anonymous says:
 >
 > Hey Shai, can’t seem to find your article on LinkedIn… Do you have a link?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavaone-booth-ios-8-issues-more.html)
 
 
-### **Anonymous** — October 16, 2014 at 9:21 am ([permalink](https://www.codenameone.com/blog/javaone-booth-ios-8-issues-more.html#comment-21447))
+
+### **Anonymous** — October 16, 2014 at 9:21 am ([permalink](/blog/javaone-booth-ios-8-issues-more/#comment-21447))
 
 > Anonymous says:
 >
 > Some changes in the CMS made links almost invisible. Not sure why… The words linkedin article are a link to this: [https://www.linkedin.com/pu…](<https://www.linkedin.com/pulse/article/20141013104245-87574-is-a-booth-at-javaone-worth-the-expense>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavaone-booth-ios-8-issues-more.html)
 
 
-### **Anonymous** — October 16, 2014 at 2:10 pm ([permalink](https://www.codenameone.com/blog/javaone-booth-ios-8-issues-more.html#comment-22271))
+
+### **Anonymous** — October 16, 2014 at 2:10 pm ([permalink](/blog/javaone-booth-ios-8-issues-more/#comment-22271))
 
 > Anonymous says:
 >
 > Oh, ok. I was also trying to find it via the CodenameOne group on LinkedIn, but I can only see the posts Chen did (last one was “Showcase your app at JavaOne” a month ago. You should probably link it there as well for increased visibility!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavaone-booth-ios-8-issues-more.html)
 
 
-### **Anonymous** — October 17, 2014 at 3:06 pm ([permalink](https://www.codenameone.com/blog/javaone-booth-ios-8-issues-more.html#comment-22088))
+
+### **Anonymous** — October 17, 2014 at 3:06 pm ([permalink](/blog/javaone-booth-ios-8-issues-more/#comment-22088))
 
 > Anonymous says:
 >
@@ -98,16 +98,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I will like to ask if Picker component is now working on iOS 8? Is there some code I have to add to my project?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavaone-booth-ios-8-issues-more.html)
 
 
-### **Anonymous** — October 17, 2014 at 10:28 pm ([permalink](https://www.codenameone.com/blog/javaone-booth-ios-8-issues-more.html#comment-22015))
+
+### **Anonymous** — October 17, 2014 at 10:28 pm ([permalink](/blog/javaone-booth-ios-8-issues-more/#comment-22015))
 
 > Anonymous says:
 >
 > Just send a new build, no code changes required.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavaone-booth-ios-8-issues-more.html)
+
 
 ---
 

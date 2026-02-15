@@ -60,7 +60,7 @@ I’m very much inclined to do the 1st option but I’m concerned about compatib
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — December 1, 2017 at 8:36 pm ([permalink](https://www.codenameone.com/blog/updates-holidays.html#comment-24154))
+### **Francesco Galgani** — December 1, 2017 at 8:36 pm ([permalink](/blog/updates-holidays/#comment-24154))
 
 > Francesco Galgani says:
 >
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thank you for the reply.
 
 
-### **Shai Almog** — December 2, 2017 at 5:10 am ([permalink](https://www.codenameone.com/blog/updates-holidays.html#comment-23741))
+### **Shai Almog** — December 2, 2017 at 5:10 am ([permalink](/blog/updates-holidays/#comment-23741))
 
 > Shai Almog says:
 >

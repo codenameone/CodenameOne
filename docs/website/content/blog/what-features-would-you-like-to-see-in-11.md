@@ -31,7 +31,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 6, 2013 at 4:25 am ([permalink](https://www.codenameone.com/blog/what-features-would-you-like-to-see-in-11.html#comment-21816))
+### **Anonymous** — March 6, 2013 at 4:25 am ([permalink](/blog/what-features-would-you-like-to-see-in-11/#comment-21816))
 
 > Anonymous says:
 >

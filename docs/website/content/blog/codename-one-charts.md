@@ -258,16 +258,16 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — February 5, 2015 at 2:46 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-21800))
+### **Anonymous** — February 5, 2015 at 2:46 am ([permalink](/blog/codename-one-charts/#comment-21800))
 
 > Anonymous says:
 >
 > this is a great addition to the product. Are the charts clickable .. can i drill down? like if i want to drill down into a particular pie in the pie chart and render some other detail, can i do so ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Anonymous** — February 6, 2015 at 2:07 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-22101))
+
+### **Anonymous** — February 6, 2015 at 2:07 am ([permalink](/blog/codename-one-charts/#comment-22101))
 
 > Anonymous says:
 >
@@ -279,37 +279,37 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Steve
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Anonymous** — February 6, 2015 at 6:02 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-22336))
+
+### **Anonymous** — February 6, 2015 at 6:02 pm ([permalink](/blog/codename-one-charts/#comment-22336))
 
 > Anonymous says:
 >
 > Can we use these library file in Intellij also ? Is so, do I have to just put them in the lib folder of the project ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Anonymous** — February 6, 2015 at 6:13 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-22206))
+
+### **Anonymous** — February 6, 2015 at 6:13 pm ([permalink](/blog/codename-one-charts/#comment-22206))
 
 > Anonymous says:
 >
 > The new charts API is part of the codename one core. No need for libraries. The old chart engine libraries will work in IntelliJ also. Yes just place the cn1lib files in your lib directory and select “Refresh libs”.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **manezi** — May 18, 2015 at 9:56 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-22319))
+
+### **manezi** — May 18, 2015 at 9:56 am ([permalink](/blog/codename-one-charts/#comment-22319))
 
 > manezi says:
 >
 > Thanks for the great work. Is additional platform support likely to be offered any time soon for com.codename1.charts? Or are platform limitations preventing this?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Shai Almog** — May 18, 2015 at 3:28 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-22392))
+
+### **Shai Almog** — May 18, 2015 at 3:28 pm ([permalink](/blog/codename-one-charts/#comment-22392))
 
 > Shai Almog says:
 >
@@ -317,29 +317,29 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Which platforms are you interested in?  
 > It works on all of our supported platforms except for J2ME, RIM and Windows Phone. J2ME & RIM are pretty outdated and irrelevant by now. We will probably rewrite the Windows work on top of their upcoming Android support at which point we we will have full support for charts.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Sana Maghraoui** — December 24, 2016 at 9:32 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23294))
+
+### **Sana Maghraoui** — December 24, 2016 at 9:32 am ([permalink](/blog/codename-one-charts/#comment-23294))
 
 > Sana Maghraoui says:
 >
 > hello! I’m trying to do run this charts but I’m not able can u help me please?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Shai Almog** — December 25, 2016 at 8:14 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23067))
+
+### **Shai Almog** — December 25, 2016 at 8:14 am ([permalink](/blog/codename-one-charts/#comment-23067))
 
 > Shai Almog says:
 >
 > Hi,  
 > what isn’t working?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Sana Maghraoui** — December 25, 2016 at 5:15 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-24118))
+
+### **Sana Maghraoui** — December 25, 2016 at 5:15 pm ([permalink](/blog/codename-one-charts/#comment-24118))
 
 > Sana Maghraoui says:
 >
@@ -347,109 +347,109 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I downloaded the project chart_master but it’s unrunnable
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Shai Almog** — December 26, 2016 at 5:06 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-22838))
+
+### **Shai Almog** — December 26, 2016 at 5:06 am ([permalink](/blog/codename-one-charts/#comment-22838))
 
 > Shai Almog says:
 >
 > It’s a bit hard to setup a new project for first timers. That’s why we have this demo in the new menu of intellij and NetBeans. Just create a new demo project and it should be one of the options.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Sana Maghraoui** — December 26, 2016 at 8:37 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23096))
+
+### **Sana Maghraoui** — December 26, 2016 at 8:37 am ([permalink](/blog/codename-one-charts/#comment-23096))
 
 > Sana Maghraoui says:
 >
 > hi!  
 > It’s okay I made it but It’s static can I make it dynamic?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Sana Maghraoui** — December 26, 2016 at 1:57 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23231))
+
+### **Sana Maghraoui** — December 26, 2016 at 1:57 pm ([permalink](/blog/codename-one-charts/#comment-23231))
 
 > Sana Maghraoui says:
 >
 > hello I need to make dynamic charts can you help me?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Shai Almog** — December 27, 2016 at 6:24 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23208))
+
+### **Shai Almog** — December 27, 2016 at 6:24 am ([permalink](/blog/codename-one-charts/#comment-23208))
 
 > Shai Almog says:
 >
 > There is a dynamic chart in the demo as well as in the kitchen sink demo (under sales)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Sana Maghraoui** — December 27, 2016 at 9:53 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-24122))
+
+### **Sana Maghraoui** — December 27, 2016 at 9:53 am ([permalink](/blog/codename-one-charts/#comment-24122))
 
 > Sana Maghraoui says:
 >
 > I mean with dynamic that get information from the DataBase and display it
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Sana Maghraoui** — December 27, 2016 at 10:02 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23062))
+
+### **Sana Maghraoui** — December 27, 2016 at 10:02 am ([permalink](/blog/codename-one-charts/#comment-23062))
 
 > Sana Maghraoui says:
 >
 > *please help me I need to get information from the database and to display it
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Shai Almog** — December 28, 2016 at 1:23 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23175))
+
+### **Shai Almog** — December 28, 2016 at 1:23 pm ([permalink](/blog/codename-one-charts/#comment-23175))
 
 > Shai Almog says:
 >
 > Kitchen sink gets information from a UI table, getting it from a database or a UI table is similar. External source that refreshes the table.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Sana Maghraoui** — December 28, 2016 at 10:04 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23037))
+
+### **Sana Maghraoui** — December 28, 2016 at 10:04 pm ([permalink](/blog/codename-one-charts/#comment-23037))
 
 > Sana Maghraoui says:
 >
 > thank you for your replies but I can’t adapt the project to the one I working with I need help .I’m not finding the Myapplication .java in the kitchenSkin in the Demo so how can I do?thank you for your help
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Shai Almog** — December 29, 2016 at 5:51 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-22688))
+
+### **Shai Almog** — December 29, 2016 at 5:51 am ([permalink](/blog/codename-one-charts/#comment-22688))
 
 > Shai Almog says:
 >
 > Kitchen sink has files that are named differently (pretty much all apps/demos do), this specific demo has that code in the SalesDemo.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Jared Ruplinger** — October 9, 2017 at 3:05 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23646))
+
+### **Jared Ruplinger** — October 9, 2017 at 3:05 pm ([permalink](/blog/codename-one-charts/#comment-23646))
 
 > Jared Ruplinger says:
 >
-> For those who are having trouble following the examples in the demo linked from this post, you might want to check out the “newer” demo from the post at [https://www.codenameone.com…](<https://www.codenameone.com/blog/charts-demo-revisited.html>)
+> For those who are having trouble following the examples in the demo linked from this post, you might want to check out the “newer” demo from the post at [https://www.codenameone.com…](</blog/charts-demo-revisited/>)
 >
 > It is a smidge simpler. That aside, however, there are a lot of moving pieces to the charts functionality and it would sure be nice to have some more thorough documentation.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
 
 
-### **Shai Almog** — October 10, 2017 at 4:40 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23638))
+
+### **Shai Almog** — October 10, 2017 at 4:40 am ([permalink](/blog/codename-one-charts/#comment-23638))
 
 > Shai Almog says:
 >
 > Yes, I agree. We need simpler charts. We added some simpler code into the kitchen sink under the sales demo. It tries to demonstrate a more “real world” use case.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-charts.html)
+
 
 ---
 

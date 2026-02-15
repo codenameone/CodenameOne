@@ -16,7 +16,7 @@ thumbnail: https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-21.j
 
 #### Installing The Eclipse Plugin
 
-For details please check out the [download section](https://www.codenameone.com/download.html).
+For details please check out the [download section](/download/).
 
 In this short video we’ll walk you thru the very basics of Codename One.
 
@@ -46,7 +46,7 @@ Next we’ll open the designer by double clicking the theme file. The theme allo
 The designer tool is also used for countless other features, such as: resolution independent images, localization and more!
 
 The most important thing is running the resulting app on my devices, to do that we right click the project and select send Android build. You will notice there are many other build targets e.g. iOS. etc.).  
-Once a build is made navigate to the [build server at codenameone.com](https://www.codenameone.com/build-server.html) and select your build entry. You can then either email the link to yourself using the dedicated button or just scan the QR code in the page. This will allow you to download and install the app to your device.
+Once a build is made navigate to the [build server at codenameone.com](/build-server/) and select your build entry. You can then either email the link to yourself using the dedicated button or just scan the QR code in the page. This will allow you to download and install the app to your device.
 
 Here is actual device footage for the app we just built!
 

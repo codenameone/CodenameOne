@@ -51,22 +51,20 @@ There are a few other variants like `runAndWait` and there is a `kill()` method 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chad Elofson** — May 10, 2017 at 5:14 am ([permalink](https://www.codenameone.com/blog/easy-thread.html#comment-23513))
+### **Chad Elofson** — May 10, 2017 at 5:14 am ([permalink](/blog/easy-thread/#comment-23513))
 
 > Chad Elofson says:
 >
 > That’s pretty slick!
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Feasy-thread.html)
 
 
-### **Javier Anton** — February 18, 2020 at 3:51 pm ([permalink](https://www.codenameone.com/blog/easy-thread.html#comment-21384))
+### **Javier Anton** — February 18, 2020 at 3:51 pm ([permalink](/blog/easy-thread/#comment-21384))
 
 > [Javier Anton](https://lh3.googleusercontent.com/a-/AAuE7mDRjHkEvAZNXquh9p7Oo00ey1yOwNzZ0SrFwD0IVA) says:
 >
 > Really good, but perhaps in the future a method similar to interrupt() could be added to cancel all the pending tasks (since kill() doesn’t cancel pending tasks)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Feasy-thread.html)
+
 
 ---
 

@@ -28,12 +28,12 @@ Here’s the kicker, we just updated all the users in the database currently to 
 
 ### How Does it Work?
 
-You can invite friends by sharing a special URL which you can see in your console [here](https://www.codenameone.com/build-server.html) under the Account tab. E.g. mine is: `<https://www.codenameone.com/index.html?ref=baa9d923-b26a-430b-a814-02cf55605231>`.
+You can invite friends by sharing a special URL which you can see in your console [here](/build-server/) under the Account tab. E.g. mine is: `</index/?ref=baa9d923-b26a-430b-a814-02cf55605231>`.
 
 __ |  You might need to logout and login again to see this entry. It should be below the token   
 ---|---  
   
-The important aspect here is the `?ref=baa9d923-b26a-430b-a814-02cf55605231` part. You can attach it to any html URL in this site including this page e.g.: `<https://www.codenameone.com/blog/increase-your-build-quotas.html?ref=baa9d923-b26a-430b-a814-02cf55605231>` would be valid.
+The important aspect here is the `?ref=baa9d923-b26a-430b-a814-02cf55605231` part. You can attach it to any html URL in this site including this page e.g.: `</blog/increase-your-build-quotas/?ref=baa9d923-b26a-430b-a814-02cf55605231>` would be valid.
 
 However `<https://www.codenameone.com/?ref=baa9d923-b26a-430b-a814-02cf55605231>` isn’t valid as it doesn’t contain an html file in the URL.
 
@@ -86,22 +86,22 @@ Keep in mind that a 1mb jar app can grow up to 16 times on iOS and a bit less on
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Synapsido** — August 21, 2018 at 12:22 am ([permalink](https://www.codenameone.com/blog/increase-your-build-quotas.html#comment-24006))
+### **Synapsido** — August 21, 2018 at 12:22 am ([permalink](/blog/increase-your-build-quotas/#comment-24006))
 
 > Synapsido says:
 >
 > I’m free user for now, I have several developer fiends invited, where can I see my total Quotas in my account…?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fincrease-your-build-quotas.html)
 
 
-### **Shai Almog** — August 21, 2018 at 8:23 am ([permalink](https://www.codenameone.com/blog/increase-your-build-quotas.html#comment-21538))
+
+### **Shai Almog** — August 21, 2018 at 8:23 am ([permalink](/blog/increase-your-build-quotas/#comment-21538))
 
 > Shai Almog says:
 >
 > On the first of the month when your credits are reset you can see how many clicked and created an account based on the build credits you would have.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fincrease-your-build-quotas.html)
+
 
 ---
 

@@ -259,7 +259,7 @@ Our Maven support represents months of careful work, and there is much more that
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Eric Gbofu** — April 13, 2021 at 6:01 pm ([permalink](https://www.codenameone.com/blog/maven-project-structure.html#comment-24445))
+### **Eric Gbofu** — April 13, 2021 at 6:01 pm ([permalink](/blog/maven-project-structure/#comment-24445))
 
 > Eric Gbofu says:
 >
@@ -275,19 +275,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaven-project-structure.html)
 
 
-### **Eric Gbofu** — April 13, 2021 at 10:00 pm ([permalink](https://www.codenameone.com/blog/maven-project-structure.html#comment-24446))
+
+### **Eric Gbofu** — April 13, 2021 at 10:00 pm ([permalink](/blog/maven-project-structure/#comment-24446))
 
 > Eric Gbofu says:
 >
 > Answers for my previous questions: <https://github.com/codenameone/CodenameOne/issues/3390>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaven-project-structure.html)
 
 
-### **Antonio Rios** — March 20, 2022 at 3:49 pm ([permalink](https://www.codenameone.com/blog/maven-project-structure.html#comment-24512))
+
+### **Antonio Rios** — March 20, 2022 at 3:49 pm ([permalink](/blog/maven-project-structure/#comment-24512))
 
 > Antonio Rios says:
 >
@@ -312,16 +312,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [ERROR] No plugin found for prefix ‘cn’ in the current project and in the plugin groups [org.apache.maven.plugins, org.codehaus.mojo] available from the repositories [local (/root/.m2/repository), central (<https://repo.maven.apache.org/maven2>)] -> [Help 1]  
 > “
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaven-project-structure.html)
 
 
-### **Steve Hannah** — March 21, 2022 at 11:48 am ([permalink](https://www.codenameone.com/blog/maven-project-structure.html#comment-24513))
+
+### **Steve Hannah** — March 21, 2022 at 11:48 am ([permalink](/blog/maven-project-structure/#comment-24513))
 
 > Steve Hannah says:
 >
 > Thanks for sharing this. I have made these changes to the archetype so that they will be part of the next update (7.0.62). Officially we support JDK8 and JDK11, not JDK17 yet, which is the reason for this failure. (i.e. an alternate fix for the first error would have been to change to JDK11).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaven-project-structure.html)
+
 
 ---
 

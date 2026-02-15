@@ -31,19 +31,19 @@ some code had to go thru. Specifically things related to syntax that needed doin
 Up until now we had terse syntax for creating a toggle button for a `RadioButton` but we didn’t have anything  
 like that for the `CheckBox`. So we added a couple of methods:
 
-  * [createToggle(Image icon)](https://www.codenameone.com/javadoc/com/codename1/ui/CheckBox.html#createToggle-com.codename1.ui.Image-)
+  * [createToggle(Image icon)](/javadoc/com/codename1/ui/CheckBox/#createToggle-com.codename1.ui.Image-)
 
-  * [createToggle(String text)](https://www.codenameone.com/javadoc/com/codename1/ui/CheckBox.html#createToggle-java.lang.String-)
+  * [createToggle(String text)](/javadoc/com/codename1/ui/CheckBox/#createToggle-java.lang.String-)
 
-  * [createToggle(String text, Image icon)](https://www.codenameone.com/javadoc/com/codename1/ui/CheckBox.html#createToggle-java.lang.String-com.codename1.ui.Image-)
+  * [createToggle(String text, Image icon)](/javadoc/com/codename1/ui/CheckBox/#createToggle-java.lang.String-com.codename1.ui.Image-)
 
 ### ButtonGroup Shortcut
 
 Up until now creating a `RadioButton` required adding it to a `ButtonGroup` which was tedious.
 
 To solve this we added a varargs  
-[addAll(Component…​)](https://www.codenameone.com/javadoc/com/codename1/ui/ButtonGroup.html#addAll-com.codename1.ui.RadioButton…​-)  
-method as well as a [varargs constructor](https://www.codenameone.com/javadoc/com/codename1/ui/ButtonGroup.html#ButtonGroup-com.codename1.ui.RadioButton…​-).
+[addAll(Component…​)](/javadoc/com/codename1/ui/ButtonGroup/#addAll-com.codename1.ui.RadioButton…​-)  
+method as well as a [varargs constructor](/javadoc/com/codename1/ui/ButtonGroup/#ButtonGroup-com.codename1.ui.RadioButton…​-).
 
 ### ComponentGroup enclose
 
@@ -52,9 +52,9 @@ method as well as a [varargs constructor](https://www.codenameone.com/javadoc/co
 
 So we added two enclose methods:
 
-  * [enclose(Component…​)](https://www.codenameone.com/javadoc/com/codename1/ui/ComponentGroup.html#enclose-com.codename1.ui.Component…​-)
+  * [enclose(Component…​)](/javadoc/com/codename1/ui/ComponentGroup/#enclose-com.codename1.ui.Component…​-)
 
-  * [encloseHorizontal(Component…​)](https://www.codenameone.com/javadoc/com/codename1/ui/ComponentGroup.html#encloseHorizontal-com.codename1.ui.Component…​-)
+  * [encloseHorizontal(Component…​)](/javadoc/com/codename1/ui/ComponentGroup/#encloseHorizontal-com.codename1.ui.Component…​-)
 
 ---
 

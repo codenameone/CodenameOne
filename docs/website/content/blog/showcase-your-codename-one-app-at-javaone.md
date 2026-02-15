@@ -51,7 +51,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — August 29, 2014 at 4:25 am ([permalink](https://www.codenameone.com/blog/showcase-your-codename-one-app-at-javaone.html#comment-22060))
+### **Anonymous** — August 29, 2014 at 4:25 am ([permalink](/blog/showcase-your-codename-one-app-at-javaone/#comment-22060))
 
 > Anonymous says:
 >
@@ -59,25 +59,25 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Wim
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshowcase-your-codename-one-app-at-javaone.html)
 
 
-### **Anonymous** — September 3, 2014 at 4:27 am ([permalink](https://www.codenameone.com/blog/showcase-your-codename-one-app-at-javaone.html#comment-22197))
+
+### **Anonymous** — September 3, 2014 at 4:27 am ([permalink](/blog/showcase-your-codename-one-app-at-javaone/#comment-22197))
 
 > Anonymous says:
 >
 > what is preferred format? can i simply send apks? I have a few you can look at.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshowcase-your-codename-one-app-at-javaone.html)
 
 
-### **Anonymous** — September 3, 2014 at 4:21 pm ([permalink](https://www.codenameone.com/blog/showcase-your-codename-one-app-at-javaone.html#comment-24184))
+
+### **Anonymous** — September 3, 2014 at 4:21 pm ([permalink](/blog/showcase-your-codename-one-app-at-javaone/#comment-24184))
 
 > Anonymous says:
 >
 > You need to submit here: [http://www.codenameone.com/…](<http://www.codenameone.com/submit-app.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshowcase-your-codename-one-app-at-javaone.html)
+
 
 ---
 

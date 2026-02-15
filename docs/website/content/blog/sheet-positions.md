@@ -11,7 +11,7 @@ author: Steve Hannah
 
 ![Header Image](https://www.codenameone.com/img/blog/new-sheet-positioning.jpgnew)
 
-Not so long ago, we [released](https://www.codenameone.com/blog/sheets-samples.html) a [Sheet component](https://www.codenameone.com/javadoc/com/codename1/ui/Sheet.html) that acts like a non-modal dialog box that slides up from the bottom. It occupies only the amount of space required to house its contents, and it provides built-in navigation controls to go “back” to the previous sheet. By default Sheets are displayed along the bottom of the screen, but we have recently added an update that allows you to position it along the north, east, west, south, or center of the screen, as shown below:
+Not so long ago, we [released](/blog/sheets-samples/) a [Sheet component](/javadoc/com/codename1/ui/Sheet/) that acts like a non-modal dialog box that slides up from the bottom. It occupies only the amount of space required to house its contents, and it provides built-in navigation controls to go “back” to the previous sheet. By default Sheets are displayed along the bottom of the screen, but we have recently added an update that allows you to position it along the north, east, west, south, or center of the screen, as shown below:
 
 ![Sheet component positions](/blog/sheet-positions/sheet-positions.png)
 
@@ -29,31 +29,31 @@ Below is a 35 second screen cast of that demo:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — February 29, 2020 at 11:27 am ([permalink](https://www.codenameone.com/blog/sheet-positions.html#comment-21414))
+### **Francesco Galgani** — February 29, 2020 at 11:27 am ([permalink](/blog/sheet-positions/#comment-21414))
 
 > Thank you, this is exactly what I need! 🙂  
 > About the Sheet in the bottom position, can it be placed at a given distance from the bottom and not exactly at the bottom like in the video? In other words, is it possible to slide up the Sheet from bottom to up, until it reaches a given distance from the bottom?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsheet-positions.html)
 
 
-### **Javier Anton** — February 29, 2020 at 9:32 pm ([permalink](https://www.codenameone.com/blog/sheet-positions.html#comment-21415))
+
+### **Javier Anton** — February 29, 2020 at 9:32 pm ([permalink](/blog/sheet-positions/#comment-21415))
 
 > [Javier Anton](https://lh3.googleusercontent.com/a-/AAuE7mDRjHkEvAZNXquh9p7Oo00ey1yOwNzZ0SrFwD0IVA) says:
 >
 > Will definitely use this thx
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsheet-positions.html)
 
 
-### **Shai Almog** — March 1, 2020 at 2:06 am ([permalink](https://www.codenameone.com/blog/sheet-positions.html#comment-21413))
+
+### **Shai Almog** — March 1, 2020 at 2:06 am ([permalink](/blog/sheet-positions/#comment-21413))
 
 > Shai Almog says:
 >
 > Maybe a creative use of margin can help with that?  
 > Haven’t tried it but I think it should work.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsheet-positions.html)
+
 
 ---
 

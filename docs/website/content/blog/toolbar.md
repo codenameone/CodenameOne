@@ -98,28 +98,28 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — December 22, 2014 at 6:23 pm ([permalink](https://www.codenameone.com/blog/toolbar.html#comment-22247))
+### **Anonymous** — December 22, 2014 at 6:23 pm ([permalink](/blog/toolbar/#comment-22247))
 
 > Anonymous says:
 >
 > Nice! I hope it’s also easier now to change the color of the toolbar. Thanks for adding this!
 
 
-### **Anonymous** — January 4, 2015 at 12:35 pm ([permalink](https://www.codenameone.com/blog/toolbar.html#comment-22070))
+### **Anonymous** — January 4, 2015 at 12:35 pm ([permalink](/blog/toolbar/#comment-22070))
 
 > Anonymous says:
 >
 > How do you update the plugin to use this toolbar functionality ?
 
 
-### **Anonymous** — January 5, 2015 at 4:11 am ([permalink](https://www.codenameone.com/blog/toolbar.html#comment-21687))
+### **Anonymous** — January 5, 2015 at 4:11 am ([permalink](/blog/toolbar/#comment-21687))
 
 > Anonymous says:
 >
 > We will make an update in a week or two.
 
 
-### **Anonymous** — February 21, 2015 at 1:42 pm ([permalink](https://www.codenameone.com/blog/toolbar.html#comment-21610))
+### **Anonymous** — February 21, 2015 at 1:42 pm ([permalink](/blog/toolbar/#comment-21610))
 
 > Anonymous says:
 >
@@ -130,28 +130,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > The method setTitleComponent(Label) in the type Form is not applicable for the arguments (ComboBox)
 
 
-### **Anonymous** — February 22, 2015 at 2:20 am ([permalink](https://www.codenameone.com/blog/toolbar.html#comment-21920))
+### **Anonymous** — February 22, 2015 at 2:20 am ([permalink](/blog/toolbar/#comment-21920))
 
 > Anonymous says:
 >
 > Use the method in the Toolbar not in the form.
 
 
-### **james agada** — March 24, 2015 at 9:51 pm ([permalink](https://www.codenameone.com/blog/toolbar.html#comment-21988))
+### **james agada** — March 24, 2015 at 9:51 pm ([permalink](/blog/toolbar/#comment-21988))
 
 > james agada says:
 >
 > ToolBar only adds to forms right? not to containers.
 
 
-### **Shai Almog** — March 25, 2015 at 5:06 am ([permalink](https://www.codenameone.com/blog/toolbar.html#comment-22237))
+### **Shai Almog** — March 25, 2015 at 5:06 am ([permalink](/blog/toolbar/#comment-22237))
 
 > Shai Almog says:
 >
 > Yes.
 
 
-### **Chidiebere Okwudire** — January 25, 2016 at 9:15 am ([permalink](https://www.codenameone.com/blog/toolbar.html#comment-22508))
+### **Chidiebere Okwudire** — January 25, 2016 at 9:15 am ([permalink](/blog/toolbar/#comment-22508))
 
 > Chidiebere Okwudire says:
 >
@@ -162,7 +162,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Why doesn’t the Android implementation by default comply with these guidelines (height, nav icon size and position, background, etc.)? It’s annoying to have to tweak the toolbar for every single app just to get the default-like look on Android whereas it just works on iOS. Can you fix this issue or am I missing something?
 
 
-### **Shai Almog** — January 25, 2016 at 12:09 pm ([permalink](https://www.codenameone.com/blog/toolbar.html#comment-22534))
+### **Shai Almog** — January 25, 2016 at 12:09 pm ([permalink](/blog/toolbar/#comment-22534))
 
 > Shai Almog says:
 >
@@ -171,7 +171,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Matching material design on Android is our #1 priority based on our recent roadmap (together with performance) so this is something we want to do and we do want things to be far more refined than they are right now. Can you file an issue with suggestions e.g. what sort of tweeks you usually do to a project to get it to match?
 
 
-### **Chidiebere Okwudire** — January 25, 2016 at 2:28 pm ([permalink](https://www.codenameone.com/blog/toolbar.html#comment-22678))
+### **Chidiebere Okwudire** — January 25, 2016 at 2:28 pm ([permalink](/blog/toolbar/#comment-22678))
 
 > Chidiebere Okwudire says:
 >
@@ -180,7 +180,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I’m still busy with the app 😉 I’ll file an issue after I’m done with the toolbar customization. That will be next week at the earliest.
 
 
-### **Shai Almog** — January 25, 2016 at 6:20 pm ([permalink](https://www.codenameone.com/blog/toolbar.html#comment-22690))
+### **Shai Almog** — January 25, 2016 at 6:20 pm ([permalink](/blog/toolbar/#comment-22690))
 
 > Shai Almog says:
 >
@@ -188,14 +188,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > no rush whatsoever. Thanks.
 
 
-### **Gareth Murfin** — January 15, 2019 at 9:39 pm ([permalink](https://www.codenameone.com/blog/toolbar.html#comment-23884))
+### **Gareth Murfin** — January 15, 2019 at 9:39 pm ([permalink](/blog/toolbar/#comment-23884))
 
 > Gareth Murfin says:
 >
 > i dont understand how the search bar was added to the toolbar, for me nothing appears
 
 
-### **Shai Almog** — January 16, 2019 at 4:45 am ([permalink](https://www.codenameone.com/blog/toolbar.html#comment-24031))
+### **Shai Almog** — January 16, 2019 at 4:45 am ([permalink](/blog/toolbar/#comment-24031))
 
 > Shai Almog says:
 >

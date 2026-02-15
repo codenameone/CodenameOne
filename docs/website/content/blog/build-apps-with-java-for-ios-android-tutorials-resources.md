@@ -15,7 +15,7 @@ There are many Codename One resources for building native mobile apps but they a
 
   * [• Create an Uber Clone in 7 Days](https://uber.cn1.co/) – Even if you don’t purchase the full book, the free chapters available to download will help you get started quickly.
   *   * [• Developer Guide](https://www.codenameone.com/manual/) – if you haven’t read the developer guide you should! Notice that it also comes in a [PDF](https://www.codenameone.com/files/developer-guide.pdf).
-  *   * [• JavaDocs](https://www.codenameone.com/javadoc/) – our JavaDocs include some hidden features such as the [component gallery](https://www.codenameone.com/javadoc/com/codename1/ui/package-summary.html) & [layout gallery](https://www.codenameone.com/javadoc/com/codename1/ui/layouts/package-summary.html).
+  *   * [• JavaDocs](https://www.codenameone.com/javadoc/) – our JavaDocs include some hidden features such as the [component gallery](/javadoc/com/codename1/ui/package-summary/) & [layout gallery](/javadoc/com/codename1/ui/layouts/package-summary/).
   *   * [• Sviluppare app multipiattaforma – Indice del corso introduttivo](https://www.informatica-libera.net/content/sviluppare-app-multipiattaforma-indice-del-corso-introduttivo) – Italian language free course for mobile cross-platform development by Francesco Galgani.
   *   * [• Port an Android app to iOS (iPhone)](/blog/port-native-android-app-ios-iphone-guide.html) – a step by step guide on porting a real world Android app to Codename One and getting it onto all the major stores.
   *   * [• Chat App Tutorial](/blog/building-a-chat-app-with-codename-one-part-1.html) – this six part series covered many ideas in Codename One including social login (Facebook, Google) IM style interface etc.
@@ -44,7 +44,7 @@ There are many Codename One resources for building native mobile apps but they a
   *   * [• Setup a Codename One Project from Git](/blog/tip-setup-codename-one-demo-from-git.html) – covers the process of converting a git project to a local project.
   * 
 
-There are many other tutorials, too many to list, you can see some of them in the [How Do I?](https://www.codenameone.com/how-do-i.html) and that is still a partial list as it doesn’t cover the older posts from before the site migration.
+There are many other tutorials, too many to list, you can see some of them in the [How Do I?](/how-do-i/) and that is still a partial list as it doesn’t cover the older posts from before the site migration.
 
 ### Videos & Online Courses
 
@@ -84,41 +84,41 @@ If you have thoughts or wishlists for tutorials, we’d be happy to hear about t
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Urfi Mirza** — November 3, 2016 at 9:25 am ([permalink](https://www.codenameone.com/blog/build-apps-with-java-for-ios-android-tutorials-resources.html#comment-22988))
+### **Urfi Mirza** — November 3, 2016 at 9:25 am ([permalink](/blog/build-apps-with-java-for-ios-android-tutorials-resources/#comment-22988))
 
 > Urfi Mirza says:
 >
 > HI….How can I create a Mobile app using NetBeans 8 Codeone project for Mobile phone deleted file recovery program? or is there any API that I can incude in my project and complete the project…..Thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-apps-with-java-for-ios-android-tutorials-resources.html)
 
 
-### **Shai Almog** — November 4, 2016 at 5:51 am ([permalink](https://www.codenameone.com/blog/build-apps-with-java-for-ios-android-tutorials-resources.html#comment-22954))
+
+### **Shai Almog** — November 4, 2016 at 5:51 am ([permalink](/blog/build-apps-with-java-for-ios-android-tutorials-resources/#comment-22954))
 
 > Shai Almog says:
 >
 > Hi,  
 > mobile phones block low level filesystem access so an app like that will be impractical natively without rooting the device which is problematic even on Android.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-apps-with-java-for-ios-android-tutorials-resources.html)
 
 
-### **Daniel Charlie** — April 21, 2017 at 10:08 am ([permalink](https://www.codenameone.com/blog/build-apps-with-java-for-ios-android-tutorials-resources.html#comment-23410))
+
+### **Daniel Charlie** — April 21, 2017 at 10:08 am ([permalink](/blog/build-apps-with-java-for-ios-android-tutorials-resources/#comment-23410))
 
 > Daniel Charlie says:
 >
 > Interesting topics. nice information helped me a lot. if it possible share some more………..
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-apps-with-java-for-ios-android-tutorials-resources.html)
 
 
-### **Juan Carlos Vásquez** — October 24, 2019 at 6:26 pm ([permalink](https://www.codenameone.com/blog/build-apps-with-java-for-ios-android-tutorials-resources.html#comment-24261))
+
+### **Juan Carlos Vásquez** — October 24, 2019 at 6:26 pm ([permalink](/blog/build-apps-with-java-for-ios-android-tutorials-resources/#comment-24261))
 
 > [Juan Carlos Vásquez](https://lh3.googleusercontent.com/a-/AAuE7mAJOkU7kIqsnkKnwtvNJ-8Z7x7_P2ufePr3WLZuCA0) says:
 >
 > Hello, can you post a tutorial on how to login to a backend server via MySQL-PHP-JSON? Thank you!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-apps-with-java-for-ios-android-tutorials-resources.html)
+
 
 ---
 

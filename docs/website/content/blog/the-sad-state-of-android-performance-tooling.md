@@ -17,21 +17,21 @@ native story improved by leaps and bounds with the introduction of Android Studi
 native Android apps has improved a lot. But the CPU profiling tools are still stuck in the stone age and this is  
 in stark contrast to the iOS tooling. 
 
-[![iOS Profiler](/blog/the-sad-state-of-android-performance-tooling/ios-profiler.png)](/img/blog/ios-profiler.png)
+[![iOS Profiler](/blog/the-sad-state-of-android-performance-tooling/ios-profiler.png)](/blog/the-sad-state-of-android-performance-tooling/ios-profiler.png)
 
-[__](/img/blog/ios-profiler.png)
-
-### iOS Profiler
-
-Better looking and more functional
+[__](/blog/the-sad-state-of-android-performance-tooling/ios-profiler.png)
 
 ### iOS Profiler
 
 Better looking and more functional
 
-[![Android Profiler](/blog/the-sad-state-of-android-performance-tooling/android-profiler.png)](/img/blog/android-profiler.png)
+### iOS Profiler
 
-[__](/img/blog/android-profiler.png)
+Better looking and more functional
+
+[![Android Profiler](/blog/the-sad-state-of-android-performance-tooling/android-profiler.png)](/blog/the-sad-state-of-android-performance-tooling/android-profiler.png)
+
+[__](/blog/the-sad-state-of-android-performance-tooling/android-profiler.png)
 
 ### Android Profiler
 
@@ -41,9 +41,9 @@ Both unattractive and disfunctional
 
 Both unattractive and disfunctional
 
-[![NetBeans Profiler](/blog/the-sad-state-of-android-performance-tooling/netbeans-profiler.png)](/img/blog/netbeans-profiler.png)
+[![NetBeans Profiler](/blog/the-sad-state-of-android-performance-tooling/netbeans-profiler.png)](/blog/the-sad-state-of-android-performance-tooling/netbeans-profiler.png)
 
-[__](/img/blog/netbeans-profiler.png)
+[__](/blog/the-sad-state-of-android-performance-tooling/netbeans-profiler.png)
 
 ### NetBeans Profiler
 

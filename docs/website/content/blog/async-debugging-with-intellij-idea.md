@@ -135,13 +135,13 @@ For more information about IntelliJ’s asynchronous debugging feature, see [the
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Antonio Rios** — April 14, 2022 at 3:20 am ([permalink](https://www.codenameone.com/blog/async-debugging-with-intellij-idea.html#comment-24534))
+### **Antonio Rios** — April 14, 2022 at 3:20 am ([permalink](/blog/async-debugging-with-intellij-idea/#comment-24534))
 
 > Antonio Rios says:
 >
 > Wonderful new features! Great job guys! I’m literally impress every time I visit the blog and see some new cool feature added. Keep those cool useful features coming please.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fasync-debugging-with-intellij-idea.html)
+
 
 ---
 

@@ -47,16 +47,16 @@ Once the book is done I’ll publish the first two chapters and the appendices h
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — July 4, 2018 at 12:39 am ([permalink](https://www.codenameone.com/blog/new-build-cloud.html#comment-24010))
+### **Francesco Galgani** — July 4, 2018 at 12:39 am ([permalink](/blog/new-build-cloud/#comment-24010))
 
 > Francesco Galgani says:
 >
 > In my apps I rely on sendMessageViaCloudSync to send to myself screenshots of the apps. I also use it to allow users to send to me technical assistance requestes. So… I hope that you will remove this API to send email only after an alternative method for your supported platforms will be ready. I also use Log.getUniqueDeviceId(), however replacing it with Log.getUniqueDeviceKey() it’s not a problem.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-build-cloud.html)
 
 
-### **Shai Almog** — July 4, 2018 at 4:24 am ([permalink](https://www.codenameone.com/blog/new-build-cloud.html#comment-24016))
+
+### **Shai Almog** — July 4, 2018 at 4:24 am ([permalink](/blog/new-build-cloud/#comment-24016))
 
 > Shai Almog says:
 >
@@ -70,19 +70,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the headsup on using this, I’ll try to give this more thought and find a long term solution before we shut down the old server.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-build-cloud.html)
 
 
-### **Francesco Galgani** — July 4, 2018 at 10:35 am ([permalink](https://www.codenameone.com/blog/new-build-cloud.html#comment-24022))
+
+### **Francesco Galgani** — July 4, 2018 at 10:35 am ([permalink](/blog/new-build-cloud/#comment-24022))
 
 > Francesco Galgani says:
 >
 > Thank you Shai, I understood what you wrote, however I have some dubts. I’m trying to expose my doubts in this comment. Because your current API can send emails only to the email account of the developer who sent the app to your build servers, I have difficult to understand that “sendMessageViaCloudSync” can be used to spam (assuming that a developer cannot spam to theirself). Moreover, this API is available only to Pro accounts, so I suppose that is virtually impossible that somebody pays a Pro account to send unwanted emails to theirself. In my experience, it’s very difficult to buy an IP that it’s not already inserted in one or more spam blacklists, so it’s normal that the IPs of your servers can be in one or more blacklists. Because all these facts, I don’t see a conceptual issue in your API… of course, I can be wrong. Thank you for any further clarification.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-build-cloud.html)
 
 
-### **Shai Almog** — July 5, 2018 at 4:01 am ([permalink](https://www.codenameone.com/blog/new-build-cloud.html#comment-23557))
+
+### **Shai Almog** — July 5, 2018 at 4:01 am ([permalink](/blog/new-build-cloud/#comment-23557))
 
 > Shai Almog says:
 >
@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Please file an issue on this I’ll try to push out a cn1lib to address this soon.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-build-cloud.html)
+
 
 ---
 

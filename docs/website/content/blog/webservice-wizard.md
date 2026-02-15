@@ -48,7 +48,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — June 8, 2014 at 5:57 pm ([permalink](https://www.codenameone.com/blog/webservice-wizard.html#comment-21984))
+### **Anonymous** — June 8, 2014 at 5:57 pm ([permalink](/blog/webservice-wizard/#comment-21984))
 
 > Anonymous says:
 >
@@ -58,10 +58,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is there any advantage to adding this system in between that communication and running a java server for this? Or is it just really additional complexity in this case?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwebservice-wizard.html)
 
 
-### **Anonymous** — June 9, 2014 at 2:17 am ([permalink](https://www.codenameone.com/blog/webservice-wizard.html#comment-21969))
+
+### **Anonymous** — June 9, 2014 at 2:17 am ([permalink](/blog/webservice-wizard/#comment-21969))
 
 > Anonymous says:
 >
@@ -71,25 +71,25 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Our goal here wasn’t just to make things faster, it was mostly to make things simpler. Since you already implemented the REST calls tht goal should be less of an issue.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwebservice-wizard.html)
 
 
-### **Anonymous** — June 9, 2014 at 6:32 pm ([permalink](https://www.codenameone.com/blog/webservice-wizard.html#comment-21592))
+
+### **Anonymous** — June 9, 2014 at 6:32 pm ([permalink](/blog/webservice-wizard/#comment-21592))
 
 > Anonymous says:
 >
 > Simpler is good though. I don’t think I’ll refactor a working project at this stage, but will try this out on new projects.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwebservice-wizard.html)
 
 
-### **Anonymous** — July 1, 2014 at 6:00 am ([permalink](https://www.codenameone.com/blog/webservice-wizard.html#comment-21446))
+
+### **Anonymous** — July 1, 2014 at 6:00 am ([permalink](/blog/webservice-wizard/#comment-21446))
 
 > Anonymous says:
 >
 > Just tried this out. Very slick. Well done !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwebservice-wizard.html)
+
 
 ---
 

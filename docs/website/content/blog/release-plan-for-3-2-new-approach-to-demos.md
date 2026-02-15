@@ -24,7 +24,7 @@ a set of features in the tool”.
 Recently, after working on my spouses Yoga Studio management app I came to the epiphany that this isn’t  
 the best way for mobile app demos. The main problem is that we can’t upload these demos to app stores  
 and show them running on a device. So with that in mind we are rethinking some future demos starting with  
-a quick and dirty [Solitaire Klondike demo](/demos-Solitaire.html) that we made within a weekend  
+a quick and dirty [Solitaire Klondike demo](/solitaire-klondike/) that we made within a weekend  
 and submitted to the store. 
 
 Check out the demo page where you can see the full code of what is now a production app that you can download  
@@ -52,16 +52,16 @@ it in the constructor but this seems tedious, with the global resources this sho
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Ross Taylor** — October 27, 2015 at 11:12 am ([permalink](https://www.codenameone.com/blog/release-plan-for-3-2-new-approach-to-demos.html#comment-22463))
+### **Ross Taylor** — October 27, 2015 at 11:12 am ([permalink](/blog/release-plan-for-3-2-new-approach-to-demos/#comment-22463))
 
 > Ross Taylor says:
 >
 > Hey I tried your solitaire app. However I have some critiques and wonder if its anything related to codenameone. The first is the card images are grainy (medium – low quality). I suppose you did this to save app size? The second is there is a line separation in the menu command after the “About”, where I think it shouldn’t be since it makes the menu command separation look untidy (looks like something broke off suddenly). The third is the background blurs (or refreshes?) when the menu command and the About dialog is disposed. The last is that when the button of the dialog is pressed in the pressed state, the highlighted area of the button way exceeds the area of the actual button. Other than these UI blips, the app seems to be pretty fast.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frelease-plan-for-3-2-new-approach-to-demos.html)
 
 
-### **Shai Almog** — October 28, 2015 at 3:29 am ([permalink](https://www.codenameone.com/blog/release-plan-for-3-2-new-approach-to-demos.html#comment-22414))
+
+### **Shai Almog** — October 28, 2015 at 3:29 am ([permalink](/blog/release-plan-for-3-2-new-approach-to-demos/#comment-22414))
 
 > Shai Almog says:
 >
@@ -70,19 +70,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The larger button than the dialog is something I just noticed for the first time, it seems that just the edges of the button exceed. Haven’t noticed it because I normally press and release. This is a property of the Android theme and isn’t indicative of anything inherent. We do need to improve that behavior though.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frelease-plan-for-3-2-new-approach-to-demos.html)
 
 
-### **Joe** — November 2, 2015 at 1:06 pm ([permalink](https://www.codenameone.com/blog/release-plan-for-3-2-new-approach-to-demos.html#comment-22129))
+
+### **Joe** — November 2, 2015 at 1:06 pm ([permalink](/blog/release-plan-for-3-2-new-approach-to-demos/#comment-22129))
 
 > Joe says:
 >
 > I cloned the demo on my local. Looks like the project files are for NetBean Do you have the instruction of how to import the projects into Eclipse?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frelease-plan-for-3-2-new-approach-to-demos.html)
 
 
-### **Shai Almog** — November 3, 2015 at 4:29 am ([permalink](https://www.codenameone.com/blog/release-plan-for-3-2-new-approach-to-demos.html#comment-22512))
+
+### **Shai Almog** — November 3, 2015 at 4:29 am ([permalink](/blog/release-plan-for-3-2-new-approach-to-demos/#comment-22512))
 
 > Shai Almog says:
 >
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Copy the src dir and libs dir on top of their Eclipse counterparts.  
 > Copy the [codenameone_settings.proper…](<http://codenameone_settings.properties>) on top of the existing one and the icon.png.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frelease-plan-for-3-2-new-approach-to-demos.html)
+
 
 ---
 

@@ -70,43 +70,43 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — February 10, 2015 at 7:44 am ([permalink](https://www.codenameone.com/blog/status-of-the-new-vm-new-demo.html#comment-21609))
+### **Anonymous** — February 10, 2015 at 7:44 am ([permalink](/blog/status-of-the-new-vm-new-demo/#comment-21609))
 
 > Anonymous says:
 >
 > I wish you can also improve the Windows port so that it can catchup to the Android and iOS.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstatus-of-the-new-vm-new-demo.html)
 
 
-### **Anonymous** — February 10, 2015 at 1:18 pm ([permalink](https://www.codenameone.com/blog/status-of-the-new-vm-new-demo.html#comment-22158))
+
+### **Anonymous** — February 10, 2015 at 1:18 pm ([permalink](/blog/status-of-the-new-vm-new-demo/#comment-22158))
 
 > Anonymous says:
 >
 > That request isn’t echoed by our enterprise customers. Due to the major effort required in rewriting that port we will only undertake it if we have several enterprise seats demanding it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstatus-of-the-new-vm-new-demo.html)
 
 
-### **Anonymous** — February 10, 2015 at 8:09 pm ([permalink](https://www.codenameone.com/blog/status-of-the-new-vm-new-demo.html#comment-24195))
+
+### **Anonymous** — February 10, 2015 at 8:09 pm ([permalink](/blog/status-of-the-new-vm-new-demo/#comment-24195))
 
 > Anonymous says:
 >
 > Interesting demo – some nice techniques to be aware of.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstatus-of-the-new-vm-new-demo.html)
 
 
-### **Anonymous** — February 11, 2015 at 7:48 am ([permalink](https://www.codenameone.com/blog/status-of-the-new-vm-new-demo.html#comment-22167))
+
+### **Anonymous** — February 11, 2015 at 7:48 am ([permalink](/blog/status-of-the-new-vm-new-demo/#comment-22167))
 
 > Anonymous says:
 >
 > Pity. So even if I advise my Co + manager to subscribe as an enterprise client it wouldn’t be enough as you need several…what a shame. Thanks for the feedback though.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstatus-of-the-new-vm-new-demo.html)
 
 
-### **Anonymous** — February 11, 2015 at 4:26 pm ([permalink](https://www.codenameone.com/blog/status-of-the-new-vm-new-demo.html#comment-22118))
+
+### **Anonymous** — February 11, 2015 at 4:26 pm ([permalink](/blog/status-of-the-new-vm-new-demo/#comment-22118))
 
 > Anonymous says:
 >
@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There are also constant rumors about APK support in Windows Phone which will really make this redundant.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstatus-of-the-new-vm-new-demo.html)
+
 
 ---
 

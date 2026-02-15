@@ -18,11 +18,11 @@ Thanks again to everyone who answered my questions. I got tons of valuable feedb
 
 One of the main things I got from pretty much everyone who wrote is the desire to improve your UI, this is a huge deal for us as I think we have an advantage here. E.g. a lot of developers who wrote to me (some of which worked with us for **years**) weren’t familiar with these demos I’ve published:
 
-  * [Material Screens](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html)
+  * [Material Screens](/blog/template-mobile-material-screens-ui-kit/)
 
-  * [Phoenix](https://www.codenameone.com/blog/template-phoenix-ui.html)
+  * [Phoenix](/blog/template-phoenix-ui/)
 
-  * [PSD to App](https://www.codenameone.com/blog/psd-to-app-revisited.html)
+  * [PSD to App](/blog/psd-to-app-revisited/)
 
   * [Clean Modern](http://www.codenameone.com/blog/template-clean-modern-ui-kit.html)
 
@@ -86,16 +86,16 @@ This was the first article in a 3 part series, check out part 2 [here](/blog/spr
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Dalvik** — March 1, 2017 at 1:04 pm ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23028))
+### **Dalvik** — March 1, 2017 at 1:04 pm ([permalink](/blog/full-stack-java-bootcamp/#comment-23028))
 
 > Interesting stuff, is this for all levels?  
 > Is there a place to register?  
 > How would this be structured?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffull-stack-java-bootcamp.html)
 
 
-### **Shai Almog** — March 1, 2017 at 3:34 pm ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23038))
+
+### **Shai Almog** — March 1, 2017 at 3:34 pm ([permalink](/blog/full-stack-java-bootcamp/#comment-23038))
 
 > Shai Almog says:
 >
@@ -103,10 +103,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ll answer the rest in an upcoming post.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffull-stack-java-bootcamp.html)
 
 
-### **Dalvik** — March 2, 2017 at 8:45 am ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-21565))
+
+### **Dalvik** — March 2, 2017 at 8:45 am ([permalink](/blog/full-stack-java-bootcamp/#comment-21565))
 
 > Dalvik says:
 >
@@ -114,19 +114,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Will this be at a physical location or will I be able to join online?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffull-stack-java-bootcamp.html)
 
 
-### **Ignatus Ujomor** — March 2, 2017 at 9:05 am ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23320))
+
+### **Ignatus Ujomor** — March 2, 2017 at 9:05 am ([permalink](/blog/full-stack-java-bootcamp/#comment-23320))
 
 > Ignatus Ujomor says:
 >
 > I am interested in the bootcamp and want to know the date, location, cost (if any), and other requirements.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffull-stack-java-bootcamp.html)
 
 
-### **Chad Elofson** — March 2, 2017 at 9:21 am ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23397))
+
+### **Chad Elofson** — March 2, 2017 at 9:21 am ([permalink](/blog/full-stack-java-bootcamp/#comment-23397))
 
 > Chad Elofson says:
 >
@@ -134,10 +134,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Looking forward to it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffull-stack-java-bootcamp.html)
 
 
-### **Shai Almog** — March 2, 2017 at 10:02 am ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23238))
+
+### **Shai Almog** — March 2, 2017 at 10:02 am ([permalink](/blog/full-stack-java-bootcamp/#comment-23238))
 
 > Shai Almog says:
 >
@@ -146,37 +146,37 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The bootcamp will be over the internet with 1 on 1 sessions going over skype or something like that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffull-stack-java-bootcamp.html)
 
 
-### **Shai Almog** — March 2, 2017 at 10:03 am ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23078))
+
+### **Shai Almog** — March 2, 2017 at 10:03 am ([permalink](/blog/full-stack-java-bootcamp/#comment-23078))
 
 > Shai Almog says:
 >
 > Great. This will be over the internet thru skype or similar tools for the 1 on 1.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffull-stack-java-bootcamp.html)
 
 
-### **Shai Almog** — March 2, 2017 at 10:04 am ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23328))
+
+### **Shai Almog** — March 2, 2017 at 10:04 am ([permalink](/blog/full-stack-java-bootcamp/#comment-23328))
 
 > Shai Almog says:
 >
 > Thanks, I’m sure Steve is thrilled to hear that 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffull-stack-java-bootcamp.html)
 
 
-### **salah Alhaddabi** — March 2, 2017 at 3:04 pm ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23269))
+
+### **salah Alhaddabi** — March 2, 2017 at 3:04 pm ([permalink](/blog/full-stack-java-bootcamp/#comment-23269))
 
 > salah Alhaddabi says:
 >
 > Dear Shai very excellent idea. Would be great if you can cover backend stuff using java ee 7 api only without third party libraries. You can for example include rest api, websocket, jms, jason processing, cdi, jpa, ejb and then present how to call web services layer from CN1 and also how to asynchrounously listen to websockets and best practices to update UI and to upliad/download images so everything is in java
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffull-stack-java-bootcamp.html)
 
 
-### **Shai Almog** — March 2, 2017 at 3:33 pm ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23183))
+
+### **Shai Almog** — March 2, 2017 at 3:33 pm ([permalink](/blog/full-stack-java-bootcamp/#comment-23183))
 
 > Shai Almog says:
 >
@@ -184,7 +184,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I don’t want to use something too exotic though, so I won’t go into some of the newer microservice style frameworks. My main focus by a huge margin is on the client, there are great Java EE/Spring etc. courses out there and I don’t think I can improve on them. What I want to do is show how all this ties together to a single cohesive product.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffull-stack-java-bootcamp.html)
+
 
 ---
 

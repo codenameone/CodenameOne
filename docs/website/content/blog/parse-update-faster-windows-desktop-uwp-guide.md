@@ -49,7 +49,7 @@ that hosts the entire developer guide (which you can
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — June 23, 2016 at 8:06 am ([permalink](https://www.codenameone.com/blog/parse-update-faster-windows-desktop-uwp-guide.html#comment-22555))
+### **Chidiebere Okwudire** — June 23, 2016 at 8:06 am ([permalink](/blog/parse-update-faster-windows-desktop-uwp-guide/#comment-22555))
 
 > Chidiebere Okwudire says:
 >
@@ -58,7 +58,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I also agree with you that Parse Server is actually a blessing in disguise. More on that in the upcoming article that you referred to 😉
 
 
-### **Carlos** — June 23, 2016 at 12:54 pm ([permalink](https://www.codenameone.com/blog/parse-update-faster-windows-desktop-uwp-guide.html#comment-22544))
+### **Carlos** — June 23, 2016 at 12:54 pm ([permalink](/blog/parse-update-faster-windows-desktop-uwp-guide/#comment-22544))
 
 > Carlos says:
 >

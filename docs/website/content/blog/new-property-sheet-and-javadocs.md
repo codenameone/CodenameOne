@@ -73,13 +73,13 @@ We’re not done yet. You’ll see more improvements trickling in over the next 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Antonio Rios** — April 9, 2022 at 7:32 pm ([permalink](https://www.codenameone.com/blog/new-property-sheet-and-javadocs.html#comment-24532))
+### **Antonio Rios** — April 9, 2022 at 7:32 pm ([permalink](/blog/new-property-sheet-and-javadocs/#comment-24532))
 
 > Antonio Rios says:
 >
 > Excellent work guys! This new feature will definitely help me troubleshoot a problem I’m having with the SpanLabel not taking the width I’m setting. For some reason it seems that I can’t resize the width through the css styling nor the setPreferredW() method on the spanlabel I made. I’m having a lot of fun learning the API, reading the developer guide, and learning from the kitchen sink example and the other samples. Every day I impressed by all the cool features. Thanks for all your hard work!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-property-sheet-and-javadocs.html)
+
 
 ---
 

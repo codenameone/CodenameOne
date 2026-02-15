@@ -143,7 +143,7 @@ I would like to focus extensively on UI design/layout as it seems to be a stumbl
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Carlos** — May 12, 2017 at 12:07 pm ([permalink](https://www.codenameone.com/blog/tutorial-create-a-gorgeous-sidemenu.html#comment-23465))
+### **Carlos** — May 12, 2017 at 12:07 pm ([permalink](/blog/tutorial-create-a-gorgeous-sidemenu/#comment-23465))
 
 > Great!!
 >
@@ -151,28 +151,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > And would be even better if the side panel could open on top.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-create-a-gorgeous-sidemenu.html)
 
 
-### **Shai Almog** — May 13, 2017 at 5:33 am ([permalink](https://www.codenameone.com/blog/tutorial-create-a-gorgeous-sidemenu.html#comment-23272))
+
+### **Shai Almog** — May 13, 2017 at 5:33 am ([permalink](/blog/tutorial-create-a-gorgeous-sidemenu/#comment-23272))
 
 > Thanks, we already implemented an on-top side menu (although it’s experimental) it’s been in the repo for 2 weeks by now but I didn’t get around to blogging about it. Will do that next week. The icon animations is something I’d like but it’s not trivial to do that right
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-create-a-gorgeous-sidemenu.html)
 
 
-### **Kerllon Andrade** — November 20, 2018 at 4:06 pm ([permalink](https://www.codenameone.com/blog/tutorial-create-a-gorgeous-sidemenu.html#comment-24014))
+
+### **Kerllon Andrade** — November 20, 2018 at 4:06 pm ([permalink](/blog/tutorial-create-a-gorgeous-sidemenu/#comment-24014))
 
 > Is css?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-create-a-gorgeous-sidemenu.html)
 
 
-### **Shai Almog** — November 21, 2018 at 7:08 am ([permalink](https://www.codenameone.com/blog/tutorial-create-a-gorgeous-sidemenu.html#comment-24020))
+
+### **Shai Almog** — November 21, 2018 at 7:08 am ([permalink](/blog/tutorial-create-a-gorgeous-sidemenu/#comment-24020))
 
 > No.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-create-a-gorgeous-sidemenu.html)
+
 
 ---
 

@@ -116,14 +116,14 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Maaike Z** — May 22, 2015 at 6:45 pm ([permalink](https://www.codenameone.com/blog/use-the-source.html#comment-24190))
+### **Maaike Z** — May 22, 2015 at 6:45 pm ([permalink](/blog/use-the-source/#comment-24190))
 
 > Maaike Z says:
 >
 > For people who also use this post regularly and wonder how to do it in the new situation, you should read this blog post: [http://www.codenameone.com/…](<http://www.codenameone.com/blog/github-migration-completed.html>)  
 > Don’t forget to add the demos (not necessary), skins and binaries in the root of the project and to execute [build_skins.sh](<http://build_skins.sh>) from codenameone-skins (maybe add this also in the developer guide?).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuse-the-source.html)
+
 
 ---
 

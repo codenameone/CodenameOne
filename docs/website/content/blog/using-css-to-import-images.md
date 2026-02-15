@@ -112,7 +112,7 @@ And the result:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — August 9, 2017 at 3:44 pm ([permalink](https://www.codenameone.com/blog/using-css-to-import-images.html#comment-23664))
+### **Francesco Galgani** — August 9, 2017 at 3:44 pm ([permalink](/blog/using-css-to-import-images/#comment-23664))
 
 > Is it possible to import several images with different cn1-source-dpi?
 >
@@ -127,10 +127,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-css-to-import-images.html)
 
 
-### **shannah78** — August 10, 2017 at 5:00 am ([permalink](https://www.codenameone.com/blog/using-css-to-import-images.html#comment-23254))
+
+### **shannah78** — August 10, 2017 at 5:00 am ([permalink](/blog/using-css-to-import-images/#comment-23254))
 
 > You would do separate styles.
 >
@@ -145,7 +145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > cn1-source-dpi: 160  
 > }
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-css-to-import-images.html)
+
 
 ---
 

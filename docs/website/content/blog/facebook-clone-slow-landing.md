@@ -45,49 +45,49 @@ Figure 2. Original vs. Clone Landscape
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **beck** — April 30, 2018 at 5:04 pm ([permalink](https://www.codenameone.com/blog/facebook-clone-slow-landing.html#comment-23845))
+### **beck** — April 30, 2018 at 5:04 pm ([permalink](/blog/facebook-clone-slow-landing/#comment-23845))
 
 > Are these clones (uber & fb clone) apk files available so that we can test them in devices before diving into the courses?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffacebook-clone-slow-landing.html)
 
 
-### **Shai Almog** — May 1, 2018 at 4:28 am ([permalink](https://www.codenameone.com/blog/facebook-clone-slow-landing.html#comment-23863))
+
+### **Shai Almog** — May 1, 2018 at 4:28 am ([permalink](/blog/facebook-clone-slow-landing/#comment-23863))
 
 > No. That would be legally problematic.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffacebook-clone-slow-landing.html)
 
 
-### **Tommy Mogaka** — May 1, 2018 at 6:03 am ([permalink](https://www.codenameone.com/blog/facebook-clone-slow-landing.html#comment-23838))
+
+### **Tommy Mogaka** — May 1, 2018 at 6:03 am ([permalink](/blog/facebook-clone-slow-landing/#comment-23838))
 
 > Tommy Mogaka says:
 >
 > In the fb clone, will you also do the messenger part? I mean that little chat widget. That would be really cool…  
 > Keep up the goodwork! cn1 is truly a solid development tool, best of both worlds i.e. cross-platform and native.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffacebook-clone-slow-landing.html)
 
 
-### **Shai Almog** — May 2, 2018 at 2:25 pm ([permalink](https://www.codenameone.com/blog/facebook-clone-slow-landing.html#comment-23953))
+
+### **Shai Almog** — May 2, 2018 at 2:25 pm ([permalink](/blog/facebook-clone-slow-landing/#comment-23953))
 
 > Shai Almog says:
 >
 > No.  
-> The next app that’s currently scheduled for August-September would be a WhatsApp clone so this should probably cover that aspect. See [https://www.codenameone.com…](<https://www.codenameone.com/blog/survey-results-2018.html>)  
+> The next app that’s currently scheduled for August-September would be a WhatsApp clone so this should probably cover that aspect. See [https://www.codenameone.com…](</blog/survey-results-2018/>)  
 > Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffacebook-clone-slow-landing.html)
 
 
-### **Francesco Galgani** — May 4, 2018 at 1:28 pm ([permalink](https://www.codenameone.com/blog/facebook-clone-slow-landing.html#comment-23632))
+
+### **Francesco Galgani** — May 4, 2018 at 1:28 pm ([permalink](/blog/facebook-clone-slow-landing/#comment-23632))
 
 > Francesco Galgani says:
 >
 > Dear Shai,  
 > thank you for your work 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffacebook-clone-slow-landing.html)
+
 
 ---
 

@@ -17,7 +17,7 @@ __ |  It’s LIVE! Check out the bootcamp signup [here](https://codenameone.teac
 I’m going to build a new mobile startup within 2 weeks and teach some of you how that is done while doing that. Most people might assume I’m talking about one of those “MVP” cardboard startups…​ This isn’t the case!  
 We’ll build a real ground breaking app with a server component that handles storage, push and a few other things you wouldn’t expect and I plan to fit the whole thing in a two week time frame.
 
-This is essentially what I said in the [last two](https://www.codenameone.com/blog/full-stack-java-bootcamp.html) posts [in this series](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html). We’ll build the **full stack** of a real world startup from the ground up to server and client production within 2 weeks of hard work!
+This is essentially what I said in the [last two](/blog/full-stack-java-bootcamp/) posts [in this series](/blog/spring-template-more-about-bootcamp/). We’ll build the **full stack** of a real world startup from the ground up to server and client production within 2 weeks of hard work!
 
 Famous last words?
 
@@ -95,7 +95,7 @@ Signup will last until Friday afternoon (GMT) and will close at that point, I’
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Dalvik** — March 8, 2017 at 7:17 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23106))
+### **Dalvik** — March 8, 2017 at 7:17 pm ([permalink](/blog/build-something-big/#comment-23106))
 
 > Dalvik says:
 >
@@ -105,10 +105,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > – What would the app be?  
 > – What sort of availability will we need during the bootcamp? Can I still go to work?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **Shai Almog** — March 8, 2017 at 7:44 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23120))
+
+### **Shai Almog** — March 8, 2017 at 7:44 pm ([permalink](/blog/build-something-big/#comment-23120))
 
 > Shai Almog says:
 >
@@ -120,19 +120,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I can’t really tell how hard it will be for each of you since this is a bit different from courses I gave in the past and would be more fluid.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **Chidiebere Okwudire** — March 8, 2017 at 9:21 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-21566))
+
+### **Chidiebere Okwudire** — March 8, 2017 at 9:21 pm ([permalink](/blog/build-something-big/#comment-21566))
 
 > Chidiebere Okwudire says:
 >
 > Are you saying each participant would need to put in roughly half a day per day over the 5-week period?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **Shai Almog** — March 8, 2017 at 9:25 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23298))
+
+### **Shai Almog** — March 8, 2017 at 9:25 pm ([permalink](/blog/build-something-big/#comment-23298))
 
 > Shai Almog says:
 >
@@ -140,19 +140,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think people can still get a lot if they don’t put that amount of time but if you look at the post, the goals are pretty intense.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **Dalvik** — March 9, 2017 at 4:31 am ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23056))
+
+### **Dalvik** — March 9, 2017 at 4:31 am ([permalink](/blog/build-something-big/#comment-23056))
 
 > Dalvik says:
 >
 > Thanks, that makes sense. I have some Codename One experience and good server experience so I’m guessing this will be less of an effort right?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **Shai Almog** — March 9, 2017 at 4:45 am ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23304))
+
+### **Shai Almog** — March 9, 2017 at 4:45 am ([permalink](/blog/build-something-big/#comment-23304))
 
 > Shai Almog says:
 >
@@ -160,19 +160,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > My point is that the timeline of the bootcamp is helpful. The materials will still be there after the completion of the bootcamp but we might not. So if we finish the bootcamp and you didn’t pay attention then you decide to go back and review stuff it might be a bit harder. You could ask us (I’ll setup a private Facebook Group for discussion) and we’ll try to help but that might impact the learning experience.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **salah Alhaddabi** — March 9, 2017 at 8:34 am ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23046))
+
+### **salah Alhaddabi** — March 9, 2017 at 8:34 am ([permalink](/blog/build-something-big/#comment-23046))
 
 > salah Alhaddabi says:
 >
 > Dear Shai, I wish you would have mentioned the time each session will take during the day (greenwich time) and the pricing so we can make up our mind over the weekend before signing up starts.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **Shai Almog** — March 9, 2017 at 9:00 am ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23435))
+
+### **Shai Almog** — March 9, 2017 at 9:00 am ([permalink](/blog/build-something-big/#comment-23435))
 
 > Shai Almog says:
 >
@@ -197,10 +197,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It’s even a nice consumer hack detailed here: [http://twocents.lifehacker….](<http://twocents.lifehacker.com/decide-what-you-re-willing-to-pay-for-something-before-1787254108>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **Chad Elofson** — March 9, 2017 at 5:00 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23246))
+
+### **Chad Elofson** — March 9, 2017 at 5:00 pm ([permalink](/blog/build-something-big/#comment-23246))
 
 > Chad Elofson says:
 >
@@ -210,19 +210,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > As I am going into business for myself, I would find it helpful if there was a payment option for the bootcamp. Definitely looking forward to Monday!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **Chad Elofson** — March 9, 2017 at 5:10 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23388))
+
+### **Chad Elofson** — March 9, 2017 at 5:10 pm ([permalink](/blog/build-something-big/#comment-23388))
 
 > Chad Elofson says:
 >
 > For payment options, I mean having the option to pay it all up front or making two or three payments.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **Shai Almog** — March 9, 2017 at 5:47 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-24129))
+
+### **Shai Almog** — March 9, 2017 at 5:47 pm ([permalink](/blog/build-something-big/#comment-24129))
 
 > Shai Almog says:
 >
@@ -230,80 +230,80 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Since the bootcamp starts this month and ends at the end of next month we won’t have payment options other than a single payment.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **Chad Elofson** — March 9, 2017 at 5:51 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23169))
+
+### **Chad Elofson** — March 9, 2017 at 5:51 pm ([permalink](/blog/build-something-big/#comment-23169))
 
 > Chad Elofson says:
 >
 > Then I shall find a way to get it covered. Thanks for the update
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **faenze e.** — March 9, 2017 at 7:16 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-21572))
+
+### **faenze e.** — March 9, 2017 at 7:16 pm ([permalink](/blog/build-something-big/#comment-21572))
 
 > faenze e. says:
 >
 > So we can sign up just to see the price, scoff, and cancel? If you are worried about apparent value, how about a sliding scale, since value is relative. 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **Shai Almog** — March 9, 2017 at 7:49 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23178))
+
+### **Shai Almog** — March 9, 2017 at 7:49 pm ([permalink](/blog/build-something-big/#comment-23178))
 
 > Shai Almog says:
 >
 > Nope. The product isn’t launched so you have nothing to signup for. On Monday the bootcamp signup will launch and the price will be there.  
 > Pricing is relative to you as the payer, not to me as the service provider who has to take nearly two months off work to setup and run this thing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **faenze e.** — March 9, 2017 at 8:16 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23029))
+
+### **faenze e.** — March 9, 2017 at 8:16 pm ([permalink](/blog/build-something-big/#comment-23029))
 
 > faenze e. says:
 >
 > Ah, I misinterpreted the signup date and comments.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **Andrew Nyago** — March 14, 2017 at 5:09 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23270))
+
+### **Andrew Nyago** — March 14, 2017 at 5:09 pm ([permalink](/blog/build-something-big/#comment-23270))
 
 > Andrew Nyago says:
 >
 > Hello, am I late for registration?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **Shai Almog** — March 14, 2017 at 6:13 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-21568))
+
+### **Shai Almog** — March 14, 2017 at 6:13 pm ([permalink](/blog/build-something-big/#comment-21568))
 
 > Shai Almog says:
 >
 > No. When registration closes we will block the ability to process the payment.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **Andrew Nyago** — March 15, 2017 at 3:44 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23362))
+
+### **Andrew Nyago** — March 15, 2017 at 3:44 pm ([permalink](/blog/build-something-big/#comment-23362))
 
 > Andrew Nyago says:
 >
 > i failed to see the link to the registration page.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
 
 
-### **Shai Almog** — March 15, 2017 at 4:28 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23370))
+
+### **Shai Almog** — March 15, 2017 at 4:28 pm ([permalink](/blog/build-something-big/#comment-23370))
 
 > Shai Almog says:
 >
 > I edited the post after it went live and added it to the top, it’s also in the home page below the fold: [http://codenameone.teachabl…](<http://codenameone.teachable.com/p/full-stack-java-mobile-app-bootcamp/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-something-big.html)
+
 
 ---
 

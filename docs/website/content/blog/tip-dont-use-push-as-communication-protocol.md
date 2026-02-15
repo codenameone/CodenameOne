@@ -20,7 +20,7 @@ On Android push was designed as an overarching general purpose communication pro
 Developers coming from the Android ecosystem tend to think of push as a communication protocol and want to use that. That’s a bad idea for iOS and not a great idea for Android either.  
 We suggest using a proper communication protocol e.g. WebSockets. You should use push only for marketing related notifications and application notices in the background. That is far more portable, powerful and doesn’t suffer from the limitations of push (e.g. permissions).
 
-E.g. in [Codename One Build](https://www.codenameone.com/blog/build-app-on-ios.html) we use networking as such:
+E.g. in [Codename One Build](/blog/build-app-on-ios/) we use networking as such:
 
   * Most logic is handled through WebServices – these are use easy to build/maintain and debug
 

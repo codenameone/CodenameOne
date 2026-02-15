@@ -167,16 +167,16 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — July 10, 2014 at 5:30 am ([permalink](https://www.codenameone.com/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system.html#comment-21886))
+### **Anonymous** — July 10, 2014 at 5:30 am ([permalink](/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system/#comment-21886))
 
 > Anonymous says:
 >
 > From the company where I am working, they analyzed many mobile cross platform development tools. The assessors know your product, but one of the biggest critiques on your product is they experience more inconsistency and adjusting for cross platforms, especially Windows and BB 10 where there are some growing demand from our clients. So instead, they opted for other tools which offers more consistency and fortunately is also favorable with our development team’s programming expertise. They don’t think your tool is bad, just more inconsistent and tedious to use than some of the others they have tried. Perhaps its not just that people don’t know CodenameOne, but also run into the issues we also encountered and therefore not using it and would rather invest in expertise for other tools? Anyway its just an honest opinion and suggestion from what I observed from our team and perhaps we are the only few.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeveloper-promotion-practical-guide-statistics-about-the-java-echo-system.html)
 
 
-### **Anonymous** — July 10, 2014 at 6:35 am ([permalink](https://www.codenameone.com/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system.html#comment-22059))
+
+### **Anonymous** — July 10, 2014 at 6:35 am ([permalink](/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system/#comment-22059))
 
 > Anonymous says:
 >
@@ -190,19 +190,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m not sure I understand the other comment related to the option you eventually took but we’d be happy if you raise some of the issues you’ve experienced in the discussion forum. Even if we don’t have an answer or can’t improve something good feedback is how we improve the product.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeveloper-promotion-practical-guide-statistics-about-the-java-echo-system.html)
 
 
-### **Anonymous** — July 10, 2014 at 7:32 am ([permalink](https://www.codenameone.com/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system.html#comment-22196))
+
+### **Anonymous** — July 10, 2014 at 7:32 am ([permalink](/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system/#comment-22196))
 
 > Anonymous says:
 >
 > The team decided develop webapps for now, but is busy assessing whether to just hire skills for specific platforms for native development in the future. Since there are many top apps developed for Windows Phone, why is CodenameOne having difficulty? Is it better to develop apps for Windows Phone from scratch reusing some of the source done by CodenameOne? Are you still planning to improve Windows support? Anyway, I’ll have a word with the assessors and see if they want to describe the issues they are having in your forum, but it seems its all about getting the product out on time for now.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeveloper-promotion-practical-guide-statistics-about-the-java-echo-system.html)
 
 
-### **Anonymous** — July 10, 2014 at 11:17 am ([permalink](https://www.codenameone.com/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system.html#comment-24183))
+
+### **Anonymous** — July 10, 2014 at 11:17 am ([permalink](/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system/#comment-24183))
 
 > Anonymous says:
 >
@@ -212,25 +212,25 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We’d love to have a better Windows Phone port, we already invested into 3 rewrites attempting to improve the situation.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeveloper-promotion-practical-guide-statistics-about-the-java-echo-system.html)
 
 
-### **Anonymous** — July 10, 2014 at 12:40 pm ([permalink](https://www.codenameone.com/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system.html#comment-22028))
+
+### **Anonymous** — July 10, 2014 at 12:40 pm ([permalink](/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system/#comment-22028))
 
 > Anonymous says:
 >
 > One of the product our assessors looked at is called: Xamarin ([www.xamarin.com](<http://www.xamarin.com>)), which is similar in concept to yours except the development code is done in C# and not Java. The downside is our development team is not C# centric, but it looks promising for people that are.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeveloper-promotion-practical-guide-statistics-about-the-java-echo-system.html)
 
 
-### **Anonymous** — July 11, 2014 at 1:34 am ([permalink](https://www.codenameone.com/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system.html#comment-22131))
+
+### **Anonymous** — July 11, 2014 at 1:34 am ([permalink](/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system/#comment-22131))
 
 > Anonymous says:
 >
 > Xamarin isn’t a Write Once Run Anywhere solution. It effectively allows you to write your application in C# but you invoke native device API’s. This means you have some common business logic but your UI (roughly 50% of the code) would be platform specific.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeveloper-promotion-practical-guide-statistics-about-the-java-echo-system.html)
+
 
 ---
 

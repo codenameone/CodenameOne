@@ -72,22 +72,22 @@ Please let us know at once if there are any recent regressions related to the An
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chibuike Mba** — February 19, 2016 at 2:56 pm ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22426))
+### **Chibuike Mba** — February 19, 2016 at 2:56 pm ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22426))
 
 > Chibuike Mba says:
 >
 > Hi Shai, we have CodenameOne logo and link on our app website: [http://ozioma.net](<http://ozioma.net>)
 >
-> Our app “Ozioma” is already on the CodenameOne app gallery here: [https://www.codenameone.com…](<https://www.codenameone.com/featured-ozioma.html>) but I want to change the screenshots of the app to the newer version screenshot, how can I do that?
+> Our app “Ozioma” is already on the CodenameOne app gallery here: [https://www.codenameone.com…](</featured-ozioma/>) but I want to change the screenshots of the app to the newer version screenshot, how can I do that?
 >
 > App package id: net.chibex.ozioma
 >
 > Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseo-gallery-performance-javascript-gradle.html)
 
 
-### **Fabrizio Grassi** — February 20, 2016 at 12:16 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22618))
+
+### **Fabrizio Grassi** — February 20, 2016 at 12:16 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22618))
 
 > Fabrizio Grassi says:
 >
@@ -98,28 +98,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Many thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseo-gallery-performance-javascript-gradle.html)
 
 
-### **Shai Almog** — February 20, 2016 at 4:07 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22628))
+
+### **Shai Almog** — February 20, 2016 at 4:07 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22628))
 
 > Shai Almog says:
 >
 > Great. Can I just grab the screenshots from your home page and update the app?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseo-gallery-performance-javascript-gradle.html)
 
 
-### **Shai Almog** — February 20, 2016 at 4:07 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22482))
+
+### **Shai Almog** — February 20, 2016 at 4:07 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22482))
 
 > Shai Almog says:
 >
 > Thanks, adding it soon!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseo-gallery-performance-javascript-gradle.html)
 
 
-### **Chibuike Mba** — February 20, 2016 at 8:28 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22583))
+
+### **Chibuike Mba** — February 20, 2016 at 8:28 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22583))
 
 > Chibuike Mba says:
 >
@@ -127,10 +127,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseo-gallery-performance-javascript-gradle.html)
 
 
-### **Shai Almog** — February 21, 2016 at 4:01 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22350))
+
+### **Shai Almog** — February 21, 2016 at 4:01 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22350))
 
 > Shai Almog says:
 >
@@ -140,10 +140,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > When is the iOS version coming?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseo-gallery-performance-javascript-gradle.html)
 
 
-### **Chibuike Mba** — February 21, 2016 at 11:40 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-21624))
+
+### **Chibuike Mba** — February 21, 2016 at 11:40 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-21624))
 
 > Chibuike Mba says:
 >
@@ -153,19 +153,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks once again, I appreciate.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseo-gallery-performance-javascript-gradle.html)
 
 
-### **Yaakov Gesher** — March 1, 2016 at 10:07 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-21493))
+
+### **Yaakov Gesher** — March 1, 2016 at 10:07 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-21493))
 
 > Yaakov Gesher says:
 >
 > I just uploaded my app to Google Play: [https://play.google.com/sto…](<https://play.google.com/store/apps/details?id=il.co.medonline.doctorapp>). iOS version coming soon!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseo-gallery-performance-javascript-gradle.html)
 
 
-### **sao** — March 1, 2016 at 11:12 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-21554))
+
+### **sao** — March 1, 2016 at 11:12 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-21554))
 
 > sao says:
 >
@@ -179,28 +179,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Afam
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseo-gallery-performance-javascript-gradle.html)
 
 
-### **Shai Almog** — March 2, 2016 at 4:17 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22535))
+
+### **Shai Almog** — March 2, 2016 at 4:17 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22535))
 
 > Shai Almog says:
 >
 > Added. Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseo-gallery-performance-javascript-gradle.html)
 
 
-### **Shai Almog** — March 2, 2016 at 4:17 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22270))
+
+### **Shai Almog** — March 2, 2016 at 4:17 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22270))
 
 > Shai Almog says:
 >
 > Added. Thanks!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseo-gallery-performance-javascript-gradle.html)
 
 
-### **James van Kessel** — March 9, 2017 at 8:54 pm ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-21567))
+
+### **James van Kessel** — March 9, 2017 at 8:54 pm ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-21567))
 
 > James van Kessel says:
 >
@@ -209,17 +209,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Apple version is pending on the wise meditations of the Apple Gurus in the sky…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseo-gallery-performance-javascript-gradle.html)
 
 
-### **Shai Almog** — March 10, 2017 at 8:41 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-23225))
+
+### **Shai Almog** — March 10, 2017 at 8:41 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-23225))
 
 > Shai Almog says:
 >
 > Hi,  
 > that’s great to hear. We’ll add this soon. Keep us posted when the app makes it to itunes.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fseo-gallery-performance-javascript-gradle.html)
+
 
 ---
 

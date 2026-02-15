@@ -43,23 +43,23 @@ in which the method is defined. This is useful when you are looking for a specif
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Yaakov Gesher** — June 23, 2015 at 8:23 am ([permalink](https://www.codenameone.com/blog/smaller-ios-source-builds-time-index.html#comment-22322))
+### **Yaakov Gesher** — June 23, 2015 at 8:23 am ([permalink](/blog/smaller-ios-source-builds-time-index/#comment-22322))
 
 > Yaakov Gesher says:
 >
 > I think another important feature to help developers get better access to documentation would be a search box in the blog. The blog entries contain so much invaluable information, and yet there doesn’t seem to be a way to search the blog.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsmaller-ios-source-builds-time-index.html)
 
 
-### **Shai Almog** — June 23, 2015 at 2:17 pm ([permalink](https://www.codenameone.com/blog/smaller-ios-source-builds-time-index.html#comment-22127))
+
+### **Shai Almog** — June 23, 2015 at 2:17 pm ([permalink](/blog/smaller-ios-source-builds-time-index/#comment-22127))
 
 > Shai Almog says:
 >
 > We’d love to have a site wide search feature that would ideally include the javadocs, developer guide etc. unfortunately this is none trivial.  
 > Notice that you can easily search [codenameone.com](<http://codenameone.com>) by typing [site:codenameone.com](site:codenameone.com) your query into google e.g.: [https://www.google.com/sear…](<https://www.google.com/search?q=site:codenameone.com+MultiButton>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsmaller-ios-source-builds-time-index.html)
+
 
 ---
 

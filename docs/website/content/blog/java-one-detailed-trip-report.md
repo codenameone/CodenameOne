@@ -443,16 +443,16 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — September 30, 2013 at 7:15 pm ([permalink](https://www.codenameone.com/blog/java-one-detailed-trip-report.html#comment-21640))
+### **Anonymous** — September 30, 2013 at 7:15 pm ([permalink](/blog/java-one-detailed-trip-report/#comment-21640))
 
 > Anonymous says:
 >
 > I’m wondering whether RoboVM has better stack trace support than XMLVM.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-one-detailed-trip-report.html)
 
 
-### **Anonymous** — October 1, 2013 at 3:53 am ([permalink](https://www.codenameone.com/blog/java-one-detailed-trip-report.html#comment-22035))
+
+### **Anonymous** — October 1, 2013 at 3:53 am ([permalink](/blog/java-one-detailed-trip-report/#comment-22035))
 
 > Anonymous says:
 >
@@ -462,19 +462,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think that if we will start maintaining XMLVM we will make radical changes to it which will improve performance, size and stack trace support. I have some ideas on the matter which I discussed with Arno to verify their feasibility. Naturally this all boils down to time/effort.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-one-detailed-trip-report.html)
 
 
-### **Anonymous** — October 4, 2013 at 2:07 pm ([permalink](https://www.codenameone.com/blog/java-one-detailed-trip-report.html#comment-21858))
+
+### **Anonymous** — October 4, 2013 at 2:07 pm ([permalink](/blog/java-one-detailed-trip-report/#comment-21858))
 
 > Anonymous says:
 >
 > I’m afraid I’m going to sound like a broken record, but thank you so much for this detailed report, it’s almost like being there! Do you know if/when the session videos will be available for viewing, like they did for 2012? Keynotes can only tell you so much… Also, I’m very intrigued by your JavaFX comment “It was a very interesting conversation but there is no point of going into details at this point in time.” We’ll stay tuned, I guess 😉 Congrats on the 21 millions devices! Love the ticker!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-one-detailed-trip-report.html)
 
 
-### **Anonymous** — October 4, 2013 at 4:20 pm ([permalink](https://www.codenameone.com/blog/java-one-detailed-trip-report.html#comment-21910))
+
+### **Anonymous** — October 4, 2013 at 4:20 pm ([permalink](/blog/java-one-detailed-trip-report/#comment-21910))
 
 > Anonymous says:
 >
@@ -482,7 +482,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > As far as I know they should upload everything to [parleys.com](<http://parleys.com>) but its not there yet. I wanted to reference some things I saw and checked there today.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-one-detailed-trip-report.html)
+
 
 ---
 

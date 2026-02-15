@@ -21,7 +21,7 @@ There is some concern about potential impact to the build process speed. We don�
 
 In other news Steve published two new cn1libs. The first is [CN1ObjCBridge](https://github.com/shannah/CN1ObjCBridge) which is effectively reflection from Java into the Objective-C platform on iOS.
 
-Instead of using [native interfaces](https://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces.html) to invoke native code you could use an API that lets you send Objective-C messages (their equivalent of method calls) from Codename One Java code. That’s pretty impressive.
+Instead of using [native interfaces](/how-do-i---access-native-device-functionality-invoke-native-interfaces/) to invoke native code you could use an API that lets you send Objective-C messages (their equivalent of method calls) from Codename One Java code. That’s pretty impressive.
 
 For most normal cases I think using native interfaces would still be better but this could fill in a niche for things that could use reflection or better callback functionality.
 
@@ -58,23 +58,23 @@ Regardless of the above I’m pretty happy with the results so far and I have a 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Tommy Mogaka** — January 18, 2018 at 10:05 pm ([permalink](https://www.codenameone.com/blog/meltdown-updates.html#comment-23706))
+### **Tommy Mogaka** — January 18, 2018 at 10:05 pm ([permalink](/blog/meltdown-updates/#comment-23706))
 
 > Tommy Mogaka says:
 >
 > Hi Shai, great work by Steve on the Scandit cn1lib. I noticed that CodenameOne is not listed in the Scandit Developer page. I saw a bunch of other development platforms there and I thought perhaps you guys could consider getting it listed there to get more traction. Best Regards!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmeltdown-updates.html)
 
 
-### **Shai Almog** — January 19, 2018 at 5:17 am ([permalink](https://www.codenameone.com/blog/meltdown-updates.html#comment-23714))
+
+### **Shai Almog** — January 19, 2018 at 5:17 am ([permalink](/blog/meltdown-updates/#comment-23714))
 
 > Shai Almog says:
 >
 > Thanks. We already asked for a listing. I posted this and followed by sending them the details so it will probably take some time for everything to update on their end.  
 > Their stuff seems pretty cool with dedicated barcode scanning phone cases etc.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmeltdown-updates.html)
+
 
 ---
 

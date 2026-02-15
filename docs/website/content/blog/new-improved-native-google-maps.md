@@ -27,7 +27,7 @@ Adding the native maps library is easy. Just open Codename One Settings, click o
 
 ![Install Google Maps library in Codename One Settings](/blog/new-improved-native-google-maps/google-maps-lib-install.png)
 
-A little bit has changed since the [last time we blogged about native maps](https://www.codenameone.com/blog/mapping-natively.html). Configuration has gotten a little bit easier. You need to provide separate keys for Android, iOS, and Javascript (If you plan to use the Javascript port). The build hints to provide these values are as follows:
+A little bit has changed since the [last time we blogged about native maps](/blog/mapping-natively/). Configuration has gotten a little bit easier. You need to provide separate keys for Android, iOS, and Javascript (If you plan to use the Javascript port). The build hints to provide these values are as follows:
     
     
     javascript.googlemaps.key=YOUR_JAVASCRIPT_API_KEY
@@ -159,7 +159,7 @@ Now you’re ready to use native maps. Here is a sample app that demonstrates ad
 
 Figure 1. Native Maps Demo App Screensshot
 
-You can view the Javascript version of this app [here](https://www.codenameone.com/demos/GoogleMaps/index.html).
+You can view the Javascript version of this app [here](/demos/GoogleMaps/index/).
 
 Read more about the Google Maps library in its [Github repository](https://github.com/codenameone/codenameone-google-maps).
 
@@ -173,7 +173,7 @@ When using native peers, you’ll find it preferable to use `InteractionDialog` 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — March 16, 2017 at 2:09 pm ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23380))
+### **Diamond** — March 16, 2017 at 2:09 pm ([permalink](/blog/new-improved-native-google-maps/#comment-23380))
 
 > Diamond says:
 >
@@ -186,47 +186,37 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > at com.codename1.googlemaps.MapContainer$BrowserBridge.waitForReady([MapContainer.java](<http://MapContainer.java>):258)  
 > at com.codename1.googlemaps.MapContainer$BrowserBridge.access$700([MapContainer.java](<http://MapContainer.java>):221)  
 > at com.codename1.googlemaps.MapContainer.getMaxZoom([MapContainer.java](<http://MapContainer.java>):531)
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **shannah78** — March 16, 2017 at 4:18 pm ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23192))
+### **shannah78** — March 16, 2017 at 4:18 pm ([permalink](/blog/new-improved-native-google-maps/#comment-23192))
 
 > shannah78 says:
 >
 > Please file an issue with a test case. I use getMaxZoom() in the GoogleMapsTest app and it works fine. So could be a race condition, or something specific to your test that is triggering this problem.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **Blessing Mahlalela** — March 18, 2017 at 7:41 pm ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23141))
+### **Blessing Mahlalela** — March 18, 2017 at 7:41 pm ([permalink](/blog/new-improved-native-google-maps/#comment-23141))
 
 > Blessing Mahlalela says:
 >
 > Hi Steve, Thanks for this lib! Works great on iOS & Android, on JS Port there is an issue. I have filed it: [https://github.com/codename…](<https://github.com/codenameone/codenameone-google-maps/issues/13>)
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **Patrick Hills** — March 24, 2017 at 2:57 pm ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23268))
+### **Patrick Hills** — March 24, 2017 at 2:57 pm ([permalink](/blog/new-improved-native-google-maps/#comment-23268))
 
 > Patrick Hills says:
 >
 > Hello Shai please how to get nearby places around my current location and if possible see their movement in real time
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **Shai Almog** — March 25, 2017 at 5:49 am ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23436))
+### **Shai Almog** — March 25, 2017 at 5:49 am ([permalink](/blog/new-improved-native-google-maps/#comment-23436))
 
 > Shai Almog says:
 >
-> You can get location via the location API. Finding nearby elements would require a webservice like googles location API. I dabbled with it a bit here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/dynamic-autocomplete.html>)
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
+> You can get location via the location API. Finding nearby elements would require a webservice like googles location API. I dabbled with it a bit here: [https://www.codenameone.com…](</blog/dynamic-autocomplete/>)
 
 
-### **Blessing Mahlalela** — March 26, 2017 at 3:10 pm ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23472))
+### **Blessing Mahlalela** — March 26, 2017 at 3:10 pm ([permalink](/blog/new-improved-native-google-maps/#comment-23472))
 
 > Blessing Mahlalela says:
 >
@@ -238,20 +228,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > });
 >
 > Note the lat & lng values are obtained inside addMapListener which is working well.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **Julio Valeriron Ochoa** — May 26, 2021 at 6:28 pm ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-24458))
+### **Julio Valeriron Ochoa** — May 26, 2021 at 6:28 pm ([permalink](/blog/new-improved-native-google-maps/#comment-24458))
 
 > Julio Valeriron Ochoa says:
 >
 > Hello steve, please provide a way to addPointerReleasedListener to MapContainer
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **Patrick Hills** — March 27, 2017 at 5:39 pm ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23179))
+### **Patrick Hills** — March 27, 2017 at 5:39 pm ([permalink](/blog/new-improved-native-google-maps/#comment-23179))
 
 > Patrick Hills says:
 >
@@ -259,103 +245,97 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Secondly the search is a little slow.  
 > So what should i do? Especially the former question, ie. searching places of my current location  
 > Thank you.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **shannah78** — March 27, 2017 at 5:42 pm ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23030))
+### **shannah78** — March 27, 2017 at 5:42 pm ([permalink](/blog/new-improved-native-google-maps/#comment-23030))
 
 > shannah78 says:
 >
 > Since the map is a native component, these lightweight events aren’t supported. Use addTapListener() to detect when the user taps on the map.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **Blessing Mahlalela** — March 27, 2017 at 7:16 pm ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-21582))
+### **Blessing Mahlalela** — March 27, 2017 at 7:16 pm ([permalink](/blog/new-improved-native-google-maps/#comment-21582))
 
 > Blessing Mahlalela says:
 >
 > Hi Steve, Thanks! addTapListener() achieves what I am trying to do.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **Mounir** — May 3, 2017 at 6:47 am ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23382))
+### **Mounir** — May 3, 2017 at 6:47 am ([permalink](/blog/new-improved-native-google-maps/#comment-23382))
 
 > Mounir says:
 >
 > Hi , I’m facing a problem with your code , it keeps generation an illegal argument exception width(0) and height(0) cannot be <=0  
 > couldn’t find the root of the issue
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **Shai Almog** — May 4, 2017 at 7:33 am ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23551))
+
+### **Shai Almog** — May 4, 2017 at 7:33 am ([permalink](/blog/new-improved-native-google-maps/#comment-23551))
 
 > Shai Almog says:
 >
 > Make sure the map is in the center of a border layout in the form and not an absolute center mode or some other special case
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **Arun raj** — August 25, 2017 at 5:54 am ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23728))
+
+### **Arun raj** — August 25, 2017 at 5:54 am ([permalink](/blog/new-improved-native-google-maps/#comment-23728))
 
 > Arun raj says:
 >
 > how to add search functionality to the map component along with auto complete
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **Shai Almog** — August 26, 2017 at 4:51 am ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23590))
+
+### **Shai Almog** — August 26, 2017 at 4:51 am ([permalink](/blog/new-improved-native-google-maps/#comment-23590))
 
 > Shai Almog says:
 >
-> See the link I provided above [https://www.codenameone.com…](<https://www.codenameone.com/blog/dynamic-autocomplete.html>)
+> See the link I provided above [https://www.codenameone.com…](</blog/dynamic-autocomplete/>)
 >
 > This isn’t a part of the map API from Google it’s something you need to do via a rest request.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **Synapsido** — September 12, 2018 at 2:50 am ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23983))
+
+### **Synapsido** — September 12, 2018 at 2:50 am ([permalink](/blog/new-improved-native-google-maps/#comment-23983))
 
 > Synapsido says:
 >
 > I got this error, trying to run app in smatphone: [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/6cf975d4eb5625da8782a90f74a8ad860093873a8f43458e7059c5b157125cbd.png>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **Shai Almog** — September 12, 2018 at 4:09 am ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23956))
+
+### **Shai Almog** — September 12, 2018 at 4:09 am ([permalink](/blog/new-improved-native-google-maps/#comment-23956))
 
 > Shai Almog says:
 >
 > Try to get the stack trace from the device either by connecting a cable and looking through DDMS or through the new native logging cn1lib.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **Synapsido** — September 18, 2018 at 3:00 am ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23800))
+
+### **Synapsido** — September 18, 2018 at 3:00 am ([permalink](/blog/new-improved-native-google-maps/#comment-23800))
 
 > Synapsido says:
 >
 > I solved the problem…  
 > But this example runs without problems in the simulator, buttons work good, but running on the phone, buttons isn’t work… whats the problem…?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
 
 
-### **Shai Almog** — September 20, 2018 at 6:51 am ([permalink](https://www.codenameone.com/blog/new-improved-native-google-maps.html#comment-23708))
+
+### **Shai Almog** — September 20, 2018 at 6:51 am ([permalink](/blog/new-improved-native-google-maps/#comment-23708))
 
 > Shai Almog says:
 >
 > It’s hard to tell from that description. How did you add the buttons, what did you do exactly?  
 > Do you see an error in the console etc.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-improved-native-google-maps.html)
+
 
 ---
 

@@ -93,22 +93,22 @@ __ |  This relies on a change to the `CN` class that will be a part of next week
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Martin Grajcar** — November 4, 2018 at 4:38 pm ([permalink](https://www.codenameone.com/blog/tip-weak-references.html#comment-24098))
+### **Martin Grajcar** — November 4, 2018 at 4:38 pm ([permalink](/blog/tip-weak-references/#comment-24098))
 
 > Martin Grajcar says:
 >
 > After reading this, I was rather confused (Why no generics? Where are the methods? Why Object?). After downloading the sources and using `grep -r`, I found `Display#createSoftWeakRef`, so it has got better. Then I’ve found `WeakHashMap`, which is probably what we should use most of the time, right?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-weak-references.html)
 
 
-### **Shai Almog** — November 5, 2018 at 5:25 am ([permalink](https://www.codenameone.com/blog/tip-weak-references.html#comment-23910))
+
+### **Shai Almog** — November 5, 2018 at 5:25 am ([permalink](/blog/tip-weak-references/#comment-23910))
 
 > Shai Almog says:
 >
 > The static API in CN mentioned a bit lower in the post is a newer version of the API in `Display`. The original API predated generification of the code base so it stayed that way. Might be worth updating for generics at some point.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-weak-references.html)
+
 
 ---
 

@@ -47,40 +47,40 @@ Figure 3. The "Components" panel toolbar, which includes a toggle button to enab
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **plumberg** — March 29, 2022 at 5:28 pm ([permalink](https://www.codenameone.com/blog/inspect-component.html#comment-24528))
+### **plumberg** — March 29, 2022 at 5:28 pm ([permalink](/blog/inspect-component/#comment-24528))
 
 > plumberg says:
 >
 > Tested it out for a bit yesterday. Looks great and very convenient!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finspect-component.html)
 
 
-### **ThomasH99** — April 5, 2022 at 11:21 am ([permalink](https://www.codenameone.com/blog/inspect-component.html#comment-24530))
+
+### **ThomasH99** — April 5, 2022 at 11:21 am ([permalink](/blog/inspect-component/#comment-24530))
 
 > ThomasH99 says:
 >
 > It is really great with these improvements! While you’re at it, Steve, improving the testing (test automation) would also make a huge difference. The old support is promising but misses some small things to be really useful. Let me know if this migth make it to your todo list and I’d be happy to provide input and feedback 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finspect-component.html)
 
 
-### **Steve Hannah** — April 5, 2022 at 11:15 pm ([permalink](https://www.codenameone.com/blog/inspect-component.html#comment-24531))
+
+### **Steve Hannah** — April 5, 2022 at 11:15 pm ([permalink](/blog/inspect-component/#comment-24531))
 
 > Steve Hannah says:
 >
 > We are making a push right now to improve the development experience in the simulator. No promises, filing an RFE in the issue tracker is where to start the ball rolling.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finspect-component.html)
 
 
-### **ThomasH99** — April 10, 2022 at 12:30 pm ([permalink](https://www.codenameone.com/blog/inspect-component.html#comment-24533))
+
+### **ThomasH99** — April 10, 2022 at 12:30 pm ([permalink](/blog/inspect-component/#comment-24533))
 
 > ThomasH99 says:
 >
 > Great, I hope for the best :-). The TestRecorder has a lot of potential and would make the Simulator UI even more powerful and impressive. I’ve filed an RFE here: <https://github.com/codenameone/CodenameOne/issues/3575>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finspect-component.html)
+
 
 ---
 

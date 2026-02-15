@@ -78,7 +78,7 @@ This is a bit of a big change, ideally this side menu should be the default but 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Carlos** — May 17, 2017 at 1:28 pm ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23485))
+### **Carlos** — May 17, 2017 at 1:28 pm ([permalink](/blog/sidemenu-on-top/#comment-23485))
 
 > Carlos says:
 >
@@ -90,10 +90,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > – And this is me being clumsy: how on earth do you change the hamburger icon color? I can’t see any theme entry, and the side icon constant still doesn’t work.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **Shai Almog** — May 18, 2017 at 5:20 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23543))
+
+### **Shai Almog** — May 18, 2017 at 5:20 am ([permalink](/blog/sidemenu-on-top/#comment-23543))
 
 > Shai Almog says:
 >
@@ -106,119 +106,119 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > – It should now use the standard TitleCommand UIID instead of the MenuCommand UIID. Since I used the addMaterialCommandToSideMenu call. I did use the menuImageSize theme constant though which currently defaults to 4.5.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **Klug Gauvain** — May 18, 2017 at 2:37 pm ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23492))
+
+### **Klug Gauvain** — May 18, 2017 at 2:37 pm ([permalink](/blog/sidemenu-on-top/#comment-23492))
 
 > Klug Gauvain says:
 >
 > Hello, found another bug: If your sidemenu need to be scrolled, with the on top menu it’s impossible ! The menu expand or retracts itself when trying to scroll.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **Shai Almog** — May 19, 2017 at 4:55 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23282))
+
+### **Shai Almog** — May 19, 2017 at 4:55 am ([permalink](/blog/sidemenu-on-top/#comment-23282))
 
 > Shai Almog says:
 >
 > Thanks, I see this. It missed the deadline for this week but I’ll try to do it for next weeks update. Can you file an issue so it doesn’t get lost?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **Klug Gauvain** — May 19, 2017 at 7:19 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23373))
+
+### **Klug Gauvain** — May 19, 2017 at 7:19 am ([permalink](/blog/sidemenu-on-top/#comment-23373))
 
 > Klug Gauvain says:
 >
 > Issue submitted
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **beck** — June 24, 2017 at 3:54 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23524))
+
+### **beck** — June 24, 2017 at 3:54 am ([permalink](/blog/sidemenu-on-top/#comment-23524))
 
 > beck says:
 >
 > It seems nice but it’d have been better if the side menu covers whole screen (on top of the toolbar as well) though the problem was discussed above. I hope it’ll cover the whole screen in future.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **Shai Almog** — June 24, 2017 at 4:39 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-24148))
+
+### **Shai Almog** — June 24, 2017 at 4:39 am ([permalink](/blog/sidemenu-on-top/#comment-24148))
 
 > Shai Almog says:
 >
 > Notice the content of the section titled “Another Layered Pane”
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **Gareth Murfin** — January 9, 2018 at 7:26 pm ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23730))
+
+### **Gareth Murfin** — January 9, 2018 at 7:26 pm ([permalink](/blog/sidemenu-on-top/#comment-23730))
 
 > Gareth Murfin says:
 >
 > How do you turn this off? It appears on all my forms after my splash and I dont need it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **Shai Almog** — January 10, 2018 at 5:26 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23842))
+
+### **Shai Almog** — January 10, 2018 at 5:26 am ([permalink](/blog/sidemenu-on-top/#comment-23842))
 
 > Shai Almog says:
 >
 > Toolbar.setOnTopSideMenu(false);
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **Gareth Murfin** — January 10, 2018 at 8:00 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23852))
+
+### **Gareth Murfin** — January 10, 2018 at 8:00 am ([permalink](/blog/sidemenu-on-top/#comment-23852))
 
 > Gareth Murfin says:
 >
 > doesnt seem to have any effect here Shai, any other things I need to do? Im using old gui builder project, but its a new project.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **Shai Almog** — January 12, 2018 at 7:06 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23607))
+
+### **Shai Almog** — January 12, 2018 at 7:06 am ([permalink](/blog/sidemenu-on-top/#comment-23607))
 
 > Shai Almog says:
 >
 > It disables this feature when used in the init(Object) method. You are probably seeing something else
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **Yaakov Gesher** — January 21, 2018 at 8:53 pm ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23764))
+
+### **Yaakov Gesher** — January 21, 2018 at 8:53 pm ([permalink](/blog/sidemenu-on-top/#comment-23764))
 
 > Yaakov Gesher says:
 >
 > Hi, I’m having trouble styling the side menu. How can I make the commands in the side menu render right-to-left? I tried `getToolbar().getMenuBar().setRTL(true);` but it didn’t seem to have an effect. Also, I wanted to make the side menu wider than just the width of the command texts, but the constants that worked with the older version don’t do anything any more. I tried editing the TitleCommand style, but it didn’t help. Thanks!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **Shai Almog** — January 22, 2018 at 4:23 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23673))
+
+### **Shai Almog** — January 22, 2018 at 4:23 am ([permalink](/blog/sidemenu-on-top/#comment-23673))
 
 > Shai Almog says:
 >
 > It should be seamless for an RTL app once we actually implement it and you wouldn’t need to do anything.  
 > Unfortunately we didn’t implement RTL yet or the right hand sidemenu in the on-top mode. It’s somewhere on our todo list hopefully we’ll be able to address it before 4.0.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **Yaakov Gesher** — January 22, 2018 at 10:35 pm ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23929))
+
+### **Yaakov Gesher** — January 22, 2018 at 10:35 pm ([permalink](/blog/sidemenu-on-top/#comment-23929))
 
 > Yaakov Gesher says:
 >
 > Sorry, maybe it wasn’t clear what I wanted to accomplish: I know that the menu currently can’t be made to open from the right, but I at least wanted the text on the commands to be right-aligned. Eventually I accomplished this by adding components rather than Commands to the menu. But is there a way to give the menu a fixed width?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **Shai Almog** — January 23, 2018 at 6:42 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23936))
+
+### **Shai Almog** — January 23, 2018 at 6:42 am ([permalink](/blog/sidemenu-on-top/#comment-23936))
 
 > Shai Almog says:
 >
@@ -226,25 +226,25 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can use RTL on a command by using toolbar.findCommandComponent(cmd) and setting the RTL flag on that component explicitly.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **Francesco Galgani** — March 15, 2018 at 5:09 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23682))
+
+### **Francesco Galgani** — March 15, 2018 at 5:09 am ([permalink](/blog/sidemenu-on-top/#comment-23682))
 
 > Francesco Galgani says:
 >
 > Are the BorderLayout.OVERLAY and the LayeredLayout equivalent? Can I use them in the same cases?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
 
 
-### **Shai Almog** — March 16, 2018 at 5:11 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-21635))
+
+### **Shai Almog** — March 16, 2018 at 5:11 am ([permalink](/blog/sidemenu-on-top/#comment-21635))
 
 > Shai Almog says:
 >
 > You always have a layered layout as there is one in the form. Layouts are constrained to their own container and are unaware of the existence of other layouts.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsidemenu-on-top.html)
+
 
 ---
 

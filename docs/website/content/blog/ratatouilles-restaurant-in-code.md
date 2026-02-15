@@ -172,25 +172,25 @@ adding/removing the details component and invoking the `animateLayout` method.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jaanus Hansen** — December 2, 2015 at 8:50 pm ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-22444))
+### **Jaanus Hansen** — December 2, 2015 at 8:50 pm ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-22444))
 
 > Jaanus Hansen says:
 >
 > Well, I suggest to remove the JavaScript demo. It is not performing well on my Android LG G2, I am afraid, that it makes a wrong impression, that CN1 is very slow and sometimes even buggy. I think, that you should use for demos Android and iOS apps, where CN1 works very well.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fratatouilles-restaurant-in-code.html)
 
 
-### **bryan** — December 2, 2015 at 10:36 pm ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-22378))
+
+### **bryan** — December 2, 2015 at 10:36 pm ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-22378))
 
 > bryan says:
 >
 > Javascript demo doesn’t work on FF 42.0 (Linux 3.13.0-71-generic #114-Ubuntu SMP Tue Dec 1 02:34:22 UTC 2015 x86_64 x86_64 x86_64 GNU/Linux). The rat icon displays then screen goes blank.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fratatouilles-restaurant-in-code.html)
 
 
-### **Shai Almog** — December 3, 2015 at 3:31 am ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-22562))
+
+### **Shai Almog** — December 3, 2015 at 3:31 am ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-22562))
 
 > Shai Almog says:
 >
@@ -198,10 +198,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Is your connection very slow?  
 > The app effectively runs locally so all data and resources are fetched before it runs.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fratatouilles-restaurant-in-code.html)
 
 
-### **Shai Almog** — December 3, 2015 at 3:36 am ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-22570))
+
+### **Shai Almog** — December 3, 2015 at 3:36 am ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-22570))
 
 > Shai Almog says:
 >
@@ -212,10 +212,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I ran it on chrome on my oneplus one and it performed reasonably well. Not as fast as the native version but totally acceptable as a fallback option. Expansion is slightly slow the first time around as the images get lazily scaled but once that happens its smooth. The side menu is pretty slow on javascript though.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fratatouilles-restaurant-in-code.html)
 
 
-### **bryan** — December 3, 2015 at 4:28 am ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-22575))
+
+### **bryan** — December 3, 2015 at 4:28 am ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-22575))
 
 > bryan says:
 >
@@ -246,34 +246,34 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > ——————–  
 > I downloaded the source and created an Android app, and it works nicely. The location and ordering stuff stuff doesn’t work (I’m not in USA) – it makes the side menu go a bit weird when it hangs, so it might be worthwhile highlighting that this may not work less people think something has barfed.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fratatouilles-restaurant-in-code.html)
 
 
-### **Shai Almog** — December 3, 2015 at 5:36 am ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-21549))
+
+### **Shai Almog** — December 3, 2015 at 5:36 am ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-21549))
 
 > Shai Almog says:
 >
 > Thanks we’re looking into it. Might be a Linux firefox issue (damn web technologies). We checked with two macs and this works there.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fratatouilles-restaurant-in-code.html)
 
 
-### **Shai Almog** — December 4, 2015 at 8:39 am ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-22480))
+
+### **Shai Almog** — December 4, 2015 at 8:39 am ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-22480))
 
 > Shai Almog says:
 >
 > Steve made some fixes here and we just deployed an update. It might take a couple of hours for cloud flair to flush the caches. Can you check this and see if it resolves the issues and if not can you verify that the error messages changed?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fratatouilles-restaurant-in-code.html)
 
 
-### **bryan** — December 6, 2015 at 4:04 am ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-22581))
+
+### **bryan** — December 6, 2015 at 4:04 am ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-22581))
 
 > bryan says:
 >
 > I think I’ve got some weirdness my end. On my development system, it still does not work, but on another system (same OS version, same FF version) it works. Ahh… just found the “problem”. On my devel system I always use “Private Browsing” with ‘Tracking Protection” turned on. With a regular browser window it works fine. Sorry for confusion.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fratatouilles-restaurant-in-code.html)
+
 
 ---
 

@@ -62,7 +62,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 26, 2015 at 6:51 pm ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22108))
+### **Anonymous** — January 26, 2015 at 6:51 pm ([permalink](/blog/web-app-build-target/#comment-22108))
 
 > Anonymous says:
 >
@@ -70,19 +70,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m wondering what the use case is you see for this ? As CN1 is touch device oriented, would you see the ability to have a keyboard/mouse app ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fweb-app-build-target.html)
 
 
-### **Anonymous** — January 26, 2015 at 10:11 pm ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22260))
+
+### **Anonymous** — January 26, 2015 at 10:11 pm ([permalink](/blog/web-app-build-target/#comment-22260))
 
 > Anonymous says:
 >
 > Take a look on Dragome ([http://www.dragome.com/)](<http://www.dragome.com/>)). It’s also a production ready bytecode to js compiler. It can be interesting for you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fweb-app-build-target.html)
 
 
-### **Anonymous** — January 27, 2015 at 3:44 am ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22284))
+
+### **Anonymous** — January 27, 2015 at 3:44 am ([permalink](/blog/web-app-build-target/#comment-22284))
 
 > Anonymous says:
 >
@@ -90,28 +90,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The main use case is enterprise requirements, sometimes just having a webapp is a starting point and if you don’t have it then its a problem. This can also provide support for niche platforms like Windows Phone, Firefox OS, tizen, Jolla etc. and allow governments/agencies that are required to support “everyone” to claim that they do.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fweb-app-build-target.html)
 
 
-### **Anonymous** — January 27, 2015 at 3:46 am ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22033))
+
+### **Anonymous** — January 27, 2015 at 3:46 am ([permalink](/blog/web-app-build-target/#comment-22033))
 
 > Anonymous says:
 >
 > Thanks, there are several. However those guys just use XMLVM for the actual heavy lifting, that’s not a very ideal solution performance wise and doesn’t solve the thread problem that we need solved.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fweb-app-build-target.html)
 
 
-### **Anonymous** — January 28, 2015 at 6:22 am ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22147))
+
+### **Anonymous** — January 28, 2015 at 6:22 am ([permalink](/blog/web-app-build-target/#comment-22147))
 
 > Anonymous says:
 >
 > That sounds like a really good idea! I’m very curious about performance. Unfortunately I can’t afford an enterprise account. Is it maybe a good idea to start some ‘crowdfunding’, to make this available for all subscribers if there’s enough money collected? I will certainly donate!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fweb-app-build-target.html)
 
 
-### **Anonymous** — January 28, 2015 at 2:53 pm ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22177))
+
+### **Anonymous** — January 28, 2015 at 2:53 pm ([permalink](/blog/web-app-build-target/#comment-22177))
 
 > Anonymous says:
 >
@@ -119,28 +119,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Performance should be good since we won’t have the overhead of reflows but obviously its something we can only prove when its fully operational.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fweb-app-build-target.html)
 
 
-### **Anonymous** — January 28, 2015 at 7:12 pm ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22302))
+
+### **Anonymous** — January 28, 2015 at 7:12 pm ([permalink](/blog/web-app-build-target/#comment-22302))
 
 > Anonymous says:
 >
 > Yes I was not thinking about a crowdfunding platform but hoping that current users would like to contribute. Bit I don’t really know if there are enough users to do such a thing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fweb-app-build-target.html)
 
 
-### **Anonymous** — January 28, 2015 at 7:22 pm ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-21477))
+
+### **Anonymous** — January 28, 2015 at 7:22 pm ([permalink](/blog/web-app-build-target/#comment-21477))
 
 > Anonymous says:
 >
 > Like Maaike, I can’t justify an enterprise account, but would be prepared to tip in for new features. If you got 50 people contributing, say, $100, that very nearly covers your goal. Maybe you need a “Make a Donation” button so people can make a one-off contribution that can be used however you see fit.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fweb-app-build-target.html)
 
 
-### **Anonymous** — January 29, 2015 at 4:04 am ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22320))
+
+### **Anonymous** — January 29, 2015 at 4:04 am ([permalink](/blog/web-app-build-target/#comment-22320))
 
 > Anonymous says:
 >
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I understand the cost issue, having reviewed the financials I can’t see any other way we can “make this work” other than bolstering our enterprise developers. We need more personnel to maintain more platforms and a one time expense just isn’t enough. Having more enterprise developers will allow us to hire more employees and thus maintain this (and other ports).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fweb-app-build-target.html)
+
 
 ---
 

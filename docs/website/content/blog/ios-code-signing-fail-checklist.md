@@ -127,7 +127,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 8, 2013 at 12:37 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-22046))
+### **Anonymous** — October 8, 2013 at 12:37 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-22046))
 
 > Anonymous says:
 >
@@ -143,10 +143,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > you have Ant or some other preprocessor check to see that the ending of the appid conforms to the packageName before the build is sent to the server. I had this wrong yesterday and was able to initiate a server side build (followed) certificate errors.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-code-signing-fail-checklist.html)
 
 
-### **Anonymous** — October 8, 2013 at 5:38 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-21973))
+
+### **Anonymous** — October 8, 2013 at 5:38 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-21973))
 
 > Anonymous says:
 >
@@ -154,10 +154,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There are indeed a lot of things we need to do and can do on the client side before actually sending the build to the server. I think there is even an issue for the various types of static analysis we can perform locally, unfortunately we never got around to doing that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-code-signing-fail-checklist.html)
 
 
-### **Anonymous** — March 6, 2014 at 3:25 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-22022))
+
+### **Anonymous** — March 6, 2014 at 3:25 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-22022))
 
 > Anonymous says:
 >
@@ -165,10 +165,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > When exporting private key / certificate pair from Mac’s keychain you will be prompted for a password to protect your private key. You _MUST_ enter a password that is at least 4 characters long – there will be no warnings / errors if you don’t, but build signing will quietly fail.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-code-signing-fail-checklist.html)
 
 
-### **Anonymous** — July 14, 2014 at 9:47 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-24215))
+
+### **Anonymous** — July 14, 2014 at 9:47 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-24215))
 
 > Anonymous says:
 >
@@ -176,35 +176,35 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Im my mac, dont existe option to “export 2 files”
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-code-signing-fail-checklist.html)
 
 
-### **Anonymous** — July 14, 2014 at 9:48 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-21916))
+
+### **Anonymous** — July 14, 2014 at 9:48 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-21916))
 
 > Anonymous says:
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-code-signing-fail-checklist.html)
 
 
-### **Anonymous** — August 9, 2014 at 3:56 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-21949))
+
+### **Anonymous** — August 9, 2014 at 3:56 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-21949))
 
 > Anonymous says:
 >
 > I return to this problem once a year. How do I extract proper mobile provision files from development environment? I spend around hour each time, macos is very alien environment.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-code-signing-fail-checklist.html)
 
 
-### **Anonymous** — August 10, 2014 at 3:19 am ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-21678))
+
+### **Anonymous** — August 10, 2014 at 3:19 am ([permalink](/blog/ios-code-signing-fail-checklist/#comment-21678))
 
 > Anonymous says:
 >
 > There is a tutorial covering this in the How Do I section.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-code-signing-fail-checklist.html)
 
 
-### **Anonymous** — September 22, 2014 at 3:50 am ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-22134))
+
+### **Anonymous** — September 22, 2014 at 3:50 am ([permalink](/blog/ios-code-signing-fail-checklist/#comment-22134))
 
 > Anonymous says:
 >
@@ -212,10 +212,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > After installing once with itunes future installations should work thru the QR code.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-code-signing-fail-checklist.html)
 
 
-### **Anonymous** — February 13, 2015 at 5:57 am ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-22352))
+
+### **Anonymous** — February 13, 2015 at 5:57 am ([permalink](/blog/ios-code-signing-fail-checklist/#comment-22352))
 
 > Anonymous says:
 >
@@ -223,10 +223,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [http://smarttechie.org/2013…](<http://smarttechie.org/2013/12/13/how-to-create-apple-safari-extension-developer-certificate-for-windows/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-code-signing-fail-checklist.html)
 
 
-### **Anonymous** — February 13, 2015 at 1:30 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-22018))
+
+### **Anonymous** — February 13, 2015 at 1:30 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-22018))
 
 > Anonymous says:
 >
@@ -234,19 +234,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > With the old VM? New VM?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-code-signing-fail-checklist.html)
 
 
-### **Anonymous** — February 13, 2015 at 4:16 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-24166))
+
+### **Anonymous** — February 13, 2015 at 4:16 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-24166))
 
 > Anonymous says:
 >
 > I don’t know which VM. I just sent the build to the build servers along with the p12 certificate and it installed all right on my iPhone.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-code-signing-fail-checklist.html)
 
 
-### **Anonymous** — February 14, 2015 at 3:33 am ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-21997))
+
+### **Anonymous** — February 14, 2015 at 3:33 am ([permalink](/blog/ios-code-signing-fail-checklist/#comment-21997))
 
 > Anonymous says:
 >
@@ -254,10 +254,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If so it might mean the new VM has another nice advantage over the old VM.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-code-signing-fail-checklist.html)
 
 
-### **Anonymous** — February 17, 2015 at 10:48 am ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-24188))
+
+### **Anonymous** — February 17, 2015 at 10:48 am ([permalink](/blog/ios-code-signing-fail-checklist/#comment-24188))
 
 > Anonymous says:
 >
@@ -265,7 +265,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Tom
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-code-signing-fail-checklist.html)
+
 
 ---
 

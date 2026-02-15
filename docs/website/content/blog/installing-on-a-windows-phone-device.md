@@ -33,13 +33,13 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 22, 2015 at 4:42 pm ([permalink](https://www.codenameone.com/blog/installing-on-a-windows-phone-device.html#comment-21607))
+### **Anonymous** — January 22, 2015 at 4:42 pm ([permalink](/blog/installing-on-a-windows-phone-device/#comment-21607))
 
 > Anonymous says:
 >
 > When you’re testing your app on the emulator, leave the emulator open between debugging sessions so you can run your app again quickly.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finstalling-on-a-windows-phone-device.html)
+
 
 ---
 

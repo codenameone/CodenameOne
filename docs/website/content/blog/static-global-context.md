@@ -103,16 +103,16 @@ Both of these classes will probably be around and won’t be deprecated any time
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — May 30, 2017 at 3:13 pm ([permalink](https://www.codenameone.com/blog/static-global-context.html#comment-23499))
+### **Diamond** — May 30, 2017 at 3:13 pm ([permalink](/blog/static-global-context/#comment-23499))
 
 > Diamond says:
 >
 > Great improvement! How about changing CN to CN1 to actually read more like the platform name?…since this is a major class most CN1 developers will be calling to perform some generic tasks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstatic-global-context.html)
 
 
-### **Shai Almog** — May 31, 2017 at 4:41 am ([permalink](https://www.codenameone.com/blog/static-global-context.html#comment-23059))
+
+### **Shai Almog** — May 31, 2017 at 4:41 am ([permalink](/blog/static-global-context/#comment-23059))
 
 > Shai Almog says:
 >
@@ -123,7 +123,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 3\. It’s not about the brand name it’s just a class name and calling it CN keeps it simple  
 > 4\. We might change our name under a future rebrand. E.g. on iOS NSString is cemented because of NextStep. I don’t mind having a CN class to mark the history but a CN1 class might be too much.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstatic-global-context.html)
+
 
 ---
 

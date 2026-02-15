@@ -17,7 +17,7 @@ If you have access to a Mac you can connect a cable and open xcode where you can
 
   * Make sure you built the debug version and not the appstore version. The appstore version won’t install on the device and can only be distributed via Apple’s store or testflight
 
-  * Verify that you are sending a 32 bit build in the build hints using the build hint `ios.debug.archs=armv7`. It’s only necessary if you have an older 32 bit device, see [this](https://www.codenameone.com/blog/moving-to-64bit-by-default.html). Notice that this only applies for debug builds, release builds include both 32 and 64 bit versions
+  * Verify that you are sending a 32 bit build in the build hints using the build hint `ios.debug.archs=armv7`. It’s only necessary if you have an older 32 bit device, see [this](/blog/moving-to-64bit-by-default/). Notice that this only applies for debug builds, release builds include both 32 and 64 bit versions
 
 __ |  Devices prior to iPad Air & iPhone 5s were 32 bit devices so iPhone 5s won’t need that flag but iPhone 5 or iPhone 5c will need it   
 ---|---  

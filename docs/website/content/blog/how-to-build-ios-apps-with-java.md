@@ -38,7 +38,7 @@ Developing apps using a ****single codebase**** that runs on ****multiple platfo
 
 Some common cross-platform frameworks include Flutter, React Native and Codename One.
 
-****Related 📝**** [Top 10 Best Cross-Platform App Development Frameworks in 2023](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2023.html)
+****Related 📝**** [Top 10 Best Cross-Platform App Development Frameworks in 2023](/blog/top-10-best-cross-platform-app-development-frameworks-in-2024/)
 
 > On Android, Java or Kotlin are the native languages whereas Apple's iOS platform relies on Swift and Obj-C as its native languages.
 
@@ -54,7 +54,7 @@ If you want to develop ****native apps**** for iOS, the official iOS SDK combine
 
 ### Use a cross-platform framework
 
-For those who don’t know or want to learn Swift, a suitable ****[cross-platform app development framework](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2022.html)**** can compile your code to native iOS executable.
+For those who don’t know or want to learn Swift, a suitable ****[cross-platform app development framework](/blog/top-10-best-cross-platform-app-development-frameworks-in-2024/)**** can compile your code to native iOS executable.
 
 ## Java vs Swift
 
@@ -109,7 +109,7 @@ With ****Codename One****, Java developers can build apps that run on iOS device
 
 If you’re not using Codename One yet, then sign up now:
 
-[Sign Up - It's Free!](https://www.codenameone.com/dashboard)
+[Sign Up - It's Free!](https://cloud.codenameone.com/secure/index.html)
 
 ## How Does It Work?
 
@@ -121,9 +121,9 @@ Codename One has a built-in simulator when running and debugging an app. For nat
 
 This removes the need to install/update complex toolchains and simplify the process of building a native iOS app.
 
-[![Codename One - iOS Architecture](/blog/how-to-build-ios-apps-with-java/Group-1563.svg)](https://www.codenameone.com/introduction.html) 
+[![Codename One - iOS Architecture](/blog/how-to-build-ios-apps-with-java/Group-1563.svg)](/introduction/) 
 
-[Codename One - iOS Architecture](https://www.codenameone.com/introduction.html)
+[Codename One - iOS Architecture](/introduction/)
 
 The process works seamlessly and makes Codename One apps native as they are literally compiled by the native platform.
 
@@ -133,7 +133,7 @@ Java bytecode is dynamically translated to a native iOS Xcode project and seamle
 >   
 > • Codename One also provides an option to ****build offline****.
 >   
-> • To understand how Codename One works, check our [developer guide](https://www.codenameone.com/developer-guide.html).
+> • To understand how Codename One works, check our [developer guide](/developer-guide/).
 
 ## Prerequisites
 
@@ -149,21 +149,13 @@ Let’s dig in.
 
 ### Tutorial to walk you through the steps of building a Hello World app.
 
-1
+1. Codename One initializer
 
-#### Codename One initializer
+2. Open in IDE
 
-2
+3. Develop & Debug App
 
-#### Open in IDE
-
-3
-
-#### Develop & Debug App
-
-4
-
-#### Create iOS Build
+4. Create iOS Build
 
 ### Step 1: Generate a new project with Codename One initializr
 
@@ -222,7 +214,7 @@ It includes a number of useful features aimed at streamlining the development pr
 Generally, you would work exclusively in the simulator until you have a near finished product that you want to share with your beta-testers.
 
 Resources:
-• For more information about the ****Codename One simulator****, see this [page](https://www.codenameone.com/codename-one-simulator.html).
+• For more information about the ****Codename One simulator****, see this [page](/codename-one-simulator/).
   
 • More information about the ****project structure, project files, editing Java code**** and ****CSS stylesheet**** can be found in this detailed [guide](https://shannah.github.io/cn1-maven-archetypes/cn1app-archetype-tutorial/getting-started.html).
 
@@ -314,9 +306,9 @@ There are several online sources for iOS app development tutorials using Java or
 
 Here are some useful links:
 
-• [Codename One Docs](https://www.codenameone.com/developing-in-codename-one.html): The first steps, guides, tutorials and resources you need.
+• [Codename One Docs](/developing-in-codename-one/): The first steps, guides, tutorials and resources you need.
 
-• [Compare Codename One](https://www.codenameone.com/compare.html): Codename One’s comparison with other cross-platform frameworks.
+• [Compare Codename One](/compare/): Codename One’s comparison with other cross-platform frameworks.
 
 • [Codename One Maven Developer Guide](https://shannah.github.io/codenameone-maven-manual/)
 

@@ -45,7 +45,7 @@ Notice that this will only work with the default xcode 10.1 mode. It seems that 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Eric Kimotho** — January 15, 2021 at 3:51 pm ([permalink](https://www.codenameone.com/blog/file-chooser-xcode-10.html#comment-24378))
+### **Eric Kimotho** — January 15, 2021 at 3:51 pm ([permalink](/blog/file-chooser-xcode-10/#comment-24378))
 
 > Thank you for this. Apple website was updated and menus rearranged. Below are the steps I followed.  
 > 1 Login to developer account
@@ -68,7 +68,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 10 Select App IDs from drop down in the right
 >
-> 11 Select app you need to enable iCloud (Note Apps are appearing here after sending successful iOS build, note in this case filechooser lib should first be uninstalled from project (using this link <https://www.codenameone.com/blog/tip-uninstall-cn1lib.html>) for build to be successful)
+> 11 Select app you need to enable iCloud (Note Apps are appearing here after sending successful iOS build, note in this case filechooser lib should first be uninstalled from project (using this link </blog/tip-uninstall-cn1lib/>) for build to be successful)
 >
 > 12 Scroll down and check iCloud then select include CloudKit support (requires Xcode 6)
 >
@@ -86,7 +86,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 19 Send iOS build, should be successful now
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffile-chooser-xcode-10.html)
+
 
 ---
 

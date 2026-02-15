@@ -57,21 +57,21 @@ week.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Lukman Javalove Idealist Jaji** — March 8, 2016 at 4:59 am ([permalink](https://www.codenameone.com/blog/toolbar-default-millimeter-sizes-weekly-releases.html#comment-21502))
+### **Lukman Javalove Idealist Jaji** — March 8, 2016 at 4:59 am ([permalink](/blog/toolbar-default-millimeter-sizes-weekly-releases/#comment-21502))
 
 > Lukman Javalove Idealist Jaji says:
 >
 > Great…I’ve been trying to use StatusBar ToastMessages and the signature component but all to no avail….Even when I updated my plugin…This is a better approach…and also when you anounce feature and even show a demo of it, let the releae time of the feature into the core API not be too long from the time of incorporation into the API as with the StatusBar and others…
 
 
-### **bryan** — March 9, 2016 at 7:26 am ([permalink](https://www.codenameone.com/blog/toolbar-default-millimeter-sizes-weekly-releases.html#comment-22736))
+### **bryan** — March 9, 2016 at 7:26 am ([permalink](/blog/toolbar-default-millimeter-sizes-weekly-releases/#comment-22736))
 
 > bryan says:
 >
 > Is there any chance you can create a new demo app which shows most of these new features. All the existing demos are semi-obsolete, and whilst the docs provide example snippets, it’s not always obvious how to put everything together.
 
 
-### **Shai Almog** — March 10, 2016 at 3:48 am ([permalink](https://www.codenameone.com/blog/toolbar-default-millimeter-sizes-weekly-releases.html#comment-22601))
+### **Shai Almog** — March 10, 2016 at 3:48 am ([permalink](/blog/toolbar-default-millimeter-sizes-weekly-releases/#comment-22601))
 
 > Shai Almog says:
 >
@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I agree. We are trying to be more organized all across the board and having a proper release schedule is part of that organized mentality.
 
 
-### **Shai Almog** — March 10, 2016 at 3:51 am ([permalink](https://www.codenameone.com/blog/toolbar-default-millimeter-sizes-weekly-releases.html#comment-22552))
+### **Shai Almog** — March 10, 2016 at 3:51 am ([permalink](/blog/toolbar-default-millimeter-sizes-weekly-releases/#comment-22552))
 
 > Shai Almog says:
 >

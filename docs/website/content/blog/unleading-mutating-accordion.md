@@ -16,7 +16,7 @@ it in a demo for which it was very suitable. As we were working with it we disco
 core methods to remove an `Accordion` entry or change it’s title. But worse, was the fact that a delete button in  
 the title wouldn’t work!  
 The crux of the issue is in the fact that  
-[lead component](https://www.codenameone.com/manual/misc-features.html#lead-component-section)  
+[lead component](/manual/misc-features/#lead-component-section)  
 doesn’t support excluding a specific component within the hierarchy from it’s behavior so we set about to fix that…​
 
 We added two new methods to the `Component` class: `setBlockLead(boolean)` & `isBlockLead()`.
@@ -27,9 +27,9 @@ rest you can use this method to exclude it from the lead component behavior whil
 This should have no effect if the component isn’t a part of a lead component.
 
 Other than that we also added to `Accordion` some methods that allow us to mutate it’s state:  
-<https://www.codenameone.com/javadoc/com/codename1/components/Accordion.html#removeContent-com.codename1.ui.Component-> [removeContent]  
+</javadoc/com/codename1/components/Accordion/#removeContent-com.codename1.ui.Component-> [removeContent]  
 & two variations of  
-[setHeader](https://www.codenameone.com/javadoc/com/codename1/components/Accordion.html#setHeader-com.codename1.ui.Component-com.codename1.ui.Component-).
+[setHeader](/javadoc/com/codename1/components/Accordion/#setHeader-com.codename1.ui.Component-com.codename1.ui.Component-).
 
 __ |  If you use a `Component` as the header you will need to use the version of the method that accepts a  
 component and not the version that accepts a `String` otherwise you will get an exception…​   

@@ -100,7 +100,7 @@ and just run them as usual!
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — November 23, 2015 at 9:51 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22428))
+### **Diamond** — November 23, 2015 at 9:51 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22428))
 
 > Diamond says:
 >
@@ -110,10 +110,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Could you please share a sample usage snippet of background location polling to help kickstart the implementation with less errors.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaterial-icons-background-music-geofencing-gradle.html)
 
 
-### **Chen Fishbein** — November 23, 2015 at 10:25 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22171))
+
+### **Chen Fishbein** — November 23, 2015 at 10:25 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22171))
 
 > Chen Fishbein says:
 >
@@ -123,19 +123,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > See the new addGeoFencing method in the LocationManager, when you get the callback check if the app isMinimized and if true you usually want to alert the user that he is now near a certain place, the only way to communicate with the user when you are in the background is by sending a local notification to the user, see:  
 > [http://www.codenameone.com/…](<http://www.codenameone.com/blog/local-notifications.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaterial-icons-background-music-geofencing-gradle.html)
 
 
-### **bryan** — November 23, 2015 at 9:36 pm ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22521))
+
+### **bryan** — November 23, 2015 at 9:36 pm ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22521))
 
 > bryan says:
 >
 > Can I use the FontImage images to automagically work in different resolutions in place of multi-images ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaterial-icons-background-music-geofencing-gradle.html)
 
 
-### **Shai Almog** — November 24, 2015 at 4:19 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22244))
+
+### **Shai Almog** — November 24, 2015 at 4:19 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22244))
 
 > Shai Almog says:
 >
@@ -143,10 +143,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Scaling a font image is effectively just drawing the text larger. It uses the native device kerning so anti-aliasing will be gorgeous.  
 > A huge bonus is that the font color auto-adapts to the color palette.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaterial-icons-background-music-geofencing-gradle.html)
 
 
-### **Chidiebere Okwudire** — December 9, 2015 at 11:34 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22505))
+
+### **Chidiebere Okwudire** — December 9, 2015 at 11:34 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22505))
 
 > Chidiebere Okwudire says:
 >
@@ -154,58 +154,58 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > With regard to background location updates, what is the frequency with which the listener will be invoked? Is it configurable?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaterial-icons-background-music-geofencing-gradle.html)
 
 
-### **Shai Almog** — December 9, 2015 at 12:04 pm ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22359))
+
+### **Shai Almog** — December 9, 2015 at 12:04 pm ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22359))
 
 > Shai Almog says:
 >
 > Hi,  
 > the LocationRequest class receives an interval which is the time in milliseconds for polling as far as I understand.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaterial-icons-background-music-geofencing-gradle.html)
 
 
-### **Chidiebere Okwudire** — December 9, 2015 at 8:45 pm ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22452))
+
+### **Chidiebere Okwudire** — December 9, 2015 at 8:45 pm ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22452))
 
 > Chidiebere Okwudire says:
 >
 > Hmmm… I still don’t get it: A LocationRequest object is not a parameter of the setBackgroundLocationListener() method…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaterial-icons-background-music-geofencing-gradle.html)
 
 
-### **Shai Almog** — December 10, 2015 at 3:38 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22369))
+
+### **Shai Almog** — December 10, 2015 at 3:38 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22369))
 
 > Shai Almog says:
 >
 > I think wires got crossed in my brain as I never used the background location listener.  
 > I think its always coarse and polls in a system defined way to preserve battery life but Chen or Steve can probably give a better answer here.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaterial-icons-background-music-geofencing-gradle.html)
 
 
-### **Chen Fishbein** — December 10, 2015 at 8:10 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22280))
+
+### **Chen Fishbein** — December 10, 2015 at 8:10 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22280))
 
 > Chen Fishbein says:
 >
 > The LocationRequest is useful for foreground location listening to preserve battery state.  
 > Background location is different and should be used when the app is not running, the app gets updates only when significant location change happens
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaterial-icons-background-music-geofencing-gradle.html)
 
 
-### **Chidiebere Okwudire** — December 10, 2015 at 11:56 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22423))
+
+### **Chidiebere Okwudire** — December 10, 2015 at 11:56 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22423))
 
 > Chidiebere Okwudire says:
 >
 > Hi Chen, thanks for the clarification though my question remains unanswered. What is a ‘significant location change’ in this context?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaterial-icons-background-music-geofencing-gradle.html)
 
 
-### **Chidiebere Okwudire** — January 20, 2016 at 12:04 pm ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22672))
+
+### **Chidiebere Okwudire** — January 20, 2016 at 12:04 pm ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22672))
 
 > Chidiebere Okwudire says:
 >
@@ -215,10 +215,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://icons8.com/](<https://icons8.com/>) provides what am looking for but the problem is that I have to download several images possibly in different colors to meet my needs. Is there a better way (e.g., an icon font that provide platform-specific versions of icons)?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaterial-icons-background-music-geofencing-gradle.html)
 
 
-### **Shai Almog** — January 20, 2016 at 2:16 pm ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22407))
+
+### **Shai Almog** — January 20, 2016 at 2:16 pm ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22407))
 
 > Shai Almog says:
 >
@@ -229,29 +229,29 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > With a refined design as we see in most of our professional grade apps, you wouldn’t use any of our builtin icons and focus on your own so having icons for everything would be redundant.
 >
-> You can have platform specific icons like these guys offer thru the resource file override feature which was designed with this exact thing in mind: [https://www.codenameone.com…]([https://www.codenameone.com/how-do-i—create-different-uis-or-use-different-images-for-specific-platformsform-factors-using-the-override-option-in-the-gui-builder.html](https://www.codenameone.com/how-do-i---create-different-uis-or-use-different-images-for-specific-platformsform-factors-using-the-override-option-in-the-gui-builder.html))
+> You can have platform specific icons like these guys offer thru the resource file override feature which was designed with this exact thing in mind: [https://www.codenameone.com…]([/how-do-i—create-different-uis-or-use-different-images-for-specific-platformsform-factors-using-the-override-option-in-the-gui-builder.html](https://www.codenameone.com/how-do-i---create-different-uis-or-use-different-images-for-specific-platformsform-factors-using-the-override-option-in-the-gui-builder/))
 >
 > However, I think this is often overstated. I think 99% of users care don’t really care that much about these conventions. If your app looks good and respects the general platform paradigm (e.g. Menu button, back button behavior etc.) it should be good.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaterial-icons-background-music-geofencing-gradle.html)
 
 
-### **Chidiebere Okwudire** — January 25, 2016 at 9:16 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-24258))
+
+### **Chidiebere Okwudire** — January 25, 2016 at 9:16 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-24258))
 
 > Chidiebere Okwudire says:
 >
 > Thanks for the explanation
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaterial-icons-background-music-geofencing-gradle.html)
 
 
-### **ayush jagga** — June 23, 2020 at 7:28 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-24278))
+
+### **ayush jagga** — June 23, 2020 at 7:28 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-24278))
 
 > [ayush jagga](https://lh3.googleusercontent.com/a-/AOh14Gg4AfIvrf-y03PXgpEK7I199ci7_UNyHimjmlpE) says:
 >
 > Geofencing remains relatively new. While more businesses experiment with technology, creative marketers will come up with more innovative ways to maximize their potential for long-term benefits. If you are thinking of experimenting with [**geofencing for promotion**](https://www.bol7.com/geo-fencing/), confirm you are qualifying your prospects supported supply and demand, and make an irresistible offer for the simplest results. 
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmaterial-icons-background-music-geofencing-gradle.html)
+
 
 ---
 

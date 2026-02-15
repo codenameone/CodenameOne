@@ -60,14 +60,14 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — February 4, 2014 at 8:25 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-21435))
+### **Anonymous** — February 4, 2014 at 8:25 am ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-21435))
 
 > Anonymous says:
 >
 > Still some minor bugs but way better than the previous support. Keep up the good work !
 
 
-### **Anonymous** — April 28, 2014 at 10:27 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-21837))
+### **Anonymous** — April 28, 2014 at 10:27 am ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-21837))
 
 > Anonymous says:
 >
@@ -75,19 +75,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Overall it’s a good port, but better performance through through directX would be nice! 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — April 28, 2014 at 12:28 pm ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-21718))
+
+### **Anonymous** — April 28, 2014 at 12:28 pm ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-21718))
 
 > Anonymous says:
 >
 > Unfortunately I don’t think we will be able to use DirectX. The problem is that when you use DirectX we can’t use text and we can’t use widgets (e.g. TextInput), it might be possible to achieve something like that but it seems rather difficult in comparison to other platforms.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — April 30, 2014 at 5:59 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-21725))
+
+### **Anonymous** — April 30, 2014 at 5:59 am ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-21725))
 
 > Anonymous says:
 >
@@ -95,10 +95,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It really does show how powerfull CodenameOne is, great job guys!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — July 24, 2014 at 4:28 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-22104))
+
+### **Anonymous** — July 24, 2014 at 4:28 am ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-22104))
 
 > Anonymous says:
 >
@@ -106,10 +106,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is the win.newPipeline=true now on by default? I tried to build with and without it and the build seamed to generate the same .xap file.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — July 24, 2014 at 2:13 pm ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-21677))
+
+### **Anonymous** — July 24, 2014 at 2:13 pm ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-21677))
 
 > Anonymous says:
 >
@@ -117,37 +117,37 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > yes its the default. You can set it to false to disable it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — October 30, 2014 at 5:57 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-21679))
+
+### **Anonymous** — October 30, 2014 at 5:57 am ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-21679))
 
 > Anonymous says:
 >
 > Hello, has further improvement/updates been made since? Also what are the current limitations to this port compared to Android/IOs?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — October 30, 2014 at 9:42 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-21950))
+
+### **Anonymous** — October 30, 2014 at 9:42 am ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-21950))
 
 > Anonymous says:
 >
 > The port is far inferior and there was no progress to speak of. From talking to our enterprise/corporate subscribers it seems they only want Windows Phone as a checklist feature and prefer we invest our efforts on the iOS/Android fronts.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — October 30, 2014 at 11:18 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-22290))
+
+### **Anonymous** — October 30, 2014 at 11:18 am ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-22290))
 
 > Anonymous says:
 >
 > Thanks for the feedback. I am seeing WP gaining momentum and with Windows Phone 10, it might gain more in the near future. Its a pity CN1’s direction is currently dictated by current paying customers since your initial ethos was to create a toolchain that enables developers to write code once that would run on most major platforms. I don’t blame you Shai, but it would be so nice to see good support for at least these three major platforms, which might attract more paying customers. Some colleagues of mine are advising me to invest development in web apps which are more portable for major platforms in the long run.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — October 30, 2014 at 9:56 pm ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-22301))
+
+### **Anonymous** — October 30, 2014 at 9:56 pm ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-22301))
 
 > Anonymous says:
 >
@@ -157,10 +157,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Try getting a non-trivial webapp to work on the mobile version of internet explorer not to mention the browser changes made in the Android 4.x branch which have no workarounds available then talk about the “portability of the web” nonsense. Anyone who says web is portable didn’t actually use it professionally on a wide scale.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — October 31, 2014 at 6:03 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-21799))
+
+### **Anonymous** — October 31, 2014 at 6:03 am ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-21799))
 
 > Anonymous says:
 >
@@ -172,10 +172,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Looking at your pricing package I would have loved to pay as a corporate or enterprise customer if you support Windows Phone quite well. Do you support BB10? I reckon your customers are using the Android port for running on that platform. Going back to the main discussion, even if I am a paying customer, I won’t have the guarantee you will support Windows Phone platform because the majority of your paying customers don’t want it as a main feature (until they decide to) and I cannot compete with the majority which is my main concern and its difficult for me to invest money into your services with this uncertainty. Thanks and all the best to you, Jan.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — October 31, 2014 at 8:47 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-21822))
+
+### **Anonymous** — October 31, 2014 at 8:47 am ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-21822))
 
 > Anonymous says:
 >
@@ -187,10 +187,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We have a couple of pro users to whom BB10 is important but they are satisfied with the option of using the APK and we try to keep the chief functionality level there working with BB10.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — December 27, 2014 at 6:32 pm ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-22249))
+
+### **Anonymous** — December 27, 2014 at 6:32 pm ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-22249))
 
 > Anonymous says:
 >
@@ -204,10 +204,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks, Jan
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — December 28, 2014 at 4:44 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-22042))
+
+### **Anonymous** — December 28, 2014 at 4:44 am ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-22042))
 
 > Anonymous says:
 >
@@ -215,10 +215,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > there is no need/option to sign for Windows Phone. MS signs on its own and since Windows Phone doesn’t have an OTA install option (without the store) there is no real need. Currently none of our enterprise customers have made a formal request to justify the effort on Windows Phone. We support desktop development which should work well for the more popular Windows platforms such as the Surface Pro.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — February 14, 2015 at 8:32 pm ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-24177))
+
+### **Anonymous** — February 14, 2015 at 8:32 pm ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-24177))
 
 > Anonymous says:
 >
@@ -244,19 +244,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Jan
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — February 15, 2015 at 5:21 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-22102))
+
+### **Anonymous** — February 15, 2015 at 5:21 am ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-22102))
 
 > Anonymous says:
 >
 > Windows Phone is the only “modern” mobile OS that doesn’t support installing apps over the air (or by click) only via cable sync or thru the store beta test process.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — February 23, 2015 at 8:52 pm ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-24196))
+
+### **Anonymous** — February 23, 2015 at 8:52 pm ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-24196))
 
 > Anonymous says:
 >
@@ -284,16 +284,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > any idea?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
 
 
-### **Anonymous** — February 24, 2015 at 3:45 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline-for-windows-phone.html#comment-22168))
+
+### **Anonymous** — February 24, 2015 at 3:45 am ([permalink](/blog/a-new-pipeline-for-windows-phone/#comment-22168))
 
 > Anonymous says:
 >
 > See [http://www.codenameone.com/…](<http://www.codenameone.com/blog/installing-on-a-windows-phone-device>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-pipeline-for-windows-phone.html)
+
 
 ---
 

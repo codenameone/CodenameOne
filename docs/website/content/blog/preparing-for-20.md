@@ -60,7 +60,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — November 19, 2013 at 11:53 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21696))
+### **Anonymous** — November 19, 2013 at 11:53 am ([permalink](/blog/preparing-for-20/#comment-21696))
 
 > Anonymous says:
 >
@@ -68,10 +68,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Albeit the answers in forum concerning web deployment but if there is even a slight chance exporting to some kind of JS or even GWT so we can target easily Web – this will be ideal.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — November 19, 2013 at 3:54 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21921))
+
+### **Anonymous** — November 19, 2013 at 3:54 pm ([permalink](/blog/preparing-for-20/#comment-21921))
 
 > Anonymous says:
 >
@@ -79,37 +79,37 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I occasionally have some thoughts about doing a threadless version of Codename One but that is a bit difficult to achieve with things such as [Dialog.show](<http://Dialog.show>) etc. being so ingrained.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — November 19, 2013 at 8:03 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21812))
+
+### **Anonymous** — November 19, 2013 at 8:03 pm ([permalink](/blog/preparing-for-20/#comment-21812))
 
 > Anonymous says:
 >
 > What would really make my life easier is the ability to put a res file containing Forms into a CN1 Library Project, then run those Forms from multiple Apps. I am developing a suite of Apps each of which have 6 or 7 common forms and its a pain to redevelop them for each App. And it will be a pain to maintain them.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — November 20, 2013 at 8:19 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21819))
+
+### **Anonymous** — November 20, 2013 at 8:19 am ([permalink](/blog/preparing-for-20/#comment-21819))
 
 > Anonymous says:
 >
 > Thanks for the feedback Steve. We are looking at some approaches to this especially with a pending rewrite of the designer tool. I’m not sure if that will make it to .2.1 though. Currently it seems that it will have to wait for the release after that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — November 20, 2013 at 4:19 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21867))
+
+### **Anonymous** — November 20, 2013 at 4:19 pm ([permalink](/blog/preparing-for-20/#comment-21867))
 
 > Anonymous says:
 >
 > On the Windows 8 front the biggest issue for me is the Database class. Last I checked is was not there, will it make it into 2.0?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — November 21, 2013 at 2:49 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21720))
+
+### **Anonymous** — November 21, 2013 at 2:49 am ([permalink](/blog/preparing-for-20/#comment-21720))
 
 > Anonymous says:
 >
@@ -117,10 +117,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The main issue with Windows Phone’s SQL support is that SQlite is only supported from the C layer and this is pretty difficult to circumvent.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — November 21, 2013 at 4:19 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21708))
+
+### **Anonymous** — November 21, 2013 at 4:19 am ([permalink](/blog/preparing-for-20/#comment-21708))
 
 > Anonymous says:
 >
@@ -134,10 +134,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I need to be able to use different width lines, anti aliasing, brushes, etc., in order to give an enriched experience. Really miss that!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — November 21, 2013 at 5:39 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21958))
+
+### **Anonymous** — November 21, 2013 at 5:39 am ([permalink](/blog/preparing-for-20/#comment-21958))
 
 > Anonymous says:
 >
@@ -149,19 +149,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Graphics is a HUGE issue for us, frankly I’m shocked we reached 2.0 without a complete rewrite of that. We are working hard to bring a new graphics engine to iOS (which will allow us to bring it to Android & the simulator too). The problem is that the native engine isn’t appropriate for what we need (its scene-graph) and most OpenGL based engines are geared for the needs of games. We have a project underway but there is no way it will be ready in time for the code freeze so it will have to wait for post 2.0. I’m hoping it will be ready for January but we are still in the exploratory stages (although outlook seems good).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — November 21, 2013 at 7:28 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21881))
+
+### **Anonymous** — November 21, 2013 at 7:28 am ([permalink](/blog/preparing-for-20/#comment-21881))
 
 > Anonymous says:
 >
 > Would be nice to add push capability to windows ports.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — November 23, 2013 at 1:40 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21619))
+
+### **Anonymous** — November 23, 2013 at 1:40 pm ([permalink](/blog/preparing-for-20/#comment-21619))
 
 > Anonymous says:
 >
@@ -171,19 +171,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Now that we are out on Android and iOS all we hear is when will Windows phone support be available. Nobody is even talking about Blackberry anymore. I need to come up with a plan.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — November 23, 2013 at 2:36 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-22024))
+
+### **Anonymous** — November 23, 2013 at 2:36 pm ([permalink](/blog/preparing-for-20/#comment-22024))
 
 > Anonymous says:
 >
 > Martin, if I recall correctly you have a pro account right? Contact me thru email about this, we can discuss options/schedules etc.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — November 24, 2013 at 11:27 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21918))
+
+### **Anonymous** — November 24, 2013 at 11:27 am ([permalink](/blog/preparing-for-20/#comment-21918))
 
 > Anonymous says:
 >
@@ -191,19 +191,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — November 24, 2013 at 4:48 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21753))
+
+### **Anonymous** — November 24, 2013 at 4:48 pm ([permalink](/blog/preparing-for-20/#comment-21753))
 
 > Anonymous says:
 >
 > Are you using the push capabilities in other platforms?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — November 24, 2013 at 4:53 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21981))
+
+### **Anonymous** — November 24, 2013 at 4:53 pm ([permalink](/blog/preparing-for-20/#comment-21981))
 
 > Anonymous says:
 >
@@ -211,19 +211,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Bluetooth is implemented completely differently between OS’s, PhoneGap which has been around quite a while still doesn’t have a bluetooth plugin after all these years. So its pretty hard to abstract it in a portable way.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — November 25, 2013 at 5:36 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21966))
+
+### **Anonymous** — November 25, 2013 at 5:36 am ([permalink](/blog/preparing-for-20/#comment-21966))
 
 > Anonymous says:
 >
 > On Android and iOs but not on CodenameOne. Thats why I want to port my products to use CodenameOne next year to support more platforms (Blackberry 10 previous and Windows 7.5 – 8) but sad to see its not supported on Windows. In fact, Windows port is quite immature at this stage compared to your other ports if I am not mistaken. As for BB10, I reckon its your Android port that will be running on there? Will there be a BB10 native port in the near future?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — November 25, 2013 at 9:57 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-24160))
+
+### **Anonymous** — November 25, 2013 at 9:57 am ([permalink](/blog/preparing-for-20/#comment-24160))
 
 > Anonymous says:
 >
@@ -231,37 +231,37 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We won’t support the BB10 directly but our Android port works well on it (we have a couple of pro users for whom this is important so we made sure of that). The process is a bit awkward but it works.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — December 10, 2013 at 10:10 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21990))
+
+### **Anonymous** — December 10, 2013 at 10:10 pm ([permalink](/blog/preparing-for-20/#comment-21990))
 
 > Anonymous says:
 >
 > Do you have plans for including Socket support?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — December 10, 2013 at 10:11 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21758))
+
+### **Anonymous** — December 10, 2013 at 10:11 pm ([permalink](/blog/preparing-for-20/#comment-21758))
 
 > Anonymous says:
 >
 > Do you have plans for including Socket support on this release?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — December 11, 2013 at 9:34 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21897))
+
+### **Anonymous** — December 11, 2013 at 9:34 am ([permalink](/blog/preparing-for-20/#comment-21897))
 
 > Anonymous says:
 >
 > We do have it in our wishlist for 2.1. It won’t be java.net.Socket but we do want to offer simple TCP client/server sockets.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — January 6, 2014 at 7:00 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21790))
+
+### **Anonymous** — January 6, 2014 at 7:00 am ([permalink](/blog/preparing-for-20/#comment-21790))
 
 > Anonymous says:
 >
@@ -271,10 +271,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Regards
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — January 6, 2014 at 8:00 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21721))
+
+### **Anonymous** — January 6, 2014 at 8:00 am ([permalink](/blog/preparing-for-20/#comment-21721))
 
 > Anonymous says:
 >
@@ -282,10 +282,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Sockets are landing soon.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — January 6, 2014 at 8:04 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21709))
+
+### **Anonymous** — January 6, 2014 at 8:04 am ([permalink](/blog/preparing-for-20/#comment-21709))
 
 > Anonymous says:
 >
@@ -297,10 +297,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Right now we are busy implementing the priorities of our existing enterprise subscribers none of which asked for bluetooth so this won’t get done for 2.1 either unless you actually purchase and make an official request.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — February 20, 2014 at 11:21 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21717))
+
+### **Anonymous** — February 20, 2014 at 11:21 am ([permalink](/blog/preparing-for-20/#comment-21717))
 
 > Anonymous says:
 >
@@ -308,16 +308,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m not very sure so can you confirm that the release 2.0 of Codenameone is available ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
 
 
-### **Anonymous** — February 20, 2014 at 2:40 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21829))
+
+### **Anonymous** — February 20, 2014 at 2:40 pm ([permalink](/blog/preparing-for-20/#comment-21829))
 
 > Anonymous says:
 >
 > For ages. Plugin version != general Codename One version.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpreparing-for-20.html)
+
 
 ---
 

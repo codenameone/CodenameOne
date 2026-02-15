@@ -46,7 +46,7 @@ The SQL Playground app shows off some of the SQL capabilities of Codename One an
 
 Notice that the JavaScript HTML5 demo is not what we have on the device where applications are translated to native code!
 
-Blog Post: [link](/sql-demo-revisited.html)
+Blog Post: [link](/blog/sql-demo-revisited/)
 
 Source: [link](https://github.com/codenameone/SQLSample)
 

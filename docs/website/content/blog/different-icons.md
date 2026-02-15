@@ -69,16 +69,16 @@ the build.xml in version control so an accidental overwrite won’t destroy your
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — September 16, 2016 at 5:29 am ([permalink](https://www.codenameone.com/blog/different-icons.html#comment-22726))
+### **bryan** — September 16, 2016 at 5:29 am ([permalink](/blog/different-icons/#comment-22726))
 
 > bryan says:
 >
 > Re Kitchen Sink – I’ve been looking at the source to see how some of the stuff in the demo is done, and it would be really good if there were more comments or description in the code (or accompanying the demo) so developers could copy some of the techniques used. There’s a bunch of stuff obviously possible with CN1, but much of it is hidden away and not always obvious that what’s possible.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdifferent-icons.html)
 
 
-### **Shai Almog** — September 16, 2016 at 9:41 am ([permalink](https://www.codenameone.com/blog/different-icons.html#comment-23091))
+
+### **Shai Almog** — September 16, 2016 at 9:41 am ([permalink](/blog/different-icons/#comment-23091))
 
 > Shai Almog says:
 >
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I will merge the pull request and then fix the “explain this” comments… You don’t even need to check out the project.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdifferent-icons.html)
+
 
 ---
 

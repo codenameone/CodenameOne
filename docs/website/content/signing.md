@@ -12,7 +12,7 @@ Code signing and provisioning for the various platforms
 2. Developers
 3. Signing
 
-**Important:** this document is out of date! Please check out the developer guide section [**here**](https://www.codenameone.com/developer-guide.html)
+**Important:** this document is out of date! Please check out the developer guide section [**here**](https://www.codenameone.com/developer-guide/)
 
 While Codename One can simplify most of the grunt work in creating cross platform mobile applications, signing is not something that can be significantly simplified since it represents the developers individual identity in the markets. In this document we attempt to explain how to acquire certificates for the various markets and how to set them up to the build.
 

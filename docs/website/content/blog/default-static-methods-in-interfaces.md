@@ -36,12 +36,12 @@ this interface. E.g. :
 
 This isn’t as important for most developers as we normally can just add a new method and solve the issue.  
 However, in the future as we move the implementation of Codename One to Java 8 syntax this will be a huge  
-boost as it will allow us to add methods to older interfaces such as [PushCallback](https://www.codenameone.com/javadoc/com/codename1/push/PushCallback.html).
+boost as it will allow us to add methods to older interfaces such as [PushCallback](/javadoc/com/codename1/push/PushCallback/).
 
 ### What are Static Interface Methods
 
 Static interface methods are generally just static methods. In many cases we just hide static methods within  
-clases but sometimes that doesn’t make sense. E.g. the [Push](https://www.codenameone.com/javadoc/com/codename1/push/Push.html) class  
+clases but sometimes that doesn’t make sense. E.g. the [Push](/javadoc/com/codename1/push/Push/) class  
 is entirely composed of static methods and doesn’t make much sense as a standalone class. We could have  
 rolled all the methods within the class into the interface as static methods and eliminated the class entirely.
 

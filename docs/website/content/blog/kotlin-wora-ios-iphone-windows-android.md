@@ -33,43 +33,43 @@ Let us know what you think in the comments.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **kutoman** — June 13, 2017 at 2:20 pm ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-24134))
+### **kutoman** — June 13, 2017 at 2:20 pm ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-24134))
 
 > kutoman says:
 >
 > great news!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-wora-ios-iphone-windows-android.html)
 
 
-### **Chad Elofson** — June 13, 2017 at 6:17 pm ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-24133))
+
+### **Chad Elofson** — June 13, 2017 at 6:17 pm ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-24133))
 
 > Chad Elofson says:
 >
 > I would be interested in helping out.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-wora-ios-iphone-windows-android.html)
 
 
-### **Don't Bother** — June 13, 2017 at 7:31 pm ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-23457))
+
+### **Don't Bother** — June 13, 2017 at 7:31 pm ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-23457))
 
 > Don't Bother says:
 >
 > Frankly speaking I don’t understand how this will help you to increase adoption of C1. I mean it is still not possible to debug C1 app on iPhone and java.time is not available for C1. There are other features I would consider as more important but this is only my personal point of view.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-wora-ios-iphone-windows-android.html)
 
 
-### **Shai Almog** — June 13, 2017 at 7:50 pm ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-22593))
+
+### **Shai Almog** — June 13, 2017 at 7:50 pm ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-22593))
 
 > Shai Almog says:
 >
 > Thanks!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-wora-ios-iphone-windows-android.html)
 
 
-### **Shai Almog** — June 13, 2017 at 7:59 pm ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-23591))
+
+### **Shai Almog** — June 13, 2017 at 7:59 pm ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-23591))
 
 > Shai Almog says:
 >
@@ -77,10 +77,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Far more important work IMO is working on good looking UI by default and better tutorials/guides. I’m currently spending most of my time on both of those things which is why Kotlin is scheduled for later and not right now. It’s also why on device debugging isn’t getting out.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-wora-ios-iphone-windows-android.html)
 
 
-### **Nick Apperley** — June 14, 2017 at 1:20 am ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-23560))
+
+### **Nick Apperley** — June 14, 2017 at 1:20 am ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-23560))
 
 > Nick Apperley says:
 >
@@ -88,10 +88,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Pivotal would also be another company to contact in relation to their extensive use of Kotlin, on the server-side (especially micro services) and Android throughout the company since around 2015. Currently Pivotal is the biggest Enterprise adopter of Kotlin who are similar in size to Google. Sébastien Deleuze heads the Kotlin group at Pivotal and can be found hanging out in Kotlin Slack on the spring channel.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-wora-ios-iphone-windows-android.html)
 
 
-### **Shai Almog** — June 14, 2017 at 4:06 am ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-21468))
+
+### **Shai Almog** — June 14, 2017 at 4:06 am ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-21468))
 
 > Shai Almog says:
 >
@@ -99,20 +99,20 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Since the starting point in Java the effort seems relatively small.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-wora-ios-iphone-windows-android.html)
 
 
-### **Don't Bother** — June 15, 2017 at 4:23 am ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-23450))
+
+### **Don't Bother** — June 15, 2017 at 4:23 am ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-23450))
 
 > Don't Bother says:
 >
 > Completely agree about nice looking UI. And kotlin support is not bringing any improvements in this area.  
 > I know that I can debug generated c code. However in this case the whole point of C1 is lost imho. I mean if I am comfortable with xcode and c++ I may not need another language and tools(c1). And I believe that on device debugger is more complex. My point is that adding features like kotlin support (which is not a deal breaker at all at the moment) you keep pushing on device debugger and UI improvements more and more. And imho absence of on device debugger is a deal breaker for some cases.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-wora-ios-iphone-windows-android.html)
 
 
-### **Shai Almog** — June 16, 2017 at 6:58 am ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-23569))
+
+### **Shai Almog** — June 16, 2017 at 6:58 am ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-23569))
 
 > Shai Almog says:
 >
@@ -138,10 +138,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Please don’t be offended by this, I don’t know who you are so I have absolutely no way of qualifying your statements. It’s business practices we had to learn the hard way when running the company.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-wora-ios-iphone-windows-android.html)
 
 
-### **Don't Bother** — June 16, 2017 at 2:19 pm ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-21586))
+
+### **Don't Bother** — June 16, 2017 at 2:19 pm ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-21586))
 
 > Don't Bother says:
 >
@@ -149,10 +149,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Looks like you got offended. Yes, I wrote critical remarks but I was hoping that it will not offend you. Sorry if it did.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-wora-ios-iphone-windows-android.html)
 
 
-### **Shai Almog** — June 17, 2017 at 7:03 am ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-23598))
+
+### **Shai Almog** — June 17, 2017 at 7:03 am ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-23598))
 
 > Shai Almog says:
 >
@@ -160,16 +160,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Not offended and I appreciate your taking the time. I do agree with most of your points 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-wora-ios-iphone-windows-android.html)
 
 
-### **Tom Tantisalidchai** — June 17, 2017 at 7:30 am ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-23355))
+
+### **Tom Tantisalidchai** — June 17, 2017 at 7:30 am ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-23355))
 
 > Tom Tantisalidchai says:
 >
 > Awesome news!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-wora-ios-iphone-windows-android.html)
+
 
 ---
 

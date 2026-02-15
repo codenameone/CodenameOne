@@ -93,16 +93,16 @@ I used a toastbar to show the undo message, you might want to provide more ways 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — January 6, 2019 at 9:10 am ([permalink](https://www.codenameone.com/blog/tip-undo-delete.html#comment-24061))
+### **Francesco Galgani** — January 6, 2019 at 9:10 am ([permalink](/blog/tip-undo-delete/#comment-24061))
 
 > Francesco Galgani says:
 >
 > Thank you for these useful methods. Can you please confirm that all of them are to be used with FIleSystemStorage and not with Storage?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-undo-delete.html)
 
 
-### **Shai Almog** — January 6, 2019 at 11:53 am ([permalink](https://www.codenameone.com/blog/tip-undo-delete.html#comment-23996))
+
+### **Shai Almog** — January 6, 2019 at 11:53 am ([permalink](/blog/tip-undo-delete/#comment-23996))
 
 > Shai Almog says:
 >
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > copyFile and deleteFile can be similarly adapted to detect a storage file and use the storage API instead of the FileSystemStorage API.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-undo-delete.html)
+
 
 ---
 

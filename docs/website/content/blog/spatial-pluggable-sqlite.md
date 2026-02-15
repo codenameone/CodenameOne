@@ -43,29 +43,29 @@ Figure 1. New Post Form in The Facebook Clone App
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Julio Valeriron Ochoa** — November 29, 2022 at 2:29 pm ([permalink](https://www.codenameone.com/blog/spatial-pluggable-sqlite.html#comment-24548))
+### **Julio Valeriron Ochoa** — November 29, 2022 at 2:29 pm ([permalink](/blog/spatial-pluggable-sqlite/#comment-24548))
 
 > how turn on encryptation mode in sqlite
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspatial-pluggable-sqlite.html)
 
 
-### **Kimotho E** — July 9, 2024 at 4:51 pm ([permalink](https://www.codenameone.com/blog/spatial-pluggable-sqlite.html#comment-24621))
+
+### **Kimotho E** — July 9, 2024 at 4:51 pm ([permalink](/blog/spatial-pluggable-sqlite/#comment-24621))
 
 > Kimotho E says:
 >
 > How can a custom version of sqlite be plugged in to replace the Database?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspatial-pluggable-sqlite.html)
 
 
-### **Shai Almog** — July 10, 2024 at 2:31 am ([permalink](https://www.codenameone.com/blog/spatial-pluggable-sqlite.html#comment-24622))
+
+### **Shai Almog** — July 10, 2024 at 2:31 am ([permalink](/blog/spatial-pluggable-sqlite/#comment-24622))
 
 > Shai Almog says:
 >
 > See <https://github.com/shannah/cn1-spatialite> create something similar with your version of sqlite.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspatial-pluggable-sqlite.html)
+
 
 ---
 

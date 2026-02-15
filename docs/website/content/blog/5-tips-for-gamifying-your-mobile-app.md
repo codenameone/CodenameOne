@@ -82,7 +82,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 24, 2013 at 2:56 pm ([permalink](https://www.codenameone.com/blog/5-tips-for-gamifying-your-mobile-app.html#comment-24251))
+### **Anonymous** — March 24, 2013 at 2:56 pm ([permalink](/blog/5-tips-for-gamifying-your-mobile-app/#comment-24251))
 
 > Anonymous says:
 >
@@ -90,28 +90,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Keep up the good work!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2F5-tips-for-gamifying-your-mobile-app.html)
 
 
-### **Anonymous** — March 24, 2013 at 4:20 pm ([permalink](https://www.codenameone.com/blog/5-tips-for-gamifying-your-mobile-app.html#comment-21425))
+
+### **Anonymous** — March 24, 2013 at 4:20 pm ([permalink](/blog/5-tips-for-gamifying-your-mobile-app/#comment-21425))
 
 > Anonymous says:
 >
 > Very cool. Thanks for the post!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2F5-tips-for-gamifying-your-mobile-app.html)
 
 
-### **Anonymous** — November 13, 2013 at 10:25 am ([permalink](https://www.codenameone.com/blog/5-tips-for-gamifying-your-mobile-app.html#comment-21681))
+
+### **Anonymous** — November 13, 2013 at 10:25 am ([permalink](/blog/5-tips-for-gamifying-your-mobile-app/#comment-21681))
 
 > Anonymous says:
 >
 > Thanks for this post. Do you have any examples of utility apps that do this well? Eg, Telecoms, banking, power etc
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2F5-tips-for-gamifying-your-mobile-app.html)
 
 
-### **Balbir singh** — February 7, 2018 at 10:16 am ([permalink](https://www.codenameone.com/blog/5-tips-for-gamifying-your-mobile-app.html#comment-23869))
+
+### **Balbir singh** — February 7, 2018 at 10:16 am ([permalink](/blog/5-tips-for-gamifying-your-mobile-app/#comment-23869))
 
 > Balbir singh says:
 >
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [http://www.nanoarchsoftware…](<http://www.nanoarchsoftware.com/Services/mobile-application>)  
 > .
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2F5-tips-for-gamifying-your-mobile-app.html)
+
 
 ---
 

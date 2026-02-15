@@ -21,12 +21,12 @@ During the month of August Google finally removed their old GCM servers. We’ve
 
 Users who still used the old style of push notifications (prior to the `google-services.json` file approach) had push messages blocked. That was expected.
 
-__ |  You can read about the modern approach to push [here](https://www.codenameone.com/manual/push.html)  
+__ |  You can read about the modern approach to push [here](/manual/push/)  
 ---|---  
   
 Because that no longer works anyway we switched the default build mode to FCM. This solves an issue for developers who neglected to define the `android.messagingService=fcm` build hint (which you no longer need). However, this causes a build error if you don’t have that JSON file in place. You can get this to compile for now by explicitly stating the build hint `android.messagingService=gcm`. However, push won’t work if you do that since the Google run GCM push servers are no longer there. But it will compile which is a start.
 
-To migrate to the new FCM approach check out the [developer guide section on push](https://www.codenameone.com/manual/push.html).
+To migrate to the new FCM approach check out the [developer guide section on push](/manual/push/).
 
 ### API Level 28 and HTTPS Requirement
 
@@ -80,11 +80,11 @@ I’ll write about other things in the coming weeks as this post is getting a bi
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — September 7, 2019 at 7:57 pm ([permalink](https://www.codenameone.com/blog/back-vacation.html#comment-24112))
+### **Francesco Galgani** — September 7, 2019 at 7:57 pm ([permalink](/blog/back-vacation/#comment-24112))
 
 > The Component Inspector enhancements are very helpful! Thank you very much!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fback-vacation.html)
+
 
 ---
 

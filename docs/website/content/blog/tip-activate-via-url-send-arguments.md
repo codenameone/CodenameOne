@@ -129,13 +129,13 @@ Whatsapp uses an inverse of this trick to activate their desktop app. They show 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — September 5, 2018 at 8:36 am ([permalink](https://www.codenameone.com/blog/tip-activate-via-url-send-arguments.html#comment-23977))
+### **Francesco Galgani** — September 5, 2018 at 8:36 am ([permalink](/blog/tip-activate-via-url-send-arguments/#comment-23977))
 
 > Francesco Galgani says:
 >
 > Thank you Shai for this article, the server redirect is a great idea to circumvent the “impossible to click” links with a custom protocol in Gmail. Some email providers allow to click any link with any custom protocol, others block any custom protocol. I circumvented this issue to send an activation link with a completely different approach, however your redirect solution is very good 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-activate-via-url-send-arguments.html)
+
 
 ---
 

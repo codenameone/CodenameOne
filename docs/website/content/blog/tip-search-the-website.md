@@ -27,7 +27,7 @@ This is the same as Google’s custom search which some sites use but provides a
 #### JavaDoc Index
 
 I’ve discussed this in the past, if you are looking for a method, variable or class this is probably the best place  
-to start: <https://www.codenameone.com/javadoc/index-all.html>
+to start: </javadoc/index-all/>
 
 This is the full “index” of our JavaDoc. It doesn’t include everything obviously it doesn’t include cn1libs and some  
 information might be missing but the ability to use the browser search within that page is very valuable.

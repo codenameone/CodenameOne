@@ -71,30 +71,30 @@ Under the Basics menu click the Update Project Libs button (bottom left). This w
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **ThomasH99** — September 19, 2021 at 2:44 pm ([permalink](https://www.codenameone.com/blog/tip-setup-codename-one-demo-from-git.html#comment-24483))
+### **ThomasH99** — September 19, 2021 at 2:44 pm ([permalink](/blog/tip-setup-codename-one-demo-from-git/#comment-24483))
 
 > I just posted this comment under the post “TIP: Using Git for Codename One Projects” but I think I should have posted it here instead:  
 > ———————  
 > Hi, is this approach is still the right way to use Git for CN1 projects using maven? (I’m no expert on either so maybe this is a basic question 🙂)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-setup-codename-one-demo-from-git.html)
 
 
-### **Shai Almog** — September 20, 2021 at 1:47 am ([permalink](https://www.codenameone.com/blog/tip-setup-codename-one-demo-from-git.html#comment-24488))
+
+### **Shai Almog** — September 20, 2021 at 1:47 am ([permalink](/blog/tip-setup-codename-one-demo-from-git/#comment-24488))
 
 > Hi,  
 > no. I think maven is actually a bit simpler. You can just gitignor the target directory.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-setup-codename-one-demo-from-git.html)
 
 
-### **ThomasH99** — September 19, 2021 at 2:44 pm ([permalink](https://www.codenameone.com/blog/tip-setup-codename-one-demo-from-git.html#comment-24484))
+
+### **ThomasH99** — September 19, 2021 at 2:44 pm ([permalink](/blog/tip-setup-codename-one-demo-from-git/#comment-24484))
 
 > I just posted this comment under the post “TIP: Using Git for Codename One Projects” but I think I should have posted it here instead:  
 > ———————  
 > Hi, is this approach is still the right way to use Git for CN1 projects using maven? (I’m no expert on either so maybe this is a basic question 🙂)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-setup-codename-one-demo-from-git.html)
+
 
 ---
 

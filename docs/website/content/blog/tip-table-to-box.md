@@ -102,7 +102,7 @@ and it’s esthetic far more appealing.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Gareth Murfin** — December 19, 2016 at 2:39 pm ([permalink](https://www.codenameone.com/blog/tip-table-to-box.html#comment-24244))
+### **Gareth Murfin** — December 19, 2016 at 2:39 pm ([permalink](/blog/tip-table-to-box/#comment-24244))
 
 > Excellent functionality, I look forward to using this in my next apps, I am ready to swap to new gui editor now too I think :-)))) Keep up the good work.
 

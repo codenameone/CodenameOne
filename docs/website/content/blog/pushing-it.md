@@ -137,28 +137,28 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — July 29, 2013 at 11:12 am ([permalink](https://www.codenameone.com/blog/pushing-it.html#comment-21833))
+### **Anonymous** — July 29, 2013 at 11:12 am ([permalink](/blog/pushing-it/#comment-21833))
 
 > Anonymous says:
 >
 > Is this for premium subscribers only?
 
 
-### **Anonymous** — July 29, 2013 at 1:52 pm ([permalink](https://www.codenameone.com/blog/pushing-it.html#comment-21680))
+### **Anonymous** — July 29, 2013 at 1:52 pm ([permalink](/blog/pushing-it/#comment-21680))
 
 > Anonymous says:
 >
 > Yes, I neglected to mention in the article that push is for pro users only.
 
 
-### **Anonymous** — August 20, 2013 at 3:45 pm ([permalink](https://www.codenameone.com/blog/pushing-it.html#comment-21818))
+### **Anonymous** — August 20, 2013 at 3:45 pm ([permalink](/blog/pushing-it/#comment-21818))
 
 > Anonymous says:
 >
 > It was mentioned earlier that CN1 uses/used Urban Airship for push. Urban Airship supports tags to send to a subset of users. Will CN1 support tags in the future?
 
 
-### **Anonymous** — August 21, 2013 at 3:23 am ([permalink](https://www.codenameone.com/blog/pushing-it.html#comment-21998))
+### **Anonymous** — August 21, 2013 at 3:23 am ([permalink](/blog/pushing-it/#comment-21998))
 
 > Anonymous says:
 >
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > We don’t currently have any plans on supporting this or Urban Airship however, our plans are fluid and depend on the requirements of our pro/enterprise account subscribers.
 
 
-### **Anonymous** — August 28, 2013 at 5:27 pm ([permalink](https://www.codenameone.com/blog/pushing-it.html#comment-21866))
+### **Anonymous** — August 28, 2013 at 5:27 pm ([permalink](/blog/pushing-it/#comment-21866))
 
 > Anonymous says:
 >

@@ -70,22 +70,22 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 3, 2014 at 8:36 am ([permalink](https://www.codenameone.com/blog/pisces-string-picker.html#comment-22011))
+### **Anonymous** — January 3, 2014 at 8:36 am ([permalink](/blog/pisces-string-picker/#comment-22011))
 
 > Anonymous says:
 >
 > Hello, when are you releasing the upcoming update?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpisces-string-picker.html)
 
 
-### **Anonymous** — January 4, 2014 at 6:07 am ([permalink](https://www.codenameone.com/blog/pisces-string-picker.html#comment-24255))
+
+### **Anonymous** — January 4, 2014 at 6:07 am ([permalink](/blog/pisces-string-picker/#comment-24255))
 
 > Anonymous says:
 >
 > Yesterday.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpisces-string-picker.html)
+
 
 ---
 

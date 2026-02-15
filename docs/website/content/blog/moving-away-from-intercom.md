@@ -52,25 +52,25 @@ We think features such as JDK 9/10/11 support is crucial with the new JDK releas
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — June 28, 2018 at 6:51 am ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-24140))
+### **Diamond** — June 28, 2018 at 6:51 am ([permalink](/blog/moving-away-from-intercom/#comment-24140))
 
 > Diamond says:
 >
 > I use [https://www.livechatinc.com](<https://www.livechatinc.com>). You might also want to check them out and compare features and cost with crisp.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-intercom.html)
 
 
-### **Shai Almog** — June 29, 2018 at 6:20 am ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-23808))
+
+### **Shai Almog** — June 29, 2018 at 6:20 am ([permalink](/blog/moving-away-from-intercom/#comment-23808))
 
 > Shai Almog says:
 >
 > I wasn’t familiar with them. Looking at this it seems they price per-agent which is slightly more expensive for our use case. The problem in this field seems to be the HUGE number of companies doing roughly the same thing. I don’t understand how Intercom can raise their prices 5x when they were already FAR more expensive with fewer features…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-intercom.html)
 
 
-### **Francesco Galgani** — July 23, 2018 at 5:19 pm ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-23891))
+
+### **Francesco Galgani** — July 23, 2018 at 5:19 pm ([permalink](/blog/moving-away-from-intercom/#comment-23891))
 
 > Francesco Galgani says:
 >
@@ -80,10 +80,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > And now a difficult question, because there is few information: in the next years, do you think that the applications developed with Codename One will be able to run on Google Fuchsia, the replacement of Android?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-intercom.html)
 
 
-### **Shai Almog** — July 24, 2018 at 4:11 am ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-23840))
+
+### **Shai Almog** — July 24, 2018 at 4:11 am ([permalink](/blog/moving-away-from-intercom/#comment-23840))
 
 > Shai Almog says:
 >
@@ -95,19 +95,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Having said that, since we run on a lot of very different architectures if something that historically never happened would happen we could target that too.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-intercom.html)
 
 
-### **Caterina Bassano** — July 24, 2018 at 11:12 am ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-23976))
+
+### **Caterina Bassano** — July 24, 2018 at 11:12 am ([permalink](/blog/moving-away-from-intercom/#comment-23976))
 
 > Caterina Bassano says:
 >
 > Interesting! I am curious: what makes Intercom a bad product and what made you choose Crisp over others?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-intercom.html)
 
 
-### **Shai Almog** — July 25, 2018 at 4:27 am ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-23982))
+
+### **Shai Almog** — July 25, 2018 at 4:27 am ([permalink](/blog/moving-away-from-intercom/#comment-23982))
 
 > Shai Almog says:
 >
@@ -133,10 +133,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The way I see it, Crisp is moving to answer customer needs. Intercom is moving to increase monetization. I don’t think anyone should use Intercom regardless of the price. It’s a company culture issue that’s probably unfixable.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-intercom.html)
 
 
-### **Shai Almog** — July 25, 2018 at 5:47 am ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-23955))
+
+### **Shai Almog** — July 25, 2018 at 5:47 am ([permalink](/blog/moving-away-from-intercom/#comment-23955))
 
 > Shai Almog says:
 >
@@ -148,25 +148,25 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Again, this boils down to a company that over monetizes its users.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-intercom.html)
 
 
-### **Francesco Galgani** — August 22, 2018 at 4:05 pm ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-23882))
+
+### **Francesco Galgani** — August 22, 2018 at 4:05 pm ([permalink](/blog/moving-away-from-intercom/#comment-23882))
 
 > Francesco Galgani says:
 >
 > I have no experience of Crisp or other similar services. If you think that Crisp is a good service, my question is if it can be integrated in a Codename One app. I’m developing a complex app: it could be useful is there is something ready to be used to get feedbacks and support requests from users.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-intercom.html)
 
 
-### **Shai Almog** — August 22, 2018 at 4:21 pm ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-24068))
+
+### **Shai Almog** — August 22, 2018 at 4:21 pm ([permalink](/blog/moving-away-from-intercom/#comment-24068))
 
 > Shai Almog says:
 >
 > I agree. We plan to integrate crisp as a cn1lib. This should be trivial to accomplish but I don’t have an ETA for it right now. It’s very much on our “TODO” list.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-intercom.html)
+
 
 ---
 

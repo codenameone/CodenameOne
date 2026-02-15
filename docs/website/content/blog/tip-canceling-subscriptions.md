@@ -32,7 +32,7 @@ If you run into billing issues be sure to contact our support, using the chat bu
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **baron** — December 1, 2018 at 10:27 am ([permalink](https://www.codenameone.com/blog/tip-canceling-subscriptions.html#comment-23984))
+### **baron** — December 1, 2018 at 10:27 am ([permalink](/blog/tip-canceling-subscriptions/#comment-23984))
 
 > baron says:
 >
@@ -41,16 +41,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > in this case i can select ok for Android Builds features in my subscribe and dispose another things i don’t need it .  
 > -on anther hand the price is increase whenever increase select many of features.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-canceling-subscriptions.html)
 
 
-### **Shai Almog** — December 2, 2018 at 7:16 am ([permalink](https://www.codenameone.com/blog/tip-canceling-subscriptions.html#comment-23957))
+
+### **Shai Almog** — December 2, 2018 at 7:16 am ([permalink](/blog/tip-canceling-subscriptions/#comment-23957))
 
 > Shai Almog says:
 >
 > The price is fixed additional features don’t change that. You can’t create apps with jars larger than 50mb see this [https://help.codenameone.co…](<https://help.codenameone.com/en-us/article/whats-the-jar-size-limit-1a9ujwp/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-canceling-subscriptions.html)
+
 
 ---
 

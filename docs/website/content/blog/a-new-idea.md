@@ -103,7 +103,7 @@ by copying them to the new plugin. Be sure to let us know immediately if you run
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Therk** — April 13, 2016 at 11:42 pm ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22656))
+### **Therk** — April 13, 2016 at 11:42 pm ([permalink](/blog/a-new-idea/#comment-22656))
 
 > Thank you for improving the plugin. It is more intuitive even though it may not be consistent with other IntelliJ plugins. Unfortunately, I started to get a NullPointerException when setting up the Run configuration for a new sample application.  
 > I am not sure the best way to report such issues, but the stack trace is:
@@ -201,10 +201,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > at java.awt.EventDispatchThread.pumpEvents([EventDispatchThread.java](<http://EventDispatchThread.java>):93)  
 > at [java.awt.EventDispatchThrea…](<http://java.awt.EventDispatchThread.run)([EventDispatchThread.java](http://EventDispatchThread.java)>:82)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-idea.html)
 
 
-### **Therk** — April 14, 2016 at 12:21 am ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22484))
+
+### **Therk** — April 14, 2016 at 12:21 am ([permalink](/blog/a-new-idea/#comment-22484))
 
 > A few suggestion on improving the IDEA plugin:  
 > 1\. In the Codename One Preferences, tabbing between fields does not seem to work, requiring a mouse click into next fields. For example in the Login or iOS Certificate Wizard.  
@@ -215,19 +215,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 6\. It should allow to select existing App ID and name for an application.  
 > 7\. Under Global Preferences and iOS Certificate Wizard, App ID and name should probably not be required, as I think Global Preferences are to be shared between other CodenameOne application.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-idea.html)
 
 
-### **Shai Almog** — April 14, 2016 at 2:36 am ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22585))
+
+### **Shai Almog** — April 14, 2016 at 2:36 am ([permalink](/blog/a-new-idea/#comment-22585))
 
 > Thanks!  
 > Those are great issues/RFE’s.  
 > The right place to file them so they don’t get lost under our workload is the issue tracker at [http://github.com/codenameo…](<http://github.com/codenameone/CodenameOne/issues/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-idea.html)
 
 
-### **Shai Almog** — April 14, 2016 at 8:08 am ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22766))
+
+### **Shai Almog** — April 14, 2016 at 8:08 am ([permalink](/blog/a-new-idea/#comment-22766))
 
 > Shai Almog says:
 >
@@ -237,44 +237,44 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 6\. It should have the existing app id from your app which must match the package name of your project.  
 > 7\. The global version of the wizard should allow you to customize the app id as it can be a * certificate but it can reside anywhere e.g. I can make a com.mycompany.* or just plain * as my default. This matters to the provisioning profile.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-idea.html)
 
 
-### **Shai Almog** — April 14, 2016 at 8:14 am ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22774))
+
+### **Shai Almog** — April 14, 2016 at 8:14 am ([permalink](/blog/a-new-idea/#comment-22774))
 
 > Shai Almog says:
 >
 > How do you set the run configuration?  
 > I see the problem but I can’t reproduce it to make sure the fix is correct.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-idea.html)
 
 
-### **Eric Coolman** — April 28, 2016 at 9:50 pm ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22466))
+
+### **Eric Coolman** — April 28, 2016 at 9:50 pm ([permalink](/blog/a-new-idea/#comment-22466))
 
 > Eric Coolman says:
 >
 > Great work, and thanks! 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-idea.html)
 
 
-### **James van Kessel** — May 20, 2016 at 3:56 pm ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22606))
+
+### **James van Kessel** — May 20, 2016 at 3:56 pm ([permalink](/blog/a-new-idea/#comment-22606))
 
 > James van Kessel says:
 >
 > Hi Shai, For someone with an existing project, are there any warnings or cautions you’d give someone still using an older CN1 plugin (i am still on 3.1) before clicking “update Plugin”?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-idea.html)
 
 
-### **Shai Almog** — May 21, 2016 at 3:51 am ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22611))
+
+### **Shai Almog** — May 21, 2016 at 3:51 am ([permalink](/blog/a-new-idea/#comment-22611))
 
 > Shai Almog says:
 >
 > If you update to the latest it will be the new plugin and there is no warning. Notice that on the plugin page at IDEA you can always download the older versions of the plugin if you need it while we fix a potential issue you might run into.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fa-new-idea.html)
+
 
 ---
 

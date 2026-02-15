@@ -27,7 +27,7 @@ Since migrating to Maven, the recommended way to create a new Codename One proje
   
 4. ****Tweet App****: A template for a Twitter-style app. Also uses the CodeRAD MVC library.
 
-There are many other demos and templates that have been developed over the years that are not listed here. For example, there are several projects listed in the [Codename One demos section](https://www.codenameone.com/demos.html) of the website.
+There are many other demos and templates that have been developed over the years that are not listed here. For example, there are several projects listed in the [Codename One demos section](/demos/) of the website.
 
 ![](/blog/creating-new-projects-with-old-templates/demos-section.png) 
 
@@ -45,7 +45,7 @@ Download it for Mac, Windows, and Linux [here](https://www.jdeploy.com/~cn1-mave
 
 ### Step 2: Download the Demo Project
 
-Once you have installed the migration tool, you should download the demo project that you wish to use as the basis for your app. As an example, I’ll use the [MSUIKit demo](https://www.codenameone.com/demos/msuikit-psd-template-port-to-cross-platform-pixel-perfect-codename-one-app-for-android-iphone-ios-etc.html).
+Once you have installed the migration tool, you should download the demo project that you wish to use as the basis for your app. As an example, I’ll use the [MSUIKit demo](/demos/msuikit-psd-template-port-to-cross-platform-pixel-perfect-codename-one-app-for-android-iphone-ios-etc/).
 
 ![](/blog/creating-new-projects-with-old-templates/msuikit.png) 
 
@@ -117,13 +117,13 @@ You might also check out the [Bare-bones project getting started tutorial](https
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Bryan Buchanan** — June 10, 2022 at 7:48 am ([permalink](https://www.codenameone.com/blog/creating-new-projects-with-old-templates.html#comment-24538))
+### **Bryan Buchanan** — June 10, 2022 at 7:48 am ([permalink](/blog/creating-new-projects-with-old-templates/#comment-24538))
 
 > Bryan Buchanan says:
 >
 > Excellent tool. Works really well.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcreating-new-projects-with-old-templates.html)
+
 
 ---
 

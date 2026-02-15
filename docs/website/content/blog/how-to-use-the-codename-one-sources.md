@@ -78,16 +78,16 @@ You can now also commit, push and send a pull request with the changes.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Ch Hjelm** — June 19, 2016 at 6:15 am ([permalink](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html#comment-22579))
+### **Ch Hjelm** — June 19, 2016 at 6:15 am ([permalink](/blog/how-to-use-the-codename-one-sources/#comment-22579))
 
 > Ch Hjelm says:
 >
 > Hi, this is a great approach and I’ve used debugging of CN1 sources for quite some time. However, the video does not mention if you can build for devices using your own copy of the CN1 sources – is that possible and how should it be done? Thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-use-the-codename-one-sources.html)
 
 
-### **Shai Almog** — June 20, 2016 at 4:10 am ([permalink](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html#comment-22732))
+
+### **Shai Almog** — June 20, 2016 at 4:10 am ([permalink](/blog/how-to-use-the-codename-one-sources/#comment-22732))
 
 > Shai Almog says:
 >
@@ -97,19 +97,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We are looking at offering a better solution for offline building to the enterprise subscription in the near future.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-use-the-codename-one-sources.html)
 
 
-### **Ch Hjelm** — June 20, 2016 at 9:52 pm ([permalink](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html#comment-22675))
+
+### **Ch Hjelm** — June 20, 2016 at 9:52 pm ([permalink](/blog/how-to-use-the-codename-one-sources/#comment-22675))
 
 > Ch Hjelm says:
 >
 > Thanks for the answer. I’m not an Enterprise user (and probably never will have the budget). If you can’t build with your modified CN1 sources for a device, then isn’t what you described above useless when developing an app for a device? Unless the changes get accepted back into the code base before having to run it on a device. And you also cannot ‘hack’ the CN1 sources when needed (e.g. I’ve had to make some changes to implement specific functionality which is not likely to be accepted into your code base), making it pretty pointless to spend time trying to work around such limitations. Sorry, if I’m missing something obvious, but I think you should mention these limitations in the material above – it’s pretty frustrating to find out *after* the fact.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-use-the-codename-one-sources.html)
 
 
-### **Shai Almog** — June 21, 2016 at 3:45 am ([permalink](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html#comment-22934))
+
+### **Shai Almog** — June 21, 2016 at 3:45 am ([permalink](/blog/how-to-use-the-codename-one-sources/#comment-22934))
 
 > Shai Almog says:
 >
@@ -119,10 +119,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’d be interested to know what sort of changes can’t be done thru a cn1lib and must go into our core sources?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-use-the-codename-one-sources.html)
 
 
-### **AMDP AMDP** — March 23, 2017 at 12:00 pm ([permalink](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html#comment-23130))
+
+### **AMDP AMDP** — March 23, 2017 at 12:00 pm ([permalink](/blog/how-to-use-the-codename-one-sources/#comment-23130))
 
 > AMDP AMDP says:
 >
@@ -133,16 +133,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Troy.  
 > #
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-use-the-codename-one-sources.html)
 
 
-### **Shai Almog** — March 24, 2017 at 5:33 am ([permalink](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html#comment-23299))
+
+### **Shai Almog** — March 24, 2017 at 5:33 am ([permalink](/blog/how-to-use-the-codename-one-sources/#comment-23299))
 
 > Shai Almog says:
 >
 > It’s C, C#, Objective-C & JavaScript. Each port for each OS needs native code to implement the OS abstraction layer. 99% is actually a bit high I should have said 99% of the code that matters.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-to-use-the-codename-one-sources.html)
+
 
 ---
 

@@ -99,16 +99,16 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — November 27, 2014 at 5:37 am ([permalink](https://www.codenameone.com/blog/sms-custom-commands.html#comment-21605))
+### **Anonymous** — November 27, 2014 at 5:37 am ([permalink](/blog/sms-custom-commands/#comment-21605))
 
 > Anonymous says:
 >
 > Hey Shai, great features! I just want to know if its possible to have one form to present a component in a side menu, and another form to have the native action bar to present the commands?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsms-custom-commands.html)
 
 
-### **Anonymous** — November 28, 2014 at 4:18 pm ([permalink](https://www.codenameone.com/blog/sms-custom-commands.html#comment-21504))
+
+### **Anonymous** — November 28, 2014 at 4:18 pm ([permalink](/blog/sms-custom-commands/#comment-21504))
 
 > Anonymous says:
 >
@@ -116,10 +116,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This isn’t trivial since commands need to be routed in a very different way to work with the action bar.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsms-custom-commands.html)
 
 
-### **Anonymous** — November 29, 2014 at 12:28 am ([permalink](https://www.codenameone.com/blog/sms-custom-commands.html#comment-22107))
+
+### **Anonymous** — November 29, 2014 at 12:28 am ([permalink](/blog/sms-custom-commands/#comment-22107))
 
 > Anonymous says:
 >
@@ -127,10 +127,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Is it possible to intercept sms in those possible platform using codenameone?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsms-custom-commands.html)
 
 
-### **Anonymous** — November 29, 2014 at 3:31 am ([permalink](https://www.codenameone.com/blog/sms-custom-commands.html#comment-22272))
+
+### **Anonymous** — November 29, 2014 at 3:31 am ([permalink](/blog/sms-custom-commands/#comment-22272))
 
 > Anonymous says:
 >
@@ -138,7 +138,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Also Android is changing the way in which it intercepts SMS so its not really useful as it was before.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsms-custom-commands.html)
+
 
 ---
 

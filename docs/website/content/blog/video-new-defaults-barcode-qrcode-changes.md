@@ -51,7 +51,7 @@ library.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **davidwaf** — December 29, 2015 at 7:59 pm ([permalink](https://www.codenameone.com/blog/video-new-defaults-barcode-qrcode-changes.html#comment-22605))
+### **davidwaf** — December 29, 2015 at 7:59 pm ([permalink](/blog/video-new-defaults-barcode-qrcode-changes/#comment-22605))
 
 > davidwaf says:
 >
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Any way, these were small changes i had to make, after which my builds started working as usual again.
 
 
-### **Shai Almog** — December 30, 2015 at 3:48 am ([permalink](https://www.codenameone.com/blog/video-new-defaults-barcode-qrcode-changes.html#comment-22424))
+### **Shai Almog** — December 30, 2015 at 3:48 am ([permalink](/blog/video-new-defaults-barcode-qrcode-changes/#comment-22424))
 
 > Shai Almog says:
 >

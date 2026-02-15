@@ -26,7 +26,7 @@ work for you then you can ignore the video/instructions below. However, if they 
   
 Google has the tendency to change things frequently which makes documenting a process to work  
 with Android much harder than the iOS equivalent.  
-The method outlined in the [“how do i” video](/how-do-i-debug-on-an-android-device.html) that we just launched  
+The method outlined in the [“how do i” video](/how-do-i/how-do-i-debug-on-an-android-device/) that we just launched  
 should work regardless of future changes. It might not be the best way to do this but it’s simple and it works.
 
 Here are the steps highlighted in the video:
@@ -72,7 +72,7 @@ on the device.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Nilmar Castro** — December 28, 2016 at 12:58 pm ([permalink](https://www.codenameone.com/blog/debug-a-codename-one-app-on-an-android-device.html#comment-22976))
+### **Nilmar Castro** — December 28, 2016 at 12:58 pm ([permalink](/blog/debug-a-codename-one-app-on-an-android-device/#comment-22976))
 
 > Nilmar Castro says:
 >
@@ -83,10 +83,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you very much
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdebug-a-codename-one-app-on-an-android-device.html)
 
 
-### **Shai Almog** — December 29, 2016 at 5:41 am ([permalink](https://www.codenameone.com/blog/debug-a-codename-one-app-on-an-android-device.html#comment-23219))
+
+### **Shai Almog** — December 29, 2016 at 5:41 am ([permalink](/blog/debug-a-codename-one-app-on-an-android-device/#comment-23219))
 
 > Shai Almog says:
 >
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > In the newer videos we have subtitles that contain the full text that you can read in the youtube page. You can also see the full transcript of every one of the new videos in their “How Do I?” page.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdebug-a-codename-one-app-on-an-android-device.html)
+
 
 ---
 

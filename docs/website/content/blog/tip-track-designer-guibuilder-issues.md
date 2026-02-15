@@ -76,34 +76,34 @@ Hopefully, having this as a good resource will allow us to improve the tools to 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Señor Sentinel** — April 13, 2017 at 6:57 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-21575))
+### **Señor Sentinel** — April 13, 2017 at 6:57 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-21575))
 
 > Señor Sentinel says:
 >
 > I can’t launch the GUI builder and would appreciate some help. The whole issue is described at Stack Overflow: [http://stackoverflow.com/qu…](<http://stackoverflow.com/questions/43372597/getting-a-java-util-nosuchelementexception-error-when-launching-gui-designer>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-track-designer-guibuilder-issues.html)
 
 
-### **Shai Almog** — April 14, 2017 at 4:29 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-21739))
+
+### **Shai Almog** — April 14, 2017 at 4:29 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-21739))
 
 > Shai Almog says:
 >
 > This will be fixed by today’s release
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-track-designer-guibuilder-issues.html)
 
 
-### **Señor Sentinel** — April 14, 2017 at 6:29 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23447))
+
+### **Señor Sentinel** — April 14, 2017 at 6:29 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23447))
 
 > Señor Sentinel says:
 >
 > Hi Shai. Would that be version 3.6.2? My IntelliJ IDEA updated the plugin to that version, but I can’t find it on [Jetbrains plugin page]([https://plugins.jetbrains.c…](<https://plugins.jetbrains.com/plugin/7357-codename-one>)), which is a bit strange. Regardless, if you mean version 3.6.2 it didn’t solve anything for me. What’s the next step in trying to get this to work..?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-track-designer-guibuilder-issues.html)
 
 
-### **Shai Almog** — April 15, 2017 at 4:29 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23473))
+
+### **Shai Almog** — April 15, 2017 at 4:29 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23473))
 
 > Shai Almog says:
 >
@@ -111,10 +111,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Does launching from command line work?  
 > What’s in the XML launch file?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-track-designer-guibuilder-issues.html)
 
 
-### **Señor Sentinel** — April 15, 2017 at 7:27 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23171))
+
+### **Señor Sentinel** — April 15, 2017 at 7:27 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23171))
 
 > Señor Sentinel says:
 >
@@ -122,41 +122,41 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > (As a side note I find it confusing getting support from Codename One. It’s a mix of commenting on blog posts, Stack Overflow, Google Groups and Intercom chat. Plus that I’ve requested twice last week that someone email me regarding your service “Client side development” to help me make an app – I never hear back from anyone. It’s a bit frustrating.)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-track-designer-guibuilder-issues.html)
 
 
-### **Shai Almog** — April 16, 2017 at 4:43 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-21583))
+
+### **Shai Almog** — April 16, 2017 at 4:43 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-21583))
 
 > Shai Almog says:
 >
 > Do you have a guibuilder.input file? What’s inside it?
 >
-> I’ve explained the free support process here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/clarifying-our-support.html>)
+> I’ve explained the free support process here: [https://www.codenameone.com…](</blog/clarifying-our-support/>)
 >
 > I have no idea who you are but we got some contacts about app development over the past week which we answered. Either way our resources are pretty low at this time so if you need us to build your app for you we won’t be able to do anything before September.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-track-designer-guibuilder-issues.html)
 
 
-### **Señor Sentinel** — April 16, 2017 at 7:12 pm ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23504))
+
+### **Señor Sentinel** — April 16, 2017 at 7:12 pm ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23504))
 
 > Señor Sentinel says:
 >
 > No, I only have a CN1Preferences file (binary, 151 bytes) in the .guiBuilder directory. Just to be sure I did a “find . ~ | grep -i guibuilder.input” and found nothing anywhere in my home path.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-track-designer-guibuilder-issues.html)
 
 
-### **Shai Almog** — April 17, 2017 at 5:38 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23291))
+
+### **Shai Almog** — April 17, 2017 at 5:38 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23291))
 
 > Shai Almog says:
 >
 > That sounds like a serious problem. Which OS are you using? Do you see anything in the intellij log after you try to launch the GUI builder?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-track-designer-guibuilder-issues.html)
 
 
-### **Señor Sentinel** — April 17, 2017 at 6:31 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23305))
+
+### **Señor Sentinel** — April 17, 2017 at 6:31 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23305))
 
 > Señor Sentinel says:
 >
@@ -166,20 +166,20 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > (In the log I see that you add a file monitor at ~/.codenameone/open.txt. I don’t know if it’s relevant or important, but that file isn’t there. Just to be sure it wasn’t placed somewhere else I searched home, and it’s nowhere to be found. But, like I said, I have no idea if this is relevant at all.)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-track-designer-guibuilder-issues.html)
 
 
-### **Shai Almog** — April 18, 2017 at 5:45 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23155))
+
+### **Shai Almog** — April 18, 2017 at 5:45 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23155))
 
 > Shai Almog says:
 >
 > That’s odd. Did you change something in the IntelliJ configuration?  
 > Did you add modules or changed the default project structure?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-track-designer-guibuilder-issues.html)
 
 
-### **Señor Sentinel** — April 18, 2017 at 6:32 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23049))
+
+### **Señor Sentinel** — April 18, 2017 at 6:32 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23049))
 
 > Señor Sentinel says:
 >
@@ -198,34 +198,34 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 8\. At next launch IntelliJ wanted to update plugin to 3.6.2, which I let it do.  
 > 9\. Tried, failed.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-track-designer-guibuilder-issues.html)
 
 
-### **shannah78** — April 18, 2017 at 5:46 pm ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-24145))
+
+### **shannah78** — April 18, 2017 at 5:46 pm ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-24145))
 
 > shannah78 says:
 >
 > Looks like there is another bug in the IntelliJ plugin that prevents you from opening GUI forms that are in the root namespace. If you place your form inside a package (not just directly in your src directory), it should work. We’ll have this bug fixed with the next plugin update.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-track-designer-guibuilder-issues.html)
 
 
-### **Señor Sentinel** — April 18, 2017 at 6:02 pm ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23391))
+
+### **Señor Sentinel** — April 18, 2017 at 6:02 pm ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23391))
 
 > Señor Sentinel says:
 >
 > Ok, so I tried putting it inside a package instead, and now I didn’t get the same error anymore. But it did complain that my packagename couldn’t be found in the res/guibuilder/-path. So I created an empty directory there with the requested name and tried again. Now it complains “Couldn’t find GUI file matching: <path to=”” my=”” file=””>”. I’ve double checked the path in the error message, and that’s the exact file that I’m trying to use the GUI Builder on.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-track-designer-guibuilder-issues.html)
 
 
-### **kutoman** — November 18, 2018 at 12:02 pm ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-24034))
+
+### **kutoman** — November 18, 2018 at 12:02 pm ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-24034))
 
 > kutoman says:
 >
 > my saved states from the gui builder are not reflected on the respective java class. I’ve checked guibuilder.input, the paths are valid. There are also no errors printed when I run it over command line. I’ve recently initialized the codename one based project on IntelliJ IDEA. It’s the first time I’m using the (new) gui builder tool.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-track-designer-guibuilder-issues.html)
+
 
 ---
 

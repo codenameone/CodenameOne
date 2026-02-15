@@ -61,16 +61,16 @@ Thank you!
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Francesco Galgani** — August 23, 2021 at 6:32 am ([permalink](https://www.codenameone.com/blog/moving-the-support-to-reddit.html#comment-24476))
+### **Francesco Galgani** — August 23, 2021 at 6:32 am ([permalink](/blog/moving-the-support-to-reddit/#comment-24476))
 
 > Francesco Galgani says:
 >
 > Are there any situations where we should prefer Reddit to Stack Overflow or vice versa?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-the-support-to-reddit.html)
 
 
-### **Shai Almog** — August 24, 2021 at 1:43 am ([permalink](https://www.codenameone.com/blog/moving-the-support-to-reddit.html#comment-24477))
+
+### **Shai Almog** — August 24, 2021 at 1:43 am ([permalink](/blog/moving-the-support-to-reddit/#comment-24477))
 
 > Shai Almog says:
 >
@@ -78,16 +78,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I like SO, it takes getting used to though.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-the-support-to-reddit.html)
 
 
-### **Francesco Galgani** — August 24, 2021 at 7:28 pm ([permalink](https://www.codenameone.com/blog/moving-the-support-to-reddit.html#comment-24478))
+
+### **Francesco Galgani** — August 24, 2021 at 7:28 pm ([permalink](/blog/moving-the-support-to-reddit/#comment-24478))
 
 > Francesco Galgani says:
 >
 > Thanks for the clarification. I like Stack Overflow which I’ve gotten used to by now and I think I’ll continue to use it, but as you told the moderation is a bit too aggressive. By the way, there are borderline issues, such as asking for advice, for which Stack Overflow is not suitable and neither is Github. So I understand the choice of Reddit.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-the-support-to-reddit.html)
+
 
 ---
 

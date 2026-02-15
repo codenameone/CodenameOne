@@ -12,7 +12,7 @@ hero_image: "/uploads/Group-2270.svg"
 
 - [JavaDocs of the API's](/javadoc/)
 
-- [ Developers Guide (HTML)](/developer-guide.html)
+- [ Developers Guide (HTML)](/developer-guide/)
 
 - [The Codename One Blog](/blog/)
 
@@ -33,7 +33,7 @@ hero_image: "/uploads/Group-2270.svg"
 - **[Codename One Academy](https://debugagent.com/series/cn1)**  
   A complete set of free courses that cover everything from basics to full featured real world app development.
 
-- **[Tutorials & Documentation List](/developer-guide.html)**  
+- **[Tutorials & Documentation List](/developer-guide/)**  
   An exhaustive list of tutorials and references in both written and video form.
 
 - **[Tutorial Tag In the Blog](/blog/)**  

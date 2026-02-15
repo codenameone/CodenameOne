@@ -49,15 +49,15 @@ within the javadocs.
 #### New Features/Enhancements
 
 In direct contrast to the statement above, some features did get thru despite our best efforts…  
-We added [getActualComponent()](https://www.codenameone.com/javadoc/com/codename1/ui/events/ActionEvent.html#getActualComponent--)  
-to [ActionEvent](https://www.codenameone.com/javadoc/com/codename1/ui/events/ActionEvent.html),  
+We added [getActualComponent()](/javadoc/com/codename1/ui/events/ActionEvent/#getActualComponent--)  
+to [ActionEvent](/javadoc/com/codename1/ui/events/ActionEvent/),  
 this allows us to handle events better for lead components such  
-as [MultiButton](https://www.codenameone.com/javadoc/com/codename1/components/MultiButton.html). 
+as [MultiButton](/javadoc/com/codename1/components/MultiButton/). 
 
 Finally we added terse  
-[encloseIn](https://www.codenameone.com/javadoc/com/codename1/ui/table/TableLayout.html#encloseIn-int-com.codename1.ui.Component...-)  
+[encloseIn](/javadoc/com/codename1/ui/table/TableLayout/#encloseIn-int-com.codename1.ui.Component...-)  
 methods to the  
-[TableLayout](https://www.codenameone.com/javadoc/com/codename1/ui/table/TableLayout.html)  
+[TableLayout](/javadoc/com/codename1/ui/table/TableLayout/)  
 class.
 ---
 
@@ -66,21 +66,21 @@ class.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — February 2, 2016 at 8:13 am ([permalink](https://www.codenameone.com/blog/parse-docs-updates.html#comment-22476))
+### **Chidiebere Okwudire** — February 2, 2016 at 8:13 am ([permalink](/blog/parse-docs-updates/#comment-22476))
 
 > Chidiebere Okwudire says:
 >
 > With regard to alternatives to Parse, I just came across this github repo: [https://github.com/relatedc…](<https://github.com/relatedcode/ParseAlternatives>)
 
 
-### **Jérémy MARQUER** — February 2, 2016 at 8:42 am ([permalink](https://www.codenameone.com/blog/parse-docs-updates.html#comment-22648))
+### **Jérémy MARQUER** — February 2, 2016 at 8:42 am ([permalink](/blog/parse-docs-updates/#comment-22648))
 
 > Jérémy MARQUER says:
 >
 > I’m pretty agree with the “Slowing Down New Feature Development” paragraph, but I find it unfortunate that you will post less news … It allows us (devs) to stay in touch with your development !
 
 
-### **Shai Almog** — February 3, 2016 at 3:29 am ([permalink](https://www.codenameone.com/blog/parse-docs-updates.html#comment-22551))
+### **Shai Almog** — February 3, 2016 at 3:29 am ([permalink](/blog/parse-docs-updates/#comment-22551))
 
 > Shai Almog says:
 >
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > BTW slant has a Codename One entry that could probably use some love.
 
 
-### **Shai Almog** — February 3, 2016 at 3:32 am ([permalink](https://www.codenameone.com/blog/parse-docs-updates.html#comment-22183))
+### **Shai Almog** — February 3, 2016 at 3:32 am ([permalink](/blog/parse-docs-updates/#comment-22183))
 
 > Shai Almog says:
 >

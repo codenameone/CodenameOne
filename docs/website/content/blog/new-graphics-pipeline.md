@@ -42,16 +42,16 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — June 12, 2014 at 9:14 pm ([permalink](https://www.codenameone.com/blog/new-graphics-pipeline.html#comment-21805))
+### **Anonymous** — June 12, 2014 at 9:14 pm ([permalink](/blog/new-graphics-pipeline/#comment-21805))
 
 > Anonymous says:
 >
 > Does the Android version use Opengl for drawing or draws in Canvas? How suitable is this for intense animations or games?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-graphics-pipeline.html)
 
 
-### **Anonymous** — June 13, 2014 at 2:44 am ([permalink](https://www.codenameone.com/blog/new-graphics-pipeline.html#comment-24214))
+
+### **Anonymous** — June 13, 2014 at 2:44 am ([permalink](/blog/new-graphics-pipeline/#comment-24214))
 
 > Anonymous says:
 >
@@ -61,10 +61,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Our current focus is on apps and to a lesser degree on lightweight games. If you have a need for intense animations or high framerate animations you would probably need to use native code at this time.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-graphics-pipeline.html)
 
 
-### **Anonymous** — June 16, 2014 at 9:00 am ([permalink](https://www.codenameone.com/blog/new-graphics-pipeline.html#comment-22039))
+
+### **Anonymous** — June 16, 2014 at 9:00 am ([permalink](/blog/new-graphics-pipeline/#comment-22039))
 
 > Anonymous says:
 >
@@ -74,19 +74,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-graphics-pipeline.html)
 
 
-### **Anonymous** — June 16, 2014 at 1:08 pm ([permalink](https://www.codenameone.com/blog/new-graphics-pipeline.html#comment-22067))
+
+### **Anonymous** — June 16, 2014 at 1:08 pm ([permalink](/blog/new-graphics-pipeline/#comment-22067))
 
 > Anonymous says:
 >
 > Not much, but the Graphics class and the geom package should contain all the relevant methods/classes.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-graphics-pipeline.html)
 
 
-### **Anonymous** — June 17, 2014 at 11:46 am ([permalink](https://www.codenameone.com/blog/new-graphics-pipeline.html#comment-22050))
+
+### **Anonymous** — June 17, 2014 at 11:46 am ([permalink](/blog/new-graphics-pipeline/#comment-22050))
 
 > Anonymous says:
 >
@@ -96,16 +96,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-graphics-pipeline.html)
 
 
-### **Anonymous** — June 17, 2014 at 4:49 pm ([permalink](https://www.codenameone.com/blog/new-graphics-pipeline.html#comment-21977))
+
+### **Anonymous** — June 17, 2014 at 4:49 pm ([permalink](/blog/new-graphics-pipeline/#comment-21977))
 
 > Anonymous says:
 >
 > Not yet. However, since we use shaders many special effects can be moved into the pipeline such as gradients, shaped clipping, etc. We are reserving these to future incremental enhancements based on user feedback.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-graphics-pipeline.html)
+
 
 ---
 

@@ -114,22 +114,22 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 13, 2015 at 7:17 am ([permalink](https://www.codenameone.com/blog/windows-phone-improvements-build-screenshots.html#comment-22201))
+### **Anonymous** — March 13, 2015 at 7:17 am ([permalink](/blog/windows-phone-improvements-build-screenshots/#comment-22201))
 
 > Anonymous says:
 >
 > It might work we haven’t tested that
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwindows-phone-improvements-build-screenshots.html)
 
 
-### **Anonymous** — March 13, 2015 at 7:17 am ([permalink](https://www.codenameone.com/blog/windows-phone-improvements-build-screenshots.html#comment-22273))
+
+### **Anonymous** — March 13, 2015 at 7:17 am ([permalink](/blog/windows-phone-improvements-build-screenshots/#comment-22273))
 
 > Anonymous says:
 >
 > Is it just QR code support or can you also scan conventional barcodes now, UPC, EAN etc.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwindows-phone-improvements-build-screenshots.html)
+
 
 ---
 

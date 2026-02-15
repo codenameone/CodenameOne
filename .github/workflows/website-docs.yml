@@ -72,6 +72,35 @@ jobs:
           WEBSITE_INCLUDE_JAVADOCS: "true"
           WEBSITE_INCLUDE_DEVGUIDE: "true"
 
+      - name: Validate internal links and images
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --offline
+            --no-progress
+            docs/website/public/**/*.html
+
+      - name: Reject absolute codenameone.com links
+        run: |
+          set -euo pipefail
+          report="docs/website/reports/disallowed-codenameone-links.txt"
+          mkdir -p "$(dirname "$report")"
+          rg -n --no-heading -S '\]\((https?:)?//(www\.)?codenameone\.com([/:?#)]|$)|<https?://(www\.)?codenameone\.com([/:?#>]|$)|(href|src)=["'"'"']https?://(www\.)?codenameone\.com([/:?#]|$)' \
+            docs/website/content docs/website/layouts docs/website/static > "$report" || true
+          if [ -s "$report" ]; then
+            echo "Disallowed absolute codenameone.com links found (use relative URLs or non-www subdomains):" >&2
+            sed -n '1,200p' "$report" >&2
+            exit 1
+          fi
+
+      - name: Upload codenameone link policy report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: codenameone-link-policy-report
+          path: docs/website/reports/disallowed-codenameone-links.txt
+          if-no-files-found: ignore
+
       - name: Validate OTA skin output
         run: |
           set -euo pipefail

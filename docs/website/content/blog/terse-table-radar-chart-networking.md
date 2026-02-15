@@ -15,7 +15,7 @@ This is the 3rd installment of the updates we did over the summer and so far it 
 
 ### Terse Table Layout
 
-`TableLayout` is pretty darn verbose e.g. this snippet from the [TableLayout JavaDoc](https://www.codenameone.com/javadoc/com/codename1/ui/table/TableLayout.html):
+`TableLayout` is pretty darn verbose e.g. this snippet from the [TableLayout JavaDoc](/javadoc/com/codename1/ui/table/TableLayout/):
     
     
     cnt.add(tl.createConstraint().
@@ -67,7 +67,7 @@ As such we can rewrite the snippet above as such:
 
 ### RadarChart
 
-[David Day](https://github.com/dj6082013) contributed new support for `RadarChart` in this [pull request](https://github.com/codenameone/CodenameOne/pull/2876). You can check out a sample of the radar chart in the [samples](https://www.codenameone.com/blog/sheets-samples.html). Specifically:
+[David Day](https://github.com/dj6082013) contributed new support for `RadarChart` in this [pull request](https://github.com/codenameone/CodenameOne/pull/2876). You can check out a sample of the radar chart in the [samples](/blog/sheets-samples/). Specifically:
     
     
     public void showChart() {

@@ -126,16 +126,16 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — September 9, 2013 at 8:55 am ([permalink](https://www.codenameone.com/blog/faster-ios-runtime-javazone-edition.html#comment-21957))
+### **Anonymous** — September 9, 2013 at 8:55 am ([permalink](/blog/faster-ios-runtime-javazone-edition/#comment-21957))
 
 > Anonymous says:
 >
 > how much weight this total stuff 😉 ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffaster-ios-runtime-javazone-edition.html)
 
 
-### **Anonymous** — September 20, 2013 at 8:33 am ([permalink](https://www.codenameone.com/blog/faster-ios-runtime-javazone-edition.html#comment-22023))
+
+### **Anonymous** — September 20, 2013 at 8:33 am ([permalink](/blog/faster-ios-runtime-javazone-edition/#comment-22023))
 
 > Anonymous says:
 >
@@ -145,28 +145,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think you can make considerable speed savings with those techniques, and they aren’t that hard to implement. Importantly, you don’t change the semantics of the code at all…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffaster-ios-runtime-javazone-edition.html)
 
 
-### **Anonymous** — September 20, 2013 at 2:17 pm ([permalink](https://www.codenameone.com/blog/faster-ios-runtime-javazone-edition.html#comment-21930))
+
+### **Anonymous** — September 20, 2013 at 2:17 pm ([permalink](/blog/faster-ios-runtime-javazone-edition/#comment-21930))
 
 > Anonymous says:
 >
 > Back breaking weight…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffaster-ios-runtime-javazone-edition.html)
 
 
-### **Anonymous** — September 20, 2013 at 2:18 pm ([permalink](https://www.codenameone.com/blog/faster-ios-runtime-javazone-edition.html#comment-21628))
+
+### **Anonymous** — September 20, 2013 at 2:18 pm ([permalink](/blog/faster-ios-runtime-javazone-edition/#comment-21628))
 
 > Anonymous says:
 >
 > True, the main cost though is in loops.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffaster-ios-runtime-javazone-edition.html)
 
 
-### **Anonymous** — September 23, 2013 at 5:50 am ([permalink](https://www.codenameone.com/blog/faster-ios-runtime-javazone-edition.html#comment-21980))
+
+### **Anonymous** — September 23, 2013 at 5:50 am ([permalink](/blog/faster-ios-runtime-javazone-edition/#comment-21980))
 
 > Anonymous says:
 >
@@ -174,10 +174,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Anyway, my question was: do you do any of those optimisations when ios.unsafe = false?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffaster-ios-runtime-javazone-edition.html)
 
 
-### **Anonymous** — September 23, 2013 at 8:56 am ([permalink](https://www.codenameone.com/blog/faster-ios-runtime-javazone-edition.html#comment-21965))
+
+### **Anonymous** — September 23, 2013 at 8:56 am ([permalink](/blog/faster-ios-runtime-javazone-edition/#comment-21965))
 
 > Anonymous says:
 >
@@ -187,28 +187,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > (Replying to myself since blog software supports limited nesting)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffaster-ios-runtime-javazone-edition.html)
 
 
-### **Anonymous** — January 10, 2014 at 12:07 am ([permalink](https://www.codenameone.com/blog/faster-ios-runtime-javazone-edition.html#comment-21959))
+
+### **Anonymous** — January 10, 2014 at 12:07 am ([permalink](/blog/faster-ios-runtime-javazone-edition/#comment-21959))
 
 > Anonymous says:
 >
 > So what happens when things crash with this flag set? App just vanishes with no message? Im going to turn it on right now!!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffaster-ios-runtime-javazone-edition.html)
 
 
-### **Anonymous** — January 10, 2014 at 12:12 am ([permalink](https://www.codenameone.com/blog/faster-ios-runtime-javazone-edition.html#comment-21882))
+
+### **Anonymous** — January 10, 2014 at 12:12 am ([permalink](/blog/faster-ios-runtime-javazone-edition/#comment-21882))
 
 > Anonymous says:
 >
 > ps – does this mean it will run faster than Android? or not ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffaster-ios-runtime-javazone-edition.html)
 
 
-### **Anonymous** — January 10, 2014 at 2:50 am ([permalink](https://www.codenameone.com/blog/faster-ios-runtime-javazone-edition.html#comment-22056))
+
+### **Anonymous** — January 10, 2014 at 2:50 am ([permalink](/blog/faster-ios-runtime-javazone-edition/#comment-22056))
 
 > Anonymous says:
 >
@@ -216,7 +216,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Android has a JIT, static compilation can’t beat JIT for some use cases.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffaster-ios-runtime-javazone-edition.html)
+
 
 ---
 

@@ -29,13 +29,13 @@ This is something we hope to remedy now that with the results of our recent effo
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **beck** — February 17, 2017 at 6:26 pm ([permalink](https://www.codenameone.com/blog/questions-of-the-week-43.html#comment-23278))
+### **beck** — February 17, 2017 at 6:26 pm ([permalink](/blog/questions-of-the-week-43/#comment-23278))
 
 > beck says:
 >
 > Thankyou shai.. much appreciated. It works in older devices but in marshmallow there is a permission denial error. Please have a look [http://stackoverflow.com/qu…](<http://stackoverflow.com/questions/42082234/littlemonkey-qrscanner-library-build-issue>) thankyou
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fquestions-of-the-week-43.html)
+
 
 ---
 

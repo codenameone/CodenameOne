@@ -69,22 +69,22 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — November 15, 2013 at 4:15 pm ([permalink](https://www.codenameone.com/blog/lts-blog-post-and-updates.html#comment-21715))
+### **Anonymous** — November 15, 2013 at 4:15 pm ([permalink](/blog/lts-blog-post-and-updates/#comment-21715))
 
 > Anonymous says:
 >
 > Please keep us informed how things are going on IntelliJ plugin and post a link to a stable beta whenever time comes.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flts-blog-post-and-updates.html)
 
 
-### **Anonymous** — November 15, 2013 at 6:38 pm ([permalink](https://www.codenameone.com/blog/lts-blog-post-and-updates.html#comment-21827))
+
+### **Anonymous** — November 15, 2013 at 6:38 pm ([permalink](/blog/lts-blog-post-and-updates/#comment-21827))
 
 > Anonymous says:
 >
 > There will be posts on the blog etc. when everything is available, I hope to provide better details of our release plan next week.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flts-blog-post-and-updates.html)
+
 
 ---
 

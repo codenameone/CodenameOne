@@ -32,7 +32,7 @@ slug: "home-test"
 
 #### Write, debug, and test apps all inside your IDE **(IntelliJ, Eclipse, VSCode or NetBeans)** using the Codename One simulator. One click for app-store ready device builds, without the headache of maintaining native SDKs.
 
-[Learn about the Development Environment](https://www.codenameone.com/development-environment.html)
+[Learn about the Development Environment](/development-environment/)
 
 ## Pixel Perfect Design
 
@@ -138,32 +138,30 @@ BeRider Shared electric scooters in Prague. Highly rated app with Google Maps in
 
 ## Blog
 
-[](https://www.codenameone.com/blog/new-css-units-in-codename-one-apps.html)![New CSS Units in Codename One Apps](/uploads/New-CSS-Units-in-Codename-One-Apps.jpg)[](https://www.codenameone.com/blog/new-css-units-in-codename-one-apps.html)
+[](/blog/new-css-units-in-codename-one-apps/)![New CSS Units in Codename One Apps](/uploads/New-CSS-Units-in-Codename-One-Apps.jpg)[](/blog/new-css-units-in-codename-one-apps/)
 
-## [New CSS Units in Codename One Apps](https://www.codenameone.com/blog/new-css-units-in-codename-one-apps.html "New CSS Units in Codename One Apps")
+## [New CSS Units in Codename One Apps](/blog/new-css-units-in-codename-one-apps/ "New CSS Units in Codename One Apps")
 
-[](https://www.codenameone.com/blog/new-css-units-in-codename-one-apps.html)July 7, 2021
+[](/blog/new-css-units-in-codename-one-apps/)July 7, 2021
 
-[](https://www.codenameone.com/blog/moving-to-api-level-30.html)![](/uploads/generic-java-2.jpg)[](https://www.codenameone.com/blog/moving-to-api-level-30.html)
+[](/blog/moving-to-api-level-30/)![](/uploads/generic-java-2.jpg)[](/blog/moving-to-api-level-30/)
 
-## [Moving to API Level 30](https://www.codenameone.com/blog/moving-to-api-level-30.html "Moving to API Level 30")
+## [Moving to API Level 30](/blog/moving-to-api-level-30/ "Moving to API Level 30")
 
-[](https://www.codenameone.com/blog/moving-to-api-level-30.html)July 6, 2021
+[](/blog/moving-to-api-level-30/)July 6, 2021
 
-[](https://www.codenameone.com/blog/tips-for-the-javascript-port-of-codename-one-apps.html)![Tips for the Javascript port of Codename One apps](/uploads/Tips-for-the-Javascript-port-of-Codename-One-apps.jpg)[](https://www.codenameone.com/blog/tips-for-the-javascript-port-of-codename-one-apps.html)
+## [Tips for the Javascript port of Codename One apps](/blog/tips-for-the-javascript-port-of-codename-one-apps)
 
-## [Tips for the Javascript port of Codename One apps](https://www.codenameone.com/blog/tips-for-the-javascript-port-of-codename-one-apps.html "Tips for the Javascript port of Codename One apps")
+[](/blog/tips-for-the-javascript-port-of-codename-one-apps/)May 31, 2021
 
-[](https://www.codenameone.com/blog/tips-for-the-javascript-port-of-codename-one-apps.html)May 31, 2021
+[](/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background/)![How to make your Codename One apps more secure?](/uploads/How-to-make-your-Codename-One-apps-more-secure.jpg)[](/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background/)
 
-[](https://www.codenameone.com/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background.html)![How to make your Codename One apps more secure?](/uploads/How-to-make-your-Codename-One-apps-more-secure.jpg)[](https://www.codenameone.com/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background.html)
+## [How to detect Jailbroken or Rooted device and hide sensitive data in background?](/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background/ "How to detect Jailbroken or Rooted device and hide sensitive data in background?")
 
-## [How to detect Jailbroken or Rooted device and hide sensitive data in background?](https://www.codenameone.com/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background.html "How to detect Jailbroken or Rooted device and hide sensitive data in background?")
+[](/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background/)May 21, 2021
 
-[](https://www.codenameone.com/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background.html)May 21, 2021
+[](/blog/android-app-bundle-support/)![Google App Bundle Support - Codename One](/uploads/Google-App-Bundle-Support.jpg)[](/blog/android-app-bundle-support/)
 
-[](https://www.codenameone.com/blog/android-app-bundle-support.html)![Google App Bundle Support - Codename One](/uploads/Google-App-Bundle-Support.jpg)[](https://www.codenameone.com/blog/android-app-bundle-support.html)
+## [Android App Bundle Support](/blog/android-app-bundle-support/ "Android App Bundle Support")
 
-## [Android App Bundle Support](https://www.codenameone.com/blog/android-app-bundle-support.html "Android App Bundle Support")
-
-[](https://www.codenameone.com/blog/android-app-bundle-support.html)May 8, 2021
+[](/blog/android-app-bundle-support/)May 8, 2021

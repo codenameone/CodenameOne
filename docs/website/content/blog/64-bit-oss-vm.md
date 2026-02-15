@@ -56,22 +56,22 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — November 10, 2014 at 8:13 am ([permalink](https://www.codenameone.com/blog/64-bit-oss-vm.html#comment-21907))
+### **Anonymous** — November 10, 2014 at 8:13 am ([permalink](/blog/64-bit-oss-vm/#comment-21907))
 
 > Anonymous says:
 >
 > I got an error when I tried to build with the new vm
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2F64-bit-oss-vm.html)
 
 
-### **Anonymous** — November 26, 2014 at 8:14 am ([permalink](https://www.codenameone.com/blog/64-bit-oss-vm.html#comment-22175))
+
+### **Anonymous** — November 26, 2014 at 8:14 am ([permalink](/blog/64-bit-oss-vm/#comment-22175))
 
 > Anonymous says:
 >
 > Can you post on the forum with more details e.g. build error log?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2F64-bit-oss-vm.html)
+
 
 ---
 

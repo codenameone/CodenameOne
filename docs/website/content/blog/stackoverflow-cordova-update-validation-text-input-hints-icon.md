@@ -102,7 +102,7 @@ run I think this is a huge improvement.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — December 9, 2015 at 10:46 am ([permalink](https://www.codenameone.com/blog/stackoverflow-cordova-update-validation-text-input-hints-icon.html#comment-22589))
+### **Diamond** — December 9, 2015 at 10:46 am ([permalink](/blog/stackoverflow-cordova-update-validation-text-input-hints-icon/#comment-22589))
 
 > Diamond says:
 >
@@ -116,10 +116,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can FloatingHint be modified to allow the empty space that holds the Label to be hidden when nothing is there and grow during the animation process? Right now the space between fields is too large due to that and doesn’t make forms look good.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstackoverflow-cordova-update-validation-text-input-hints-icon.html)
 
 
-### **Shai Almog** — December 9, 2015 at 11:58 am ([permalink](https://www.codenameone.com/blog/stackoverflow-cordova-update-validation-text-input-hints-icon.html#comment-22597))
+
+### **Shai Almog** — December 9, 2015 at 11:58 am ([permalink](/blog/stackoverflow-cordova-update-validation-text-input-hints-icon/#comment-22597))
 
 > Shai Almog says:
 >
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’d like to provide that option in floating hint but its non-trivial in the current animation architecture since it would require growing in two containers which means using animateHierarchy and that API is a bit flaky. I’m looking at rewriting our animation logic to address some core issues in Codename One and allow some seriously cool effects including this sort of effect.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstackoverflow-cordova-update-validation-text-input-hints-icon.html)
+
 
 ---
 

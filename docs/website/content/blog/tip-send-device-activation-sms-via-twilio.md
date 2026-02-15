@@ -110,13 +110,13 @@ Next time I’ll talk about doing the actual activation process and maybe discus
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Gareth Murfin** — October 5, 2018 at 8:23 pm ([permalink](https://www.codenameone.com/blog/tip-send-device-activation-sms-via-twilio.html#comment-24079))
+### **Gareth Murfin** — October 5, 2018 at 8:23 pm ([permalink](/blog/tip-send-device-activation-sms-via-twilio/#comment-24079))
 
 > Gareth Murfin says:
 >
 > Awesome, I would LOVE a twilio library for cn1,to abstract away from their HELL.. ! using it right now on android, what a mess….
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-send-device-activation-sms-via-twilio.html)
+
 
 ---
 

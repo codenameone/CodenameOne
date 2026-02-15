@@ -36,7 +36,7 @@ this time around.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Alexandre Richonnier** — March 28, 2015 at 1:24 pm ([permalink](https://www.codenameone.com/blog/github-migration-plan.html#comment-22248))
+### **Alexandre Richonnier** — March 28, 2015 at 1:24 pm ([permalink](/blog/github-migration-plan/#comment-22248))
 
 > Alexandre Richonnier says:
 >
@@ -44,20 +44,20 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > For open source projects, there ‘s no limit.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgithub-migration-plan.html)
 
 
-### **Shai Almog** — March 28, 2015 at 3:01 pm ([permalink](https://www.codenameone.com/blog/github-migration-plan.html#comment-22261))
+
+### **Shai Almog** — March 28, 2015 at 3:01 pm ([permalink](/blog/github-migration-plan/#comment-22261))
 
 > Shai Almog says:
 >
 > We looked at that and several others. While I’d love that it does seem that pretty much everyone is going to Github.  
 > I like Github in general, the site and tools are amazing. I think the main problem is git itself but since most people are moving in that direction we should probably align rather than fight it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgithub-migration-plan.html)
 
 
-### **cvconover** — August 11, 2015 at 12:58 pm ([permalink](https://www.codenameone.com/blog/github-migration-plan.html#comment-22435))
+
+### **cvconover** — August 11, 2015 at 12:58 pm ([permalink](/blog/github-migration-plan/#comment-22435))
 
 > cvconover says:
 >
@@ -68,10 +68,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Cheers  
 > Craig
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgithub-migration-plan.html)
 
 
-### **Shai Almog** — August 11, 2015 at 2:02 pm ([permalink](https://www.codenameone.com/blog/github-migration-plan.html#comment-21545))
+
+### **Shai Almog** — August 11, 2015 at 2:02 pm ([permalink](/blog/github-migration-plan/#comment-21545))
 
 > Shai Almog says:
 >
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Overall, I’m much happier with Git today and I’m generally happy we made the move.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgithub-migration-plan.html)
+
 
 ---
 

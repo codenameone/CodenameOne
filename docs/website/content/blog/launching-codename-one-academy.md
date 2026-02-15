@@ -64,35 +64,35 @@ Thanks again for all the feedback it’s very much appreciated and this just wou
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Dalvik** — June 26, 2017 at 12:09 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23432))
+### **Dalvik** — June 26, 2017 at 12:09 pm ([permalink](/blog/launching-codename-one-academy/#comment-23432))
 
 > Great!  
 > Just signed up to the full package 😉
 >
 > Thanks for the new survey I’m one of the guys who voted for Uber so I changed my vote to a whatsapp clone here.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **Francesco Galgani** — June 26, 2017 at 3:39 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-21863))
+
+### **Francesco Galgani** — June 26, 2017 at 3:39 pm ([permalink](/blog/launching-codename-one-academy/#comment-21863))
 
 > Francesco Galgani says:
 >
 > Any extra discount for the PRO developers?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **Shai Almog** — June 26, 2017 at 4:12 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23547))
+
+### **Shai Almog** — June 26, 2017 at 4:12 pm ([permalink](/blog/launching-codename-one-academy/#comment-23547))
 
 > Shai Almog says:
 >
 > FYI you are in a serious minority as this seems to have flipped with the removal of Uber but things like this can change in an instant… [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/651d65b7d5bc648698cf133b10285a7c0de988b1247655484780e11f4aac9635.png>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **Shai Almog** — June 26, 2017 at 4:16 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23643))
+
+### **Shai Almog** — June 26, 2017 at 4:16 pm ([permalink](/blog/launching-codename-one-academy/#comment-23643))
 
 > Shai Almog says:
 >
@@ -101,65 +101,65 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We charge for them so we’ll have the financial incentive to keep enhancing and growing them.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **salah Alhaddabi** — June 26, 2017 at 5:53 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23635))
+
+### **salah Alhaddabi** — June 26, 2017 at 5:53 pm ([permalink](/blog/launching-codename-one-academy/#comment-23635))
 
 > salah Alhaddabi says:
 >
 > Already signed up and enrolled in all courses. I think i will skip the spring part and focus on building the UI only as i am only using java ee 7 instead of spring.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **Shai Almog** — June 26, 2017 at 7:09 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23480))
+
+### **Shai Almog** — June 26, 2017 at 7:09 pm ([permalink](/blog/launching-codename-one-academy/#comment-23480))
 
 > Shai Almog says:
 >
 > Thanks!  
 > I was never a fan of Spring but Spring Boot won me over… It has some pretty spectacular ideas and brings Java to the level of agility normally reserved to scripting languages.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **Michael Lindvall** — June 26, 2017 at 7:57 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23484))
+
+### **Michael Lindvall** — June 26, 2017 at 7:57 pm ([permalink](/blog/launching-codename-one-academy/#comment-23484))
 
 > Michael Lindvall says:
 >
 > I’m looking forward to all the material you’re sharing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **bryan** — June 26, 2017 at 8:06 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23203))
+
+### **bryan** — June 26, 2017 at 8:06 pm ([permalink](/blog/launching-codename-one-academy/#comment-23203))
 
 > bryan says:
 >
 > Looking at the curriculum for the courses, I get the impression that you might be moving towards styling forms via CSS rather than themes ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **Stephen Aitchison** — June 27, 2017 at 12:03 am ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23509))
+
+### **Stephen Aitchison** — June 27, 2017 at 12:03 am ([permalink](/blog/launching-codename-one-academy/#comment-23509))
 
 > Stephen Aitchison says:
 >
 > was thinking about learning more on Codename One, but I want to find some tutorials on how to learn without the initial investiment upfront.. do you know of any good resources that you would suggest?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **Shai Almog** — June 27, 2017 at 3:38 am ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23405))
+
+### **Shai Almog** — June 27, 2017 at 3:38 am ([permalink](/blog/launching-codename-one-academy/#comment-23405))
 
 > Shai Almog says:
 >
 > There is a relatively big free course in that package for just that case. It’s not as refined as the other courses because I did it first (I will hopefully get the time to go back and polish it). But it still contains a lot of practical and important information.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **Shai Almog** — June 27, 2017 at 3:41 am ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23417))
+
+### **Shai Almog** — June 27, 2017 at 3:41 am ([permalink](/blog/launching-codename-one-academy/#comment-23417))
 
 > Shai Almog says:
 >
@@ -167,47 +167,47 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The restaurant builder app generates versions of the restaurant app and customizing CSS in a code generator seems easier than the alternative.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **Amuche Chimezie** — June 28, 2017 at 9:47 am ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23453))
+
+### **Amuche Chimezie** — June 28, 2017 at 9:47 am ([permalink](/blog/launching-codename-one-academy/#comment-23453))
 
 > Amuche Chimezie says:
 >
 > Hi Shai, Just seeing this today. Just to be sure before I sign up. With $200 I get access to Deep Dive into Mobile and Build Real World Full Stack Mobile Apps in Java bundles right?  
 > An urgent feedback please to enable me close out on this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **Shai Almog** — June 29, 2017 at 3:32 am ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-22281))
+
+### **Shai Almog** — June 29, 2017 at 3:32 am ([permalink](/blog/launching-codename-one-academy/#comment-22281))
 
 > Shai Almog says:
 >
 > When you purchase build real world full stack mobile apps the deep dive is included.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **João Bastos** — June 29, 2017 at 11:30 am ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23433))
+
+### **João Bastos** — June 29, 2017 at 11:30 am ([permalink](/blog/launching-codename-one-academy/#comment-23433))
 
 > João Bastos says:
 >
 > All-in!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **Francesco Galgani** — June 29, 2017 at 1:43 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23489))
+
+### **Francesco Galgani** — June 29, 2017 at 1:43 pm ([permalink](/blog/launching-codename-one-academy/#comment-23489))
 
 > Francesco Galgani says:
 >
 > I’m enrolled in Build Real World Full Stack Mobile Apps in Java. You wrote that is costs 199USD or six installments of 39USD. I paid the first installment, I expected to pay 39USD, but you charged me 47.6USD. Ok, it’s not a problem, but in my opinion it’s not correct to show prices without saying that taxes will be added to them at the payment. What taxes have I paid for? I live outside the United States.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **Shai Almog** — June 29, 2017 at 1:52 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23548))
+
+### **Shai Almog** — June 29, 2017 at 1:52 pm ([permalink](/blog/launching-codename-one-academy/#comment-23548))
 
 > Shai Almog says:
 >
@@ -215,25 +215,25 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Just so we are clear any extra amount you pay doesn’t get to us as it’s deducted immediately.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **Francesco Galgani** — June 29, 2017 at 1:55 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23644))
+
+### **Francesco Galgani** — June 29, 2017 at 1:55 pm ([permalink](/blog/launching-codename-one-academy/#comment-23644))
 
 > Francesco Galgani says:
 >
 > Ok
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
 
 
-### **Amuche Chimezie** — July 3, 2017 at 8:13 am ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23601))
+
+### **Amuche Chimezie** — July 3, 2017 at 8:13 am ([permalink](/blog/launching-codename-one-academy/#comment-23601))
 
 > Amuche Chimezie says:
 >
 > Made Payments. Please help confirm.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Flaunching-codename-one-academy.html)
+
 
 ---
 

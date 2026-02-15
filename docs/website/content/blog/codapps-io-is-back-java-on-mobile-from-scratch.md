@@ -33,10 +33,10 @@ when you are completely new to Java.
 
 Here are some helpful resources to get you started:
 
-  * [Component Gallery](https://www.codenameone.com/javadoc/com/codename1/ui/package-summary.html) – shows  
+  * [Component Gallery](/javadoc/com/codename1/ui/package-summary/) – shows  
 the common components that are a part of Codename One in a visual index
 
-  * [Layout gallery](https://www.codenameone.com/javadoc/com/codename1/ui/layouts/package-summary.html) –  
+  * [Layout gallery](/javadoc/com/codename1/ui/layouts/package-summary/) –  
 layouts are one of the hardest concepts to grasp in Codename One, this visual gallery covers the basic Codename One  
 layout managers
 
@@ -44,7 +44,7 @@ layout managers
 API and what’s available in it you can search any method/class by clicking one of the index files  
 Developer guide
 
-  * [Demos](/demos.html) – the Codename One demos e.g. the [Kitchen Sink](/demos-KitchenSink.html) are a  
+  * [Demos](/demos.html) – the Codename One demos e.g. the [Kitchen Sink](/kitchen-sink/) are a  
 great place to start. You can create most demos by just going thru the wizard process by selecting  
 New Project → Codename One → Demos →#Name of demo#
 

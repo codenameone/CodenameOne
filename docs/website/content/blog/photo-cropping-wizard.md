@@ -118,11 +118,11 @@ To get to that point we need the UI that invokes this code which looks like this
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — May 29, 2019 at 5:08 pm ([permalink](https://www.codenameone.com/blog/photo-cropping-wizard.html#comment-23584))
+### **Francesco Galgani** — May 29, 2019 at 5:08 pm ([permalink](/blog/photo-cropping-wizard/#comment-23584))
 
 > Thank you Shai 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fphoto-cropping-wizard.html)
+
 
 ---
 

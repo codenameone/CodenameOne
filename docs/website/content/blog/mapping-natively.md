@@ -94,34 +94,34 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 17, 2014 at 3:22 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22095))
+### **Anonymous** — March 17, 2014 at 3:22 pm ([permalink](/blog/mapping-natively/#comment-22095))
 
 > Anonymous says:
 >
 > I really like this approach of introducing new features as modules. This enables us to drill down to the core of what CN1 is. In the future it might even be possible to incorporate a sort of package manager into the designer to automatically load the modules that you need for your project. Sort of like developing Netbeans platform plugins. I know we’re a ways away from that, but this small step of introducing maps as a separate module is perhaps a precedent-setting step in the right direction.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Anonymous** — March 17, 2014 at 6:51 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21791))
+
+### **Anonymous** — March 17, 2014 at 6:51 pm ([permalink](/blog/mapping-natively/#comment-21791))
 
 > Anonymous says:
 >
 > I’ve only used the MapComponent very simply, so am not really across any issues with it, so I’m wondering what the extra complexity of native maps buys me ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Anonymous** — March 17, 2014 at 8:50 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21723))
+
+### **Anonymous** — March 17, 2014 at 8:50 pm ([permalink](/blog/mapping-natively/#comment-21723))
 
 > Anonymous says:
 >
 > Excellent, thanks for this. I’ve just tried it with my own API keys (that is a debacle – thanks Google) but once set up it works great. Hopefully the graphical glitches can be addressed sometime but its looking and performing great.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Anonymous** — March 18, 2014 at 2:59 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21710))
+
+### **Anonymous** — March 18, 2014 at 2:59 am ([permalink](/blog/mapping-natively/#comment-21710))
 
 > Anonymous says:
 >
@@ -129,19 +129,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The main reason we didn’t add this back is that we want to migrate to a new designer architecture eventually. This is still in drawing board stages but we have a pretty good idea of where we want to go here.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Anonymous** — March 18, 2014 at 3:00 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21724))
+
+### **Anonymous** — March 18, 2014 at 3:00 am ([permalink](/blog/mapping-natively/#comment-21724))
 
 > Anonymous says:
 >
 > Its mostly a matter of feel/performance. The native map is very fluid and fast, Google wrote it on OpenGL using vector graphics and its really smooth.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Anonymous** — March 20, 2014 at 7:19 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22076))
+
+### **Anonymous** — March 20, 2014 at 7:19 am ([permalink](/blog/mapping-natively/#comment-22076))
 
 > Anonymous says:
 >
@@ -149,64 +149,64 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Reason being I think users will complain about the blank screen, because they are used to seeing the map in the background.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Anonymous** — March 20, 2014 at 4:36 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21960))
+
+### **Anonymous** — March 20, 2014 at 4:36 pm ([permalink](/blog/mapping-natively/#comment-21960))
 
 > Anonymous says:
 >
 > We do that automatically for all peer components. Map is special (check the code to understand why) we had an issue in the AndroidPeer which should be fixed in current builds.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Anonymous** — March 21, 2014 at 1:36 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21883))
+
+### **Anonymous** — March 21, 2014 at 1:36 pm ([permalink](/blog/mapping-natively/#comment-21883))
 
 > Anonymous says:
 >
 > Hi I have just updated my SVN CN1 source project and refreshed libs. The Google map still becomes blank when a dialog is displayed.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Anonymous** — March 21, 2014 at 1:37 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22057))
+
+### **Anonymous** — March 21, 2014 at 1:37 pm ([permalink](/blog/mapping-natively/#comment-22057))
 
 > Anonymous says:
 >
 > Hi I have just updated my CN1 sources project and refreshed libs. The Google map still becomes blank when a dialog is displayed.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Anonymous** — March 21, 2014 at 2:24 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21875))
+
+### **Anonymous** — March 21, 2014 at 2:24 pm ([permalink](/blog/mapping-natively/#comment-21875))
 
 > Anonymous says:
 >
 > I’ll try this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Anonymous** — March 23, 2014 at 7:10 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21932))
+
+### **Anonymous** — March 23, 2014 at 7:10 am ([permalink](/blog/mapping-natively/#comment-21932))
 
 > Anonymous says:
 >
 > For some reason the fix didn’t propagate to the build servers. We are updating them again now. Should be there in a half hour or so.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Anonymous** — March 23, 2014 at 8:15 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21440))
+
+### **Anonymous** — March 23, 2014 at 8:15 am ([permalink](/blog/mapping-natively/#comment-21440))
 
 > Anonymous says:
 >
 > Thanks map now appears in the background of dialog.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Anonymous** — September 5, 2014 at 3:22 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21935))
+
+### **Anonymous** — September 5, 2014 at 3:22 am ([permalink](/blog/mapping-natively/#comment-21935))
 
 > Anonymous says:
 >
@@ -218,10 +218,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Greg
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Anonymous** — September 5, 2014 at 12:42 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22132))
+
+### **Anonymous** — September 5, 2014 at 12:42 pm ([permalink](/blog/mapping-natively/#comment-22132))
 
 > Anonymous says:
 >
@@ -229,10 +229,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > no. Should work fine without.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Anonymous** — November 10, 2014 at 3:41 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22292))
+
+### **Anonymous** — November 10, 2014 at 3:41 am ([permalink](/blog/mapping-natively/#comment-22292))
 
 > Anonymous says:
 >
@@ -240,10 +240,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Are there other steps required, beside just dropping library into libs folder especially for IDEA environment?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Anonymous** — November 26, 2014 at 8:13 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22123))
+
+### **Anonymous** — November 26, 2014 at 8:13 am ([permalink](/blog/mapping-natively/#comment-22123))
 
 > Anonymous says:
 >
@@ -251,46 +251,46 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Its an issue with IDEA that’s easily fixable, check out this: [http://devnet.jetbrains.com…](<http://devnet.jetbrains.com/message/5301721>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Bobo Collen** — April 8, 2015 at 2:49 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22063))
+
+### **Bobo Collen** — April 8, 2015 at 2:49 pm ([permalink](/blog/mapping-natively/#comment-22063))
 
 > Bobo Collen says:
 >
 > How do i define iOS & Android build arguments within the project? i want to include GoogleMaps in this GoogleMapTest Demo using my GoogleMaps API, so that i can be more familiar with the process before i develop my Maps project.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Shai Almog** — April 9, 2015 at 5:29 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22109))
+
+### **Shai Almog** — April 9, 2015 at 5:29 am ([permalink](/blog/mapping-natively/#comment-22109))
 
 > Shai Almog says:
 >
 > Right click the project, select preferences. In the Codename One section you should see a “Build Hints” tab and there you can add keys/values.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Bobo Collen** — April 13, 2015 at 3:27 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21612))
+
+### **Bobo Collen** — April 13, 2015 at 3:27 pm ([permalink](/blog/mapping-natively/#comment-21612))
 
 > Bobo Collen says:
 >
 > Thank you for your prompt response, I included the build arguments and the project is showing an Openstreet Maps instead of Google Maps. Are these Google maps APIs for Android and iOS going to cater for those of Windows Phone and Black Berry? If not, which maps APIs must we use since Black Berry and Windows Phone are not covered by Google maps?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Shai Almog** — April 14, 2015 at 5:20 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-24167))
+
+### **Shai Almog** — April 14, 2015 at 5:20 am ([permalink](/blog/mapping-natively/#comment-24167))
 
 > Shai Almog says:
 >
 > That is the map component fallback, you can define it by replacing the map implementation. Keep in mind that on the device this will look completely different anyway since it will run native code. I suggest you start with device testing and make sure that works for you since there are quite a few hurdles there.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Marco Grabmüller** — September 13, 2016 at 1:50 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22964))
+
+### **Marco Grabmüller** — September 13, 2016 at 1:50 pm ([permalink](/blog/mapping-natively/#comment-22964))
 
 > Marco Grabmüller says:
 >
@@ -316,10 +316,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > cnt.setCameraPosition(coord);  
 > cnt.addMarker(null, coord, “test”, “”, null);
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Shai Almog** — September 14, 2016 at 4:33 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23061))
+
+### **Shai Almog** — September 14, 2016 at 4:33 am ([permalink](/blog/mapping-natively/#comment-23061))
 
 > Shai Almog says:
 >
@@ -327,10 +327,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > make sure you are up to date on the latest map from the extensions menu (under Codename One Settings). This usually means the SHA1 or something is incorrect so make sure you are using a proper release build etc.  
 > If this still fails you need to connect the device with a cable and look thru the DDMS Android tool at the console. Google prints errors to the console with more details and you should be able to see the misconfiguration there.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Marco Grabmüller** — September 14, 2016 at 8:06 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23081))
+
+### **Marco Grabmüller** — September 14, 2016 at 8:06 am ([permalink](/blog/mapping-natively/#comment-23081))
 
 > Marco Grabmüller says:
 >
@@ -344,75 +344,75 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > now the map works great! thx for support!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **essay writer** — September 19, 2016 at 7:26 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21459))
+
+### **essay writer** — September 19, 2016 at 7:26 pm ([permalink](/blog/mapping-natively/#comment-21459))
 
 > essay writer says:
 >
 > The mapping natively makes it easier for the performance. It might be difficult in the start but the complete working with research and limitation leads this as perfect one. It shoddily not has complexity in its findings.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Yngve Moe** — September 23, 2016 at 11:09 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23083))
+
+### **Yngve Moe** — September 23, 2016 at 11:09 pm ([permalink](/blog/mapping-natively/#comment-23083))
 
 > Yngve Moe says:
 >
 > Warning: be careful not to add any leading or trailing spaces in the iOS build hints (I got them added automatically when copying from this page in Chrome). The build server chokes on the extra spaces.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **youssef abdeen** — December 1, 2016 at 5:25 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21449))
+
+### **youssef abdeen** — December 1, 2016 at 5:25 pm ([permalink](/blog/mapping-natively/#comment-21449))
 
 > youssef abdeen says:
 >
 > i am new at this, i dont know where to put this code in my app, any help please !!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Shai Almog** — December 2, 2016 at 5:31 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22754))
+
+### **Shai Almog** — December 2, 2016 at 5:31 am ([permalink](/blog/mapping-natively/#comment-22754))
 
 > Shai Almog says:
 >
 > It’s the main application code, you can just include the cn1lib from the extensions menu and use MapContainer in code like other components. Notice you need to define some build hints based on the instructions in the extensions menu under Codename One Settings.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **youssef abdeen** — December 2, 2016 at 11:54 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23248))
+
+### **youssef abdeen** — December 2, 2016 at 11:54 pm ([permalink](/blog/mapping-natively/#comment-23248))
 
 > youssef abdeen says:
 >
 > i did what you said and the application worked, but i did not use the google map API key, i got the API key but i don’t know where to put it. and sorry i didn’t understand the part you said about the “build hints”.  
 > thank you
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **youssef abdeen** — December 3, 2016 at 12:30 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23103))
+
+### **youssef abdeen** — December 3, 2016 at 12:30 am ([permalink](/blog/mapping-natively/#comment-23103))
 
 > youssef abdeen says:
 >
 > [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/6cc4ec8421f4ac9f6cc219dba9cf877069c721be0d7a9c17f7de71e32d311797.jpg>)  
 > where exactly to put the argument thing and the keys here??
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Shai Almog** — December 3, 2016 at 9:15 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23117))
+
+### **Shai Almog** — December 3, 2016 at 9:15 am ([permalink](/blog/mapping-natively/#comment-23117))
 
 > Shai Almog says:
 >
 > In the right click menu go to the Codename One Settings app where a build hints option is available. Native maps work on the simulator but are very different on the device…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Marco Grabmüller** — December 5, 2016 at 7:31 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23126))
+
+### **Marco Grabmüller** — December 5, 2016 at 7:31 am ([permalink](/blog/mapping-natively/#comment-23126))
 
 > Marco Grabmüller says:
 >
@@ -431,10 +431,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank you very much
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Shai Almog** — December 6, 2016 at 5:27 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23255))
+
+### **Shai Almog** — December 6, 2016 at 5:27 am ([permalink](/blog/mapping-natively/#comment-23255))
 
 > Shai Almog says:
 >
@@ -442,10 +442,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > the post above is outdated and you should refer to the github project page for instructions. Ideally we’ll post an updated blog on doing this.  
 > The new extension which is installable via the extensions menu in the Codename One Settings auto-setups most of these hints so if you added ios.* hints as instructed above you shouldn’t have and should remove them.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Marco Grabmüller** — December 6, 2016 at 8:19 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23264))
+
+### **Marco Grabmüller** — December 6, 2016 at 8:19 am ([permalink](/blog/mapping-natively/#comment-23264))
 
 > Marco Grabmüller says:
 >
@@ -467,10 +467,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks again! [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/1e361fa5b098d7bcdd0c8359676d4fdb5f286c271ef3ba99a3718de4f67c8aea.png>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Shai Almog** — December 7, 2016 at 6:39 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23086))
+
+### **Shai Almog** — December 7, 2016 at 6:39 am ([permalink](/blog/mapping-natively/#comment-23086))
 
 > Shai Almog says:
 >
@@ -480,48 +480,48 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > FYI 9 out of 10 iOS build errors happen when you generate your own certificates incorrectly instead of using the certificate wizard.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **youssef abdeen** — December 8, 2016 at 8:39 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22956))
+
+### **youssef abdeen** — December 8, 2016 at 8:39 pm ([permalink](/blog/mapping-natively/#comment-22956))
 
 > youssef abdeen says:
 >
 > i am developing an app using codename one to notify a driver if he drives in a the wrong direction of a street using google maps i already downloaded the google map extension and it opened in my app i just want any ideas how to know the direction of a certain street on google map and use it in my code, so if a driver went on the wrong direction of this street i would notify him by a dialog message.  
 > thank you
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Shai Almog** — December 9, 2016 at 7:37 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23015))
+
+### **Shai Almog** — December 9, 2016 at 7:37 am ([permalink](/blog/mapping-natively/#comment-23015))
 
 > Shai Almog says:
 >
 > That’s probably a part of the google GEO API. I’m afraid I’m unfamiliar with that and can’t give you any pointers. I think you will need to modify the implementation of the google maps cn1lib to include this functionality so it’s non-trivial and requires some native code.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Stephen Michael** — January 18, 2017 at 6:13 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23069))
+
+### **Stephen Michael** — January 18, 2017 at 6:13 pm ([permalink](/blog/mapping-natively/#comment-23069))
 
 > Stephen Michael says:
 >
 > Is there any work in progress to update the native mapping library to utilize V3 of the Google Maps API? I am looking to integrate the “unlimited/free” access via Android and IOS native maps API’s, and am wondering about the accessibility of V3 Google Maps API’s via CodenameOne. Thoughts?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Shai Almog** — January 19, 2017 at 6:18 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23088))
+
+### **Shai Almog** — January 19, 2017 at 6:18 am ([permalink](/blog/mapping-natively/#comment-23088))
 
 > Shai Almog says:
 >
 > V2 is the latest. V3 is for JavaScript only and we use the native API’s.  
 > We are actually updating the Maps right now to have an optional JavaScript fallback instead of the MapComponent fallback. I think the UX is better overall. There are already some committed changes on that but this isn’t released yet since it’s work in progress.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Terry Wilkinson** — February 2, 2017 at 8:21 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23302))
+
+### **Terry Wilkinson** — February 2, 2017 at 8:21 pm ([permalink](/blog/mapping-natively/#comment-23302))
 
 > Terry Wilkinson says:
 >
@@ -540,20 +540,20 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thank,  
 > Terry
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Shai Almog** — February 3, 2017 at 7:42 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23076))
+
+### **Shai Almog** — February 3, 2017 at 7:42 am ([permalink](/blog/mapping-natively/#comment-23076))
 
 > Shai Almog says:
 >
 > Hi,  
 > I suggest using the extension manager tool in Codename One Settings to install cn1libs. I hope to post a refreshed version of this guide within a couple of weeks once we get out the new version of the library.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Terry Wilkinson** — February 3, 2017 at 5:01 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-24245))
+
+### **Terry Wilkinson** — February 3, 2017 at 5:01 pm ([permalink](/blog/mapping-natively/#comment-24245))
 
 > Terry Wilkinson says:
 >
@@ -561,25 +561,25 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > In the mean time, your suggestion helped me, and I have succeeded in building and installing the demo app. However, when I run it, it comes up using OpenStreetMaps. I must have missed something else 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Shai Almog** — February 4, 2017 at 8:18 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23209))
+
+### **Shai Almog** — February 4, 2017 at 8:18 am ([permalink](/blog/mapping-natively/#comment-23209))
 
 > Shai Almog says:
 >
 > You need to make sure all the keys from google are setup correctly in the build hints.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
 
 
-### **Terry Wilkinson** — February 4, 2017 at 1:42 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22822))
+
+### **Terry Wilkinson** — February 4, 2017 at 1:42 pm ([permalink](/blog/mapping-natively/#comment-22822))
 
 > Terry Wilkinson says:
 >
 > That’s what it took – thanks very much. I thought I’d done that, but is must have gotten deleted somehow – grrrr.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmapping-natively.html)
+
 
 ---
 

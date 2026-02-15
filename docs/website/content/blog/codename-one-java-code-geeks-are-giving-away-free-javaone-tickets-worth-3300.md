@@ -82,25 +82,25 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — July 9, 2014 at 7:17 am ([permalink](https://www.codenameone.com/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html#comment-21437))
+### **Anonymous** — July 9, 2014 at 7:17 am ([permalink](/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300/#comment-21437))
 
 > Anonymous says:
 >
 > Tweeted, Facebooked –> Tickets pleaaase 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html)
 
 
-### **Anonymous** — July 9, 2014 at 11:37 am ([permalink](https://www.codenameone.com/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html#comment-21732))
+
+### **Anonymous** — July 9, 2014 at 11:37 am ([permalink](/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300/#comment-21732))
 
 > Anonymous says:
 >
 > If you submitted the form then its up to the guys at Java Code Geeks to raffle based on the rules highlighted in the contest form.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html)
 
 
-### **Anonymous** — July 9, 2014 at 7:22 pm ([permalink](https://www.codenameone.com/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html#comment-22078))
+
+### **Anonymous** — July 9, 2014 at 7:22 pm ([permalink](/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300/#comment-22078))
 
 > Anonymous says:
 >
@@ -112,10 +112,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nikhil Dahake
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html)
 
 
-### **Anonymous** — July 10, 2014 at 1:41 am ([permalink](https://www.codenameone.com/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html#comment-22186))
+
+### **Anonymous** — July 10, 2014 at 1:41 am ([permalink](/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300/#comment-22186))
 
 > Anonymous says:
 >
@@ -125,10 +125,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > However, J1 has a discover pass that doesn’t allow much and should cost roughly $50. It allows you to see the pavilion booths and the big announcements/general sessions (if I remember correctly). I’m not sure if this is something you can buy via Oracles site, if not we might be able to provide you with access to such a pass.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html)
 
 
-### **Anonymous** — July 10, 2014 at 2:36 pm ([permalink](https://www.codenameone.com/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html#comment-21934))
+
+### **Anonymous** — July 10, 2014 at 2:36 pm ([permalink](/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300/#comment-21934))
 
 > Anonymous says:
 >
@@ -140,25 +140,25 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Nikhil
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html)
 
 
-### **Anonymous** — July 11, 2014 at 1:35 am ([permalink](https://www.codenameone.com/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html#comment-21985))
+
+### **Anonymous** — July 11, 2014 at 1:35 am ([permalink](/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300/#comment-21985))
 
 > Anonymous says:
 >
 > I think so. I never had such a pass since I always had a speaker pass. You should check that it provides pavilion access which is where the booths should be.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html)
 
 
-### **Anonymous** — July 11, 2014 at 9:21 pm ([permalink](https://www.codenameone.com/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html#comment-21970))
+
+### **Anonymous** — July 11, 2014 at 9:21 pm ([permalink](/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300/#comment-21970))
 
 > Anonymous says:
 >
 > Yes, the disover pass allows you access to the exhibition hall and thats where the booth will be. I got myself a discover pass. Will visit your booth 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html)
+
 
 ---
 

@@ -310,25 +310,25 @@ As these webinars will be happening every two weeks, I’d like to make some tim
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — September 15, 2015 at 8:55 pm ([permalink](https://www.codenameone.com/blog/psd-to-app-converting-a-beautiful-design-into-a-native-mobile-app.html#comment-22324))
+### **bryan** — September 15, 2015 at 8:55 pm ([permalink](/blog/psd-to-app-converting-a-beautiful-design-into-a-native-mobile-app/#comment-22324))
 
 > Great tutorial. Is there any reason you copied/pasted the unselected UUID’s to selected, and didn’t right click -> Derive them ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpsd-to-app-converting-a-beautiful-design-into-a-native-mobile-app.html)
 
 
-### **Eliecer Hernández Garbey** — March 13, 2016 at 3:38 am ([permalink](https://www.codenameone.com/blog/psd-to-app-converting-a-beautiful-design-into-a-native-mobile-app.html#comment-22594))
+
+### **Eliecer Hernández Garbey** — March 13, 2016 at 3:38 am ([permalink](/blog/psd-to-app-converting-a-beautiful-design-into-a-native-mobile-app/#comment-22594))
 
 > Just amazing. A real inspirational and interesting video.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpsd-to-app-converting-a-beautiful-design-into-a-native-mobile-app.html)
 
 
-### **Html Pro** — April 20, 2017 at 5:52 am ([permalink](https://www.codenameone.com/blog/psd-to-app-converting-a-beautiful-design-into-a-native-mobile-app.html#comment-21584))
+
+### **Html Pro** — April 20, 2017 at 5:52 am ([permalink](/blog/psd-to-app-converting-a-beautiful-design-into-a-native-mobile-app/#comment-21584))
 
 > Love this article. Nicely explain all the points with code example and self explaining images. Amazing . More then enough for the beginner. He/she can learn alot of thing by such amazing tutorials.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpsd-to-app-converting-a-beautiful-design-into-a-native-mobile-app.html)
+
 
 ---
 

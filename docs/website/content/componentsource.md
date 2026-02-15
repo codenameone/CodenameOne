@@ -6,9 +6,7 @@ slug: "componentsource"
 
 # ComponentSource
 
-1. [Home](/)
-2. [About](/about.html)
-3. ComponentSource
+**Notice:** This web-page is here for historical reasons. We no longer work with ComponentSource.
 
 ![](/uploads/component_source_logo.jpg)
 

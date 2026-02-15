@@ -48,31 +48,31 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — June 20, 2014 at 4:17 am ([permalink](https://www.codenameone.com/blog/navigate-faster-builds.html#comment-21948))
+### **Anonymous** — June 20, 2014 at 4:17 am ([permalink](/blog/navigate-faster-builds/#comment-21948))
 
 > Anonymous says:
 >
 > Thanks for including this feature. Tested on Android and iOS and it worked perfectly. I will like to know if this functionality will work on windows phone by opening Here Drive or similar navigator?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnavigate-faster-builds.html)
 
 
-### **Anonymous** — June 20, 2014 at 1:31 pm ([permalink](https://www.codenameone.com/blog/navigate-faster-builds.html#comment-22004))
+
+### **Anonymous** — June 20, 2014 at 1:31 pm ([permalink](/blog/navigate-faster-builds/#comment-22004))
 
 > Anonymous says:
 >
 > At the moment this isn’t supported on Windows Phone.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnavigate-faster-builds.html)
 
 
-### **Anonymous** — June 21, 2014 at 8:58 am ([permalink](https://www.codenameone.com/blog/navigate-faster-builds.html#comment-21821))
+
+### **Anonymous** — June 21, 2014 at 8:58 am ([permalink](/blog/navigate-faster-builds/#comment-21821))
 
 > Anonymous says:
 >
 > Tried it on Nokia X device running Android OS, it works perfectly by opening Nokia Here Drive. Hopefully it will work on Windows Phone. Thanks once again for this feature…I have been waiting for it
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnavigate-faster-builds.html)
+
 
 ---
 

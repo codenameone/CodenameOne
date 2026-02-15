@@ -110,7 +110,7 @@ We also added a constructor for text, image and a UIID.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — November 17, 2015 at 9:25 am ([permalink](https://www.codenameone.com/blog/good-looking-by-default-native-fonts-simulator-detection-more.html#comment-22443))
+### **Chidiebere Okwudire** — November 17, 2015 at 9:25 am ([permalink](/blog/good-looking-by-default-native-fonts-simulator-detection-more/#comment-22443))
 
 > Chidiebere Okwudire says:
 >
@@ -118,10 +118,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > BTW: There’s a typo in the text: “Lets” should be “Let’s”
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgood-looking-by-default-native-fonts-simulator-detection-more.html)
 
 
-### **Shai Almog** — November 18, 2015 at 3:43 am ([permalink](https://www.codenameone.com/blog/good-looking-by-default-native-fonts-simulator-detection-more.html#comment-22377))
+
+### **Shai Almog** — November 18, 2015 at 3:43 am ([permalink](/blog/good-looking-by-default-native-fonts-simulator-detection-more/#comment-22377))
 
 > Shai Almog says:
 >
@@ -132,16 +132,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The beaker says to me that this is a Lab (like the kitchen sink was), its also a “one off” animation so if you run it and go get some coffee you come back and the animation is gone.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgood-looking-by-default-native-fonts-simulator-detection-more.html)
 
 
-### **bankifsc codes** — December 15, 2015 at 4:53 am ([permalink](https://www.codenameone.com/blog/good-looking-by-default-native-fonts-simulator-detection-more.html#comment-22590))
+
+### **bankifsc codes** — December 15, 2015 at 4:53 am ([permalink](/blog/good-looking-by-default-native-fonts-simulator-detection-more/#comment-22590))
 
 > bankifsc codes says:
 >
 > [Mobile tracker with name and address](<http://mobilenumbertrackr.com>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgood-looking-by-default-native-fonts-simulator-detection-more.html)
+
 
 ---
 

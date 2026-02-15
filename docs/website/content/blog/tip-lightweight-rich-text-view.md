@@ -131,7 +131,7 @@ I chose to use HTML because I already had a parser but the basic concept should 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — April 6, 2018 at 10:17 pm ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-23789))
+### **Francesco Galgani** — April 6, 2018 at 10:17 pm ([permalink](/blog/tip-lightweight-rich-text-view/#comment-23789))
 
 > Thank you Shai, your “proof of concept” (as you definited it) is exactly what I was looking for. In some simple circumstances, it can be a good replacement for SpanLabel and an easier and better solution than BrowserComponent (expecially if I need a text that should be automatically internationalized like in Label and SpanLabel). However, I found two issues in your code, that are easy to fix. The first one is that the font size is zero, so no text is shown. To solve, I changed the fonts definitions so:
 >
@@ -145,10 +145,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Label internalization = new Label(text);  
 > text = internalization.getText();
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-lightweight-rich-text-view.html)
 
 
-### **Shai Almog** — April 7, 2018 at 4:36 am ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-23796))
+
+### **Shai Almog** — April 7, 2018 at 4:36 am ([permalink](/blog/tip-lightweight-rich-text-view/#comment-23796))
 
 > Shai Almog says:
 >
@@ -157,53 +157,53 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can easily internationalize the body of HTML and this example using the UIManager.getInstance().localize() method.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-lightweight-rich-text-view.html)
 
 
-### **Gareth Murfin** — August 8, 2018 at 3:23 am ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-23650))
+
+### **Gareth Murfin** — August 8, 2018 at 3:23 am ([permalink](/blog/tip-lightweight-rich-text-view/#comment-23650))
 
 > Gareth Murfin says:
 >
 > Great little widget, with these fixes its showing ok .
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-lightweight-rich-text-view.html)
 
 
-### **Durank** — September 30, 2020 at 12:49 pm ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-24351))
+
+### **Durank** — September 30, 2020 at 12:49 pm ([permalink](/blog/tip-lightweight-rich-text-view/#comment-24351))
 
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
 > Provide and example how to applie color to specific portion of text
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-lightweight-rich-text-view.html)
 
 
-### **Shai Almog** — October 1, 2020 at 6:40 am ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-24348))
+
+### **Shai Almog** — October 1, 2020 at 6:40 am ([permalink](/blog/tip-lightweight-rich-text-view/#comment-24348))
 
 > Shai Almog says:
 >
 > There’s nothing built in but it should be trivial to add that as it isn’t much different than setting bold styles. You can parse a `font` tag or a custom tag of your own and set the color any way you want. That’s the point of including the source and not building this into Codename One.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-lightweight-rich-text-view.html)
 
 
-### **Julio Valeriron Ochoa** — September 22, 2021 at 3:03 pm ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-24490))
+
+### **Julio Valeriron Ochoa** — September 22, 2021 at 3:03 pm ([permalink](/blog/tip-lightweight-rich-text-view/#comment-24490))
 
 > Julio Valeriron Ochoa says:
 >
 > Please provide support to color and size
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-lightweight-rich-text-view.html)
 
 
-### **Lianna Casper** — September 23, 2021 at 1:54 am ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-24493))
+
+### **Lianna Casper** — September 23, 2021 at 1:54 am ([permalink](/blog/tip-lightweight-rich-text-view/#comment-24493))
 
 > Lianna Casper says:
 >
 > This is literally the same. Just add `int currentColor` next to currentFont. Then when a color attribute is hit set the value of the currentColor and reset it to the default when exiting the tag.  
 > Then just do an `s.setFgColor(currentColor);`.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-lightweight-rich-text-view.html)
+
 
 ---
 

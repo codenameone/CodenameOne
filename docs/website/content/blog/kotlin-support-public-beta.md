@@ -170,81 +170,81 @@ We can do lots of things but to do those we need feedback and traction. Feedback
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Tom Tantisalidchai** — July 11, 2017 at 12:14 pm ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-23443))
+### **Tom Tantisalidchai** — July 11, 2017 at 12:14 pm ([permalink](/blog/kotlin-support-public-beta/#comment-23443))
 
 > Tom Tantisalidchai says:
 >
 > Thanks for the awesome work! It’d be great if we can easily use Kotlin’s coroutines library from [https://github.com/Kotlin/k…](<https://github.com/Kotlin/kotlinx.coroutines>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-support-public-beta.html)
 
 
-### **salah Alhaddabi** — July 11, 2017 at 5:46 pm ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-24150))
+
+### **salah Alhaddabi** — July 11, 2017 at 5:46 pm ([permalink](/blog/kotlin-support-public-beta/#comment-24150))
 
 > salah Alhaddabi says:
 >
 > Does this mean you will no longer support java and use kotlin instead??? This would be a pity as Java was the main reason i am using CN1…..
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-support-public-beta.html)
 
 
-### **shannah78** — July 11, 2017 at 5:54 pm ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-24141))
+
+### **shannah78** — July 11, 2017 at 5:54 pm ([permalink](/blog/kotlin-support-public-beta/#comment-24141))
 
 > shannah78 says:
 >
 > No. We still support, Java. I’m fairly confident that we will always support Java as, like you said, that is the main reason why many developers are using CN1 in the first place. Adding support for Kotlin just provides the option of using Kotlin in your projects as well.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-support-public-beta.html)
 
 
-### **Shai Almog** — July 12, 2017 at 5:07 am ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-24218))
+
+### **Shai Almog** — July 12, 2017 at 5:07 am ([permalink](/blog/kotlin-support-public-beta/#comment-24218))
 
 > Shai Almog says:
 >
 > Thanks for the feedback. I’m pretty sure this can be ported to a cn1lib although I’m not sure how well cn1libs work with Kotlin. Steve?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-support-public-beta.html)
 
 
-### **shannah78** — July 12, 2017 at 6:06 pm ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-23702))
+
+### **shannah78** — July 12, 2017 at 6:06 pm ([permalink](/blog/kotlin-support-public-beta/#comment-23702))
 
 > shannah78 says:
 >
 > cn1libs will work fine with Kotlin.  
 > I have taken a quick look at this library though and there are a few red flags that may limit its usefulness. For example, the async/yield stuff it appears to have special providers for JavaFX and Swing. Really that portion is just doing the same thing as invokeAndBlock, which CN1 has had for years (since the beginning), so I question the value of that portion of the library in the CN1 context.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-support-public-beta.html)
 
 
-### **Albert Gao** — October 8, 2017 at 9:12 pm ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-23722))
+
+### **Albert Gao** — October 8, 2017 at 9:12 pm ([permalink](/blog/kotlin-support-public-beta/#comment-23722))
 
 > Albert Gao says:
 >
 > Great news! The Kotlin is the reason we are currently evaluating the codenameOne as a cross platform solution. Although I have a little program on how to consume the lib that are written in Kotlin, any help would be great. I use this repo and it works: [https://github.com/shannah/…](<https://github.com/shannah/codenameone-kotlin>) , but don’t know how to add another kotlin lib like kotlin coroutine and kotlin reflection. Any help would be thankful.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-support-public-beta.html)
 
 
-### **Shai Almog** — October 9, 2017 at 4:38 am ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-23553))
+
+### **Shai Almog** — October 9, 2017 at 4:38 am ([permalink](/blog/kotlin-support-public-beta/#comment-23553))
 
 > Shai Almog says:
 >
 > I think you should be able to wrap them as cn1libs
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-support-public-beta.html)
 
 
-### **Thomas** — March 2, 2018 at 3:04 am ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-23959))
+
+### **Thomas** — March 2, 2018 at 3:04 am ([permalink](/blog/kotlin-support-public-beta/#comment-23959))
 
 > Thomas says:
 >
 > Is the kotlin api fully supported or is it just a subset of its classes like for java (for example can I import io.socket.client.Socket in a kotlin class in codenameone and this would work out of the box? or like for [java.io](<http://java.io>) some kotlin class aren’t supported?)  
 > Also, is it possible to mix some kotlin files with some java ones in the same codenameone project?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-support-public-beta.html)
 
 
-### **Shai Almog** — March 2, 2018 at 4:52 am ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-23698))
+
+### **Shai Almog** — March 2, 2018 at 4:52 am ([permalink](/blog/kotlin-support-public-beta/#comment-23698))
 
 > Shai Almog says:
 >
@@ -252,7 +252,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > No you can’t access the full Java SE API, you have almost the same restrictions as the Java version has. Notice that projects like Kotlin Native have even worse restrictions…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkotlin-support-public-beta.html)
+
 
 ---
 

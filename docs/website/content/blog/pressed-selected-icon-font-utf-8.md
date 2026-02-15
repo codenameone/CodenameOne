@@ -17,9 +17,9 @@ look as attractive when the `Buton` is selected or pressed!
 
 The thing is that with an icon font this is trivial to accomplish and requires literally no code changes. So starting with  
 the the next update calling  
-[FontImage.setMaterialIcon(Label l, char icon)](https://www.codenameone.com/javadoc/com/codename1/ui/FontImage.html#setMaterialIcon-com.codename1.ui.Label-char-)  
+[FontImage.setMaterialIcon(Label l, char icon)](/javadoc/com/codename1/ui/FontImage/#setMaterialIcon-com.codename1.ui.Label-char-)  
 or  
-[FontImage.setMaterialIcon(Label l, char icon, float size)](https://www.codenameone.com/javadoc/com/codename1/ui/FontImage.html#setMaterialIcon-com.codename1.ui.Label-char-float-)  
+[FontImage.setMaterialIcon(Label l, char icon, float size)](/javadoc/com/codename1/ui/FontImage/#setMaterialIcon-com.codename1.ui.Label-char-float-)  
 with a `Button` will implicitly set the pressed/selected & disabled icons for the button.
 
 E.g.:
@@ -55,7 +55,7 @@ However, Java defaults to platform native encoding and so minor mistakes like ca
 can be devastating and hard to track. To make matters even more annoying the correct method `String.getBytes(encoding)`  
 throws a checked exception for no real reason making it far more painful to use than the default…​
 
-I was reminded of this just the other day, it seems our [Properties](https://www.codenameone.com/javadoc/com/codename1/io/Properties.html)  
+I was reminded of this just the other day, it seems our [Properties](/javadoc/com/codename1/io/Properties/)  
 class used `ISO-8859-1` encoding. This is pretty much the most standard encoding and should be supported everywhere…​
 
 Turns out it doesn’t work in the JavaScript port which uses UTF-8. Since UTF-8 makes more sense we just fixed the  
@@ -67,16 +67,16 @@ Turns out it doesn’t work in the JavaScript port which uses UTF-8. Since UTF-8
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chibuike Mba** — May 25, 2016 at 6:03 pm ([permalink](https://www.codenameone.com/blog/pressed-selected-icon-font-utf-8.html#comment-22799))
+### **Chibuike Mba** — May 25, 2016 at 6:03 pm ([permalink](/blog/pressed-selected-icon-font-utf-8/#comment-22799))
 
 > Chibuike Mba says:
 >
 > Hi Shai, does Toolbar Command support this button icon capability?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpressed-selected-icon-font-utf-8.html)
 
 
-### **Shai Almog** — May 26, 2016 at 4:10 am ([permalink](https://www.codenameone.com/blog/pressed-selected-icon-font-utf-8.html#comment-22850))
+
+### **Shai Almog** — May 26, 2016 at 4:10 am ([permalink](/blog/pressed-selected-icon-font-utf-8/#comment-22850))
 
 > Shai Almog says:
 >
@@ -86,16 +86,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We’ll add to the next update a version of setMaterialIcon that accepts a command and UIID. And we’ll also try to add a few methods to toolbar that should do effectively this e.g. addMaterialCommandToSideMenu(…)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpressed-selected-icon-font-utf-8.html)
 
 
-### **Chibuike Mba** — May 26, 2016 at 7:10 am ([permalink](https://www.codenameone.com/blog/pressed-selected-icon-font-utf-8.html#comment-22723))
+
+### **Chibuike Mba** — May 26, 2016 at 7:10 am ([permalink](/blog/pressed-selected-icon-font-utf-8/#comment-22723))
 
 > Chibuike Mba says:
 >
 > OK. Great. Will be looking forward for that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpressed-selected-icon-font-utf-8.html)
+
 
 ---
 

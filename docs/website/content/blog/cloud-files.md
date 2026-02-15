@@ -103,7 +103,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 10, 2014 at 7:01 pm ([permalink](https://www.codenameone.com/blog/cloud-files.html#comment-22012))
+### **Anonymous** — March 10, 2014 at 7:01 pm ([permalink](/blog/cloud-files/#comment-22012))
 
 > Anonymous says:
 >
@@ -111,16 +111,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > what about Windows Phone? will it have native maps support too?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcloud-files.html)
 
 
-### **Anonymous** — March 11, 2014 at 5:02 am ([permalink](https://www.codenameone.com/blog/cloud-files.html#comment-21658))
+
+### **Anonymous** — March 11, 2014 at 5:02 am ([permalink](/blog/cloud-files/#comment-21658))
 
 > Anonymous says:
 >
 > That isn’t planned at the moment. On Windows Phone we will currently fallback to MapComponent. Google Maps doesn’t have a version for Windows Phone so supporting something like here maps etc. might be a pain.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcloud-files.html)
+
 
 ---
 

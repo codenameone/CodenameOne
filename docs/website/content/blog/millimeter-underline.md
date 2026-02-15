@@ -37,22 +37,22 @@ This can have far reaching effect as a lot of our components currently feature d
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — August 24, 2017 at 3:43 pm ([permalink](https://www.codenameone.com/blog/millimeter-underline.html#comment-23703))
+### **Francesco Galgani** — August 24, 2017 at 3:43 pm ([permalink](/blog/millimeter-underline/#comment-23703))
 
 > Francesco Galgani says:
 >
 > Thank you. Can you add some screenshots to show the new features? 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmillimeter-underline.html)
 
 
-### **Shai Almog** — August 25, 2017 at 3:24 am ([permalink](https://www.codenameone.com/blog/millimeter-underline.html#comment-23711))
+
+### **Shai Almog** — August 25, 2017 at 3:24 am ([permalink](/blog/millimeter-underline/#comment-23711))
 
 > Shai Almog says:
 >
 > I thought about that when I was making the post but frankly there isn’t much to see. It’s just a line at the bottom like you have in the iOS theme for multi button and other components.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmillimeter-underline.html)
+
 
 ---
 

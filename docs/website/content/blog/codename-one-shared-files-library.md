@@ -127,22 +127,22 @@ Add the following maven dependency to your common/pom.xml file
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Wits ICT** — August 1, 2023 at 10:26 pm ([permalink](https://www.codenameone.com/blog/codename-one-shared-files-library.html#comment-24565))
+### **Wits ICT** — August 1, 2023 at 10:26 pm ([permalink](/blog/codename-one-shared-files-library/#comment-24565))
 
 > Wits ICT says:
 >
 > Thanks for this. And good to see blogs returning after a while.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-shared-files-library.html)
 
 
-### **Mobi Tribe** — October 10, 2023 at 12:49 pm ([permalink](https://www.codenameone.com/blog/codename-one-shared-files-library.html#comment-24580))
+
+### **Mobi Tribe** — October 10, 2023 at 12:49 pm ([permalink](/blog/codename-one-shared-files-library/#comment-24580))
 
 > Mobi Tribe says:
 >
 > Thanks @Steve Hannah. This is awesome. Very useful… As @Wits ICT has said, glad to see you guys back. Hopefully you, Chen and Shai and the rest of the cn1 family still have good stuff in store.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-shared-files-library.html)
+
 
 ---
 

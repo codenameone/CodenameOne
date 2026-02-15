@@ -12,8 +12,8 @@ author: Shai Almog
 ![Header Image](/blog/sql-explorer-global-toolbar-location-docs/documention.jpg)
 
 I was working on documenting the SQLite support in Codename One, you can see some of that work both in the  
-[db package](https://www.codenameone.com/javadoc/com/codename1/db/package-summary.html) and in the  
-[developer guide](https://www.codenameone.com/manual/files-storage-networking.html). As a demo for  
+[db package](/javadoc/com/codename1/db/package-summary/) and in the  
+[developer guide](/manual/files-storage-networking/). As a demo for  
 SQL I decided to just create a tool that allows you to type arbitrary SQL to execute it on the device and see  
 the results in a `Table`…​
 
@@ -23,7 +23,7 @@ issues by querying the DB!
 
 ### Toolbars All Around
 
-The [Toolbar API](https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html) is the way forward  
+The [Toolbar API](/javadoc/com/codename1/ui/Toolbar/) is the way forward  
 but up until now we didn’t include the option to set the `Toolbar` globally so for every `Form` you had to do the:
     
     
@@ -48,16 +48,16 @@ that refines the behavior of the simulator when working with the location API. T
 accessible path to code contribution thru the Java SE code which should be easier.
 
 Check out my post on contributing code to the Codename One project  
-[here](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html)
+[here](/blog/how-to-use-the-codename-one-sources/)
 
 ### Documentation Progress
 
 Our manual is over 650 pages. We just finished a rewrite of the IO section which is **HUGE**!
 
 Similarly to the galleries we made for components and layouts we created sections for the  
-[database](https://www.codenameone.com/javadoc/com/codename1/db/package-summary.html),  
-[XPath processing/parsing language](https://www.codenameone.com/javadoc/com/codename1/processing/package-summary.html) &  
-[general IO (storage, filesystem, parsing, networking etc.)](https://www.codenameone.com/javadoc/com/codename1/io/package-summary.html).
+[database](/javadoc/com/codename1/db/package-summary/),  
+[XPath processing/parsing language](/javadoc/com/codename1/processing/package-summary/) &  
+[general IO (storage, filesystem, parsing, networking etc.)](/javadoc/com/codename1/io/package-summary/).
 
 Check out these sections and let us know what you think.
 ---
@@ -67,41 +67,41 @@ Check out these sections and let us know what you think.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Dalvik** — March 4, 2016 at 1:21 pm ([permalink](https://www.codenameone.com/blog/sql-explorer-global-toolbar-location-docs.html#comment-22517))
+### **Dalvik** — March 4, 2016 at 1:21 pm ([permalink](/blog/sql-explorer-global-toolbar-location-docs/#comment-22517))
 
 > Dalvik says:
 >
 > Can we maybe add more functionality to the DB explorer tool?  
 > This opens some potential to “on device analysis” style API’s. Any plans on that?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsql-explorer-global-toolbar-location-docs.html)
 
 
-### **Shai Almog** — March 5, 2016 at 4:14 am ([permalink](https://www.codenameone.com/blog/sql-explorer-global-toolbar-location-docs.html#comment-22667))
+
+### **Shai Almog** — March 5, 2016 at 4:14 am ([permalink](/blog/sql-explorer-global-toolbar-location-docs/#comment-22667))
 
 > Shai Almog says:
 >
 > I’d love that but I’m not sure when we’ll get around to do something like this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsql-explorer-global-toolbar-location-docs.html)
 
 
-### **Mr Emma** — April 14, 2016 at 3:25 pm ([permalink](https://www.codenameone.com/blog/sql-explorer-global-toolbar-location-docs.html#comment-22595))
+
+### **Mr Emma** — April 14, 2016 at 3:25 pm ([permalink](/blog/sql-explorer-global-toolbar-location-docs/#comment-22595))
 
 > Mr Emma says:
 >
 > For some reason your locationmanager never works for me even tho i follow all possible instructions, it works perfectly on the emulator but moving to a real android device it never works
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsql-explorer-global-toolbar-location-docs.html)
 
 
-### **Shai Almog** — April 15, 2016 at 3:01 am ([permalink](https://www.codenameone.com/blog/sql-explorer-global-toolbar-location-docs.html#comment-21508))
+
+### **Shai Almog** — April 15, 2016 at 3:01 am ([permalink](/blog/sql-explorer-global-toolbar-location-docs/#comment-21508))
 
 > Shai Almog says:
 >
 > I suggest trying it as we explained it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsql-explorer-global-toolbar-location-docs.html)
+
 
 ---
 

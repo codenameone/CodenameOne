@@ -34,7 +34,7 @@ It’s an important feature as JDK 8 reaches end of life at the end of the year.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — August 16, 2018 at 8:13 am ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-24055))
+### **Francesco Galgani** — August 16, 2018 at 8:13 am ([permalink](/blog/uber-book-is-out-jdk-11/#comment-24055))
 
 > Francesco Galgani says:
 >
@@ -45,81 +45,81 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Is the Codename One plugin ready for NetBeans 9.0?  
 > Is the current code of our Codename One apps fully compatible with Java9/10?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-book-is-out-jdk-11.html)
 
 
-### **Shai Almog** — August 16, 2018 at 12:14 pm ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-23995))
+
+### **Shai Almog** — August 16, 2018 at 12:14 pm ([permalink](/blog/uber-book-is-out-jdk-11/#comment-23995))
 
 > Shai Almog says:
 >
 > Yes on all counts with the plugin that comes out tomorrow (including JDK 11). We did our testing but it was relatively limited so we hope people will let us know how well this works (or doesn’t work). We also use these newer JDK’s in our continuous integration tests.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-book-is-out-jdk-11.html)
 
 
-### **Gareth Murfin** — August 16, 2018 at 12:33 pm ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-23848))
+
+### **Gareth Murfin** — August 16, 2018 at 12:33 pm ([permalink](/blog/uber-book-is-out-jdk-11/#comment-23848))
 
 > Gareth Murfin says:
 >
 > Great work on the book, that might be my xmas gift to myself :-))))
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-book-is-out-jdk-11.html)
 
 
-### **Ronald Tshabalala** — August 16, 2018 at 4:18 pm ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-23661))
+
+### **Ronald Tshabalala** — August 16, 2018 at 4:18 pm ([permalink](/blog/uber-book-is-out-jdk-11/#comment-23661))
 
 > Ronald Tshabalala says:
 >
 > Hey Shai, are you still going to do further examples for the course? I read a few blogs back saying you doing a messaging system?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-book-is-out-jdk-11.html)
 
 
-### **Shai Almog** — August 17, 2018 at 3:37 am ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-23941))
+
+### **Shai Almog** — August 17, 2018 at 3:37 am ([permalink](/blog/uber-book-is-out-jdk-11/#comment-23941))
 
 > Shai Almog says:
 >
 > Yes!  
-> I will produce 8 apps for the course out of which I delivered 2 (in addition to the 2+ already there beforehand). The next app would be a whatsapp clone which will launch in 2018. It will be followed by a netflix clone. You can see how this was decided in the survey results [https://www.codenameone.com…](<https://www.codenameone.com/blog/survey-results-2018.html>)
+> I will produce 8 apps for the course out of which I delivered 2 (in addition to the 2+ already there beforehand). The next app would be a whatsapp clone which will launch in 2018. It will be followed by a netflix clone. You can see how this was decided in the survey results [https://www.codenameone.com…](</blog/survey-results-2018/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-book-is-out-jdk-11.html)
 
 
-### **Francesco Galgani** — August 17, 2018 at 10:07 pm ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-24063))
+
+### **Francesco Galgani** — August 17, 2018 at 10:07 pm ([permalink](/blog/uber-book-is-out-jdk-11/#comment-24063))
 
 > Francesco Galgani says:
 >
 > Thank you. At the moment I’m migrating from Netbeans8.2+JDK8 to Netbeans9+OpenJDK10. I suggest you to update the info here (it’s written to use JDK8):  
-> [https://www.codenameone.com…](<https://www.codenameone.com/download.html>)
+> [https://www.codenameone.com…](</download/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-book-is-out-jdk-11.html)
 
 
-### **Shai Almog** — August 18, 2018 at 8:09 am ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-23949))
+
+### **Shai Almog** — August 18, 2018 at 8:09 am ([permalink](/blog/uber-book-is-out-jdk-11/#comment-23949))
 
 > Shai Almog says:
 >
 > Yes, we’ll update it once we know JDK 9+ are stable.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-book-is-out-jdk-11.html)
 
 
-### **Tommy Mogaka** — August 21, 2018 at 10:11 am ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-23909))
+
+### **Tommy Mogaka** — August 21, 2018 at 10:11 am ([permalink](/blog/uber-book-is-out-jdk-11/#comment-23909))
 
 > Tommy Mogaka says:
 >
 > Hi Shai, Will the upcoming 2019 Java licensing change by Oracle have an effect on Codename One? Is CN1 dependent on Java for developing and deploying apps or is there an alternative Development Tool Kit that supports the cn1 plugin? Please advice! Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-book-is-out-jdk-11.html)
 
 
-### **Shai Almog** — August 22, 2018 at 4:01 am ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-23900))
+
+### **Shai Almog** — August 22, 2018 at 4:01 am ([permalink](/blog/uber-book-is-out-jdk-11/#comment-23900))
 
 > Shai Almog says:
 >
 > OpenJDK is the alternative. Its license is free. Also as long as you keep updating the JDK to the latest LTS (currently JDK 11) this shouldn’t be a problem. This is the exact reason we’re moving to support JDK 11.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-book-is-out-jdk-11.html)
+
 
 ---
 

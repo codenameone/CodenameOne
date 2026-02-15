@@ -73,7 +73,7 @@ I have been developing in both Java and Javascript for years, so needing to use 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **BrendanEich** — August 24, 2015 at 4:20 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22161))
+### **BrendanEich** — August 24, 2015 at 4:20 pm ([permalink](/blog/javascript-get-threaded/#comment-22161))
 
 > BrendanEich says:
 >
@@ -83,10 +83,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > /be
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-get-threaded.html)
 
 
-### **shannah78** — August 24, 2015 at 5:27 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22204))
+
+### **shannah78** — August 24, 2015 at 5:27 pm ([permalink](/blog/javascript-get-threaded/#comment-22204))
 
 > shannah78 says:
 >
@@ -107,19 +107,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I am watching the progress of WASM with anticipation, and I fully expect that JS will add threads – or at least the basis upon which threads could be implemented at some time in the future. I’d just like to see it sooner than later. I still contend that threads (or at least concurrency with easily shared memory) are a feature of any “grown-up” language, and JS devs need the option of removing the training wheels from time to time.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-get-threaded.html)
 
 
-### **Jason Mulligan** — August 25, 2015 at 10:31 am ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22276))
+
+### **Jason Mulligan** — August 25, 2015 at 10:31 am ([permalink](/blog/javascript-get-threaded/#comment-22276))
 
 > Jason Mulligan says:
 >
 > You don’t need threads in your “core” reactor, but do you need to understand how to write code for the env/language. Use promises for IO, events for user interaction and stateless functions for the rest; you’ll do fine. IPC may seem undesirable, but it forces you to really think about what you’re doing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-get-threaded.html)
 
 
-### **shannah78** — August 25, 2015 at 2:15 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22084))
+
+### **shannah78** — August 25, 2015 at 2:15 pm ([permalink](/blog/javascript-get-threaded/#comment-22084))
 
 > shannah78 says:
 >
@@ -134,10 +134,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Promises and other reactive patterns for working asynchronously are all very clever developments by very smart people to solve a problem that shouldn’t need to be solved.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-get-threaded.html)
 
 
-### **Jason Mulligan** — August 25, 2015 at 2:47 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-21478))
+
+### **Jason Mulligan** — August 25, 2015 at 2:47 pm ([permalink](/blog/javascript-get-threaded/#comment-21478))
 
 > Jason Mulligan says:
 >
@@ -147,19 +147,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I disagree with the rest, as I can only assume you’ve trapped yourself with a way of thinking.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-get-threaded.html)
 
 
-### **shannah78** — August 25, 2015 at 3:03 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22433))
+
+### **shannah78** — August 25, 2015 at 3:03 pm ([permalink](/blog/javascript-get-threaded/#comment-22433))
 
 > shannah78 says:
 >
 > Thanks for the CSP ref. Wasn’t familiar with that one. Looks promising. PEBCAK must have been a self reference. Cheer up. It will be ok.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-get-threaded.html)
 
 
-### **BrendanEich** — September 2, 2015 at 3:34 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22366))
+
+### **BrendanEich** — September 2, 2015 at 3:34 pm ([permalink](/blog/javascript-get-threaded/#comment-22366))
 
 > BrendanEich says:
 >
@@ -169,10 +169,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > /be
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-get-threaded.html)
 
 
-### **Alexey Andreev** — September 4, 2015 at 4:14 am ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-24192))
+
+### **Alexey Andreev** — September 4, 2015 at 4:14 am ([permalink](/blog/javascript-get-threaded/#comment-24192))
 
 > Alexey Andreev says:
 >
@@ -196,25 +196,25 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > what about millions of Java programmers?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-get-threaded.html)
 
 
-### **Asmithdev** — September 14, 2015 at 7:30 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22376))
+
+### **Asmithdev** — September 14, 2015 at 7:30 pm ([permalink](/blog/javascript-get-threaded/#comment-22376))
 
 > Asmithdev says:
 >
 > I guess you’ve never heard of [http://www.hamsters.io/](<http://www.hamsters.io/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-get-threaded.html)
 
 
-### **Asmithdev** — September 14, 2015 at 7:38 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22306))
+
+### **Asmithdev** — September 14, 2015 at 7:38 pm ([permalink](/blog/javascript-get-threaded/#comment-22306))
 
 > Asmithdev says:
 >
 > Threads don’t suck with the use of the current web worker API and transferrable objects…although I do agree the API itself sucks on many levels the memory model makes threading extremely safe, I’m not entirely sure why people are unwilling to open their minds up to multithreading in JavaScript as the problem isn’t the language but rather lack of creativity and dedication to making them usable in a practical way. I wrote WebHamsters ([http://hamsters.io](<http://hamsters.io>)) specifically for this very reason, the tools are freely available for use by anyone who cares to invest the time to learn them. I don’t know why you would throw the potential of 100’s of % performance improvements with automatic parallelization because something “sucks” on an idealogical level.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjavascript-get-threaded.html)
+
 
 ---
 

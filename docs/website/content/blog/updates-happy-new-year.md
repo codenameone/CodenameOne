@@ -19,7 +19,7 @@ I’ve been working on cloning the Uber UI and functionality focusing on the chi
 
 Figure 1. The Uber side menu next to the clone
 
-You can see a larger version [here](/img/blog/uber-app-side-menu.png).
+You can see a larger version [here](/blog/updates-happy-new-year/uber-app-side-menu-thumb.png).
 
 I hope I’ll make the end of year deadline to publish the full module but with everything going on around here I might slip into January. I’m still hopeful I can get it out but realistically I’m trying to “do it right” and that takes time.
 ---
@@ -29,11 +29,11 @@ I hope I’ll make the end of year deadline to publish the full module but with 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **davidwaf** — December 21, 2017 at 1:13 pm ([permalink](https://www.codenameone.com/blog/updates-happy-new-year.html#comment-23639))
+### **davidwaf** — December 21, 2017 at 1:13 pm ([permalink](/blog/updates-happy-new-year/#comment-23639))
 
 > awesome!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fupdates-happy-new-year.html)
+
 
 ---
 

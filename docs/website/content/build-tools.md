@@ -126,4 +126,4 @@ iOS App Store
 
 ## Setting up the Build Tools
 
-You don’t need to set up any of these build tools. The Codename One Build cloud takes care of all that. If you have the IntelliJ/NetBeans/Eclipse plugin installed, you can build your Java or Kotlin project as a native mobile app with the press of a button. [Get Started](https://www.codenameone.com/getting-started.html)
+You don’t need to set up any of these build tools. The Codename One Build cloud takes care of all that. If you have the IntelliJ/NetBeans/Eclipse plugin installed, you can build your Java or Kotlin project as a native mobile app with the press of a button. [Get Started](/getting-started/)

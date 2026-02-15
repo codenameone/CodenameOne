@@ -46,23 +46,23 @@ Now, whenever you build the library project, it will automatically copy it into 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — February 23, 2020 at 10:06 am ([permalink](https://www.codenameone.com/blog/css-in-cn1libs.html#comment-21390))
+### **Francesco Galgani** — February 23, 2020 at 10:06 am ([permalink](/blog/css-in-cn1libs/#comment-21390))
 
 > [Francesco Galgani](https://lh6.googleusercontent.com/-4K0ax_DVJf4/AAAAAAAAAAI/AAAAAAAAAAA/AMZuuckEd1kcni0y8k6NMzNtxwOCEPatQQ/photo.jpg) says:
 >
 > Thank you, however this can cause that the cn1lib CSS conflict with existing CSS. Another tip for the developer of a cn1lib could be the use of an unique prefix for every CSS included in the cn1lib. That prefix could be the name of the cn1lib, for example. Do you agree?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcss-in-cn1libs.html)
 
 
-### **Shai Almog** — February 24, 2020 at 3:06 am ([permalink](https://www.codenameone.com/blog/css-in-cn1libs.html#comment-21389))
+
+### **Shai Almog** — February 24, 2020 at 3:06 am ([permalink](/blog/css-in-cn1libs/#comment-21389))
 
 > Shai Almog says:
 >
 > I think that just using a unique name for a CSS element should be enough for most cases although a library specific prefix would probably be healthy.  
 > I don’t think this is something we should force as we’d like the option for CSS to override global theme settings when required e.g. in the case of a theme library. E.g. a cn1lib that offers dark mode theming.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcss-in-cn1libs.html)
+
 
 ---
 

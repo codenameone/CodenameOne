@@ -31,7 +31,7 @@ Unlike the language change you could still revert this change manually by defini
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Simone Peirani** — September 7, 2016 at 7:16 am ([permalink](https://www.codenameone.com/blog/java-8-api-23-defaults.html#comment-23032))
+### **Simone Peirani** — September 7, 2016 at 7:16 am ([permalink](/blog/java-8-api-23-defaults/#comment-23032))
 
 > Simone Peirani says:
 >
@@ -39,7 +39,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I noticed an issue with BTDemo on Android 6.0.1 device (with API 23 in build hints). To get works the App the user should go under settings –> App – – > BTDemo –> Authorizations, and manually enable the position authorization.  
 > By setting API 21 under build hints, BTDemo perfectly works instead.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-8-api-23-defaults.html)
+
 
 ---
 

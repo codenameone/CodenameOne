@@ -17,7 +17,7 @@ This regression was caused by new features in the `Command` class that now has t
 
 ### Launch Screen Storyboards
 
-With the shift to Xcode 9, which is the default version on the Codename One build servers as of [February 2018](https://www.codenameone.com/blog/xcode-9-on-by-default.html), it is now possible to use a launch-screen storyboard as the splash screen instead of launch images. This will potentially solve the issue of the proliferation of screenshots, as you can supply a single storyboard which will work on all devices. Launch storyboards are disabled by default at this time, but we will flip the switch for 5.0 so they will be the default. You can enable the LaunchScreen storyboard by adding the `ios.multitasking=true` build hint and explicitly disable them by setting it to `false`.
+With the shift to Xcode 9, which is the default version on the Codename One build servers as of [February 2018](/blog/xcode-9-on-by-default/), it is now possible to use a launch-screen storyboard as the splash screen instead of launch images. This will potentially solve the issue of the proliferation of screenshots, as you can supply a single storyboard which will work on all devices. Launch storyboards are disabled by default at this time, but we will flip the switch for 5.0 so they will be the default. You can enable the LaunchScreen storyboard by adding the `ios.multitasking=true` build hint and explicitly disable them by setting it to `false`.
 
 The build hint is called “multitasking”, because iOS’ split-screen and multi-tasking feature **requires** that the app uses a launch storyboard rather than launch images.
 
@@ -60,25 +60,25 @@ As part of that I asked Steve to add a few enhancements to the CSS support which
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — April 25, 2018 at 8:05 am ([permalink](https://www.codenameone.com/blog/version-4-1-launch-screen-storyboards.html#comment-23969))
+### **Francesco Galgani** — April 25, 2018 at 8:05 am ([permalink](/blog/version-4-1-launch-screen-storyboards/#comment-23969))
 
 > Francesco Galgani says:
 >
 > You wrote: «The default Codename One launch storyboard simply shows your app’s icon in the middle of the screen». My question is about the size of this icon: because it’s always sized 512×512 pixels, does its actual size vary according the screen DPI? In my apps, I implemented a splash screen with the app’s icon sized as I want it, but if Codename One shows app’s icon in the middle of the screen, probably I’ll have two splash screens, that will be the same app’s icon sized differently… that is not what I want, of course.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fversion-4-1-launch-screen-storyboards.html)
 
 
-### **Francesco Galgani** — April 25, 2018 at 12:22 pm ([permalink](https://www.codenameone.com/blog/version-4-1-launch-screen-storyboards.html#comment-23642))
+
+### **Francesco Galgani** — April 25, 2018 at 12:22 pm ([permalink](/blog/version-4-1-launch-screen-storyboards/#comment-23642))
 
 > Francesco Galgani says:
 >
 > You wrote that we can get smaller binaries, but the screenshot images are still generated with ios.multitasking=true and without ios.fastbuild=true build hints. But ios.fastbuild=true is only for debug builds (according to the developer guide). Please see the shannah reply to this issue: [https://github.com/codename…](<https://github.com/codenameone/CodenameOne/issues/2396>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fversion-4-1-launch-screen-storyboards.html)
 
 
-### **Shai Almog** — April 26, 2018 at 5:42 am ([permalink](https://www.codenameone.com/blog/version-4-1-launch-screen-storyboards.html#comment-23925))
+
+### **Shai Almog** — April 26, 2018 at 5:42 am ([permalink](/blog/version-4-1-launch-screen-storyboards/#comment-23925))
 
 > Shai Almog says:
 >
@@ -86,7 +86,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I misunderstood Steve’s implementation so the post above gets some current facts wrong. I think we need to shift the implementation to match the post not the other way around. We’re discussing this, I don’t think it makes sense to have both the screenshots and the xib.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fversion-4-1-launch-screen-storyboards.html)
+
 
 ---
 

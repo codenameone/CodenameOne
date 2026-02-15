@@ -61,31 +61,31 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 27, 2014 at 4:31 pm ([permalink](https://www.codenameone.com/blog/mighty-morphing-components.html#comment-22116))
+### **Anonymous** — October 27, 2014 at 4:31 pm ([permalink](/blog/mighty-morphing-components/#comment-22116))
 
 > Anonymous says:
 >
 > That’s very neat. Nice effect.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmighty-morphing-components.html)
 
 
-### **Anonymous** — November 1, 2014 at 1:27 pm ([permalink](https://www.codenameone.com/blog/mighty-morphing-components.html#comment-21849))
+
+### **Anonymous** — November 1, 2014 at 1:27 pm ([permalink](/blog/mighty-morphing-components/#comment-21849))
 
 > Anonymous says:
 >
 > Great one! you guys are doing a great job keeping up with everything that matters.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmighty-morphing-components.html)
 
 
-### **Anonymous** — November 27, 2014 at 10:54 pm ([permalink](https://www.codenameone.com/blog/mighty-morphing-components.html#comment-22156))
+
+### **Anonymous** — November 27, 2014 at 10:54 pm ([permalink](/blog/mighty-morphing-components/#comment-22156))
 
 > Anonymous says:
 >
 > Kool
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmighty-morphing-components.html)
+
 
 ---
 

@@ -61,13 +61,13 @@ Once the bootcamp is over I plan to redo a lot of the videos in the site and rew
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **salah Alhaddabi** — April 18, 2017 at 3:40 pm ([permalink](https://www.codenameone.com/blog/big-changes-bootcamp-updates.html#comment-23448))
+### **salah Alhaddabi** — April 18, 2017 at 3:40 pm ([permalink](/blog/big-changes-bootcamp-updates/#comment-23448))
 
 > salah Alhaddabi says:
 >
 > Very nice Shai and hope the result of the bootcamp will be fruitful and lead to better tutorials/documentation
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbig-changes-bootcamp-updates.html)
+
 
 ---
 

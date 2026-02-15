@@ -101,7 +101,7 @@ with the same facebook app.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Andreas Grätz** — May 23, 2016 at 7:14 am ([permalink](https://www.codenameone.com/blog/questions-of-the-week-vi.html#comment-22468))
+### **Andreas Grätz** — May 23, 2016 at 7:14 am ([permalink](/blog/questions-of-the-week-vi/#comment-22468))
 
 > Andreas Grätz says:
 >
@@ -113,10 +113,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 3\. When do you support iPad Pro 12 inch native resolution?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fquestions-of-the-week-vi.html)
 
 
-### **Shai Almog** — May 24, 2016 at 4:08 am ([permalink](https://www.codenameone.com/blog/questions-of-the-week-vi.html#comment-22578))
+
+### **Shai Almog** — May 24, 2016 at 4:08 am ([permalink](/blog/questions-of-the-week-vi/#comment-22578))
 
 > Shai Almog says:
 >
@@ -124,10 +124,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 2/3. Good questions. We already support everything in terms of the code but we are currently still compiling on an older version of xcode due to logistical reasons that would require a painful migration. We’re announcing a migration process to the newest version of xcode this week so keep an eye on the blog. Once we have the newest version of xcode in the new build servers we’ll be able to address a lot of feature requests.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fquestions-of-the-week-vi.html)
 
 
-### **Andreas Grätz** — May 25, 2016 at 11:11 pm ([permalink](https://www.codenameone.com/blog/questions-of-the-week-vi.html#comment-22876))
+
+### **Andreas Grätz** — May 25, 2016 at 11:11 pm ([permalink](/blog/questions-of-the-week-vi/#comment-22876))
 
 > Andreas Grätz says:
 >
@@ -135,10 +135,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 2\. I’m writing a business app and this app needs a master/detail view on tablets like this: [https://apppie.files.wordpr…]([https://apppie.files.wordpress.com/2015/03/screenshot-2015-03-08-20-20-24.png?w=474&h=393](https://apppie.files.wordpress.com/2015/03/screenshot-2015-03-08-20-20-24.png?w=474&h=393)) and this [https://developer.xamarin.c…](<https://developer.xamarin.com/recipes/ios/content_controls/split_view/Images/Picture_1.png>)  
 > “Translated” to Codename One I need to place two “forms” side by side each with a title and actions/menus. The left form is the masterview and must have a constant(!) width on both landscape and portrait-mode. The problem is, that placing two forms in a (super-)form, it is not possible to set the widths and the menus don’t work.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fquestions-of-the-week-vi.html)
 
 
-### **Shai Almog** — May 26, 2016 at 3:57 am ([permalink](https://www.codenameone.com/blog/questions-of-the-week-vi.html#comment-21412))
+
+### **Shai Almog** — May 26, 2016 at 3:57 am ([permalink](/blog/questions-of-the-week-vi/#comment-21412))
 
 > Shai Almog says:
 >
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Ideally we want to have a more generic approach for this, we actually have an old attempt at a generic master detail API but it was pretty awful as it predated a lot of the newer ideas we have in the framework such as Toolbar. We might take a stab at that again as we are rewriting the kitchen sink demo.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fquestions-of-the-week-vi.html)
+
 
 ---
 

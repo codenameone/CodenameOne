@@ -146,7 +146,7 @@ nature of Java problematic.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Luix** — December 30, 2015 at 2:26 pm ([permalink](https://www.codenameone.com/blog/analysis-google-moving-to-openjdk-what-that-really-means.html#comment-22616))
+### **Luix** — December 30, 2015 at 2:26 pm ([permalink](/blog/analysis-google-moving-to-openjdk-what-that-really-means/#comment-22616))
 
 > Luix says:
 >
@@ -154,10 +154,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I don’t mean to start a flame war, but IMHO Google should ditch the Java approach all together and find a better replacement.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanalysis-google-moving-to-openjdk-what-that-really-means.html)
 
 
-### **Shai Almog** — December 30, 2015 at 2:31 pm ([permalink](https://www.codenameone.com/blog/analysis-google-moving-to-openjdk-what-that-really-means.html#comment-22626))
+
+### **Shai Almog** — December 30, 2015 at 2:31 pm ([permalink](/blog/analysis-google-moving-to-openjdk-what-that-really-means/#comment-22626))
 
 > Shai Almog says:
 >
@@ -167,10 +167,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Google analyzed the options before picking Java, there are no realistic alternatives for Java and none are better performing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanalysis-google-moving-to-openjdk-what-that-really-means.html)
 
 
-### **Luix** — December 30, 2015 at 2:44 pm ([permalink](https://www.codenameone.com/blog/analysis-google-moving-to-openjdk-what-that-really-means.html#comment-22636))
+
+### **Luix** — December 30, 2015 at 2:44 pm ([permalink](/blog/analysis-google-moving-to-openjdk-what-that-really-means/#comment-22636))
 
 > Luix says:
 >
@@ -178,10 +178,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > As a SysAdmin I deal with poorly written Java code all the time (i.e. the developers simply complain about their code running slow on expensive hardware because they don’t have enough resources). I’d like to see a path to better resource usage rather than expecting the system to grow in size. That’s just an unrealistic approach. I reckon it’s Google’s fault for not steering the development in that direction, but then again, Java might be the de facto standard, but it doesn’t mean it couldn’t be improved.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanalysis-google-moving-to-openjdk-what-that-really-means.html)
 
 
-### **Shai Almog** — December 30, 2015 at 2:53 pm ([permalink](https://www.codenameone.com/blog/analysis-google-moving-to-openjdk-what-that-really-means.html#comment-22456))
+
+### **Shai Almog** — December 30, 2015 at 2:53 pm ([permalink](/blog/analysis-google-moving-to-openjdk-what-that-really-means/#comment-22456))
 
 > Shai Almog says:
 >
@@ -189,10 +189,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I totally see the issues you are running against, some Java apps are just ridiculous and its often hard for us to gauge what the hell is needed in terms of resources. One annoyance I had with servers was that the Xmx switch for the JVM to indicate the maximum memory has no value for the admin. It only allocates the memory visible to the Java application but not the memory I need to give to the server. So if I use -Xmx2gb the app might take up 2.5gb because of various VM overhead issues. This makes it pretty painful, but that’s an implementation problem more than an inherent issue in the Java language.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanalysis-google-moving-to-openjdk-what-that-really-means.html)
 
 
-### **Luix** — December 30, 2015 at 3:01 pm ([permalink](https://www.codenameone.com/blog/analysis-google-moving-to-openjdk-what-that-really-means.html#comment-21500))
+
+### **Luix** — December 30, 2015 at 3:01 pm ([permalink](/blog/analysis-google-moving-to-openjdk-what-that-really-means/#comment-21500))
 
 > Luix says:
 >
@@ -204,19 +204,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > All I have left are my best wishes for the upcoming new year.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanalysis-google-moving-to-openjdk-what-that-really-means.html)
 
 
-### **bryan** — January 2, 2016 at 10:10 pm ([permalink](https://www.codenameone.com/blog/analysis-google-moving-to-openjdk-what-that-really-means.html#comment-22440))
+
+### **bryan** — January 2, 2016 at 10:10 pm ([permalink](/blog/analysis-google-moving-to-openjdk-what-that-really-means/#comment-22440))
 
 > bryan says:
 >
 > What you said makes no sense at all. Java the language is fine (unless your preference is functional languages), and the JVM (which as Shai has noted is NOT what Google use) works just fine also. Back in the day almost all feature phones had Java baked in, and given the hardware constraints, Java apps worked remarkably well (and worked even better with LWUIT – thanks Shai/Chen), so to say Java is intrinsically slow or a resource hog is nonsense.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanalysis-google-moving-to-openjdk-what-that-really-means.html)
 
 
-### **Adam** — January 6, 2016 at 7:19 pm ([permalink](https://www.codenameone.com/blog/analysis-google-moving-to-openjdk-what-that-really-means.html#comment-22657))
+
+### **Adam** — January 6, 2016 at 7:19 pm ([permalink](/blog/analysis-google-moving-to-openjdk-what-that-really-means/#comment-22657))
 
 > Adam says:
 >
@@ -224,10 +224,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Are these really competing goals? Something that executes in fewer CPU cycles will result in longer battery life. AOT is always better than JIT for most things (unless they can only be known at runtime), but as far as a JIT engine goes, faster is better for everybody.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanalysis-google-moving-to-openjdk-what-that-really-means.html)
 
 
-### **Shai Almog** — January 6, 2016 at 7:30 pm ([permalink](https://www.codenameone.com/blog/analysis-google-moving-to-openjdk-what-that-really-means.html#comment-22514))
+
+### **Shai Almog** — January 6, 2016 at 7:30 pm ([permalink](/blog/analysis-google-moving-to-openjdk-what-that-really-means/#comment-22514))
 
 > Shai Almog says:
 >
@@ -243,10 +243,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Anyway, I digress. Its a bit more complex than that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanalysis-google-moving-to-openjdk-what-that-really-means.html)
 
 
-### **Adam** — January 6, 2016 at 7:46 pm ([permalink](https://www.codenameone.com/blog/analysis-google-moving-to-openjdk-what-that-really-means.html#comment-22257))
+
+### **Adam** — January 6, 2016 at 7:46 pm ([permalink](/blog/analysis-google-moving-to-openjdk-what-that-really-means/#comment-22257))
 
 > Adam says:
 >
@@ -254,10 +254,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That being said, what on earth would the JIT be doing that is consuming otherwise idle CPU cycles that aren’t otherwise necessary tasks? Overly aggressive garbage collection? Maybe I’m only looking at this from an application level lens when I should be viewing from a virtual machine lens.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanalysis-google-moving-to-openjdk-what-that-really-means.html)
 
 
-### **Shai Almog** — January 6, 2016 at 7:55 pm ([permalink](https://www.codenameone.com/blog/analysis-google-moving-to-openjdk-what-that-really-means.html#comment-22664))
+
+### **Shai Almog** — January 6, 2016 at 7:55 pm ([permalink](/blog/analysis-google-moving-to-openjdk-what-that-really-means/#comment-22664))
 
 > Shai Almog says:
 >
@@ -269,7 +269,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Mobile JIT’s aren’t as aggressive but they do something weird. They GC jitted code. E.g. if RAM is low or if a piece of code was used a few times and then no longer called then wasting RAM on compiled code is redundant.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fanalysis-google-moving-to-openjdk-what-that-really-means.html)
+
 
 ---
 

@@ -84,32 +84,32 @@ We might still revert this fix if we run into too many problems so with this Fri
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **João Bastos** — February 13, 2017 at 12:32 pm ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23210))
+### **João Bastos** — February 13, 2017 at 12:32 pm ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23210))
 
 > Is the addAll shortcut already available? Cant see it in netbeans…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Shai Almog** — February 14, 2017 at 8:05 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23119))
+
+### **Shai Almog** — February 14, 2017 at 8:05 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23119))
 
 > Shai Almog says:
 >
 > It should be. Use the Update Client Libs button in Codename One Settings.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **João Bastos** — February 14, 2017 at 5:23 pm ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24230))
+
+### **João Bastos** — February 14, 2017 at 5:23 pm ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24230))
 
 > João Bastos says:
 >
 > Solved! Thanks Shai!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Denis** — September 20, 2018 at 8:06 pm ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24001))
+
+### **Denis** — September 20, 2018 at 8:06 pm ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24001))
 
 > Denis says:
 >
@@ -128,46 +128,46 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > p.s. CodenameOne version 5.0
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Denis** — September 21, 2018 at 10:38 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24033))
+
+### **Denis** — September 21, 2018 at 10:38 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24033))
 
 > Denis says:
 >
 > update, text appears on real devices, but it’s very very tiny
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Shai Almog** — September 22, 2018 at 6:09 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23934))
+
+### **Shai Almog** — September 22, 2018 at 6:09 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23934))
 
 > Shai Almog says:
 >
 > It looks like you used something such as absolute center or flow layout. That won’t work. These layout managers give components their preferred size which means the resizing text will shrink and won’t grow. You need to use a layout that gives out the full width.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Denis** — September 23, 2018 at 9:02 pm ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24070))
+
+### **Denis** — September 23, 2018 at 9:02 pm ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24070))
 
 > Denis says:
 >
 > yes, you are right, in some parts of UI I used flow layout. Is there any other way to make text bigger on tablets ? because it’s really very very tiny on 10 inch tablets, is it possible to set font size for “Label” UUID (to apply it to all labels at once) depending on device screen size ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Shai Almog** — September 24, 2018 at 4:33 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24082))
+
+### **Shai Almog** — September 24, 2018 at 4:33 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24082))
 
 > Shai Almog says:
 >
 > You can do that in the theme. See the section in the developer guide about theme layering. You can add a theme on top of the current theme.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Denis** — September 24, 2018 at 6:54 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23785))
+
+### **Denis** — September 24, 2018 at 6:54 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23785))
 
 > Denis says:
 >
@@ -177,37 +177,37 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Display.getInstance().getDisplayWidth()  
 > Display.getInstance().getDisplayHeight()
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Shai Almog** — September 25, 2018 at 8:23 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24019))
+
+### **Shai Almog** — September 25, 2018 at 8:23 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24019))
 
 > Shai Almog says:
 >
 > There’s isTablet() both in Display & the CN class.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Denis** — September 25, 2018 at 12:05 pm ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24025))
+
+### **Denis** — September 25, 2018 at 12:05 pm ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24025))
 
 > Denis says:
 >
 > cool, thanks ! just tried that, interesting, but font changes doesn’t apply, background color does, i.e. I have correct layered theme and code setup, I see different background for tablets, but font size doesn’t change, I am trying t set to “True Type: native:MainRegular” and “True Type Size: Large”, but nothing happens on tablets, I tried both “[Default Style]” and “Label”, “Button” individually, can you please advise ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Denis** — September 26, 2018 at 9:01 pm ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24052))
+
+### **Denis** — September 26, 2018 at 9:01 pm ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24052))
 
 > Denis says:
 >
 > setting “True Type Size” to millimeters value on component level helped, [Default Style] still doesn’t work even with millimeters value, I set font site for Buttons and Labels, but for example Dialog title is still very tiny, looks like I should set values for all components individually
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Denis** — September 27, 2018 at 8:48 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24084))
+
+### **Denis** — September 27, 2018 at 8:48 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24084))
 
 > Denis says:
 >
@@ -218,28 +218,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > all in simulator haven’t test on real devices yet
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Denis** — September 27, 2018 at 10:43 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23964))
+
+### **Denis** — September 27, 2018 at 10:43 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23964))
 
 > Denis says:
 >
 > on real tablet device dialog title appears similar to mobile, but with less spacing from top and bottom
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Shai Almog** — September 28, 2018 at 5:31 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24048))
+
+### **Shai Almog** — September 28, 2018 at 5:31 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24048))
 
 > Shai Almog says:
 >
 > Which tablet skin? It’s possible the skin is out of date and needs a new theme
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Denis** — September 28, 2018 at 7:17 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23866))
+
+### **Denis** — September 28, 2018 at 7:17 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23866))
 
 > Denis says:
 >
@@ -252,19 +252,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > java.lang.UnsatisfiedLinkError: Native Library C:UsersDenisAppDataLocalTempsqlite-3.7.151-amd64-sqlitejdbc.dll already loaded in another classloader  
 > java.lang.UnsatisfiedLinkError: org.sqlite.NativeDB._open(Ljava/lang/String;I)V
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Shai Almog** — September 29, 2018 at 4:27 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24069))
+
+### **Shai Almog** — September 29, 2018 at 4:27 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24069))
 
 > Shai Almog says:
 >
 > Did you refresh theme? It’s a bit hard to guess with that amount of information.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Shai Almog** — September 29, 2018 at 4:31 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24074))
+
+### **Shai Almog** — September 29, 2018 at 4:31 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24074))
 
 > Shai Almog says:
 >
@@ -272,53 +272,53 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The simulator crash is due to sqlite, we tried multiple ways to workaround it but it seems that the sqlite JDBC support is averse to class loaders. If you use sqlite switching skins will crash and you’ll have to re-run the app. There’s this issue which we tried and failed to fix multiple times [https://github.com/codename…](<https://github.com/codenameone/CodenameOne/issues/2175>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Shai Almog** — September 30, 2018 at 9:27 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24044))
+
+### **Shai Almog** — September 30, 2018 at 9:27 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24044))
 
 > Shai Almog says:
 >
 > Default will only work for things that aren’t explicitly defined. Since the title is explicitly defined in the native theme you need to override that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Shai Almog** — September 30, 2018 at 9:28 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-21580))
+
+### **Shai Almog** — September 30, 2018 at 9:28 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-21580))
 
 > Shai Almog says:
 >
 > That mostly relates to the density of the device
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Denis** — October 1, 2018 at 9:07 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24087))
+
+### **Denis** — October 1, 2018 at 9:07 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24087))
 
 > Denis says:
 >
 > that makes sense, and I thought the same, the only problem is that we can’t see what defined in native theme ))) I have just 6 items in theme settings, Default style, Button, Container, Label, Multibutton and Toolbar (only Padding/Margin) and as I understand because they are explicitly defined in main theme I have to define them also in layered theme, [Default Style] in layered theme will not override their parameters from main theme, is that correct ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Shai Almog** — October 2, 2018 at 4:49 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23822))
+
+### **Shai Almog** — October 2, 2018 at 4:49 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23822))
 
 > Shai Almog says:
 >
 > Technically you can open the native theme file from our git repo, but that’s probably not a good idea since that might change. Yes you need to explicitly define things you want to change. E.g. the title in iOS is center aligned and in Android it’s left aligned. We usually don’t override alignment to keep that default behavior.  
 > The nice thing is that most of these things can be tested live with the simulator and switching is relatively quick (with the exception of the SQLite problem).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
 
 
-### **Denis** — October 2, 2018 at 12:21 pm ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23893))
+
+### **Denis** — October 2, 2018 at 12:21 pm ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23893))
 
 > Denis says:
 >
 > Thank you Shai, I do exactly the same, use emulator to adjust components, it’s very useful, thanks !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautosizing-add-all-ios-redirects.html)
+
 
 ---
 

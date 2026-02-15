@@ -37,26 +37,26 @@ to help you detect the cases where you do so. Hopefully this will make the migra
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Gareth Murfin** — June 16, 2016 at 5:02 pm ([permalink](https://www.codenameone.com/blog/ios-http-urls.html#comment-22893))
+### **Gareth Murfin** — June 16, 2016 at 5:02 pm ([permalink](/blog/ios-http-urls/#comment-22893))
 
 > Gareth Murfin says:
 >
 > So HttpS will be fine right?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-http-urls.html)
 
 
-### **Shai Almog** — June 17, 2016 at 3:40 am ([permalink](https://www.codenameone.com/blog/ios-http-urls.html#comment-22827))
+
+### **Shai Almog** — June 17, 2016 at 3:40 am ([permalink](/blog/ios-http-urls/#comment-22827))
 
 > Shai Almog says:
 >
 > That’s the goal. To force apps to use proper https sites and proper security.  
 > I understand the logic here. In a browser you can see the lock icon on the top left and know if you are submitting to a secure website. In an app there is no such indication.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-http-urls.html)
 
 
-### **Eric Coolman** — July 1, 2016 at 11:24 pm ([permalink](https://www.codenameone.com/blog/ios-http-urls.html#comment-22704))
+
+### **Eric Coolman** — July 1, 2016 at 11:24 pm ([permalink](/blog/ios-http-urls/#comment-22704))
 
 > Eric Coolman says:
 >
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > So far we haven’t been flagged for enabling arbitrary loads support with our banking apps, but I’m sure Apple will start clamping down soon.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-http-urls.html)
+
 
 ---
 

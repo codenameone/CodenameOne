@@ -142,51 +142,51 @@ You can also check out the Javadocs for the the library [here](https://rawgit.co
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **ftp27** — March 25, 2015 at 10:27 am ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-24242))
+### **ftp27** — March 25, 2015 at 10:27 am ([permalink](/blog/geo-visualization-library/#comment-24242))
 
 > Yesterday I’m solved a similar task 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgeo-visualization-library.html)
 
 
-### **Chidiebere Okwudire** — March 18, 2017 at 11:57 pm ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23408))
+
+### **Chidiebere Okwudire** — March 18, 2017 at 11:57 pm ([permalink](/blog/geo-visualization-library/#comment-23408))
 
 > Chidiebere Okwudire says:
 >
 > Hi, nice! I want to do something but I’m wondering how best to convert my map (in this case an office floor map) into GeoJSON so that users can click on specific, predefined areas to designate their office spaces. Any pointers?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgeo-visualization-library.html)
 
 
-### **Chidiebere Okwudire** — March 19, 2017 at 12:05 am ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23420))
+
+### **Chidiebere Okwudire** — March 19, 2017 at 12:05 am ([permalink](/blog/geo-visualization-library/#comment-23420))
 
 > Chidiebere Okwudire says:
 >
 > @Steve: Demo link still points to the now extinct googlecode repo. Can you update it to point to Github?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgeo-visualization-library.html)
 
 
-### **Shai Almog** — March 19, 2017 at 5:12 am ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23426))
+
+### **Shai Almog** — March 19, 2017 at 5:12 am ([permalink](/blog/geo-visualization-library/#comment-23426))
 
 > Shai Almog says:
 >
 > We moved the demo repo here: [https://github.com/codename…](<https://github.com/codenameone/codenameone-demos/tree/master/GeoVizDemo>)  
 > We probably need to refresh that demo
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgeo-visualization-library.html)
 
 
-### **Chidiebere Okwudire** — March 25, 2017 at 10:30 pm ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23247))
+
+### **Chidiebere Okwudire** — March 25, 2017 at 10:30 pm ([permalink](/blog/geo-visualization-library/#comment-23247))
 
 > Chidiebere Okwudire says:
 >
 > Any idea if/how I can apply this concept to an arbitrary image? Use case is a floor map in which I want to define sitting positions such that users can click and indicate where they’re sitting for example. User ‘ftp27’ seems to have done something similar but I don’t know how…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgeo-visualization-library.html)
 
 
-### **shannah78** — March 31, 2017 at 1:26 pm ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23481))
+
+### **shannah78** — March 31, 2017 at 1:26 pm ([permalink](/blog/geo-visualization-library/#comment-23481))
 
 > shannah78 says:
 >
@@ -194,10 +194,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ve never had to perform this task though so there may be better ways.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgeo-visualization-library.html)
 
 
-### **Chidiebere Okwudire** — April 2, 2017 at 3:28 pm ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23490))
+
+### **Chidiebere Okwudire** — April 2, 2017 at 3:28 pm ([permalink](/blog/geo-visualization-library/#comment-23490))
 
 > Chidiebere Okwudire says:
 >
@@ -205,10 +205,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It’s pretty easy for me to determine the pixels coordinates of the polygons bounding the desired spaces. However, given the different DPIs on various devices, I doubt this will work… What coordinates are provided in the pointerPressed(), pointerReleased() methods of the ImageViewer class? I’m wondering if I can map these in a DPI-independent way…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgeo-visualization-library.html)
 
 
-### **Shai Almog** — April 2, 2017 at 5:03 pm ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23363))
+
+### **Shai Almog** — April 2, 2017 at 5:03 pm ([permalink](/blog/geo-visualization-library/#comment-23363))
 
 > Shai Almog says:
 >
@@ -216,34 +216,34 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You could use ImageViewer or just do something similar, check out its code.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgeo-visualization-library.html)
 
 
-### **Chidiebere Okwudire** — April 5, 2017 at 3:05 am ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23371))
+
+### **Chidiebere Okwudire** — April 5, 2017 at 3:05 am ([permalink](/blog/geo-visualization-library/#comment-23371))
 
 > Chidiebere Okwudire says:
 >
 > I’m not sure I completely get it: How does getRGB help in this case? On the original image, I define the coordinates of the bounding boxes of areas of interest. My challenge is how to translate these to the scaled image regardless of device DPI such that I can detect clicks within those areas and do other things like draw overlays.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgeo-visualization-library.html)
 
 
-### **Shai Almog** — April 5, 2017 at 4:32 am ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23315))
+
+### **Shai Almog** — April 5, 2017 at 4:32 am ([permalink](/blog/geo-visualization-library/#comment-23315))
 
 > Shai Almog says:
 >
 > I don’t see the problem. You can just draw the image in any resolution you want.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgeo-visualization-library.html)
 
 
-### **Chidiebere Okwudire** — April 5, 2017 at 5:41 am ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23381))
+
+### **Chidiebere Okwudire** — April 5, 2017 at 5:41 am ([permalink](/blog/geo-visualization-library/#comment-23381))
 
 > Chidiebere Okwudire says:
 >
 > Okay. I’ll try it out and let you know if I run into any difficulties 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgeo-visualization-library.html)
+
 
 ---
 

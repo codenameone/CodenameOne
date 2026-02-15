@@ -22,7 +22,7 @@ __ |  Since the app will be launched directly to the background, you cannot assu
 ### Implementing Background Fetch
 
 Apps that wish to implement background fetch must implement the  
-[BackgroundFetch](https://www.codenameone.com/javadoc/com/codename1/background/BackgroundFetch.html)  
+[BackgroundFetch](/javadoc/com/codename1/background/BackgroundFetch/)  
 interface in their main class.
 
 __ |  The main class is the one mentioned in the preferences not the state machine or some other class!   
@@ -164,7 +164,7 @@ The following code demonstrates simple usage of the API:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Nick Koirala** — June 22, 2016 at 5:13 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-21454))
+### **Nick Koirala** — June 22, 2016 at 5:13 am ([permalink](/blog/background-fetch/#comment-21454))
 
 > Nick Koirala says:
 >
@@ -174,82 +174,82 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ve found that you can’t poll faster than 60 seconds, not a big problem, an update every minute is still plenty, but might be worth noting as the example code uses 10 seconds, but that’s not what result I’m getting on my phone. If you set it lower then it’ll just call the method every 60 seconds.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Lukman Javalove Idealist Jaji** — June 23, 2016 at 9:00 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-22912))
+
+### **Lukman Javalove Idealist Jaji** — June 23, 2016 at 9:00 am ([permalink](/blog/background-fetch/#comment-22912))
 
 > Lukman Javalove Idealist Jaji says:
 >
 > Will it be a good programming practice to use this feature to connect to a remote DB every x minutes? Or is there a more effective way to achieve this? Sometimes when the back button is pressed on the MainForm, the app ought to be minmized but when I reopen, it looks like the app starts all over again. Does this feature prevent that?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Shai Almog** — June 24, 2016 at 6:24 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-22748))
+
+### **Shai Almog** — June 24, 2016 at 6:24 am ([permalink](/blog/background-fetch/#comment-22748))
 
 > Shai Almog says:
 >
 > Probably not, it will grind your battery down to nothing. The right thing to do is to use push to trigger an update.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Lukman Javalove Idealist Jaji** — June 26, 2016 at 6:36 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-22813))
+
+### **Lukman Javalove Idealist Jaji** — June 26, 2016 at 6:36 am ([permalink](/blog/background-fetch/#comment-22813))
 
 > Lukman Javalove Idealist Jaji says:
 >
 > Thanks Shai .. does this apply also to on device background checks … say if a file exists in storage or on the filesystem
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Shai Almog** — June 27, 2016 at 3:04 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-22724))
+
+### **Shai Almog** — June 27, 2016 at 3:04 am ([permalink](/blog/background-fetch/#comment-22724))
 
 > Shai Almog says:
 >
 > I have no idea. I’m guessing it should work.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Scott Turner** — May 11, 2017 at 2:21 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-23401))
+
+### **Scott Turner** — May 11, 2017 at 2:21 pm ([permalink](/blog/background-fetch/#comment-23401))
 
 > Scott Turner says:
 >
 > I noticed an issue with the BackgroundFetch functionality. It’s not mentioned in this blog post, but for ios, you have to set ios.locationusagedescription in the build hints, otherwise it won’t hit the performBackgroundFetch callback on apple devices. It took me several hours of poking around to figure this out, so it’s definitely worth amending the post.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Shai Almog** — May 12, 2017 at 12:25 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-23533))
+
+### **Shai Almog** — May 12, 2017 at 12:25 pm ([permalink](/blog/background-fetch/#comment-23533))
 
 > Shai Almog says:
 >
 > I’m not familiar enough with that piece of code so I asked about it. I understand that there should be no dependency on location usage description so if this happens with a simple hello world that might be a bug. One thing I did understand is that iOS is ridiculously sensitive about background behavior. So if you use things like location etc. this might fail by crashing with no messages or any indication of what went wrong.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Scott Turner** — May 12, 2017 at 12:48 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-23333))
+
+### **Scott Turner** — May 12, 2017 at 12:48 pm ([permalink](/blog/background-fetch/#comment-23333))
 
 > Scott Turner says:
 >
 > Thanks, Shai. After playing around with BackgroundFetch I realized it wasn’t really right for my use case anyway. It’s far too unpredictable on ios. I need it to hit reliably at least once every 30 seconds and it seems like it doesn’t allow that sort of flexibility. Oh well! Thanks for the follow up.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Ch Hjelm** — May 20, 2019 at 8:28 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-24093))
+
+### **Ch Hjelm** — May 20, 2019 at 8:28 pm ([permalink](/blog/background-fetch/#comment-24093))
 
 > Ch Hjelm says:
 >
 > I understand that only `init()` will be executed before `performBackgroundFetch` is run in the background. If I have a lot of things being executed on a normal application startup (and which are not necessary for the `performBackgroundFetch` to execute), I guess that initialization code should then rather go into `start()` to avoid slowing the `performBackgroundFetch` down (with the risk that it takes too long and get killed). In which case, `start()` should test on whether current is null like in your example, and only execute all the initialization code if `current` actually is null. Would you agree this is the best approach?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Shai Almog** — May 21, 2019 at 4:26 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-23991))
+
+### **Shai Almog** — May 21, 2019 at 4:26 am ([permalink](/blog/background-fetch/#comment-23991))
 
 > Shai Almog says:
 >
@@ -257,10 +257,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > init is only invoked when the app is launched from destroyed mode (cold start). Start is invoked on resume from suspended mode. This lets us detect a case of resume which might be applicable.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Ch Hjelm** — May 21, 2019 at 6:42 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-24058))
+
+### **Ch Hjelm** — May 21, 2019 at 6:42 am ([permalink](/blog/background-fetch/#comment-24058))
 
 > Ch Hjelm says:
 >
@@ -276,37 +276,37 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > }`  
 > Hope I managed to make it clear. I basically want to double check with your expertise because any issues here could be difficult to catch in the Simulator or in device testing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Shai Almog** — May 22, 2019 at 9:33 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-23998))
+
+### **Shai Almog** — May 22, 2019 at 9:33 am ([permalink](/blog/background-fetch/#comment-23998))
 
 > Shai Almog says:
 >
 > You shouldn’t write any code there. It could slow down restore and you should minimize code in init as they can trigger ANR’s (app not responding). In a case of ANR your app could be killed instantly. You can start a thread in the init code and do initialization logic there after a small delay to let the UI grab some CPU. There is no reason to prefer start over init() for this sort of logic though.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Arthur Major** — July 23, 2021 at 4:42 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-24470))
+
+### **Arthur Major** — July 23, 2021 at 4:42 pm ([permalink](/blog/background-fetch/#comment-24470))
 
 > Arthur Major says:
 >
 > I tested this code and works good in Android 7 and below, but Android 8+ just run once, is there something else I have to do?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Steve Hannah** — July 23, 2021 at 5:04 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-24471))
+
+### **Steve Hannah** — July 23, 2021 at 5:04 pm ([permalink](/blog/background-fetch/#comment-24471))
 
 > Steve Hannah says:
 >
 > Background execution has gotten a lot harder with newer versions of Android. It is difficult to predict when the platform will run your background tasks, and they may be blocked for any reason on both Android and iOS. If you can check the device log it might give you a clue as to what its “complaint” is.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Arthur Major** — July 23, 2021 at 11:57 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-24472))
+
+### **Arthur Major** — July 23, 2021 at 11:57 pm ([permalink](/blog/background-fetch/#comment-24472))
 
 > Arthur Major says:
 >
@@ -335,10 +335,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That’s all the log I got when it runs.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Steve Hannah** — July 28, 2021 at 12:54 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-24473))
+
+### **Steve Hannah** — July 28, 2021 at 12:54 pm ([permalink](/blog/background-fetch/#comment-24473))
 
 > Steve Hannah says:
 >
@@ -350,10 +350,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Working around these growing background execution restrictions is tricky. We may end up deprecating some of these background execution APIs and shifting to implementing this type of thing in cn1libs.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbackground-fetch.html)
 
 
-### **Arthur Major** — July 28, 2021 at 4:44 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-24474))
+
+### **Arthur Major** — July 28, 2021 at 4:44 pm ([permalink](/blog/background-fetch/#comment-24474))
 
 > Arthur Major says:
 >

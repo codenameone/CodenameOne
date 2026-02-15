@@ -17,7 +17,7 @@ Learn how to build Codename One from source and use this "local" version in your
 
 > This post is targeted at experienced Codename One users. If you haven’t built an app with Codename One before, I recommend you start with this [Getting Started tutorial](https://shannah.github.io/cn1-maven-archetypes/cn1app-archetype-tutorial/getting-started.html) (for Java) or [this tutorial](https://shannah.github.io/cn1app-archetype-kotlin-template/getting-started.html) (for Kotlin).
 
-One of the benefits of [moving to Maven](https://www.codenameone.com/blog/moving-to-maven.html) is improved project hygiene. It is now trivial to build Codename One from source.
+One of the benefits of [moving to Maven](/blog/moving-to-maven/) is improved project hygiene. It is now trivial to build Codename One from source.
 
 In this video, I show you how to build Codename One from source and use this “local” version in your Codename One projects.
 
@@ -27,33 +27,27 @@ Here’s the gist of what happens in the video.
 
 1. Clone the [Codename One repository](https://github.com/codenameone/CodenameOne), then run mvn install in the maven subdirectory:
 
-```bash
-				
-					git clone https://github.com/codenameone/CodenameOne
+```bash			
+git clone https://github.com/codenameone/CodenameOne
 cd CodenameOne/maven
-mvn install
-				
-			
+mvn install			
 ```
 
 This will take a few minutes, but at the end of the tunnel you should see “SUCCESS” as shown below:
 
-![mvn-install-success](https://www.codenameone.com/wp-content/uploads/2021/04/mvn-install-success.png)
+**NOTE**: Due to wordpress issues the images in this blogpost were lost.
 
 2. Clone the [cn1-maven-archetypes repository](https://github.com/shannah/cn1-maven-archetypes), then run mvn install in its root directory:
 
-```bash
-				
-					git clone https://github.com/shannah/cn1-maven-archetypes
+```bash			
+git clone https://github.com/shannah/cn1-maven-archetypes
 cd cn1-maven-archetypes
-mvn install
-				
-			
+mvn install				
 ```
 
 This will take another minute or so, but at the end of the tunnel you should see “SUCCESS”:
 
-![mvn-install-archetypes-success](https://www.codenameone.com/wp-content/uploads/2021/04/mvn-install-archetypes-success.png)
+...
 
 After completing these steps, Codename One will be installed in the local maven repository. A key point I make in this video is the version number of the sources that I checked out of Github. If you are cloning the project from the master branch, then the version will usually be a SNAPSHOT version. E.g. 7.0.21-SNAPSHOT. This is a Maven convention. Release versions will not have the **-SNAPSHOT** suffix.
   
@@ -66,7 +60,7 @@ Now that Codename One is installed in your local Maven repo, you can use that ve
 
 I demonstrate this in the video by creating a new project with the [Codename One initializr](https://start.codenameone.com/).
 
-![cn1-intializr](https://www.codenameone.com/wp-content/uploads/2021/04/cn1-intializr.png)
+...
 
 ## Tip
 
@@ -74,11 +68,11 @@ I demonstrate this in the video by creating a new project with the [Codename One
 
 After downloading and extracting the project, I open its pom.xml file and and look for the <cn1.version> and <cn1.plugin.version> properties:
 
-![cn1-version-properties](https://www.codenameone.com/wp-content/uploads/2021/04/cn1-version-properties.png)
+...
 
 I then change these to point to the version that I installed into my local maven repository: 7.0.21-SNAPSHOT.
 
-![cn1-version-updated](https://www.codenameone.com/wp-content/uploads/2021/04/cn1-version-updated.png)
+...
 
 ### Why Build From Source?
 
@@ -96,7 +90,7 @@ If you want to dig deeper into Codename One’s Maven support, check out the [Co
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Dave Dyer** — July 20, 2023 at 10:07 pm ([permalink](https://www.codenameone.com/blog/building-codename-one-from-source-maven-edition.html#comment-24563))
+### **Dave Dyer** — July 20, 2023 at 10:07 pm ([permalink](/blog/building-codename-one-from-source-maven-edition/#comment-24563))
 
 > Dave Dyer says:
 >
@@ -106,17 +100,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > java-runtime: Compilation failure: Compilation failure:  
 > [ERROR] Source option 5 is no longer supported. Use 7 or later.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-codename-one-from-source-maven-edition.html)
 
 
-### **Dave Dyer** — July 21, 2023 at 7:35 pm ([permalink](https://www.codenameone.com/blog/building-codename-one-from-source-maven-edition.html#comment-24564))
+
+### **Dave Dyer** — July 21, 2023 at 7:35 pm ([permalink](/blog/building-codename-one-from-source-maven-edition/#comment-24564))
 
 > Dave Dyer says:
 >
 > This is somehow related to the java version in use. I fixed this by  
 > downgrading my default java from java-16 to and older jdk, jdk-1.8
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-codename-one-from-source-maven-edition.html)
+
 
 ---
 

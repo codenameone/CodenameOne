@@ -97,16 +97,16 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — August 12, 2013 at 8:28 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-21826))
+### **Anonymous** — August 12, 2013 at 8:28 am ([permalink](/blog/in-a-pinch/#comment-21826))
 
 > Anonymous says:
 >
 > This is one of missing APIs,what I am waiting for. Great!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-a-pinch.html)
 
 
-### **Mahmoud** — April 3, 2016 at 7:35 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22797))
+
+### **Mahmoud** — April 3, 2016 at 7:35 am ([permalink](/blog/in-a-pinch/#comment-22797))
 
 > Mahmoud says:
 >
@@ -117,22 +117,22 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > thanks,
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-a-pinch.html)
 
 
-### **Shai Almog** — April 4, 2016 at 2:30 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22808))
+
+### **Shai Almog** — April 4, 2016 at 2:30 am ([permalink](/blog/in-a-pinch/#comment-22808))
 
 > Shai Almog says:
 >
 > Hi,  
-> there is a code sample within the JavaDocs that covers just that use case: [https://www.codenameone.com…](<https://www.codenameone.com/javadoc/com/codename1/components/ImageViewer.html>)  
+> there is a code sample within the JavaDocs that covers just that use case: [https://www.codenameone.com…](</javadoc/com/codename1/components/ImageViewer/>)  
 > It’s also included in the developer guide section of the ImageViewer:  
-> [https://www.codenameone.com…](<https://www.codenameone.com/manual/components.html#_imageviewer>)
+> [https://www.codenameone.com…](</manual/components/#_imageviewer>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-a-pinch.html)
 
 
-### **Mahmoud** — April 5, 2016 at 8:11 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22492))
+
+### **Mahmoud** — April 5, 2016 at 8:11 am ([permalink](/blog/in-a-pinch/#comment-22492))
 
 > Mahmoud says:
 >
@@ -145,10 +145,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > BR,
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-a-pinch.html)
 
 
-### **Mahmoud** — June 25, 2016 at 1:24 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22758))
+
+### **Mahmoud** — June 25, 2016 at 1:24 am ([permalink](/blog/in-a-pinch/#comment-22758))
 
 > Mahmoud says:
 >
@@ -158,46 +158,46 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > when i run my app on small device the image looks like attached image (there’s a space on top and bottom of image )  
 > any idea please
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-a-pinch.html)
 
 
-### **Shai Almog** — June 25, 2016 at 5:56 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22624))
+
+### **Shai Almog** — June 25, 2016 at 5:56 am ([permalink](/blog/in-a-pinch/#comment-22624))
 
 > Shai Almog says:
 >
 > Images default to “scale to fit” in the image viewer.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-a-pinch.html)
 
 
-### **Mahmoud** — June 25, 2016 at 11:05 pm ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-21519))
+
+### **Mahmoud** — June 25, 2016 at 11:05 pm ([permalink](/blog/in-a-pinch/#comment-21519))
 
 > Mahmoud says:
 >
 > ok how i can change it
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-a-pinch.html)
 
 
-### **Shai Almog** — June 26, 2016 at 4:48 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22800))
+
+### **Shai Almog** — June 26, 2016 at 4:48 am ([permalink](/blog/in-a-pinch/#comment-22800))
 
 > Shai Almog says:
 >
 > You can change the zoom level, but are you trying to show a static image or allow the user to change that? If the former then image viewer is the wrong component to use.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-a-pinch.html)
 
 
-### **Mahmoud** — June 26, 2016 at 7:13 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22851))
+
+### **Mahmoud** — June 26, 2016 at 7:13 am ([permalink](/blog/in-a-pinch/#comment-22851))
 
 > Mahmoud says:
 >
 > dynamic list in ImageViewer( images from url) i show it as slider
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-a-pinch.html)
 
 
-### **Shai Almog** — June 27, 2016 at 3:06 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22860))
+
+### **Shai Almog** — June 27, 2016 at 3:06 am ([permalink](/blog/in-a-pinch/#comment-22860))
 
 > Shai Almog says:
 >
@@ -205,10 +205,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > This can create an image whose edges are wider than the screen so when you try to swipe you will really pan within the image…  
 > You can replicate that behavior by zooming in with pinch and trying to swipe to see what I mean.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-a-pinch.html)
 
 
-### **Mahmoud** — July 1, 2016 at 4:09 pm ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22901))
+
+### **Mahmoud** — July 1, 2016 at 4:09 pm ([permalink](/blog/in-a-pinch/#comment-22901))
 
 > Mahmoud says:
 >
@@ -216,10 +216,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > if you understand what i mean , is any way to create slider images without space on top and bottom of image in small device  
 > thanks a lot
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-a-pinch.html)
 
 
-### **Shai Almog** — July 2, 2016 at 4:29 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22959))
+
+### **Shai Almog** — July 2, 2016 at 4:29 am ([permalink](/blog/in-a-pinch/#comment-22959))
 
 > Shai Almog says:
 >
@@ -227,7 +227,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If you look at that native OS UI you will notice space above or on the sides to keep the aspect ratio of the image in place as you swipe. If you are speaking of a different UI/UX I’ll need a reference.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-a-pinch.html)
+
 
 ---
 

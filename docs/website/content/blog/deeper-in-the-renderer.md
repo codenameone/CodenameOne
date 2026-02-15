@@ -146,34 +146,34 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — December 18, 2013 at 6:59 pm ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-24235))
+### **Anonymous** — December 18, 2013 at 6:59 pm ([permalink](/blog/deeper-in-the-renderer/#comment-24235))
 
 > Anonymous says:
 >
 > Any chance of some sample code snippets for the “few other features in the generic list cell renderer that aren’t well documented”
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeeper-in-the-renderer.html)
 
 
-### **Anonymous** — December 19, 2013 at 3:19 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21904))
+
+### **Anonymous** — December 19, 2013 at 3:19 am ([permalink](/blog/deeper-in-the-renderer/#comment-21904))
 
 > Anonymous says:
 >
 > They are all listed below with the relevant code where applicable. Which one of the bullets isn’t clear?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeeper-in-the-renderer.html)
 
 
-### **Anonymous** — December 19, 2013 at 3:22 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21845))
+
+### **Anonymous** — December 19, 2013 at 3:22 am ([permalink](/blog/deeper-in-the-renderer/#comment-21845))
 
 > Anonymous says:
 >
 > the last two.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeeper-in-the-renderer.html)
 
 
-### **Anonymous** — December 19, 2013 at 3:27 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21766))
+
+### **Anonymous** — December 19, 2013 at 3:27 am ([permalink](/blog/deeper-in-the-renderer/#comment-21766))
 
 > Anonymous says:
 >
@@ -181,10 +181,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The second case allows you to provide different values for selected/unselected states. So if you have a model with values on the keys of the hashtable that you want to appear differently when pressed you can use that. A common use case is a different icon when the entry is selected (to match the colors) so normally I would place the icon as hash.put(“icon”, myUnselectedIcon); which will work both for selected/unselected states of the renderer. If I want a different icon design for the selected state I can use: hash.put(“#icon”, mySelectedIcon) as well. This will appear when the entry is selected.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeeper-in-the-renderer.html)
 
 
-### **Anonymous** — May 10, 2014 at 5:43 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-22013))
+
+### **Anonymous** — May 10, 2014 at 5:43 am ([permalink](/blog/deeper-in-the-renderer/#comment-22013))
 
 > Anonymous says:
 >
@@ -196,10 +196,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can u provide some insight into this??
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeeper-in-the-renderer.html)
 
 
-### **Anonymous** — May 10, 2014 at 12:00 pm ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21660))
+
+### **Anonymous** — May 10, 2014 at 12:00 pm ([permalink](/blog/deeper-in-the-renderer/#comment-21660))
 
 > Anonymous says:
 >
@@ -209,28 +209,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Unfortunately there is no way in Java to indicate “don’t use this method here but only use it there” so we use the relatively coarse tool of deprecation. In hindsight we should have done renderers completely differently if at all but that is already water under the bridge.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeeper-in-the-renderer.html)
 
 
-### **Anonymous** — August 14, 2014 at 2:21 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-22144))
+
+### **Anonymous** — August 14, 2014 at 2:21 am ([permalink](/blog/deeper-in-the-renderer/#comment-22144))
 
 > Anonymous says:
 >
 > how to add different online images on each items of list ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeeper-in-the-renderer.html)
 
 
-### **Anonymous** — August 14, 2014 at 3:46 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-22005))
+
+### **Anonymous** — August 14, 2014 at 3:46 am ([permalink](/blog/deeper-in-the-renderer/#comment-22005))
 
 > Anonymous says:
 >
 > Set a different URL for the URLImage attribute in the model.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeeper-in-the-renderer.html)
 
 
-### **Anonymous** — August 14, 2014 at 5:41 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21444))
+
+### **Anonymous** — August 14, 2014 at 5:41 am ([permalink](/blog/deeper-in-the-renderer/#comment-21444))
 
 > Anonymous says:
 >
@@ -248,10 +248,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > And how to use URL Image in model (by code) ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeeper-in-the-renderer.html)
 
 
-### **Kaneda** — December 11, 2015 at 1:18 pm ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21623))
+
+### **Kaneda** — December 11, 2015 at 1:18 pm ([permalink](/blog/deeper-in-the-renderer/#comment-21623))
 
 > Kaneda says:
 >
@@ -259,10 +259,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks you
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeeper-in-the-renderer.html)
 
 
-### **Shai Almog** — December 12, 2015 at 5:30 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-22221))
+
+### **Shai Almog** — December 12, 2015 at 5:30 am ([permalink](/blog/deeper-in-the-renderer/#comment-22221))
 
 > Shai Almog says:
 >
@@ -272,19 +272,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The bottom container can be a standard BoxLayout.X_AXIS with two BoxLayout.Y_AXIS within it. The first box Y would container the date as month string and number and the second would contain the title/subtitle (possibly as span label).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeeper-in-the-renderer.html)
 
 
-### **Kaneda** — December 14, 2015 at 11:10 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-22300))
+
+### **Kaneda** — December 14, 2015 at 11:10 am ([permalink](/blog/deeper-in-the-renderer/#comment-22300))
 
 > Kaneda says:
 >
 > I try it 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeeper-in-the-renderer.html)
 
 
-### **Kaneda** — December 14, 2015 at 4:07 pm ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21499))
+
+### **Kaneda** — December 14, 2015 at 4:07 pm ([permalink](/blog/deeper-in-the-renderer/#comment-21499))
 
 > Kaneda says:
 >
@@ -295,10 +295,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > But, the text of the label doesn’t display, how can I display the text hover the image. I think the image is not a background image.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeeper-in-the-renderer.html)
 
 
-### **Shai Almog** — December 15, 2015 at 5:15 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21490))
+
+### **Shai Almog** — December 15, 2015 at 5:15 am ([permalink](/blog/deeper-in-the-renderer/#comment-21490))
 
 > Shai Almog says:
 >
@@ -306,7 +306,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Try placing a label with a text in a Container next to a label with the downloadable image.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdeeper-in-the-renderer.html)
+
 
 ---
 

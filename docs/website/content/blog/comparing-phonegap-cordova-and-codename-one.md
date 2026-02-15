@@ -196,34 +196,34 @@ If you think we misrepresented Codename One or PhoneGap/Cordova in any way let u
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — June 28, 2016 at 8:46 pm ([permalink](https://www.codenameone.com/blog/comparing-phonegap-cordova-and-codename-one.html#comment-21514))
+### **bryan** — June 28, 2016 at 8:46 pm ([permalink](/blog/comparing-phonegap-cordova-and-codename-one/#comment-21514))
 
 > bryan says:
 >
 > CN1 vs React Native ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-phonegap-cordova-and-codename-one.html)
 
 
-### **Shai Almog** — June 29, 2016 at 4:19 am ([permalink](https://www.codenameone.com/blog/comparing-phonegap-cordova-and-codename-one.html#comment-22451))
+
+### **Shai Almog** — June 29, 2016 at 4:19 am ([permalink](/blog/comparing-phonegap-cordova-and-codename-one/#comment-22451))
 
 > Shai Almog says:
 >
 > Agreed. I already wrote something but it wasn’t a real comparison: [http://www.codenameone.com/…](<http://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-phonegap-cordova-and-codename-one.html)
 
 
-### **bryan** — June 29, 2016 at 4:34 am ([permalink](https://www.codenameone.com/blog/comparing-phonegap-cordova-and-codename-one.html#comment-22920))
+
+### **bryan** — June 29, 2016 at 4:34 am ([permalink](/blog/comparing-phonegap-cordova-and-codename-one/#comment-22920))
 
 > bryan says:
 >
 > ah.. yes I remember now. Would be good to get a feature for feature comparison.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-phonegap-cordova-and-codename-one.html)
 
 
-### **José Ignacio Santa Cruz** — June 29, 2016 at 12:39 pm ([permalink](https://www.codenameone.com/blog/comparing-phonegap-cordova-and-codename-one.html#comment-22950))
+
+### **José Ignacio Santa Cruz** — June 29, 2016 at 12:39 pm ([permalink](/blog/comparing-phonegap-cordova-and-codename-one/#comment-22950))
 
 > José Ignacio Santa Cruz says:
 >
@@ -231,10 +231,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Nice comparison, I used CN1 in the early LWUIT days. Due to the lack of Android support those days I went native and finally hybrid using jQuery mobile. Today I’m using Ionic, but the main reason is because of how fast can my team deliver an almost ready product, making HTML is fast and easy. JavaScript developers are not so difficult to find, and if you have design issues, giving the CSS to a designer is no big deal, he/she won’t have to learn anything new. It needs tweaking and tooling and putting brain on the deployment process to get small sized and small memory footprint apps, just like any other developing strategy chosen.  
 > Not better or worse, just different, aimed for different needs.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-phonegap-cordova-and-codename-one.html)
 
 
-### **Shai Almog** — June 29, 2016 at 1:20 pm ([permalink](https://www.codenameone.com/blog/comparing-phonegap-cordova-and-codename-one.html#comment-22927))
+
+### **Shai Almog** — June 29, 2016 at 1:20 pm ([permalink](/blog/comparing-phonegap-cordova-and-codename-one/#comment-22927))
 
 > Shai Almog says:
 >
@@ -244,25 +244,25 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > In mobile where the design needs to be aware of screen size, density, orientation, font constraints etc. the design requires proper programming skills. I’ve yet to see a designer produce something half decent for a website and I can’t imagine one producing something workable for cross platform mobile devices…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-phonegap-cordova-and-codename-one.html)
 
 
-### **David Hinckley** — July 1, 2016 at 11:15 am ([permalink](https://www.codenameone.com/blog/comparing-phonegap-cordova-and-codename-one.html#comment-22784))
+
+### **David Hinckley** — July 1, 2016 at 11:15 am ([permalink](/blog/comparing-phonegap-cordova-and-codename-one/#comment-22784))
 
 > David Hinckley says:
 >
 > I am a Java/Android developer and was asked to create an Android watch application to be added to an existing Cordova project. I was hoping that Cordova could receive requests from the watch through Android Wear messaging, but our Cordova expert says that Cordova can only receive Wear messages, if the Cordova app is currently in the foreground. It appears Cordova can’t run in the background without writing native code. If this is true, it may be important when considering Cordova. So, I ended up writing the native Android Wear message receiving piece for Cordova.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-phonegap-cordova-and-codename-one.html)
 
 
-### **amikeliunas** — July 6, 2016 at 4:58 am ([permalink](https://www.codenameone.com/blog/comparing-phonegap-cordova-and-codename-one.html#comment-22410))
+
+### **amikeliunas** — July 6, 2016 at 4:58 am ([permalink](/blog/comparing-phonegap-cordova-and-codename-one/#comment-22410))
 
 > amikeliunas says:
 >
 > Was that a comment, concern, or just venting out?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcomparing-phonegap-cordova-and-codename-one.html)
+
 
 ---
 

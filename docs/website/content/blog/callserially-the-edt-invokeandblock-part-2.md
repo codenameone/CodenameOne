@@ -163,7 +163,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 2, 2015 at 7:34 pm ([permalink](https://www.codenameone.com/blog/callserially-the-edt-invokeandblock-part-2.html#comment-22285))
+### **Anonymous** — March 2, 2015 at 7:34 pm ([permalink](/blog/callserially-the-edt-invokeandblock-part-2/#comment-22285))
 
 > Anonymous says:
 >
@@ -181,16 +181,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcallserially-the-edt-invokeandblock-part-2.html)
 
 
-### **Anonymous** — March 3, 2015 at 2:02 am ([permalink](https://www.codenameone.com/blog/callserially-the-edt-invokeandblock-part-2.html#comment-22353))
+
+### **Anonymous** — March 3, 2015 at 2:02 am ([permalink](/blog/callserially-the-edt-invokeandblock-part-2/#comment-22353))
 
 > Anonymous says:
 >
 > Thanks for the catch!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcallserially-the-edt-invokeandblock-part-2.html)
+
 
 ---
 

@@ -155,7 +155,7 @@ Watch the video demo of [Codename One initializr](https://dev.to/shannah/online-
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Javier Anton** — March 29, 2021 at 11:53 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24419))
+### **Javier Anton** — March 29, 2021 at 11:53 pm ([permalink](/blog/moving-to-maven/#comment-24419))
 
 > Javier Anton says:
 >
@@ -163,37 +163,37 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There should be a space after each -D and there shouldn’t be backslashes after each line. I think that copying the command into HTML messed it up somehow
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Steve Hannah** — March 29, 2021 at 11:59 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24420))
+
+### **Steve Hannah** — March 29, 2021 at 11:59 pm ([permalink](/blog/moving-to-maven/#comment-24420))
 
 > Steve Hannah says:
 >
 > Looks correct to me. Those slashes escape the new line chars so it can be displayed on multiple lines. You can paste that directly into Mac or Linux. Or Windows even, if running bash.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Javier Anton** — March 30, 2021 at 7:42 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24421))
+
+### **Javier Anton** — March 30, 2021 at 7:42 am ([permalink](/blog/moving-to-maven/#comment-24421))
 
 > Javier Anton says:
 >
 > Nevermind. I was running Powershell on Windows. In that case, what I said is required
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Steve Hannah** — March 30, 2021 at 12:29 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24426))
+
+### **Steve Hannah** — March 30, 2021 at 12:29 pm ([permalink](/blog/moving-to-maven/#comment-24426))
 
 > Steve Hannah says:
 >
 > Thanks. I’ll add a note in the docs about Windows.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Javier Anton** — March 30, 2021 at 9:48 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24422))
+
+### **Javier Anton** — March 30, 2021 at 9:48 am ([permalink](/blog/moving-to-maven/#comment-24422))
 
 > Javier Anton says:
 >
@@ -207,56 +207,56 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > system  
 > ${user.home}/.codenameone/android-${android.platform}/android.jar
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Javier Anton** — March 30, 2021 at 9:49 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24423))
+
+### **Javier Anton** — March 30, 2021 at 9:49 am ([permalink](/blog/moving-to-maven/#comment-24423))
 
 > Javier Anton says:
 >
 > seems the comments can’t contain xml
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Javier Anton** — March 30, 2021 at 9:53 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24424))
+
+### **Javier Anton** — March 30, 2021 at 9:53 am ([permalink](/blog/moving-to-maven/#comment-24424))
 
 > Javier Anton says:
 >
 > Actually, that was wrong. I still can’t compile because my new maven project doesn’t detect the android package of my native sources. And I can’t delete my previous comments, which makes this page look kind of ugly. Enough feedback for today! 😛
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Steve Hannah** — April 1, 2021 at 12:23 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24436))
+
+### **Steve Hannah** — April 1, 2021 at 12:23 pm ([permalink](/blog/moving-to-maven/#comment-24436))
 
 > Steve Hannah says:
 >
 > I see the issue. Add the following to the <build> section of your android/pom.xml file.  
 > <sourceDirectory>src/main/empty</sourceDirectory>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Steve Hannah** — March 30, 2021 at 12:28 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24425))
+
+### **Steve Hannah** — March 30, 2021 at 12:28 pm ([permalink](/blog/moving-to-maven/#comment-24425))
 
 > Steve Hannah says:
 >
 > You shouldn’t need to do that. The android native source doesn’t get compiled. It is sent to the build server as source. Are you getting an error message when you try to build?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Javier Anton** — March 30, 2021 at 7:44 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24427))
+
+### **Javier Anton** — March 30, 2021 at 7:44 pm ([permalink](/blog/moving-to-maven/#comment-24427))
 
 > Javier Anton says:
 >
 > Yes, I was getting an error message when building from Android. It started with it complaining about the android package. I know that this wasn’t happening before (Ant) and thought that it was now (Maven) required to use the Android SDK. Why could it be that my project is saying this after migrating to Maven?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Steve Hannah** — March 30, 2021 at 7:59 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24428))
+
+### **Steve Hannah** — March 30, 2021 at 7:59 pm ([permalink](/blog/moving-to-maven/#comment-24428))
 
 > Steve Hannah says:
 >
@@ -270,10 +270,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You would only need the android SDK installed if you were doing a local android build (e.g. `mvn package -Dcodename1.platform=android -Dcodename1.buildTarget=android-source`).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Javier Anton** — March 30, 2021 at 11:51 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24429))
+
+### **Javier Anton** — March 30, 2021 at 11:51 pm ([permalink](/blog/moving-to-maven/#comment-24429))
 
 > Javier Anton says:
 >
@@ -291,7 +291,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > These errors happen both in PowerShell and in NetBeans
 
 
-### **Steve Hannah** — March 31, 2021 at 12:14 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24430))
+### **Steve Hannah** — March 31, 2021 at 12:14 am ([permalink](/blog/moving-to-maven/#comment-24430))
 
 > Steve Hannah says:
 >
@@ -299,7 +299,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 2. If it is 7.0.17, then please describe the exact command you are running, and what output you are getting.
 
 
-### **Javier Anton** — March 31, 2021 at 8:05 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24431))
+### **Javier Anton** — March 31, 2021 at 8:05 am ([permalink](/blog/moving-to-maven/#comment-24431))
 
 > Javier Anton says:
 >
@@ -318,7 +318,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I just tried “Clean and Rebuild” and now my project doesn’t detect Android native code anymore. I think I’ll have to re-run the migration later today and see if something changes
 
 
-### **Javier Anton** — March 31, 2021 at 7:25 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24432))
+### **Javier Anton** — March 31, 2021 at 7:25 pm ([permalink](/blog/moving-to-maven/#comment-24432))
 
 > Javier Anton says:
 >
@@ -340,16 +340,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Feel free to send me an email or anything, I can jump on a call too if required. Unless you can think of anything I will stop trying to fix this for now as I feel I have hit a dead end
 
 
-### **Steve Hannah** — March 31, 2021 at 9:25 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24433))
+### **Steve Hannah** — March 31, 2021 at 9:25 pm ([permalink](/blog/moving-to-maven/#comment-24433))
 
 > Steve Hannah says:
 >
 > I found an bug with the migration of cn1libs that include required library properties. It is fixed and will be part of the the 7.0.19 release. You’ll need to run migration again with that version number. That release has already been deployed to maven central, but it usually takes a few hours before it is available.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Javier Anton** — April 1, 2021 at 8:51 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24434))
+
+### **Javier Anton** — April 1, 2021 at 8:51 am ([permalink](/blog/moving-to-maven/#comment-24434))
 
 > Javier Anton says:
 >
@@ -357,26 +357,26 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Android builds still try to find the android SDK for native sources and fail
 
 
-### **Steve Hannah** — April 1, 2021 at 12:21 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24435))
+### **Steve Hannah** — April 1, 2021 at 12:21 pm ([permalink](/blog/moving-to-maven/#comment-24435))
 
 > Steve Hannah says:
 >
 > I see the issue. Add the following to the <build> section of your android/pom.xml file.  
 > <sourceDirectory>src/main/empty</sourceDirectory>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Javier Anton** — April 1, 2021 at 2:45 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24437))
+
+### **Javier Anton** — April 1, 2021 at 2:45 pm ([permalink](/blog/moving-to-maven/#comment-24437))
 
 > Javier Anton says:
 >
 > Nice one – it works
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Eric Gbofu** — April 1, 2021 at 4:15 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24438))
+
+### **Eric Gbofu** — April 1, 2021 at 4:15 pm ([permalink](/blog/moving-to-maven/#comment-24438))
 
 > Eric Gbofu says:
 >
@@ -392,19 +392,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > PS: Maven is new for me.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Steve Hannah** — April 1, 2021 at 4:50 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24439))
+
+### **Steve Hannah** — April 1, 2021 at 4:50 pm ([permalink](/blog/moving-to-maven/#comment-24439))
 
 > Steve Hannah says:
 >
 > Yes. That’s right. You need to add the mainName property. There are other properties you can add also, such as cn1Version (to set explicit codename one version).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Eric Gbofu** — April 1, 2021 at 5:06 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24440))
+
+### **Eric Gbofu** — April 1, 2021 at 5:06 pm ([permalink](/blog/moving-to-maven/#comment-24440))
 
 > Eric Gbofu says:
 >
@@ -414,44 +414,44 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Regards
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Steve Hannah** — April 1, 2021 at 5:41 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24441))
+
+### **Steve Hannah** — April 1, 2021 at 5:41 pm ([permalink](/blog/moving-to-maven/#comment-24441))
 
 > Steve Hannah says:
 >
 > I believe the plan is to deprecate the Codename One plugins. They will not be modified to support Maven. IDEs all have built-in support for Maven. We’ll be focusing on tailoring the application project archetype to work smoothly with each IDE. This will provide a more robust and consistent experience for developers across all IDEs.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Eric Gbofu** — April 1, 2021 at 9:43 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24442))
+
+### **Eric Gbofu** — April 1, 2021 at 9:43 pm ([permalink](/blog/moving-to-maven/#comment-24442))
 
 > Eric Gbofu says:
 >
 > Ok! Thanks for the clarification
 
 
-### **Eric Gbofu** — April 1, 2021 at 11:29 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24443))
+### **Eric Gbofu** — April 1, 2021 at 11:29 pm ([permalink](/blog/moving-to-maven/#comment-24443))
 
 > Eric Gbofu says:
 >
 > About my question, i want to know if you can add the mainName property directly into the archetype so the developer will not have to add it manually every time that he wants to create a new project ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Eric Gbofu** — April 1, 2021 at 11:30 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24444))
+
+### **Eric Gbofu** — April 1, 2021 at 11:30 pm ([permalink](/blog/moving-to-maven/#comment-24444))
 
 > Eric Gbofu says:
 >
 > About my first question, i want to know if you can add the mainName property directly into the archetype so the developer will not have to add it manually every time that he wants to create a new project ? Is there a problem to do it that way?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Raazia Tariq** — February 22, 2024 at 9:42 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24596))
+
+### **Raazia Tariq** — February 22, 2024 at 9:42 pm ([permalink](/blog/moving-to-maven/#comment-24596))
 
 > Raazia Tariq says:
 >
@@ -459,25 +459,25 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I got this error while converting an existing project.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Shai Almog** — February 23, 2024 at 3:02 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24597))
+
+### **Shai Almog** — February 23, 2024 at 3:02 am ([permalink](/blog/moving-to-maven/#comment-24597))
 
 > Shai Almog says:
 >
 > Personally I found it’s easier and more reliable to create a new project using <https://start.codenameone.com> and then copying over the source/css/codenameone\_settings.properties on top of the new project (while removing cn1lib build hints). Then reinstalling the cn1libs.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
 
 
-### **Raazia Tariq** — February 23, 2024 at 4:16 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24598))
+
+### **Raazia Tariq** — February 23, 2024 at 4:16 pm ([permalink](/blog/moving-to-maven/#comment-24598))
 
 > Raazia Tariq says:
 >
 > I was able to convert the project successfully. Now, I am stuck on upgrading the project to support higher version of android and iOS. Is there any documentation regarding that?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-to-maven.html)
+
 
 ---
 

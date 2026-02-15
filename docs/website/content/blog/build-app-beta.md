@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/build-app-beta/codename-one-build.jpg)
 
-One of the big “behind the scenes” motivations for our big [build cloud migration](https://www.codenameone.com/blog/new-build-cloud.html) was new server API’s. We now have a completely new backend and this made it easier to build a completely new Codename One App christened as “Codename One Build”.
+One of the big “behind the scenes” motivations for our big [build cloud migration](/blog/new-build-cloud/) was new server API’s. We now have a completely new backend and this made it easier to build a completely new Codename One App christened as “Codename One Build”.
 
 This app is currently in public beta on Android which you can opt-into [here](https://play.google.com/apps/testing/com.codename1.build.app). Once we feel good with the Android version we’ll push out versions for iOS and maybe UWP if there’s demand for that.
 

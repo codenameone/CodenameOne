@@ -82,58 +82,58 @@ __ |  The variable duke is the image of the icon placed into the src directory
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **beck** — September 11, 2016 at 9:46 am ([permalink](https://www.codenameone.com/blog/in-the-shadow.html#comment-22916))
+### **beck** — September 11, 2016 at 9:46 am ([permalink](/blog/in-the-shadow/#comment-22916))
 
 > beck says:
 >
 > We can use the shadow effect in img only or in the components as well. eg I have a blue background container. Can i have the shadow effect in this container as well?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-the-shadow.html)
 
 
-### **Shai Almog** — September 12, 2016 at 4:17 am ([permalink](https://www.codenameone.com/blog/in-the-shadow.html#comment-22972))
+
+### **Shai Almog** — September 12, 2016 at 4:17 am ([permalink](/blog/in-the-shadow/#comment-22972))
 
 > Shai Almog says:
 >
 > If the background of the container is fixed you can draw the image with the background then create a shadow for that and place everything in a layered layout.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-the-shadow.html)
 
 
-### **Bayu Sanjaya** — September 12, 2016 at 1:09 pm ([permalink](https://www.codenameone.com/blog/in-the-shadow.html#comment-23022))
+
+### **Bayu Sanjaya** — September 12, 2016 at 1:09 pm ([permalink](/blog/in-the-shadow/#comment-23022))
 
 > Bayu Sanjaya says:
 >
 > can you give us an example for shadowed container?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-the-shadow.html)
 
 
-### **Shai Almog** — September 13, 2016 at 3:47 am ([permalink](https://www.codenameone.com/blog/in-the-shadow.html#comment-21463))
+
+### **Shai Almog** — September 13, 2016 at 3:47 am ([permalink](/blog/in-the-shadow/#comment-21463))
 
 > Shai Almog says:
 >
 > Containers are transparent by default so doing this generically isn’t necessarily ideal. It might also pose a problem if the container is scrollable or if it reflows (e.g. on rotation). I would suggest doing this for individual components within the container. Just paint the component on an image and use that as the shadow base then do something like LayeredLayout.encloseIn(new Label(myShadow), myComponent)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-the-shadow.html)
 
 
-### **Ali Ahmadur Rahman** — August 5, 2018 at 8:42 pm ([permalink](https://www.codenameone.com/blog/in-the-shadow.html#comment-23820))
+
+### **Ali Ahmadur Rahman** — August 5, 2018 at 8:42 pm ([permalink](/blog/in-the-shadow/#comment-23820))
 
 > Ali Ahmadur Rahman says:
 >
 > Nice tutorial. Hope to get more from you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-the-shadow.html)
 
 
-### **Martin Brook** — October 28, 2018 at 10:17 am ([permalink](https://www.codenameone.com/blog/in-the-shadow.html#comment-23950))
+
+### **Martin Brook** — October 28, 2018 at 10:17 am ([permalink](/blog/in-the-shadow/#comment-23950))
 
 > Martin Brook says:
 >
 > Great article. thanks a lot for sharing with us.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fin-the-shadow.html)
+
 
 ---
 

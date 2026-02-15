@@ -40,7 +40,7 @@ With the free version, there is a JAR size limit of 1 - 8.5mb. Notice that this 
 
 The free tier allows you to use your generated apps commercially and place have no restrictions on them. There are no nag screens or license limitations!
 
-There are many additional benefits and additional features you can get in the paid plans, see the [pricing details here](https://www.codenameone.com/pricing.html).
+There are many additional benefits and additional features you can get in the paid plans, see the [pricing details here](/pricing/).
 
 ### Where can I learn more?
 

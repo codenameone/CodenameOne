@@ -121,7 +121,7 @@ issues faster.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jérémy MARQUER** — April 27, 2016 at 4:31 pm ([permalink](https://www.codenameone.com/blog/issue-submission-guideline.html#comment-22662))
+### **Jérémy MARQUER** — April 27, 2016 at 4:31 pm ([permalink](/blog/issue-submission-guideline/#comment-22662))
 
 > Jérémy MARQUER says:
 >
@@ -129,7 +129,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Can you help me with this issue please : [https://github.com/shannah/…](<https://github.com/shannah/cn1-freshdesk/issues/3>)  
 > I can’t build anymore for Android until library with andlib format is included in this cn1lib. Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fissue-submission-guideline.html)
+
 
 ---
 

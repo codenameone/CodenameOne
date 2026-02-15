@@ -74,22 +74,22 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 7, 2014 at 7:02 pm ([permalink](https://www.codenameone.com/blog/ios-8-installs-customizing-the-pull-to-refresh.html#comment-22041))
+### **Anonymous** — October 7, 2014 at 7:02 pm ([permalink](/blog/ios-8-installs-customizing-the-pull-to-refresh/#comment-22041))
 
 > Anonymous says:
 >
 > The solution to the iOS8 issue seems to be to put some random characters into the bundle ID of the plist file. As this is managed by CN1 can you enable this at your end? Its affecting me for my installs as I usually run on Linux and therefore don’t have (or want) iTunes just to install.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-8-installs-customizing-the-pull-to-refresh.html)
 
 
-### **Anonymous** — October 7, 2014 at 11:24 pm ([permalink](https://www.codenameone.com/blog/ios-8-installs-customizing-the-pull-to-refresh.html#comment-22069))
+
+### **Anonymous** — October 7, 2014 at 11:24 pm ([permalink](/blog/ios-8-installs-customizing-the-pull-to-refresh/#comment-22069))
 
 > Anonymous says:
 >
 > That is exactly why we have the ios.plistInject build argument.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-8-installs-customizing-the-pull-to-refresh.html)
+
 
 ---
 

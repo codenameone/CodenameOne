@@ -47,59 +47,59 @@ However, we will change the default build to use JCEF once we deem this stable e
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — June 20, 2020 at 10:59 pm ([permalink](https://www.codenameone.com/blog/moving-away-from-fx.html#comment-24277))
+### **Francesco Galgani** — June 20, 2020 at 10:59 pm ([permalink](/blog/moving-away-from-fx/#comment-24277))
 
 > [Francesco Galgani](https://lh6.googleusercontent.com/-4K0ax_DVJf4/AAAAAAAAAAI/AAAAAAAAAAA/AMZuuckEd1kcni0y8k6NMzNtxwOCEPatQQ/photo.jpg) says:
 >
 > JavaFX is necessary also for the CSS support, in particular for generating 9-piece image borders.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-fx.html)
 
 
-### **Shai Almog** — June 21, 2020 at 1:46 am ([permalink](https://www.codenameone.com/blog/moving-away-from-fx.html#comment-24276))
+
+### **Shai Almog** — June 21, 2020 at 1:46 am ([permalink](/blog/moving-away-from-fx/#comment-24276))
 
 > Shai Almog says:
 >
 > Yes, but it won’t be with JCEF as it can be used instead and would probably work better/faster as well.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-fx.html)
 
 
-### **Javier Anton** — June 24, 2020 at 8:52 pm ([permalink](https://www.codenameone.com/blog/moving-away-from-fx.html#comment-24282))
+
+### **Javier Anton** — June 24, 2020 at 8:52 pm ([permalink](/blog/moving-away-from-fx/#comment-24282))
 
 > [Javier Anton](https://lh3.googleusercontent.com/a-/AAuE7mDRjHkEvAZNXquh9p7Oo00ey1yOwNzZ0SrFwD0IVA) says:
 >
 > We recently introduced (.net) CEF in one of the apps I make at work to replace embedded IEs. It increased the build size from 7 to 70MB. The business could not be happier as performance has really improved. People like performance. Desktop build size is not as much of a problem as mobile app size
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-fx.html)
 
 
-### **Shai Almog** — June 25, 2020 at 2:01 am ([permalink](https://www.codenameone.com/blog/moving-away-from-fx.html#comment-24279))
+
+### **Shai Almog** — June 25, 2020 at 2:01 am ([permalink](/blog/moving-away-from-fx/#comment-24279))
 
 > Shai Almog says:
 >
 > Yes. Actually for the desktop apps I think it will be smaller than the full blown JavaFX VM and we will be able to download it dynamically if necessary in the future.  
 > The main problem is the IDE libraries. Here size matters. Every week we release an update and if that update includes a 60mb CEF attachment this can be a problem. So we need this as a separate thing from the main JAR and ideally we’d want to keep it completely separate as our plugin is already freakishly huge.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-fx.html)
 
 
-### **Angelo** — July 15, 2020 at 2:47 pm ([permalink](https://www.codenameone.com/blog/moving-away-from-fx.html#comment-24294))
+
+### **Angelo** — July 15, 2020 at 2:47 pm ([permalink](/blog/moving-away-from-fx/#comment-24294))
 
 > Angelo says:
 >
 > Do you cofirm it’s under active development and it wil be released in a few days?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-fx.html)
 
 
-### **Shai Almog** — July 16, 2020 at 2:21 am ([permalink](https://www.codenameone.com/blog/moving-away-from-fx.html#comment-24297))
+
+### **Shai Almog** — July 16, 2020 at 2:21 am ([permalink](/blog/moving-away-from-fx/#comment-24297))
 
 > Shai Almog says:
 >
 > Take a look at our github commit history.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmoving-away-from-fx.html)
+
 
 ---
 

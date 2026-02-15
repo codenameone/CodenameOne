@@ -34,35 +34,35 @@ time this code occurs in a pre-existing app.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Maaike Z** — May 6, 2015 at 5:58 pm ([permalink](https://www.codenameone.com/blog/storage-migration.html#comment-24189))
+### **Maaike Z** — May 6, 2015 at 5:58 pm ([permalink](/blog/storage-migration/#comment-24189))
 
 > Maaike Z says:
 >
 > Is it a boolean? So ios.newStorageLocation = true when I want to use the new location?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstorage-migration.html)
 
 
-### **Shai Almog** — May 7, 2015 at 4:09 am ([permalink](https://www.codenameone.com/blog/storage-migration.html#comment-22215))
+
+### **Shai Almog** — May 7, 2015 at 4:09 am ([permalink](/blog/storage-migration/#comment-22215))
 
 > Shai Almog says:
 >
 > Yes it should be true/false (notice its not yet on the servers and will be there before the weekend).  
 > We already documented it in the manual section: [http://www.codenameone.com/…](<http://www.codenameone.com/manual/advanced-topics.html#_sending_arguments_to_the_build_server>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstorage-migration.html)
 
 
-### **kazza186** — August 2, 2016 at 9:59 am ([permalink](https://www.codenameone.com/blog/storage-migration.html#comment-22780))
+
+### **kazza186** — August 2, 2016 at 9:59 am ([permalink](/blog/storage-migration/#comment-22780))
 
 > kazza186 says:
 >
 > Has there been a change with this? I’ve just found this because I’m having the exact problem where data is being wiped on iPhones with low storage space, but I never defined this hint so shouldn’t it be using Documents directory? My files are being stored in Library/caches when I use the codename one file storage. Is that correct? How do I switch it to use the Documents? Thanks.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstorage-migration.html)
 
 
-### **Shai Almog** — August 3, 2016 at 4:54 am ([permalink](https://www.codenameone.com/blog/storage-migration.html#comment-21451))
+
+### **Shai Almog** — August 3, 2016 at 4:54 am ([permalink](/blog/storage-migration/#comment-21451))
 
 > Shai Almog says:
 >
@@ -70,17 +70,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > When did you create the project and which project type did you select?  
 > Check the FileSystemStorage.getRoots values on the device. Print them to a dialog or log. They should be arranged as documents first and caches second. If not then the build hint isn’t turned on for some reason.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstorage-migration.html)
 
 
-### **kazza186** — August 4, 2016 at 4:21 am ([permalink](https://www.codenameone.com/blog/storage-migration.html#comment-22895))
+
+### **kazza186** — August 4, 2016 at 4:21 am ([permalink](/blog/storage-migration/#comment-22895))
 
 > kazza186 says:
 >
 > Printed it to a Dialog without the build hint added. Cache was first, then Documents. Have added the build hint now and it’s using Documents instad of Cache which is good.  
 > I’m using Eclipse, created the project in January 2016. I can’t remember which project type I used sorry.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstorage-migration.html)
+
 
 ---
 

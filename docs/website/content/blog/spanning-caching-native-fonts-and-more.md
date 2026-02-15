@@ -98,16 +98,16 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — July 25, 2013 at 9:49 am ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-24233))
+### **Anonymous** — July 25, 2013 at 9:49 am ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-24233))
 
 > Anonymous says:
 >
 > Thanks guys. I was thinking of how to implement that in an upcoming project. 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspanning-caching-native-fonts-and-more.html)
 
 
-### **Anonymous** — July 25, 2013 at 10:43 am ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-21699))
+
+### **Anonymous** — July 25, 2013 at 10:43 am ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-21699))
 
 > Anonymous says:
 >
@@ -115,28 +115,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > About the TT fonts, I believe it is possible to add this support to j2me/BB devices, at least I was able to do some basic rendering without anti-aliasing
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspanning-caching-native-fonts-and-more.html)
 
 
-### **Anonymous** — July 25, 2013 at 2:36 pm ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-21843))
+
+### **Anonymous** — July 25, 2013 at 2:36 pm ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-21843))
 
 > Anonymous says:
 >
 > TTF files are supported on RIM. On J2ME they can’t be supported though. We have bitmap font support for J2ME devices but we don’t recommend using it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspanning-caching-native-fonts-and-more.html)
 
 
-### **Anonymous** — July 25, 2013 at 3:59 pm ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-21764))
+
+### **Anonymous** — July 25, 2013 at 3:59 pm ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-21764))
 
 > Anonymous says:
 >
 > Nice to know RIM supports TTF, about J2ME I do believe it can support TTF, and it would replace the bitmap font for sure.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspanning-caching-native-fonts-and-more.html)
 
 
-### **Anonymous** — September 10, 2014 at 6:28 pm ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-21685))
+
+### **Anonymous** — September 10, 2014 at 6:28 pm ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-21685))
 
 > Anonymous says:
 >
@@ -152,19 +152,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Storage.getInstance().writeObject(“LocallyCachedData”, newCachedData);
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspanning-caching-native-fonts-and-more.html)
 
 
-### **Anonymous** — September 11, 2014 at 1:43 am ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-22188))
+
+### **Anonymous** — September 11, 2014 at 1:43 am ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-22188))
 
 > Anonymous says:
 >
 > Thanks 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspanning-caching-native-fonts-and-more.html)
 
 
-### **Anonymous** — November 6, 2014 at 6:46 am ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-22189))
+
+### **Anonymous** — November 6, 2014 at 6:46 am ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-22189))
 
 > Anonymous says:
 >
@@ -172,10 +172,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The LabelFont uiid is used in Label and test on emulator , the new font is displayed but the font is not displayed in Mobile and tablet , why?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspanning-caching-native-fonts-and-more.html)
 
 
-### **Anonymous** — November 6, 2014 at 3:27 pm ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-22225))
+
+### **Anonymous** — November 6, 2014 at 3:27 pm ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-22225))
 
 > Anonymous says:
 >
@@ -183,10 +183,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Which font are you using?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspanning-caching-native-fonts-and-more.html)
 
 
-### **Anonymous** — November 7, 2014 at 3:47 am ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-22106))
+
+### **Anonymous** — November 7, 2014 at 3:47 am ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-22106))
 
 > Anonymous says:
 >
@@ -194,16 +194,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > And I am using these magneto monospaced fonts but the font is shown in emulator but not the font is not displayed in mobile and tablet
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspanning-caching-native-fonts-and-more.html)
 
 
-### **Anonymous** — November 8, 2014 at 12:15 pm ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-22031))
+
+### **Anonymous** — November 8, 2014 at 12:15 pm ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-22031))
 
 > Anonymous says:
 >
 > Don’t use bitmap fonts, we deprecated those. Use TTF fonts.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fspanning-caching-native-fonts-and-more.html)
+
 
 ---
 

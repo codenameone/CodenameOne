@@ -35,7 +35,7 @@ In the past this also applied for apps like mapping apps, e.g. up until recently
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Maxim Geraskyn** — April 10, 2017 at 5:47 pm ([permalink](https://www.codenameone.com/blog/tip-when-shouldnt-i-use-codename-one.html#comment-23213))
+### **Maxim Geraskyn** — April 10, 2017 at 5:47 pm ([permalink](/blog/tip-when-shouldnt-i-use-codename-one/#comment-23213))
 
 > Maxim Geraskyn says:
 >
@@ -47,10 +47,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > But, the question is – would you recommend to use it as a base for a rather big development, eventually it will contain around 200K-500K lines of code?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-when-shouldnt-i-use-codename-one.html)
 
 
-### **Shai Almog** — April 11, 2017 at 4:32 am ([permalink](https://www.codenameone.com/blog/tip-when-shouldnt-i-use-codename-one.html#comment-23345))
+
+### **Shai Almog** — April 11, 2017 at 4:32 am ([permalink](/blog/tip-when-shouldnt-i-use-codename-one/#comment-23345))
 
 > Shai Almog says:
 >
@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > As a side note, a lot of desktop related code can be optimized away in the move to mobile e.g. storage can be streamlined as a lot of features (e.g. export) don’t make as much sense in mobile. Codename One also includes a lot of abstractions to help you cull away code and making it more generic.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-when-shouldnt-i-use-codename-one.html)
+
 
 ---
 

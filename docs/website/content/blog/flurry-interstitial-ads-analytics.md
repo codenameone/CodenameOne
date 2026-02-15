@@ -30,7 +30,7 @@ tutorial. We now have 2 ad networks integrated in that way which means that if y
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 2, 2015 at 1:29 pm ([permalink](https://www.codenameone.com/blog/flurry-interstitial-ads-analytics.html#comment-22119))
+### **Anonymous** — March 2, 2015 at 1:29 pm ([permalink](/blog/flurry-interstitial-ads-analytics/#comment-22119))
 
 > Anonymous says:
 >
@@ -44,10 +44,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Cheers
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflurry-interstitial-ads-analytics.html)
 
 
-### **Anonymous** — March 3, 2015 at 2:04 am ([permalink](https://www.codenameone.com/blog/flurry-interstitial-ads-analytics.html#comment-22295))
+
+### **Anonymous** — March 3, 2015 at 2:04 am ([permalink](/blog/flurry-interstitial-ads-analytics/#comment-22295))
 
 > Anonymous says:
 >
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > With the new VM we would like to upgrade the crash reporting capability to a level that would provide you with Java thread states which is far more useful than anything Flurry has for a Java developer. But that is still a way off.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflurry-interstitial-ads-analytics.html)
+
 
 ---
 

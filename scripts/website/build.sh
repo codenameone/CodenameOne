@@ -64,15 +64,12 @@ build_developer_guide_for_site() {
   )
 
   cp "${html_out}/developer-guide.html" "${manual_dir}/index.html"
-  cp "${html_out}/developer-guide.html" "${WEBSITE_DIR}/static/developer-guide.html"
-
-  for asset_dir in "${source_dir}"/*; do
-    local base_name
-    base_name="$(basename "${asset_dir}")"
-    if [ -d "${asset_dir}" ] && [ "${base_name}" != "sketch" ]; then
-      cp -R "${asset_dir}" "${manual_dir}/"
-    fi
-  done
+  # Keep assets next to /manual/index.html exactly where generated HTML resolves them.
+  rsync -a \
+    --exclude 'sketch/' \
+    --exclude '*.asciidoc' \
+    --exclude '*.adoc' \
+    "${source_dir}/" "${manual_dir}/"
 }
 
 if ! command -v "${HUGO_BIN}" >/dev/null 2>&1; then

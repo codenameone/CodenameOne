@@ -21,7 +21,7 @@ In this tutorial I try to separate the various ports & explain when each one of 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — November 5, 2017 at 10:50 am ([permalink](https://www.codenameone.com/blog/tutorial-desktop-javascript-ports.html#comment-23704))
+### **Francesco Galgani** — November 5, 2017 at 10:50 am ([permalink](/blog/tutorial-desktop-javascript-ports/#comment-23704))
 
 > Francesco Galgani says:
 >
@@ -29,20 +29,20 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Please also note the the link “Developer guide section covering the JavaScript port” in the page “How Do I – Use the Desktop and JavaScript Ports” is broken (the word “manual” in the URL is duplicated).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-desktop-javascript-ports.html)
 
 
-### **Shai Almog** — November 6, 2017 at 2:31 pm ([permalink](https://www.codenameone.com/blog/tutorial-desktop-javascript-ports.html#comment-23712))
+
+### **Shai Almog** — November 6, 2017 at 2:31 pm ([permalink](/blog/tutorial-desktop-javascript-ports/#comment-23712))
 
 > Shai Almog says:
 >
 > Thanks! We’ll fix the links.  
 > You can look at the demos in the demo section. Each one of them has a JavaScript link among the links in the bottom.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-desktop-javascript-ports.html)
 
 
-### **Francesco Galgani** — November 7, 2017 at 8:03 pm ([permalink](https://www.codenameone.com/blog/tutorial-desktop-javascript-ports.html#comment-23851))
+
+### **Francesco Galgani** — November 7, 2017 at 8:03 pm ([permalink](/blog/tutorial-desktop-javascript-ports/#comment-23851))
 
 > Francesco Galgani says:
 >
@@ -54,23 +54,23 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I didn’t tested all the demos, maybe they need a check. At the moment my first impression is not the best, but I hope that all the problems are resolvable.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-desktop-javascript-ports.html)
 
 
-### **Shai Almog** — November 8, 2017 at 5:12 am ([permalink](https://www.codenameone.com/blog/tutorial-desktop-javascript-ports.html#comment-23859))
+
+### **Shai Almog** — November 8, 2017 at 5:12 am ([permalink](/blog/tutorial-desktop-javascript-ports/#comment-23859))
 
 > Shai Almog says:
 >
-> We support cursor behavior in the current version of Codename One (I think it was added for 3.7) but we don’t implicitly change the mouse cursor. This should work on JavaScript and in the simulator see [https://www.codenameone.com…](<https://www.codenameone.com/blog/splitpane-cursors-push-registration.html>)
+> We support cursor behavior in the current version of Codename One (I think it was added for 3.7) but we don’t implicitly change the mouse cursor. This should work on JavaScript and in the simulator see [https://www.codenameone.com…](</blog/splitpane-cursors-push-registration/>)
 >
 > I just tried the pocker demo and it worked for me, it took a few seconds to load so maybe some hiccup happened during download on your end?
 >
 > Property cross seems to freeze when accessing the network, we might have an issue in our webserver as we need to proxy server calls to workaround the “same origin” restriction. We’ll have to look into that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-desktop-javascript-ports.html)
 
 
-### **Francesco Galgani** — November 12, 2017 at 12:04 am ([permalink](https://www.codenameone.com/blog/tutorial-desktop-javascript-ports.html#comment-23678))
+
+### **Francesco Galgani** — November 12, 2017 at 12:04 am ([permalink](/blog/tutorial-desktop-javascript-ports/#comment-23678))
 
 > Francesco Galgani says:
 >
@@ -94,10 +94,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > at YRC ([Preferences.java](<http://Preferences.java>):233)  
 > at Nj ([CodenameOneImplementation.java](<http://CodenameOneImplementation.java>):211)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-desktop-javascript-ports.html)
 
 
-### **Shai Almog** — November 12, 2017 at 5:17 am ([permalink](https://www.codenameone.com/blog/tutorial-desktop-javascript-ports.html#comment-23566))
+
+### **Shai Almog** — November 12, 2017 at 5:17 am ([permalink](/blog/tutorial-desktop-javascript-ports/#comment-23566))
 
 > Shai Almog says:
 >
@@ -105,16 +105,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Notice that like all Codename One build links this will expire in a couple of days.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-desktop-javascript-ports.html)
 
 
-### **Francesco Galgani** — November 12, 2017 at 12:53 pm ([permalink](https://www.codenameone.com/blog/tutorial-desktop-javascript-ports.html#comment-21531))
+
+### **Francesco Galgani** — November 12, 2017 at 12:53 pm ([permalink](/blog/tutorial-desktop-javascript-ports/#comment-21531))
 
 > Francesco Galgani says:
 >
 > Very good news: the live preview you linked works correctly 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftutorial-desktop-javascript-ports.html)
+
 
 ---
 

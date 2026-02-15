@@ -155,16 +155,16 @@ not free of any costs. But everything has a cost and this one is probably worth 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Bo83** — January 6, 2016 at 5:20 pm ([permalink](https://www.codenameone.com/blog/debating-brendan-eich-over-android-openjdk-move.html#comment-22182))
+### **Bo83** — January 6, 2016 at 5:20 pm ([permalink](/blog/debating-brendan-eich-over-android-openjdk-move/#comment-22182))
 
 > Bo83 says:
 >
 > great article and I get the overall gist of what you are saying but I would need a dictionary of terms and a day to study it to really read this article and understand it intelligently and thoroughly. I just want to write code with the latest and greatest; can’t we all just get along 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdebating-brendan-eich-over-android-openjdk-move.html)
 
 
-### **Shai Almog** — January 6, 2016 at 5:28 pm ([permalink](https://www.codenameone.com/blog/debating-brendan-eich-over-android-openjdk-move.html#comment-22522))
+
+### **Shai Almog** — January 6, 2016 at 5:28 pm ([permalink](/blog/debating-brendan-eich-over-android-openjdk-move/#comment-22522))
 
 > Shai Almog says:
 >
@@ -172,19 +172,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It was actually fun debating him since he is a good debater (and REALLY smart). I just really can’t stand debating with “catch phrases”. Technical debates require proof and context which is problematic in twitter.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdebating-brendan-eich-over-android-openjdk-move.html)
 
 
-### **Chad** — January 6, 2016 at 10:56 pm ([permalink](https://www.codenameone.com/blog/debating-brendan-eich-over-android-openjdk-move.html#comment-22389))
+
+### **Chad** — January 6, 2016 at 10:56 pm ([permalink](/blog/debating-brendan-eich-over-android-openjdk-move/#comment-22389))
 
 > Chad says:
 >
 > IMO phrases like “Java has amazing TCK’s that check compatibility” and “It has quite a few separate compliant VM’s” are disingenuous. This is what killed Harmony in the first place, they couldn’t get a TCK because Oracle didn’t like their license. I would love to make my own open source compatible JVM, but I will never see the TCK. I think it’s harmful to pretend it’s a “good thing(tm)” that implementations have to pass a hidden test suite whose keyholders may make demands of your software. Sure it means I can’t call my JVM “Java”, but that’s the problem here. There is only one open-source compliant JVM implementation base that I am aware of, and that is a bad thing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdebating-brendan-eich-over-android-openjdk-move.html)
 
 
-### **Shai Almog** — January 7, 2016 at 3:37 am ([permalink](https://www.codenameone.com/blog/debating-brendan-eich-over-android-openjdk-move.html#comment-22671))
+
+### **Shai Almog** — January 7, 2016 at 3:37 am ([permalink](/blog/debating-brendan-eich-over-android-openjdk-move/#comment-22671))
 
 > Shai Almog says:
 >
@@ -199,7 +199,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > For a small VM (like us) this is more problematic so I totally agree that the opaqueness of the TCK process is a problem. FYI I did “see” and worked a lot with the TCK on older versions of Java to get our VM’s thru compliance. For Sun’s VM’s it was mostly trivial since the JIT/VM was reused but there are a lot of weird edge cases tested by the TCK.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fdebating-brendan-eich-over-android-openjdk-move.html)
+
 
 ---
 

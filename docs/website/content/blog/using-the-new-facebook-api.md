@@ -86,25 +86,25 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — December 2, 2013 at 7:55 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-21641))
+### **Anonymous** — December 2, 2013 at 7:55 am ([permalink](/blog/using-the-new-facebook-api/#comment-21641))
 
 > Anonymous says:
 >
 > What about platforms which donot have native facebook integration like J2ME ? When is facebook planning to stop OAUTH login from applications ? This is really a shocking piece of news!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-the-new-facebook-api.html)
 
 
-### **Anonymous** — December 2, 2013 at 2:40 pm ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-22036))
+
+### **Anonymous** — December 2, 2013 at 2:40 pm ([permalink](/blog/using-the-new-facebook-api/#comment-22036))
 
 > Anonymous says:
 >
 > At the moment they still work but it was bound to happen with Facebook. If you are relying on Facebook as your only means of authentication I would look for alternative solutions.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-the-new-facebook-api.html)
 
 
-### **Anonymous** — December 4, 2013 at 6:02 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-22064))
+
+### **Anonymous** — December 4, 2013 at 6:02 am ([permalink](/blog/using-the-new-facebook-api/#comment-22064))
 
 > Anonymous says:
 >
@@ -126,19 +126,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Good luck!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-the-new-facebook-api.html)
 
 
-### **Anonymous** — December 5, 2013 at 11:13 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-21911))
+
+### **Anonymous** — December 5, 2013 at 11:13 am ([permalink](/blog/using-the-new-facebook-api/#comment-21911))
 
 > Anonymous says:
 >
 > Thanks, the token should automatically be set to FaceBookAccess so after login it should seamlessly be there and you should be able to use the class.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-the-new-facebook-api.html)
 
 
-### **Anonymous** — January 20, 2014 at 5:37 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-21905))
+
+### **Anonymous** — January 20, 2014 at 5:37 am ([permalink](/blog/using-the-new-facebook-api/#comment-21905))
 
 > Anonymous says:
 >
@@ -152,19 +152,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > (using IntelliJ IDEA)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-the-new-facebook-api.html)
 
 
-### **Anonymous** — January 20, 2014 at 3:25 pm ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-21982))
+
+### **Anonymous** — January 20, 2014 at 3:25 pm ([permalink](/blog/using-the-new-facebook-api/#comment-21982))
 
 > Anonymous says:
 >
 > It seems there is a bug in the IDEA plugin where Update Client Libs is incorrectly mapped to refresh libs. As a workaround just send a build (to any platform) without this import, it will update the libraries for you after which point you should be able to import this package.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-the-new-facebook-api.html)
 
 
-### **Anonymous** — February 3, 2015 at 10:55 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-22090))
+
+### **Anonymous** — February 3, 2015 at 10:55 am ([permalink](/blog/using-the-new-facebook-api/#comment-22090))
 
 > Anonymous says:
 >
@@ -172,10 +172,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I have an application that uses Facebook as a login option but it always asks for the credentials, i.e. instead of clicking on the ‘login with facebook’ and entering my app, it requires the user to enter his Facebook login info even if he is already signed in to Facebook (Web or/and Facebook App)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-the-new-facebook-api.html)
 
 
-### **Anonymous** — February 3, 2015 at 10:56 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-22017))
+
+### **Anonymous** — February 3, 2015 at 10:56 am ([permalink](/blog/using-the-new-facebook-api/#comment-22017))
 
 > Anonymous says:
 >
@@ -183,19 +183,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > What can I do so it will go in straight without the additional required login?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-the-new-facebook-api.html)
 
 
-### **Anonymous** — February 3, 2015 at 1:42 pm ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-24165))
+
+### **Anonymous** — February 3, 2015 at 1:42 pm ([permalink](/blog/using-the-new-facebook-api/#comment-24165))
 
 > Anonymous says:
 >
 > Make sure that on your device settings facebook login is enabled otherwise the native facebook login falls back to web login.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-the-new-facebook-api.html)
 
 
-### **Mr Emma** — September 26, 2015 at 5:08 pm ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-22179))
+
+### **Mr Emma** — September 26, 2015 at 5:08 pm ([permalink](/blog/using-the-new-facebook-api/#comment-22179))
 
 > Mr Emma says:
 >
@@ -210,45 +210,45 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > keytool -exportcert -alias (your_keystore_alias) -keystore (path_to_your_keystore) | openssl sha1 -binary | openssl base64
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-the-new-facebook-api.html)
 
 
-### **Shai Almog** — September 27, 2015 at 3:51 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-21603))
+
+### **Shai Almog** — September 27, 2015 at 3:51 am ([permalink](/blog/using-the-new-facebook-api/#comment-21603))
 
 > Shai Almog says:
 >
 > In which os?  
 > See the newer guide: [http://www.codenameone.com/…](<http://www.codenameone.com/facebook-login.html>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-the-new-facebook-api.html)
 
 
-### **Mr Emma** — September 27, 2015 at 7:24 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-22241))
+
+### **Mr Emma** — September 27, 2015 at 7:24 am ([permalink](/blog/using-the-new-facebook-api/#comment-22241))
 
 > Mr Emma says:
 >
 > Am on the windows 10 OS and I want to generate the key hash for my Android app. I have gone through the new guide my only issue is generating the key hash
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-the-new-facebook-api.html)
 
 
-### **Shai Almog** — September 28, 2015 at 4:08 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-21652))
+
+### **Shai Almog** — September 28, 2015 at 4:08 am ([permalink](/blog/using-the-new-facebook-api/#comment-21652))
 
 > Shai Almog says:
 >
 > Second entry when googling: “facebook openssl windows”  
 > [http://stackoverflow.com/qu…](<http://stackoverflow.com/questions/4347924/key-hash-for-facebook-android-sdk>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-the-new-facebook-api.html)
 
 
-### **Mr Emma** — September 28, 2015 at 11:28 pm ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-22253))
+
+### **Mr Emma** — September 28, 2015 at 11:28 pm ([permalink](/blog/using-the-new-facebook-api/#comment-22253))
 
 > Mr Emma says:
 >
 > thanx it helped alot
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fusing-the-new-facebook-api.html)
+
 
 ---
 

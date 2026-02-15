@@ -78,7 +78,7 @@ Figure 7. The iOS signing section will automatically be updated to reflect the l
 
 ## Tip
 
-> The new certificate wizard also generates a provisioning profile for the Notification Service Extension, which is used in the case that you are using [rich push notifications.](https://www.codenameone.com/blog/tich-push-notification-improved-validation.html)
+> The new certificate wizard also generates a provisioning profile for the Notification Service Extension, which is used in the case that you are using [rich push notifications.](/blog/tich-push-notification-improved-validation/)
 ---
 
 ## Archived Comments
@@ -86,44 +86,44 @@ Figure 7. The iOS signing section will automatically be updated to reflect the l
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **ThomasH99** — March 27, 2022 at 6:48 pm ([permalink](https://www.codenameone.com/blog/new-ios-certificate-wizard.html#comment-24520))
+### **ThomasH99** — March 27, 2022 at 6:48 pm ([permalink](/blog/new-ios-certificate-wizard/#comment-24520))
 
 > ThomasH99 says:
 >
 > Hello, it’s great with this kind of improvements, the certificate wizard is a huge help. However, I just tried this new version to regenerate my certificates and the first steps work fine, I confirm the access with the 6 digit code and it’s running, but then I get an error “Certification generation failed. null”. First I thought it was because my credit card had expired, but it’s fixed and I still can’t generate. Any suggestions for what may be going wrong?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-ios-certificate-wizard.html)
 
 
-### **ThomasH99** — March 27, 2022 at 7:16 pm ([permalink](https://www.codenameone.com/blog/new-ios-certificate-wizard.html#comment-24521))
+
+### **ThomasH99** — March 27, 2022 at 7:16 pm ([permalink](/blog/new-ios-certificate-wizard/#comment-24521))
 
 > ThomasH99 says:
 >
 > (Sorry just posted this on an unrelated issue in reddit, it should be here:) I connected to my account and noticed I needed to approve the new license conditions (hadn’t see that on my last connect). After approving it, the error message is different: now it says I need to update to Xcode 7.3. I wonder if that is on my side (I guess not)? As a side note, the Certificate error window is too small to show the entire error message and it’s not possible to copy the text which would have been nice.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-ios-certificate-wizard.html)
 
 
-### **Steve Hannah** — March 28, 2022 at 1:43 pm ([permalink](https://www.codenameone.com/blog/new-ios-certificate-wizard.html#comment-24522))
+
+### **Steve Hannah** — March 28, 2022 at 1:43 pm ([permalink](/blog/new-ios-certificate-wizard/#comment-24522))
 
 > Steve Hannah says:
 >
 > I have opened an issue for this. <https://github.com/codenameone/CodenameOne/issues/3571>  
 > I cannot reproduce this issue myself, so it would be helpful if you would update that issue with some more details that might help to reproduce the issue.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-ios-certificate-wizard.html)
 
 
-### **Paul Beardow** — September 17, 2023 at 9:32 am ([permalink](https://www.codenameone.com/blog/new-ios-certificate-wizard.html#comment-24572))
+
+### **Paul Beardow** — September 17, 2023 at 9:32 am ([permalink](/blog/new-ios-certificate-wizard/#comment-24572))
 
 > Paul Beardow says:
 >
 > Is there an easy way to generate ad-hoc builds? I want to test my app on a few friendly users but when I select the ad-hoc option the build fails. It seems the production certificate/profile created by the wizard isn’t the one that includes ad-hoc releases, only app store, so there is a mismatch and an error.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-ios-certificate-wizard.html)
 
 
-### **Shai Almog** — September 18, 2023 at 2:25 am ([permalink](https://www.codenameone.com/blog/new-ios-certificate-wizard.html#comment-24574))
+
+### **Shai Almog** — September 18, 2023 at 2:25 am ([permalink](/blog/new-ios-certificate-wizard/#comment-24574))
 
 > Shai Almog says:
 >
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The main reason the wizard is needed is for certificates.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-ios-certificate-wizard.html)
+
 
 ---
 

@@ -115,7 +115,7 @@ semantics might not work properly
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chibuike Mba** — January 29, 2016 at 10:32 pm ([permalink](https://www.codenameone.com/blog/terse-syntax-migration-wizard-more.html#comment-22457))
+### **Chibuike Mba** — January 29, 2016 at 10:32 pm ([permalink](/blog/terse-syntax-migration-wizard-more/#comment-22457))
 
 > Chibuike Mba says:
 >
@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Am using CodenameOne 3.3
 
 
-### **Shai Almog** — January 30, 2016 at 5:35 am ([permalink](https://www.codenameone.com/blog/terse-syntax-migration-wizard-more.html#comment-21501))
+### **Shai Almog** — January 30, 2016 at 5:35 am ([permalink](/blog/terse-syntax-migration-wizard-more/#comment-21501))
 
 > Shai Almog says:
 >

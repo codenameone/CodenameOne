@@ -135,54 +135,54 @@ This is by no means the final version of this. These sort of files tend to chang
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Martin Grajcar** — November 4, 2018 at 3:11 pm ([permalink](https://www.codenameone.com/blog/tip-using-git-for-codename-one-projects.html#comment-24007))
+### **Martin Grajcar** — November 4, 2018 at 3:11 pm ([permalink](/blog/tip-using-git-for-codename-one-projects/#comment-24007))
 
 > Martin Grajcar says:
 >
 > My project build just failed in `<copy todir=”bin”><fileset dir=”override”/></copy>` because of the missing `override` directory. This was my fault as I deleted all empty directories, but git doesn’t track them, so build of a cloned project will fail for the very same reason.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-using-git-for-codename-one-projects.html)
 
 
-### **Shai Almog** — November 5, 2018 at 5:26 am ([permalink](https://www.codenameone.com/blog/tip-using-git-for-codename-one-projects.html#comment-23901))
+
+### **Shai Almog** — November 5, 2018 at 5:26 am ([permalink](/blog/tip-using-git-for-codename-one-projects/#comment-23901))
 
 > Shai Almog says:
 >
 > Is it possible your build.xml is out of date?  
 > build.xml should implicitly create that directory if it’s missing when you send a build and when you run if you use netbeans.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-using-git-for-codename-one-projects.html)
 
 
-### **Martin Grajcar** — November 5, 2018 at 3:19 pm ([permalink](https://www.codenameone.com/blog/tip-using-git-for-codename-one-projects.html#comment-23972))
+
+### **Martin Grajcar** — November 5, 2018 at 3:19 pm ([permalink](/blog/tip-using-git-for-codename-one-projects/#comment-23972))
 
 > Martin Grajcar says:
 >
-> It may be out of date, but at most by a week as on Oct 29, I created a new project. I edited it manually, because of [https://www.codenameone.com…](<https://www.codenameone.com/blog/tip-using-lombok-other-tools.html>).
+> It may be out of date, but at most by a week as on Oct 29, I created a new project. I edited it manually, because of [https://www.codenameone.com…](</blog/tip-using-lombok-other-tools/>).
 >
 > There are many `<mkdir dir=”override”/>` there, but there’s none before the copy in the jar target. So I added it now.
 >
 > I’m using Eclipse. I wonder, how to get updates to build.xml, in case you do some important changes in the future (overwriting my edited file is no problem because of git).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-using-git-for-codename-one-projects.html)
 
 
-### **Shai Almog** — November 6, 2018 at 6:55 am ([permalink](https://www.codenameone.com/blog/tip-using-git-for-codename-one-projects.html#comment-23883))
+
+### **Shai Almog** — November 6, 2018 at 6:55 am ([permalink](/blog/tip-using-git-for-codename-one-projects/#comment-23883))
 
 > Shai Almog says:
 >
 > build.xml is embedded in Codename One Settings so when you save changes there it offers to override your current version. Please file an issue on this and we’ll try to add that mkdir before that as well.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-using-git-for-codename-one-projects.html)
 
 
-### **ThomasH99** — September 19, 2021 at 2:30 pm ([permalink](https://www.codenameone.com/blog/tip-using-git-for-codename-one-projects.html#comment-24482))
+
+### **ThomasH99** — September 19, 2021 at 2:30 pm ([permalink](/blog/tip-using-git-for-codename-one-projects/#comment-24482))
 
 > ThomasH99 says:
 >
 > Hi, is this approach is still the right way to use Git for CN1 projects using maven? (I’m no expert on either so maybe this is a basic question 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-using-git-for-codename-one-projects.html)
+
 
 ---
 

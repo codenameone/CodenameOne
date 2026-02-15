@@ -46,25 +46,25 @@ Steve also committed fixes for many long standing VM RFE’s which should land j
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Tur Tur der Scheinriese** — March 23, 2017 at 3:05 pm ([permalink](https://www.codenameone.com/blog/why-bootcamp.html#comment-21573))
+### **Tur Tur der Scheinriese** — March 23, 2017 at 3:05 pm ([permalink](/blog/why-bootcamp/#comment-21573))
 
 > Tur Tur der Scheinriese says:
 >
 > Is there a chance to get the source code from the video?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-bootcamp.html)
 
 
-### **Shai Almog** — March 24, 2017 at 5:38 am ([permalink](https://www.codenameone.com/blog/why-bootcamp.html#comment-23057))
+
+### **Shai Almog** — March 24, 2017 at 5:38 am ([permalink](/blog/why-bootcamp/#comment-23057))
 
 > Shai Almog says:
 >
 > The source is a part of the bootcamp so not in the near future see:  
-> [https://www.codenameone.com…](<https://www.codenameone.com/blog/bootcamp-parse-bouns-post-materials.html>)
+> [https://www.codenameone.com…](</blog/bootcamp-parse-bouns-post-materials/>)
 >
-> I used the same visual effect I used here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/new-animation-manager.html>)
+> I used the same visual effect I used here: [https://www.codenameone.com…](</blog/new-animation-manager/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-bootcamp.html)
+
 
 ---
 

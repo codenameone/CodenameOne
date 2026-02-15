@@ -60,7 +60,7 @@ Label and its subclasses can have a mask associated with an icon thru a theme co
 
 To apply a theme mask we define a theme constant image representing the mask and then invoke `Label.setMaskName(String)` with the name of the theme constant. We can also set the mask object directly into the label which can be very beneficial.
 
-The [SocialBoo](https://www.codenameone.com/blog/social-boo-revisited.html) demo uses this approach to round up the images of the avatars using rounded borders…​
+The [SocialBoo](/blog/social-boo-revisited/) demo uses this approach to round up the images of the avatars using rounded borders…​
 
 ### Performance Tradeoffs
 
@@ -76,22 +76,22 @@ We might also trigger a performance issue when invoking `setIcon` in a performan
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Clipping Creations India** — January 11, 2018 at 11:18 am ([permalink](https://www.codenameone.com/blog/tip-understand-image-masking-performance.html#comment-23860))
+### **Clipping Creations India** — January 11, 2018 at 11:18 am ([permalink](/blog/tip-understand-image-masking-performance/#comment-23860))
 
 > Clipping Creations India says:
 >
 > Hi Shai Almog, you have mentioned important tips about image masking. Great job.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-understand-image-masking-performance.html)
 
 
-### **AR Khan** — February 9, 2018 at 8:12 am ([permalink](https://www.codenameone.com/blog/tip-understand-image-masking-performance.html#comment-23541))
+
+### **AR Khan** — February 9, 2018 at 8:12 am ([permalink](/blog/tip-understand-image-masking-performance/#comment-23541))
 
 > AR Khan says:
 >
 > This is a very good and more necessary idea that you have explained here. thank you for this best resources
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-understand-image-masking-performance.html)
+
 
 ---
 

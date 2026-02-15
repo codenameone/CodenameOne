@@ -23,13 +23,13 @@ the ground up, to that point we created the new open source project:
 [JavaDoc Source Embed](https://github.com/codenameone/JavaDocSourceEmbed). 
 
 The goal of this project is to allow using github “gist” in JavaDoc which allows you to create JavaDoc that looks  
-like [this](https://www.codenameone.com/javadoc/com/codename1/location/LocationManager.html)  
+like [this](/javadoc/com/codename1/location/LocationManager/)  
 instead of the normally anemic source embeds.   
 If you are unfamiliar with [github gists](https://gist.github.com/) its essentially  
 a code snippet hosting service that both formats the code nicely and allows you to easily maintain it thru  
 github (fork, star, watch etc.).  
 The central hosting is the true “killer feature”, it allows you to embed the sample everywhere that’s applicable  
-instead of copying and pasting it. E.g. the [LocationManager](https://www.codenameone.com/javadoc/com/codename1/location/LocationManager.html)  
+instead of copying and pasting it. E.g. the [LocationManager](/javadoc/com/codename1/location/LocationManager/)  
 is a good place to hold the sample but so is the [Geofence](http://codenameone.com/javadoc/com/codename1/location/Geofence.html) class.  
 In those cases we only had to copy this small snippet in the javadoc: 
     
@@ -55,7 +55,7 @@ Besides the many rewrites and fixes we made for the document we also authored a 
 Codename One class names to links into the JavaDoc. 
 
 So now instead of just highlighting the mention of `LocationManager` you would see  
-[LocationManager](https://www.codenameone.com/javadoc/com/codename1/location/LocationManager.html)  
+[LocationManager](/javadoc/com/codename1/location/LocationManager/)  
 which is far more useful. Notice that this shouldn’t affect things like code blocks only mentions of a  
 specific class. From this point on we’ll try to interconnect the documentation to produce a more coherent  
 experience with the docs.  

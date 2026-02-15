@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/build-app-not-coming-ios/codename-one-build.jpg)
 
-When we [released Codename One 6.0](https://www.codenameone.com/blog/codename-one-6-0-chat-live.html) we mentioned that Codename One build is going through the approval process on iOS. We didn’t mention that this was a process where Apple repeatedly rejected us and we had to appeal over and over again. 
+When we [released Codename One 6.0](/blog/codename-one-6-0-chat-live/) we mentioned that Codename One build is going through the approval process on iOS. We didn’t mention that this was a process where Apple repeatedly rejected us and we had to appeal over and over again. 
 
 We wanted to have a native app because they look/feel slightly better. We also wanted native in-app-purchase as an alternative to PayPal. But it seems Apple won’t allow a native app to do basic things that a web app can easily pull off on its platform. 
 
@@ -59,14 +59,14 @@ For the Android version we still have the native app that works just fine. It al
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — March 31, 2019 at 8:13 am ([permalink](https://www.codenameone.com/blog/build-app-not-coming-ios.html#comment-23958))
+### **Francesco Galgani** — March 31, 2019 at 8:13 am ([permalink](/blog/build-app-not-coming-ios/#comment-23958))
 
 > Francesco Galgani says:
 >
 > Dear Shai,  
 > I understand the problem: I have an app with high votes on Android (4.8/5) and +1000 installations, but Apple rejected the same identical app multiple times because the reviewers consider it “useless”…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuild-app-not-coming-ios.html)
+
 
 ---
 

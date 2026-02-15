@@ -113,7 +113,7 @@ If you know of other attractive solutions, have success stories/useful tips to s
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Marian Ignev** — September 25, 2016 at 4:31 am ([permalink](https://www.codenameone.com/blog/how-i-chose-my-replacement-for-parse-com-part-2.html#comment-22973))
+### **Marian Ignev** — September 25, 2016 at 4:31 am ([permalink](/blog/how-i-chose-my-replacement-for-parse-com-part-2/#comment-22973))
 
 > Marian Ignev says:
 >
@@ -134,10 +134,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > All best,  
 > Marian
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-i-chose-my-replacement-for-parse-com-part-2.html)
 
 
-### **Chidiebere Okwudire** — September 29, 2016 at 11:00 am ([permalink](https://www.codenameone.com/blog/how-i-chose-my-replacement-for-parse-com-part-2.html#comment-22965))
+### **Chidiebere Okwudire** — September 29, 2016 at 11:00 am ([permalink](/blog/how-i-chose-my-replacement-for-parse-com-part-2/#comment-22965))
 
 > Chidiebere Okwudire says:
 >
@@ -156,11 +155,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 2\. About the Freemium model, you’re right that my wording in the article might incorrectly give the impression that the author is completely against Freemium whereas the article does *try* to compare both sides. I emphasize “try” here because in my opinion, the article is baised in favor of the dangers of freemium than the benefits. Again, let the interested reader be the judge. Let’s not get too distracted by the article though because I think the more important point in this context is: Is Sashido a freemium service or not? What’s your take on that? Note that [http://www.sashido.io/#Pricing](<http://www.sashido.io/#Pricing>) still include the line that I quoted in my article: “It starts from $4.95/mo. Better than free.”
 >
 > I look forward to your response and once again thanks for taking your time to engage in this conversation.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-i-chose-my-replacement-for-parse-com-part-2.html)
 
 
-### **Marian Ignev** — September 30, 2016 at 2:38 am ([permalink](https://www.codenameone.com/blog/how-i-chose-my-replacement-for-parse-com-part-2.html#comment-22997))
+### **Marian Ignev** — September 30, 2016 at 2:38 am ([permalink](/blog/how-i-chose-my-replacement-for-parse-com-part-2/#comment-22997))
 
 > Marian Ignev says:
 >
@@ -169,8 +166,6 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thank you for your detailed answer. I appreciate it and I’m totally agree with you … let the interested reader be the judge I think that’s fair 🙂
 >
 > And yes … SashiDo is not a free service, but everybody can try it 14 days for free 🙂
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fhow-i-chose-my-replacement-for-parse-com-part-2.html)
 
 ---
 

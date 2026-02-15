@@ -46,7 +46,7 @@ the libs API’s under the android implementation only section.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — June 29, 2015 at 10:49 am ([permalink](https://www.codenameone.com/blog/integrating-android-3rd-party-libraries-jni.html#comment-21599))
+### **Chidiebere Okwudire** — June 29, 2015 at 10:49 am ([permalink](/blog/integrating-android-3rd-party-libraries-jni/#comment-21599))
 
 > Chidiebere Okwudire says:
 >
@@ -54,19 +54,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Under option 1, can you elaborate what you mean by “API’s that are unavailable on Android” when talking about obfuscation?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintegrating-android-3rd-party-libraries-jni.html)
 
 
-### **John Markh** — January 18, 2017 at 7:13 pm ([permalink](https://www.codenameone.com/blog/integrating-android-3rd-party-libraries-jni.html#comment-23235))
+
+### **John Markh** — January 18, 2017 at 7:13 pm ([permalink](/blog/integrating-android-3rd-party-libraries-jni/#comment-23235))
 
 > John Markh says:
 >
 > I would be great to have a code example to, for example, using Android PackageManager to retrieve a list of installed applications.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintegrating-android-3rd-party-libraries-jni.html)
 
 
-### **Shai Almog** — January 19, 2017 at 6:15 am ([permalink](https://www.codenameone.com/blog/integrating-android-3rd-party-libraries-jni.html#comment-24120))
+
+### **Shai Almog** — January 19, 2017 at 6:15 am ([permalink](/blog/integrating-android-3rd-party-libraries-jni/#comment-24120))
 
 > Shai Almog says:
 >
@@ -74,10 +74,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Using this query on github I was able to find several results: [https://github.com/search?q…]([https://github.com/search?q=codename1+PackageManager&type=Code&utf8=%E2%9C%93](https://github.com/search?q=codename1+PackageManager&type=Code&utf8=%E2%9C%93))
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintegrating-android-3rd-party-libraries-jni.html)
 
 
-### **Shai Almog** — January 19, 2017 at 6:17 am ([permalink](https://www.codenameone.com/blog/integrating-android-3rd-party-libraries-jni.html#comment-23146))
+
+### **Shai Almog** — January 19, 2017 at 6:17 am ([permalink](/blog/integrating-android-3rd-party-libraries-jni/#comment-23146))
 
 > Shai Almog says:
 >
@@ -86,25 +86,25 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > A JAR might import javax.swing and use it for some cases but might handle that case correctly by catching the class not found exception. However, this might collide with obfuscation that doesn’t like those sort of tricks…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintegrating-android-3rd-party-libraries-jni.html)
 
 
-### **Amina Benzerga** — July 13, 2017 at 3:31 pm ([permalink](https://www.codenameone.com/blog/integrating-android-3rd-party-libraries-jni.html#comment-23516))
+
+### **Amina Benzerga** — July 13, 2017 at 3:31 pm ([permalink](/blog/integrating-android-3rd-party-libraries-jni/#comment-23516))
 
 > Amina Benzerga says:
 >
 > the query does not work anymore, could you please give me a example? Thank you 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintegrating-android-3rd-party-libraries-jni.html)
 
 
-### **Shai Almog** — July 14, 2017 at 6:35 am ([permalink](https://www.codenameone.com/blog/integrating-android-3rd-party-libraries-jni.html#comment-21393))
+
+### **Shai Almog** — July 14, 2017 at 6:35 am ([permalink](/blog/integrating-android-3rd-party-libraries-jni/#comment-21393))
 
 > Shai Almog says:
 >
 > I see 11 results in the link above
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintegrating-android-3rd-party-libraries-jni.html)
+
 
 ---
 

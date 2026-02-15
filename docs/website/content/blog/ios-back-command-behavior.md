@@ -89,11 +89,11 @@ I have a lot more to say about the Facebook app, I hope I’ll complete it in ti
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — May 18, 2018 at 7:43 am ([permalink](https://www.codenameone.com/blog/ios-back-command-behavior.html#comment-23915))
+### **Francesco Galgani** — May 18, 2018 at 7:43 am ([permalink](/blog/ios-back-command-behavior/#comment-23915))
 
 > Thank you very much for this information, this post helped me on setting correctly the back buttons for iOS and Android. Thank you for all the other news.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-back-command-behavior.html)
+
 
 ---
 

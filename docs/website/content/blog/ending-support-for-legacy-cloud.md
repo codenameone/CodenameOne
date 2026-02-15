@@ -41,13 +41,13 @@ Using our own servers has been liberating and far more powerful. This is a move 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Gareth Murfin** — August 8, 2018 at 4:38 am ([permalink](https://www.codenameone.com/blog/ending-support-for-legacy-cloud.html#comment-23987))
+### **Gareth Murfin** — August 8, 2018 at 4:38 am ([permalink](/blog/ending-support-for-legacy-cloud/#comment-23987))
 
 > Gareth Murfin says:
 >
 > Awesome cant wait to see the new stuff.. I always assumed app engine was perfect but I dont think ive got around to really using it much.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fending-support-for-legacy-cloud.html)
+
 
 ---
 

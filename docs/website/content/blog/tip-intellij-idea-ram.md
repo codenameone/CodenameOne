@@ -37,11 +37,11 @@ Figure 2. Configuring the Memory Available to Ant
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **davidwaf** — April 4, 2018 at 8:16 am ([permalink](https://www.codenameone.com/blog/tip-intellij-idea-ram.html#comment-21431))
+### **davidwaf** — April 4, 2018 at 8:16 am ([permalink](/blog/tip-intellij-idea-ram/#comment-21431))
 
 > Netbeans here too. Can’t just switch.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-intellij-idea-ram.html)
+
 
 ---
 

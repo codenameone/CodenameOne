@@ -40,29 +40,29 @@ __ |  The special deal has elapsed, thanks for all of you who signed up!
   
 ### Highlights of this Release
 
-  * **Offline Build Support** – Building thru the cloud is one of the “defining features” of Codename One, but some government level customers need the [ability to build offline](https://www.codenameone.com/blog/offline-build.html) due to regulatory concerns
+  * **Offline Build Support** – Building thru the cloud is one of the “defining features” of Codename One, but some government level customers need the [ability to build offline](/blog/offline-build/) due to regulatory concerns
 
-  * **Production grade UWP (Universal Windows Platform) Port** – [UWP](https://www.codenameone.com/manual/appendix-uwp.html) allows seamless native support for Windows 10 on Intel/ARM devices & PC’s such as the very popular Surface line
+  * **Production grade UWP (Universal Windows Platform) Port** – [UWP](/manual/appendix-uwp/) allows seamless native support for Windows 10 on Intel/ARM devices & PC’s such as the very popular Surface line
 
-  * **New GUI Builder Release** – We released the [new GUI builder](https://www.codenameone.com/blog/using-the-new-gui-builder.html). It still has rough edges but is improving at a rapid pace
+  * **New GUI Builder Release** – We released the [new GUI builder](/blog/using-the-new-gui-builder/). It still has rough edges but is improving at a rapid pace
 
-  * **Round Borders** – [Round style borders](https://www.codenameone.com/blog/round-border-in-the-designer.html) are available now both in the designer and code
+  * **Round Borders** – [Round style borders](/blog/round-border-in-the-designer/) are available now both in the designer and code
 
-  * **Floating Action Button** – New [FloatingActionButton](https://www.codenameone.com/blog/floating-button.html) component that allows [badging](https://www.codenameone.com/blog/badging-arbitrary-components.html) as well
+  * **Floating Action Button** – New [FloatingActionButton](/blog/floating-button/) component that allows [badging](/blog/badging-arbitrary-components/) as well
 
-  * **In App Purchase Subscriptions & Receipts** – We completely rewrote the IAP documentation and added support for [subscriptions](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html)
+  * **In App Purchase Subscriptions & Receipts** – We completely rewrote the IAP documentation and added support for [subscriptions](/blog/autorenewing-subscriptions-in-ios-and-android/)
 
-  * **Security Enhancements** – We introduced [seamless storage encryption](https://www.codenameone.com/blog/seamless-storage-encryption.html) & [certificate pinning (SSL Pinning)](https://www.codenameone.com/blog/certificate-verification-avoid-pinning-vulnerability.html)
+  * **Security Enhancements** – We introduced [seamless storage encryption](/blog/seamless-storage-encryption/) & [certificate pinning (SSL Pinning)](/blog/certificate-verification-avoid-pinning-vulnerability/)
 
-  * **New & Remastered Demos** – [Demos](https://www.codenameone.com/demos.html) were overhauled and new demos were added based on PSD design showing the level of creativity that you can integrate into your applications
+  * **New & Remastered Demos** – [Demos](/demos/) were overhauled and new demos were added based on PSD design showing the level of creativity that you can integrate into your applications
 
-  * **URL & File API’s** – Easier porting for existing Java code thru [File & URL](https://www.codenameone.com/blog/file-url-java-mobile-compatibility.html) API’s
+  * **URL & File API’s** – Easier porting for existing Java code thru [File & URL](/blog/file-url-java-mobile-compatibility/) API’s
 
-  * **Properties** – [Properties](https://www.codenameone.com/blog/properties.html) allow us to build terse/type safe efficient mapping to storage/database/XML/JSON etc.
+  * **Properties** – [Properties](/blog/properties/) allow us to build terse/type safe efficient mapping to storage/database/XML/JSON etc.
 
-  * **Newer Defaults** – [Java 8 & Android API 23](https://www.codenameone.com/blog/java-8-api-23-defaults.html) are now on by default as well as [xcode 7.3](https://www.codenameone.com/blog/xcode-migration-revisited-again.html) with xcode 8 coming soon. Android’s [peer component](https://www.codenameone.com/blog/new-peers-on-by-default-on-android.html) is also on by default
+  * **Newer Defaults** – [Java 8 & Android API 23](/blog/java-8-api-23-defaults/) are now on by default as well as [xcode 7.3](/blog/xcode-migration-revisited-again/) with xcode 8 coming soon. Android’s [peer component](/blog/new-peers-on-by-default-on-android/) is also on by default
 
-  * **Easy Caching** – [Caching HTTP](https://www.codenameone.com/blog/automatic-caching.html) has never been easier…​
+  * **Easy Caching** – [Caching HTTP](/blog/automatic-caching/) has never been easier…​
 
 ### Lowlights
 
@@ -90,7 +90,7 @@ Thanks for reading this far and if you have any thoughts/suggestions of any kind
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Boniface N. Githinji** — January 16, 2017 at 5:34 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23308))
+### **Boniface N. Githinji** — January 16, 2017 at 5:34 pm ([permalink](/blog/codename-one-3-6-now-live-special-sale/#comment-23308))
 
 > Boniface N. Githinji says:
 >
@@ -100,38 +100,38 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/5163d29b02233350f5955a94ac28e83a736bb8412d59921f99a513e15eac8f4a.png>) [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/e41214b31a9525e4d162cc3643b92123eeb82801b3041fa2d40ac3907705e728.png>) [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/9a05b55913ef04e354bb80535a6f1d9e97d36f0247e6e0b8be1d2d165b51252d.png>) [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/88334fc0569db5713eb867d88a7b9ed60ebe2692d00b1e352ef08bcb167b7821.png>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
 
 
-### **bryan** — January 16, 2017 at 7:44 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23188))
+
+### **bryan** — January 16, 2017 at 7:44 pm ([permalink](/blog/codename-one-3-6-now-live-special-sale/#comment-23188))
 
 > bryan says:
 >
 > Screenshots on the app store look quite impressive. Well done !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
 
 
-### **Shai Almog** — January 17, 2017 at 6:47 am ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23234))
+
+### **Shai Almog** — January 17, 2017 at 6:47 am ([permalink](/blog/codename-one-3-6-now-live-special-sale/#comment-23234))
 
 > Shai Almog says:
 >
-> You guys made a lot of progress since the screenshots were added here: [https://www.codenameone.com…](<https://www.codenameone.com/featured-sematime.html>)  
+> You guys made a lot of progress since the screenshots were added here: [https://www.codenameone.com…](</featured-sematime/>)  
 > We’ll try to update to the latest screenshots!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
 
 
-### **Chidiebere Okwudire** — January 17, 2017 at 6:58 am ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-24119))
+
+### **Chidiebere Okwudire** — January 17, 2017 at 6:58 am ([permalink](/blog/codename-one-3-6-now-live-special-sale/#comment-24119))
 
 > Chidiebere Okwudire says:
 >
 > Great job guys! I’ve been out of touch lately due to other commitments but I follow the updates and look forward to when I can get busy with CodenameOne again.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
 
 
-### **Lukman Javalove Idealist Jaji** — January 17, 2017 at 2:42 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23087))
+
+### **Lukman Javalove Idealist Jaji** — January 17, 2017 at 2:42 pm ([permalink](/blog/codename-one-3-6-now-live-special-sale/#comment-23087))
 
 > Lukman Javalove Idealist Jaji says:
 >
@@ -139,64 +139,64 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > did you generate your UI from a PSD?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
 
 
-### **Boniface N. Githinji** — January 17, 2017 at 3:16 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23242))
+
+### **Boniface N. Githinji** — January 17, 2017 at 3:16 pm ([permalink](/blog/codename-one-3-6-now-live-special-sale/#comment-23242))
 
 > Boniface N. Githinji says:
 >
 > Thanks bryan.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
 
 
-### **Boniface N. Githinji** — January 17, 2017 at 3:16 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23163))
+
+### **Boniface N. Githinji** — January 17, 2017 at 3:16 pm ([permalink](/blog/codename-one-3-6-now-live-special-sale/#comment-23163))
 
 > Boniface N. Githinji says:
 >
 > Hi Lukman, no; did it all in Java from scratch.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
 
 
-### **Boniface N. Githinji** — January 17, 2017 at 3:20 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-22918))
+
+### **Boniface N. Githinji** — January 17, 2017 at 3:20 pm ([permalink](/blog/codename-one-3-6-now-live-special-sale/#comment-22918))
 
 > Boniface N. Githinji says:
 >
 > Thanks Shai. Yes indeed. This is a great platform, we are big believers in WORA and will keep shipping all our mobile apps via CodenameOne.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
 
 
-### **Lukman Javalove Idealist Jaji** — January 17, 2017 at 5:39 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23267))
+
+### **Lukman Javalove Idealist Jaji** — January 17, 2017 at 5:39 pm ([permalink](/blog/codename-one-3-6-now-live-special-sale/#comment-23267))
 
 > Lukman Javalove Idealist Jaji says:
 >
 > Fantastic…….good job man….really good job
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
 
 
-### **Lukman Javalove Idealist Jaji** — January 17, 2017 at 6:06 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23309))
+
+### **Lukman Javalove Idealist Jaji** — January 17, 2017 at 6:06 pm ([permalink](/blog/codename-one-3-6-now-live-special-sale/#comment-23309))
 
 > Lukman Javalove Idealist Jaji says:
 >
 > pleae give me your email boniface….. thank you
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
 
 
-### **Chen Fishbein** — January 18, 2017 at 11:48 am ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23287))
+
+### **Chen Fishbein** — January 18, 2017 at 11:48 am ([permalink](/blog/codename-one-3-6-now-live-special-sale/#comment-23287))
 
 > Chen Fishbein says:
 >
 > Nice one! well done!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
 
 
-### **Boniface N. Githinji** — February 16, 2017 at 1:28 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-6-now-live-special-sale.html#comment-23045))
+
+### **Boniface N. Githinji** — February 16, 2017 at 1:28 pm ([permalink](/blog/codename-one-3-6-now-live-special-sale/#comment-23045))
 
 > Boniface N. Githinji says:
 >
@@ -204,7 +204,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Keep doing the good work we’ll keep evangelizing this framework here in Africa.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-6-now-live-special-sale.html)
+
 
 ---
 

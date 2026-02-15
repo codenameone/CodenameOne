@@ -36,13 +36,13 @@ Check it out and let us know what you think…​
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Nick Koirala** — June 2, 2016 at 2:55 am ([permalink](https://www.codenameone.com/blog/bluetooth-support.html#comment-22554))
+### **Nick Koirala** — June 2, 2016 at 2:55 am ([permalink](/blog/bluetooth-support/#comment-22554))
 
 > Nick Koirala says:
 >
 > Nice, just built the demo and found it picking things up. Can it scan in the background and call back to the app? I.e., for discovering beacons.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbluetooth-support.html)
+
 
 ---
 

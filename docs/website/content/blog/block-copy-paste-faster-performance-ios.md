@@ -32,22 +32,22 @@ One of the things to notice in the issue discussion is that the original optimiz
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **M Usman Nu** — February 10, 2017 at 1:52 pm ([permalink](https://www.codenameone.com/blog/block-copy-paste-faster-performance-ios.html#comment-23327))
+### **M Usman Nu** — February 10, 2017 at 1:52 pm ([permalink](/blog/block-copy-paste-faster-performance-ios/#comment-23327))
 
 > M Usman Nu says:
 >
 > Do i need to add ios.disableScreenshots in built-hints in order to enable this feature ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fblock-copy-paste-faster-performance-ios.html)
 
 
-### **Shai Almog** — February 11, 2017 at 5:57 am ([permalink](https://www.codenameone.com/blog/block-copy-paste-faster-performance-ios.html#comment-23098))
+
+### **Shai Almog** — February 11, 2017 at 5:57 am ([permalink](/blog/block-copy-paste-faster-performance-ios/#comment-23098))
 
 > Shai Almog says:
 >
 > No, that has nothing to do with that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fblock-copy-paste-faster-performance-ios.html)
+
 
 ---
 

@@ -148,7 +148,7 @@ failed and prevent the user from proceeding.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — April 7, 2015 at 1:43 pm ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-21688))
+### **Diamond** — April 7, 2015 at 1:43 pm ([permalink](/blog/validation-regex-masking/#comment-21688))
 
 > Diamond says:
 >
@@ -162,10 +162,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Lastly, will the keyboard close and re-open when stopEditing() and editString() are called? Or make the keyboard flashes?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvalidation-regex-masking.html)
 
 
-### **Shai Almog** — April 7, 2015 at 7:15 pm ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-22191))
+
+### **Shai Almog** — April 7, 2015 at 7:15 pm ([permalink](/blog/validation-regex-masking/#comment-22191))
 
 > Shai Almog says:
 >
@@ -175,20 +175,20 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Auto move might be an interesting approach to masking, this is one of those things we need to think about.  
 > Yes, the keyboard does flash. On my iphone this felt acceptable.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvalidation-regex-masking.html)
 
 
-### **Gerben** — August 12, 2015 at 8:31 am ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-22203))
+
+### **Gerben** — August 12, 2015 at 8:31 am ([permalink](/blog/validation-regex-masking/#comment-22203))
 
 > Gerben says:
 >
 > A regex containing (?= does not seem to work yet. Example, a password that should contain at least one lowercase character:  
 > “^(?=.*[a-z]).{8,24}$”
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvalidation-regex-masking.html)
 
 
-### **shannah78** — August 12, 2015 at 5:50 pm ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-21551))
+
+### **shannah78** — August 12, 2015 at 5:50 pm ([permalink](/blog/validation-regex-masking/#comment-21551))
 
 > shannah78 says:
 >
@@ -197,10 +197,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > If I were you I would just break this up into two constraints. E.g. The regex “[a-z]” will be sufficient to make sure it contains at least one lowercase character, and you can do the length constraint separately.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvalidation-regex-masking.html)
 
 
-### **Mo** — June 2, 2016 at 5:03 pm ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-22568))
+
+### **Mo** — June 2, 2016 at 5:03 pm ([permalink](/blog/validation-regex-masking/#comment-22568))
 
 > Mo says:
 >
@@ -214,10 +214,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > PLease advice if this is something was overlooked from my end?? and many thanks in advnce.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvalidation-regex-masking.html)
 
 
-### **Shai Almog** — June 3, 2016 at 4:03 am ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-22623))
+
+### **Shai Almog** — June 3, 2016 at 4:03 am ([permalink](/blog/validation-regex-masking/#comment-22623))
 
 > Shai Almog says:
 >
@@ -227,62 +227,62 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 3\. See setErrorMessageUIID(). It uses the PopupDialog UIID for the content itself.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvalidation-regex-masking.html)
 
 
-### **Mo** — June 4, 2016 at 9:24 am ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-21518))
+
+### **Mo** — June 4, 2016 at 9:24 am ([permalink](/blog/validation-regex-masking/#comment-21518))
 
 > Mo says:
 >
 > 1\. on the simulator,
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvalidation-regex-masking.html)
 
 
-### **Shai Almog** — June 5, 2016 at 4:15 am ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-22777))
+
+### **Shai Almog** — June 5, 2016 at 4:15 am ([permalink](/blog/validation-regex-masking/#comment-22777))
 
 > Shai Almog says:
 >
 > On the device text entry behaves quite differently.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvalidation-regex-masking.html)
 
 
-### **Chris** — April 23, 2018 at 9:03 pm ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-23542))
+
+### **Chris** — April 23, 2018 at 9:03 pm ([permalink](/blog/validation-regex-masking/#comment-23542))
 
 > Chris says:
 >
 > Shai, keyboard will not close after automovenext(). This will lead to an issue when the device is rotated. Text in the field will display in the wrong location and misaligned as well.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvalidation-regex-masking.html)
 
 
-### **Shai Almog** — April 24, 2018 at 5:23 am ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-23691))
+
+### **Shai Almog** — April 24, 2018 at 5:23 am ([permalink](/blog/validation-regex-masking/#comment-23691))
 
 > Shai Almog says:
 >
 > Is the parent container scrollable on the Y axis?  
 > Android resizes the screen on edit so you need to leave enough room for the text field in such cases.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvalidation-regex-masking.html)
 
 
-### **Chris** — April 24, 2018 at 6:45 pm ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-23774))
+
+### **Chris** — April 24, 2018 at 6:45 pm ([permalink](/blog/validation-regex-masking/#comment-23774))
 
 > Chris says:
 >
 > Yes scrollable on Y-Axis. But this is happening other way around when the tablet flipped form portrait mode to landscape.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvalidation-regex-masking.html)
 
 
-### **Shai Almog** — April 25, 2018 at 7:12 am ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-23906))
+
+### **Shai Almog** — April 25, 2018 at 7:12 am ([permalink](/blog/validation-regex-masking/#comment-23906))
 
 > Shai Almog says:
 >
 > Can you post a screenshot? What do you mean by “other way around”?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fvalidation-regex-masking.html)
+
 
 ---
 

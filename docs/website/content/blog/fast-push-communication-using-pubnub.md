@@ -66,70 +66,70 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — April 22, 2014 at 9:28 am ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-22003))
+### **Anonymous** — April 22, 2014 at 9:28 am ([permalink](/blog/fast-push-communication-using-pubnub/#comment-22003))
 
 > Anonymous says:
 >
 > Just spent a day looking at this finally, its kind of tough to get started for the first couple of hours but after that its plain sailing, made a whatsapp clone in 7 hrs that runs on all mobiles, thanks to codenameone 😀 Im amazed pubnub have put together such a decent and problem free API and extremely bloody thankful.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffast-push-communication-using-pubnub.html)
 
 
-### **Anonymous** — September 6, 2014 at 8:07 pm ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-24239))
+
+### **Anonymous** — September 6, 2014 at 8:07 pm ([permalink](/blog/fast-push-communication-using-pubnub/#comment-24239))
 
 > Anonymous says:
 >
 > Please someone help me out,I don’t know where to start in pubnub
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffast-push-communication-using-pubnub.html)
 
 
-### **Anonymous** — September 7, 2014 at 3:00 am ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-21878))
+
+### **Anonymous** — September 7, 2014 at 3:00 am ([permalink](/blog/fast-push-communication-using-pubnub/#comment-21878))
 
 > Anonymous says:
 >
 > Did you go thru the tutorial on their website?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffast-push-communication-using-pubnub.html)
 
 
-### **Anonymous** — September 7, 2014 at 8:31 am ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-21733))
+
+### **Anonymous** — September 7, 2014 at 8:31 am ([permalink](/blog/fast-push-communication-using-pubnub/#comment-21733))
 
 > Anonymous says:
 >
 > I did but not understanding anything there.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffast-push-communication-using-pubnub.html)
 
 
-### **Anonymous** — September 7, 2014 at 1:31 pm ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-22040))
+
+### **Anonymous** — September 7, 2014 at 1:31 pm ([permalink](/blog/fast-push-communication-using-pubnub/#comment-22040))
 
 > Anonymous says:
 >
 > This [http://www.pubnub.com/docs/…](<http://www.pubnub.com/docs/java/codenameone/tutorial/quick-start.html>) seems really simple. Do you have any Java programming experience?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffast-push-communication-using-pubnub.html)
 
 
-### **Anonymous** — September 18, 2014 at 5:09 am ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-22198))
+
+### **Anonymous** — September 18, 2014 at 5:09 am ([permalink](/blog/fast-push-communication-using-pubnub/#comment-22198))
 
 > Anonymous says:
 >
 > Helo Gareth,am jude.Am trying to create a mobile chat application for my project.I want to create something similar to whatsap and skype for android,but am not sure how to go about this.Please can you give me tips on how to do this project.Thanks in advance
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffast-push-communication-using-pubnub.html)
 
 
-### **Linsong Wang** — December 19, 2016 at 8:08 pm ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-23161))
+
+### **Linsong Wang** — December 19, 2016 at 8:08 pm ([permalink](/blog/fast-push-communication-using-pubnub/#comment-23161))
 
 > Linsong Wang says:
 >
 > Pubnub is deprecating 3.x version, and 4.x is the recommended now. Any plan to upgrade corresponding cn1lib?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffast-push-communication-using-pubnub.html)
 
 
-### **Shai Almog** — December 20, 2016 at 5:28 am ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-23277))
+
+### **Shai Almog** — December 20, 2016 at 5:28 am ([permalink](/blog/fast-push-communication-using-pubnub/#comment-23277))
 
 > Shai Almog says:
 >
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > On our side we’d like to offer a better webservice oriented tool that will work with websockets for efficient universal communications. There is no current ETA for this though as this is still on the drawing board.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffast-push-communication-using-pubnub.html)
+
 
 ---
 

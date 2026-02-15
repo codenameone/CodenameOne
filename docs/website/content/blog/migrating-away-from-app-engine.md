@@ -44,7 +44,7 @@ We will also need you to update URL’s for services such as push notification e
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **James David Low** — May 26, 2015 at 7:39 am ([permalink](https://www.codenameone.com/blog/migrating-away-from-app-engine.html#comment-22160))
+### **James David Low** — May 26, 2015 at 7:39 am ([permalink](/blog/migrating-away-from-app-engine/#comment-22160))
 
 > James David Low says:
 >
@@ -52,10 +52,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > “The Files API feature used here to write files to Blobstore has been deprecated and is going to be removed at some time in the future, in favor of writing files to Google Cloud Storage and using Blobstore to serve them.” – [https://cloud.google.com/ap…](<https://cloud.google.com/appengine/docs/java/blobstore/#Java_Writing_files_to_the_Blobstore>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-away-from-app-engine.html)
 
 
-### **Shai Almog** — May 26, 2015 at 2:59 pm ([permalink](https://www.codenameone.com/blog/migrating-away-from-app-engine.html#comment-24198))
+
+### **Shai Almog** — May 26, 2015 at 2:59 pm ([permalink](/blog/migrating-away-from-app-engine/#comment-24198))
 
 > Shai Almog says:
 >
@@ -63,20 +63,20 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We had a few regressions with it in the past which demonstrate that Google doesn’t really do much QA for that API. The basic blobstore API is pretty opaque and we had some issues that we had no way of debugging. Because there is quite literally, no one to talk to at Google the safe thing to do is migrate away ASAP. We can’t take any risks with this since a failure in this API will cause builds to fail.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-away-from-app-engine.html)
 
 
-### **Youssef** — May 31, 2015 at 6:51 pm ([permalink](https://www.codenameone.com/blog/migrating-away-from-app-engine.html#comment-21939))
+
+### **Youssef** — May 31, 2015 at 6:51 pm ([permalink](/blog/migrating-away-from-app-engine/#comment-21939))
 
 > Youssef says:
 >
 > I was about to use APP ENGINE for my new project. Now that i read this, i’m looking for some good alternatives.  
 > Do you have any suggestions ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-away-from-app-engine.html)
 
 
-### **Shai Almog** — June 1, 2015 at 9:30 am ([permalink](https://www.codenameone.com/blog/migrating-away-from-app-engine.html#comment-22093))
+
+### **Shai Almog** — June 1, 2015 at 9:30 am ([permalink](/blog/migrating-away-from-app-engine/#comment-22093))
 
 > Shai Almog says:
 >
@@ -84,16 +84,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We are moving to a microservices architecture which should make these decisions much simpler and easier to fix in the future.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-away-from-app-engine.html)
 
 
-### **chachan** — June 30, 2015 at 8:29 pm ([permalink](https://www.codenameone.com/blog/migrating-away-from-app-engine.html#comment-22344))
+
+### **chachan** — June 30, 2015 at 8:29 pm ([permalink](/blog/migrating-away-from-app-engine/#comment-22344))
 
 > chachan says:
 >
 > We started a project with App Engine but the more we want to add features, the more we find obstacles. In fact, we’re going to code a few more features and we’ll start the migration soon to Digital Ocean. Sad but needed
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-away-from-app-engine.html)
+
 
 ---
 

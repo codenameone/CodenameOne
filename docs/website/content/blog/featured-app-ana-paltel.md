@@ -13,7 +13,7 @@ author: Shai Almog
 
 Millions of Codename One apps are installed on devices every month. Most of them aren’t in the gallery  
 and are never featured in this recurring segment. We are looking for something exceptional in apps that  
-we feature here and [Ana Paltel](/featured-ana-paltel.html) fits that bill. It has a polished UI and it’s  
+we feature here and [Ana Paltel](/blog/featured-app-ana-paltel/) fits that bill. It has a polished UI and it’s  
 shipped by a major operator. It uses some unique Codename One features to boot making it even more interesting.
 
 We liked the usage of the native Google Maps integration that provides  

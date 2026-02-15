@@ -162,7 +162,7 @@ This is an implementation of a feature that was [requested](https://code.google.
 quite a while back. Historically, when moving from one text field to the next the VKB would fold and reopen. We now allow you to seamlessly  
 move between input fields. 
 
-You can also read the far more detailed list of release notes [here](/codenameone-3-0-release-notes.html). 
+You can also read the far more detailed list of release notes [here](/codename-one-3-0-release-notes/). 
 
 One of the things we are announcing today is a switch to faster release cycles, we already announced the  
 next two release dates which will probably map to versions 3.1 and 3.2 respectively: July 27th and October 27 2015.  
@@ -196,13 +196,13 @@ superior gc.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **manezi** — April 30, 2015 at 12:22 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-0-now-live.html#comment-22103))
+### **manezi** — April 30, 2015 at 12:22 pm ([permalink](/blog/codename-one-3-0-now-live/#comment-22103))
 
 > manezi says:
 >
 > Fantastic news. Well done to the CN1 team!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-0-now-live.html)
+
 
 ---
 

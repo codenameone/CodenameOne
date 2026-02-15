@@ -27,32 +27,32 @@ We might release several plugin updates in the near future to iron out bugs and 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **salah Alhaddabi** — June 21, 2017 at 4:51 am ([permalink](https://www.codenameone.com/blog/code-freeze-for-3-7.html#comment-23523))
+### **salah Alhaddabi** — June 21, 2017 at 4:51 am ([permalink](/blog/code-freeze-for-3-7/#comment-23523))
 
 > salah Alhaddabi says:
 >
 > We are all with you and support your excellent vision Shai.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcode-freeze-for-3-7.html)
 
 
-### **Francesco Galgani** — June 21, 2017 at 5:22 pm ([permalink](https://www.codenameone.com/blog/code-freeze-for-3-7.html#comment-23561))
+
+### **Francesco Galgani** — June 21, 2017 at 5:22 pm ([permalink](/blog/code-freeze-for-3-7/#comment-23561))
 
 > Francesco Galgani says:
 >
 > I’ve just installed the 3.7 in Netbeans.  
 > At the moment is there any detailed announcement of the changes compared to the previous version?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcode-freeze-for-3-7.html)
 
 
-### **Shai Almog** — June 22, 2017 at 4:24 am ([permalink](https://www.codenameone.com/blog/code-freeze-for-3-7.html#comment-23546))
+
+### **Shai Almog** — June 22, 2017 at 4:24 am ([permalink](/blog/code-freeze-for-3-7/#comment-23546))
 
 > Shai Almog says:
 >
 > We will have a release announcement with itemized details on Tuesday the 27th.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcode-freeze-for-3-7.html)
+
 
 ---
 

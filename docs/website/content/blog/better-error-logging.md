@@ -37,34 +37,34 @@ Notice that this API is potentially prohibitive in terms of performance. As such
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — April 17, 2019 at 3:10 pm ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-23990))
+### **Francesco Galgani** — April 17, 2019 at 3:10 pm ([permalink](/blog/better-error-logging/#comment-23990))
 
 > Francesco Galgani says:
 >
 > In the Javadoc of `Display.getInstance().setEnableAsyncStackTraces(…);`, it’s written: «Currently this is only supported in the JavaSE/Simulator port». Is it true? In that case, it’s not useful for crash reports…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbetter-error-logging.html)
 
 
-### **Shai Almog** — April 18, 2019 at 2:43 am ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-24057))
+
+### **Shai Almog** — April 18, 2019 at 2:43 am ([permalink](/blog/better-error-logging/#comment-24057))
 
 > Shai Almog says:
 >
 > It should work for desktop builds and Android as far as the code goes. Some platforms might fail because of the way stack traces are handled but I don’t see anything in the code that indicates this was actually enforced. It might not work everywhere e.g. on iOS.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbetter-error-logging.html)
 
 
-### **Francesco Galgani** — April 23, 2019 at 1:58 pm ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-24108))
+
+### **Francesco Galgani** — April 23, 2019 at 1:58 pm ([permalink](/blog/better-error-logging/#comment-24108))
 
 > Francesco Galgani says:
 >
 > There is something strange, maybe you can help me to better understand the logic of setEnableAsyncStackTraces. Without setEnableAsyncStackTraces, I have a NullPointerException without any indication of the line of code that thrown the exception (so the log is useless), while with setEnableAsyncStackTraces(true) I have a com.codename1.ui.Display$EdtException, but in the log there is no mention of any NullPointerException, so it’s unclear where is the exception and why is there an exception.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbetter-error-logging.html)
 
 
-### **Francesco Galgani** — April 23, 2019 at 2:21 pm ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-24096))
+
+### **Francesco Galgani** — April 23, 2019 at 2:21 pm ([permalink](/blog/better-error-logging/#comment-24096))
 
 > Francesco Galgani says:
 >
@@ -75,10 +75,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > however my question is the same: why does a NullPointerException become a  
 > Display$EdtException using setEnableAsyncStackTraces?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbetter-error-logging.html)
 
 
-### **Shai Almog** — April 23, 2019 at 4:55 pm ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-24115))
+
+### **Shai Almog** — April 23, 2019 at 4:55 pm ([permalink](/blog/better-error-logging/#comment-24115))
 
 > Shai Almog says:
 >
@@ -86,35 +86,35 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > What’s popup? What type of component is it?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbetter-error-logging.html)
 
 
-### **Francesco Galgani** — April 23, 2019 at 5:57 pm ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-23921))
+
+### **Francesco Galgani** — April 23, 2019 at 5:57 pm ([permalink](/blog/better-error-logging/#comment-23921))
 
 > Francesco Galgani says:
 >
 > This is the code: [https://gist.github.com/jsf…](<https://gist.github.com/jsfan3/9f9865c28b70b9e19c737a4ea65cace4>)  
 > As you can see, I’m trying to adapt AutoCompleteTextField to my needs. Note at the bottom of the code the commented popup.remove(). I’m trying to close the popup list immediately when setEditable(false) is called. A safe and correct way to do it could fit with my use case, but maybe my code is not safe. Moreover, calling setEditable(true) after setEditable(false) causes that the popup list will not appear again when the user start typing in the field. I hope that few changes can fix this code. Do you have any suggestion? (I know that Stack Overflow is more suitable for this type of questions, however we started the discussion here. Thank you for your support)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbetter-error-logging.html)
 
 
-### **Shai Almog** — April 24, 2019 at 4:04 am ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-24040))
+
+### **Shai Almog** — April 24, 2019 at 4:04 am ([permalink](/blog/better-error-logging/#comment-24040))
 
 > Shai Almog says:
 >
 > Maybe this is related to an ongoing animation which triggered this. That might explain the broken stack trace. It might be necessary to flush animations first for this method to work.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbetter-error-logging.html)
 
 
-### **Francesco Galgani** — April 24, 2019 at 6:20 am ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-24066))
+
+### **Francesco Galgani** — April 24, 2019 at 6:20 am ([permalink](/blog/better-error-logging/#comment-24066))
 
 > Francesco Galgani says:
 >
 > You’re right!!! Thank you! You gave me the right hint to solve half of this issue: the first half is what you supposed (that solved the issue in several cases), the second half was that an override of initComponent() and deinitalize() allowed me to solve the exception in other cases. This is my fixed code: [https://gist.github.com/jsf…](<https://gist.github.com/jsfan3/d8c9698afe63f8cf466679e6a1d79a34>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbetter-error-logging.html)
+
 
 ---
 

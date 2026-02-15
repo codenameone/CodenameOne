@@ -48,13 +48,13 @@ Happy learning!
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Francesco Galgani** — January 7, 2021 at 11:32 am ([permalink](https://www.codenameone.com/blog/why-you-should-learn-spring-boot-in-2021.html#comment-24372))
+### **Francesco Galgani** — January 7, 2021 at 11:32 am ([permalink](/blog/why-you-should-learn-spring-boot-in-2021/#comment-24372))
 
 > Francesco Galgani says:
 >
 > I have known for the first time and learned Spring Boot following Shai’s courses in the Codename One Academy and deepening on my own: in fact, at the beginning it was an uphill path rather difficult, but now I can say that Codename One + Spring Boot are my daily bread to make “real” applications. Perhaps my greatest demonstration of how Codename One + Spring Boot is a winning combination is when I made a desktop application for Windows in just one day, an application still used today, which is a small backend for a website made by me (obviously I had a lot of code ready because I used it in other projects, otherwise it would not have been possible). It needs a lot of study and patience to use Codename One + Spring Boot.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwhy-you-should-learn-spring-boot-in-2021.html)
+
 
 ---
 

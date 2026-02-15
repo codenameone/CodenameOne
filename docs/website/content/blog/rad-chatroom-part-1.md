@@ -52,11 +52,11 @@ Figure 2. Page 2 of new project wizard in NetBeans
 
 ### Step 1: Create a New Codename One project
 
-If you haven’t created a Codename One project before, you can refer to [this tutorial](https://www.codenameone.com/hello-world.html), which walks you through the creation of your first Codename One project.
+If you haven’t created a Codename One project before, you can refer to [this tutorial](/hello-world/), which walks you through the creation of your first Codename One project.
 
 ### Step 2: Activate CSS
 
-The CodeRAD and RADChatRoom libs require CSS to be activated in your project. See [this tutorial](https://www.codenameone.com/blog/live-css-update.html) for the steps on enabling CSS.
+The CodeRAD and RADChatRoom libs require CSS to be activated in your project. See [this tutorial](/blog/live-css-update/) for the steps on enabling CSS.
 
 ### Step 3: Add Dependencies
 
@@ -66,7 +66,7 @@ In Codename One settings, add the following cn1libs:
 
   2. RADChatRoom
 
-If you haven’t activated any cn1libs before in your Codename One projects, see [this tutorial](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html) which explains the process.
+If you haven’t activated any cn1libs before in your Codename One projects, see [this tutorial](/blog/automatically-install-update-distribute-cn1libs-extensions/) which explains the process.
 
 ### Step 4: Create Application Controller
 

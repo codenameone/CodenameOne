@@ -13,7 +13,7 @@ author: Steve Hannah
 
 On Thursday morning we rolled the cameras for chapter 2 of our exciting new webinar series. This time around there were far fewer (though not zero) technical issues, and we were able to share a productive hour of mobile app development in the company of our fellow coders.
 
-[Last time](https://www.codenameone.com/blog/java-mobile-dev-webinar-recap.html), we built a [social media app](https://github.com/shannah/social-network) similar to Facebook. It highlighted how you can easily build REST client using Codename One. This time around we changed directions and built a game: **Classic Flickr Concentration**. Basically it is a matching game where you get a set of cards, and you tap them to flip them over. You just need to find the matches. My two-year-old daughter loves this game, by the way.
+[Last time](/blog/java-mobile-dev-webinar-recap/), we built a [social media app](https://github.com/shannah/social-network) similar to Facebook. It highlighted how you can easily build REST client using Codename One. This time around we changed directions and built a game: **Classic Flickr Concentration**. Basically it is a matching game where you get a set of cards, and you tap them to flip them over. You just need to find the matches. My two-year-old daughter loves this game, by the way.
 
 Here is a 1-minute screen-cast of the game being played side-by-side on both an iPad Air 2, and a Nexus 5:
 
@@ -47,13 +47,13 @@ I think we all had a good time talking and learning about Codename One. Hope to 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Steve Nganga** — August 31, 2015 at 4:13 pm ([permalink](https://www.codenameone.com/blog/java-mobile-dev-webinar-sequel-recap.html#comment-22141))
+### **Steve Nganga** — August 31, 2015 at 4:13 pm ([permalink](/blog/java-mobile-dev-webinar-sequel-recap/#comment-22141))
 
 > Steve Nganga says:
 >
 > Hi Steve….Great job there…We would like to see a tutorial where you are using native interfaces
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-mobile-dev-webinar-sequel-recap.html)
+
 
 ---
 

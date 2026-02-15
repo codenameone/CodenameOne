@@ -413,16 +413,16 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 29, 2015 at 3:48 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22312))
+### **Anonymous** — January 29, 2015 at 3:48 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22312))
 
 > Anonymous says:
 >
 > That’s very cool Steve. Semi off-topic, but you might be interested in this JavaFX clock: [http://blog.crisp.se/2012/0…](<http://blog.crisp.se/2012/09/24/oscarlantz/analog-clock-revisited>) – it uses JavaFX bound properties in a very elegant fashion.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics-part-2-drawing-an-analog-clock.html)
 
 
-### **Anonymous** — January 29, 2015 at 4:07 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22125))
+
+### **Anonymous** — January 29, 2015 at 4:07 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22125))
 
 > Anonymous says:
 >
@@ -430,19 +430,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This predated my LWUIT work but we didn’t take it into LWUIT due to size concerns… Adding “proper” properties to Codename One is something that has been on my wishlist for quite some time, but to do this properly I would want the VM to support this internally so properties would have zero overhead compared to fields. That would take some effort…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics-part-2-drawing-an-analog-clock.html)
 
 
-### **Anonymous** — January 29, 2015 at 4:23 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-21597))
+
+### **Anonymous** — January 29, 2015 at 4:23 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-21597))
 
 > Anonymous says:
 >
 > I can blame you ! LOL. I have to admit having used Swing, LWUIT etc for a very long time, then coming to FX with it’s extensive use of binding was quite a shock and hard on my tired old brain – but then when see code like the clock I mentioned, where the binding makes it “just work” with almost no code, you can really see the power of the concept.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics-part-2-drawing-an-analog-clock.html)
 
 
-### **Anonymous** — January 31, 2015 at 7:11 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22054))
+
+### **Anonymous** — January 31, 2015 at 7:11 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22054))
 
 > Anonymous says:
 >
@@ -462,48 +462,48 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [f.show](<http://f.show)(>);
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics-part-2-drawing-an-analog-clock.html)
 
 
-### **José Helana** — December 7, 2015 at 8:21 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22348))
+
+### **José Helana** — December 7, 2015 at 8:21 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22348))
 
 > José Helana says:
 >
 > how do I get the clock to have the time automatically
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics-part-2-drawing-an-analog-clock.html)
 
 
-### **Shai Almog** — December 8, 2015 at 4:47 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22333))
+
+### **Shai Almog** — December 8, 2015 at 4:47 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22333))
 
 > Shai Almog says:
 >
 > You can use the java.util.Calendar class to get the current time and set it to the hands.  
 > See the last section of this tutorial with animating the clock.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics-part-2-drawing-an-analog-clock.html)
 
 
-### **Franck Marchand** — March 3, 2016 at 10:17 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22691))
+
+### **Franck Marchand** — March 3, 2016 at 10:17 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22691))
 
 > Franck Marchand says:
 >
 > Thanks for this example.  
 > But do you know why It doesn’t work If I add AnalogClock in Container sets with BoxLayout ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics-part-2-drawing-an-analog-clock.html)
 
 
-### **Shai Almog** — March 4, 2016 at 3:42 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22525))
+
+### **Shai Almog** — March 4, 2016 at 3:42 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22525))
 
 > Shai Almog says:
 >
 > Did you override calcPreferredSize() to give the clock a size?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics-part-2-drawing-an-analog-clock.html)
 
 
-### **Franck Marchand** — March 4, 2016 at 1:13 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22660))
+
+### **Franck Marchand** — March 4, 2016 at 1:13 pm ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22660))
 
 > Franck Marchand says:
 >
@@ -519,43 +519,43 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > }  
 > });
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics-part-2-drawing-an-analog-clock.html)
 
 
-### **Shai Almog** — March 5, 2016 at 4:13 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22372))
+
+### **Shai Almog** — March 5, 2016 at 4:13 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22372))
 
 > Shai Almog says:
 >
 > You need to override the calcPreferredSize() to give the clock a size or invoke setPreferredSize() to hardcode a minimum size.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics-part-2-drawing-an-analog-clock.html)
 
 
-### **Franck Marchand** — March 7, 2016 at 11:54 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22638))
+
+### **Franck Marchand** — March 7, 2016 at 11:54 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22638))
 
 > Franck Marchand says:
 >
 > Thanks, it works.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics-part-2-drawing-an-analog-clock.html)
 
 
-### **Ahmed Elnabwy** — May 5, 2017 at 6:45 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-21529))
+
+### **Ahmed Elnabwy** — May 5, 2017 at 6:45 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-21529))
 
 > Ahmed Elnabwy says:
 >
 > imports ,please
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics-part-2-drawing-an-analog-clock.html)
 
 
-### **Shai Almog** — May 6, 2017 at 5:41 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-23439))
+
+### **Shai Almog** — May 6, 2017 at 5:41 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-23439))
 
 > Shai Almog says:
 >
 > import com.codename1.ui.*;
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-graphics-part-2-drawing-an-analog-clock.html)
+
 
 ---
 

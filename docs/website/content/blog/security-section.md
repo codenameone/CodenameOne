@@ -11,9 +11,9 @@ author: Shai Almog
 
 ![Header Image](/blog/security-section/security.jpg)
 
-We’ve had a lot of [security related posts](/blog/tags/security.html) in the past few months as we refined many edge cases with some customers. These posts are difficult to comb thru as they are all over the place and it’s hard to get a glance of “what’s available”.
+We’ve had a lot of security related posts in the past few months as we refined many edge cases with some customers. These posts are difficult to comb through as they are all over the place, and it’s hard to get a glance of “what’s available.”
 
-So we added a new [security section](/manual/security.html) to the developer guide which adds some general information about Codename One security and includes most of the details about what you can do in terms of security.
+So we added a new [security section](/developer-guide#_security) to the developer guide which adds some general information about Codename One security and includes most of the details about what you can do in terms of security.
 
 If you have any ideas or notice anything missing don’t forget that you can edit every section of the developer guide in [our wiki](/blog/wiki-parparvm-performance-actionevent-type.html) and this includes the security section which is available [in the wiki here](https://github.com/codenameone/CodenameOne/wiki/security).
 

@@ -38,13 +38,13 @@ Codename One.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Sadart** — October 10, 2016 at 2:44 pm ([permalink](https://www.codenameone.com/blog/tip-disable-google-play-services.html#comment-22844))
+### **Sadart** — October 10, 2016 at 2:44 pm ([permalink](/blog/tip-disable-google-play-services/#comment-22844))
 
 > Sadart says:
 >
 > Thanks for the tip. I have already seen the 1.5mb app size reduction in my latest build following the tip.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-disable-google-play-services.html)
+
 
 ---
 

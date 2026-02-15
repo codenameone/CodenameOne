@@ -96,7 +96,7 @@ you can also define the source style in code.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — February 19, 2016 at 9:12 am ([permalink](https://www.codenameone.com/blog/new-animation-manager.html#comment-22540))
+### **Diamond** — February 19, 2016 at 9:12 am ([permalink](/blog/new-animation-manager/#comment-22540))
 
 > Diamond says:
 >
@@ -104,20 +104,20 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Where can I get the full source for this new animation manager demo please? Where is the image placed, at the contentPane or TitleArea using Toolbar?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-animation-manager.html)
 
 
-### **Shai Almog** — February 19, 2016 at 12:11 pm ([permalink](https://www.codenameone.com/blog/new-animation-manager.html#comment-22615))
+
+### **Shai Almog** — February 19, 2016 at 12:11 pm ([permalink](/blog/new-animation-manager/#comment-22615))
 
 > Shai Almog says:
 >
 > Hi Diamond,  
-> we haven’t made it into a full fledged demo but I did add a shorter standalone section on this into the Toolbar javadocs and the developer guide: [https://www.codenameone.com…](<https://www.codenameone.com/manual/components.html#_title_animations>)
+> we haven’t made it into a full fledged demo but I did add a shorter standalone section on this into the Toolbar javadocs and the developer guide: [https://www.codenameone.com…](</manual/components/#_title_animations>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-animation-manager.html)
 
 
-### **Mac Flanegan** — March 2, 2017 at 4:53 pm ([permalink](https://www.codenameone.com/blog/new-animation-manager.html#comment-23008))
+
+### **Mac Flanegan** — March 2, 2017 at 4:53 pm ([permalink](/blog/new-animation-manager/#comment-23008))
 
 > Mac Flanegan says:
 >
@@ -131,10 +131,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Edit: I tryed to use constant menuButtonTopBool but no success.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-animation-manager.html)
 
 
-### **Mac Flanegan** — March 2, 2017 at 5:12 pm ([permalink](https://www.codenameone.com/blog/new-animation-manager.html#comment-23165))
+
+### **Mac Flanegan** — March 2, 2017 at 5:12 pm ([permalink](/blog/new-animation-manager/#comment-23165))
 
 > Mac Flanegan says:
 >
@@ -149,19 +149,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > stitle.setPaddingBottom(20);
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-animation-manager.html)
 
 
-### **Shai Almog** — March 3, 2017 at 8:03 am ([permalink](https://www.codenameone.com/blog/new-animation-manager.html#comment-23361))
+
+### **Shai Almog** — March 3, 2017 at 8:03 am ([permalink](/blog/new-animation-manager/#comment-23361))
 
 > Shai Almog says:
 >
 > One of the approaches I took in one of my demos was to hide the side menu icon using the theme constant and then add a Command to the toolbar where I wanted it to be. The command just called the open side menu method of the toolbar.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-animation-manager.html)
 
 
-### **Mac Flanegan** — March 3, 2017 at 7:06 pm ([permalink](https://www.codenameone.com/blog/new-animation-manager.html#comment-23279))
+
+### **Mac Flanegan** — March 3, 2017 at 7:06 pm ([permalink](/blog/new-animation-manager/#comment-23279))
 
 > Mac Flanegan says:
 >
@@ -171,16 +171,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m trying to create an interface similar to native android applications, like the YouTube App where the title is hidden with Scroll up.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-animation-manager.html)
 
 
-### **Shai Almog** — March 4, 2017 at 10:13 am ([permalink](https://www.codenameone.com/blog/new-animation-manager.html#comment-23369))
+
+### **Shai Almog** — March 4, 2017 at 10:13 am ([permalink](/blog/new-animation-manager/#comment-23369))
 
 > Shai Almog says:
 >
 > I think the flickr demo might have something like this that uses the hide toolbar feature
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-animation-manager.html)
+
 
 ---
 

@@ -298,41 +298,41 @@ It might be interesting to allow manipulation of some SVG object states as well�
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — November 20, 2017 at 4:56 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-21633))
+### **Francesco Galgani** — November 20, 2017 at 4:56 pm ([permalink](/blog/flamingo-svg-transcoder/#comment-21633))
 
 > I’m interested in converting an svg scalable logo to Codename One code, but… is the link you provided correct? There is no mention of Codename One:  
 > [https://github.com/ebourg/f…](<https://github.com/ebourg/flamingo-svg-transcoder>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder.html)
 
 
-### **Shai Almog** — November 21, 2017 at 12:33 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-21533))
+
+### **Shai Almog** — November 21, 2017 at 12:33 pm ([permalink](/blog/flamingo-svg-transcoder/#comment-21533))
 
 > Ugh, thanks! It’s [http://github.com/codenameo…](<http://github.com/codenameone/flamingo-svg-transcoder>)  
 > I’ll fix it in the post.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder.html)
 
 
-### **Angelo** — June 23, 2020 at 5:31 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24281))
+
+### **Angelo** — June 23, 2020 at 5:31 pm ([permalink](/blog/flamingo-svg-transcoder/#comment-24281))
 
 > Angelo says:
 >
 > If I understand, the utility converts an SVG file that uses a reduced set of features to real Java code. Is it possible just to create a XML file to be loaded from resources with curves, lines, moves and so on? You could create a class like ImageFromSVGSubset and instances would be created with sort of new ImageFromSVGSubset(“id”). The xml has not to be an official format, just used by developers in Codename One that want to use the transcoder and that know what they are doing. I think it should take just one hour of development for you, starting from the current fork.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder.html)
 
 
-### **Shai Almog** — June 24, 2020 at 2:45 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-21424))
+
+### **Shai Almog** — June 24, 2020 at 2:45 am ([permalink](/blog/flamingo-svg-transcoder/#comment-21424))
 
 > Shai Almog says:
 >
 > No it’s harder.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder.html)
 
 
-### **Angelo** — June 24, 2020 at 7:11 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24280))
+
+### **Angelo** — June 24, 2020 at 7:11 am ([permalink](/blog/flamingo-svg-transcoder/#comment-24280))
 
 > Angelo says:
 >
@@ -344,37 +344,37 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I had problems in some cases with the paint method that is annotated @Override  
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder.html)
 
 
-### **Durank** — October 21, 2020 at 3:20 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24344))
+
+### **Durank** — October 21, 2020 at 3:20 pm ([permalink](/blog/flamingo-svg-transcoder/#comment-24344))
 
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
 > Please provide a solutions to use SVG images more easy.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder.html)
 
 
-### **Durank** — October 21, 2020 at 4:33 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24360))
+
+### **Durank** — October 21, 2020 at 4:33 pm ([permalink](/blog/flamingo-svg-transcoder/#comment-24360))
 
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
 > I did all steps in the flamingo page and I can’t see the generated java code to my svg image
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder.html)
 
 
-### **Shai Almog** — October 22, 2020 at 10:48 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24362))
+
+### **Shai Almog** — October 22, 2020 at 10:48 am ([permalink](/blog/flamingo-svg-transcoder/#comment-24362))
 
 > Shai Almog says:
 >
 > Does it print out that it’s processing the SVGs? What’s printed?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder.html)
 
 
-### **Duran k** — October 22, 2020 at 3:10 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24364))
+
+### **Duran k** — October 22, 2020 at 3:10 pm ([permalink](/blog/flamingo-svg-transcoder/#comment-24364))
 
 > [Duran k](https://lh3.googleusercontent.com/a-/AOh14GhIAakAlC4gLyRHwDzKuv6MUG2CDvLghf3zUAG8yA=s96-c) says:
 >
@@ -408,10 +408,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > F:data_kdpprogramsCodenameOneutils_programssvg>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder.html)
 
 
-### **Shai Almog** — October 23, 2020 at 6:53 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24356))
+
+### **Shai Almog** — October 23, 2020 at 6:53 am ([permalink](/blog/flamingo-svg-transcoder/#comment-24356))
 
 > Shai Almog says:
 >
@@ -420,25 +420,25 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > . com.mypackage.svg  
 > “`
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder.html)
 
 
-### **Duran k** — October 23, 2020 at 6:30 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24363))
+
+### **Duran k** — October 23, 2020 at 6:30 pm ([permalink](/blog/flamingo-svg-transcoder/#comment-24363))
 
 > [Duran k](https://lh3.googleusercontent.com/a-/AOh14GhIAakAlC4gLyRHwDzKuv6MUG2CDvLghf3zUAG8yA=s96-c) says:
 >
 > I don’t know what is the package name that you said. This documentation isn’t very clear. Please provide a Documentation more clear.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder.html)
 
 
-### **Shai Almog** — October 24, 2020 at 5:38 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24365))
+
+### **Shai Almog** — October 24, 2020 at 5:38 am ([permalink](/blog/flamingo-svg-transcoder/#comment-24365))
 
 > Shai Almog says:
 >
 > It’s your package name. This is a code generator. It generates source code to a specific package name.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fflamingo-svg-transcoder.html)
+
 
 ---
 

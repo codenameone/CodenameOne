@@ -10,8 +10,6 @@ Cross-platform frameworks solve different problems, so comparisons can feel like
 
 This page focuses on practical decision criteria: portability, performance profile, tooling, native integration, and long-term maintainability.
 
-![Comparing Cross-Platform Frameworks](/uploads/Competition_Monochromatic.png)
-
 ## At a Glance
 
 | Capability | Codename One | Flutter | React Native | Hybrid-Web (Ionic/Cordova) | Xamarin |

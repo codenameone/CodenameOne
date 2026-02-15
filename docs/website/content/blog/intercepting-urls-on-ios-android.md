@@ -115,7 +115,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — August 12, 2017 at 10:56 am ([permalink](https://www.codenameone.com/blog/intercepting-urls-on-ios-android.html#comment-23753))
+### **Francesco Galgani** — August 12, 2017 at 10:56 am ([permalink](/blog/intercepting-urls-on-ios-android/#comment-23753))
 
 > Francesco Galgani says:
 >
@@ -129,14 +129,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > So, my questions are if this post is still update and if it’s correctly formatted (it’s not clear if the build arguments for Android and iOS are in only one row).
 >
 > I suppose that the build arguments are the ones described in “Sending Arguments To The Build Server”, is it right?  
-> [https://www.codenameone.com…](<https://www.codenameone.com/manual/advanced-topics.html#_sending_arguments_to_the_build_server>)
+> [https://www.codenameone.com…](</manual/advanced-topics/#_sending_arguments_to_the_build_server>)
 >
 > Thank you.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintercepting-urls-on-ios-android.html)
 
 
-### **Shai Almog** — August 13, 2017 at 5:32 am ([permalink](https://www.codenameone.com/blog/intercepting-urls-on-ios-android.html#comment-23424))
+
+### **Shai Almog** — August 13, 2017 at 5:32 am ([permalink](/blog/intercepting-urls-on-ios-android/#comment-23424))
 
 > Shai Almog says:
 >
@@ -146,27 +146,27 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This can be done easily in Codename One and is done by the JAT app.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintercepting-urls-on-ios-android.html)
 
 
-### **Francesco Galgani** — July 11, 2018 at 6:22 pm ([permalink](https://www.codenameone.com/blog/intercepting-urls-on-ios-android.html#comment-23649))
+
+### **Francesco Galgani** — July 11, 2018 at 6:22 pm ([permalink](/blog/intercepting-urls-on-ios-android/#comment-23649))
 
 > Francesco Galgani says:
 >
 > At the begging of this post, you wrote: «For Android you would probably also want to add the build argument android.xactivity=android:exported=”false”». Indeed this build hint cannot be used, because it causes that Android cannot start the app, giving the error: “The app is not installed”. The reason is explained here: [https://stackoverflow.com/a…](<https://stackoverflow.com/a/49471457>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintercepting-urls-on-ios-android.html)
 
 
-### **Shai Almog** — July 12, 2018 at 5:39 am ([permalink](https://www.codenameone.com/blog/intercepting-urls-on-ios-android.html#comment-23986))
+
+### **Shai Almog** — July 12, 2018 at 5:39 am ([permalink](/blog/intercepting-urls-on-ios-android/#comment-23986))
 
 > Shai Almog says:
 >
 > I don’t recall this at all, it’s been 4 years since I wrote that so no idea…
 >
-> This isn’t mentioned in the developer guide section though: [https://www.codenameone.com…](<https://www.codenameone.com/manual/advanced-topics.html>)
+> This isn’t mentioned in the developer guide section though: [https://www.codenameone.com…](</manual/advanced-topics/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fintercepting-urls-on-ios-android.html)
+
 
 ---
 

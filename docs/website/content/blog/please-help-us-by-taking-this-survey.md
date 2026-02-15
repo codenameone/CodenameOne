@@ -52,7 +52,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 25, 2013 at 12:27 am ([permalink](https://www.codenameone.com/blog/please-help-us-by-taking-this-survey.html#comment-21944))
+### **Anonymous** — October 25, 2013 at 12:27 am ([permalink](/blog/please-help-us-by-taking-this-survey/#comment-21944))
 
 > Anonymous says:
 >
@@ -60,10 +60,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > How the hell would anyone expect to make any meaningful inferences from the imprecise garbage they collect is anyone guess.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fplease-help-us-by-taking-this-survey.html)
 
 
-### **Anonymous** — October 25, 2013 at 8:10 am ([permalink](https://www.codenameone.com/blog/please-help-us-by-taking-this-survey.html#comment-21668))
+
+### **Anonymous** — October 25, 2013 at 8:10 am ([permalink](/blog/please-help-us-by-taking-this-survey/#comment-21668))
 
 > Anonymous says:
 >
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is important to us because when you as a developer want to start working with a platform such as Codename One you need to get permission from your manager, he will look at the results of surveys like this one…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fplease-help-us-by-taking-this-survey.html)
+
 
 ---
 

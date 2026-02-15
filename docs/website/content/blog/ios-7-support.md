@@ -39,7 +39,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 2, 2014 at 7:42 pm ([permalink](https://www.codenameone.com/blog/ios-7-support.html#comment-21813))
+### **Anonymous** — January 2, 2014 at 7:42 pm ([permalink](/blog/ios-7-support/#comment-21813))
 
 > Anonymous says:
 >
@@ -51,34 +51,34 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Emil
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-7-support.html)
 
 
-### **Anonymous** — January 3, 2014 at 3:23 am ([permalink](https://www.codenameone.com/blog/ios-7-support.html#comment-21778))
+
+### **Anonymous** — January 3, 2014 at 3:23 am ([permalink](/blog/ios-7-support/#comment-21778))
 
 > Anonymous says:
 >
 > Its been there for a while. Just click the More… option in the skins menu.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-7-support.html)
 
 
-### **Anonymous** — January 3, 2014 at 4:02 am ([permalink](https://www.codenameone.com/blog/ios-7-support.html#comment-21809))
+
+### **Anonymous** — January 3, 2014 at 4:02 am ([permalink](/blog/ios-7-support/#comment-21809))
 
 > Anonymous says:
 >
 > I am aware that the skin is available in the simulator. I was referring to the device still using the old skin; sorry for being unclear 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-7-support.html)
 
 
-### **Anonymous** — January 4, 2014 at 6:09 am ([permalink](https://www.codenameone.com/blog/ios-7-support.html#comment-21795))
+
+### **Anonymous** — January 4, 2014 at 6:09 am ([permalink](/blog/ios-7-support/#comment-21795))
 
 > Anonymous says:
 >
 > You need to define the build argument ios.themeMode to modern or just wait a couple of weeks till we flip the switch to make iOS 7 the default.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-7-support.html)
+
 
 ---
 

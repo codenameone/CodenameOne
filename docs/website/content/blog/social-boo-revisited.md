@@ -12,8 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/social-boo-revisited/socialboo.jpg)
 
 SocialBoo originated from the same [app design vault](http://www.appdesignvault.com/shop/social-boo/) set  
-of designs that brought us the [Chrome Demo](/blog/chrome-demo.html). [This demo](/demos-SocialBoo.html)  
-uses a somewhat outdated but still reasonable gunmetal look, it also features different UI styles when running  
+of designs that brought us the Chrome Demo. This demo uses a somewhat outdated but still reasonable gunmetal look, it also features different UI styles when running  
 on a tablet/phone. Notice in the screenshot above that the UI for the demo differs when running in a  
 phone/tablet and even changes when the tablet flips between portrait and landscape…​
 
@@ -21,7 +20,7 @@ This demo was originally created using the old GUI builder but was modernized to
 
 **Check the live version running on the right hand side thanks to the power of the Codename One JavaScript port!**
 
-You can check out [the demo here](/demos-SocialBoo.html) & the  
+You can check out the  
 [full source code here](https://github.com/codenameone/SocialBoo).
 
 We barely changed anything in this demo, although it did “age” it still looks reasonable even today. One of the  
@@ -35,12 +34,13 @@ The switch from the old GUI builder to the new GUI builder almost worked but the
 screen support in the old code. This isn’t supported by the new GUI builder as there is no concept of “flow”  
 so we replicated roughly the same behavior using:
     
-    
-    if(SocialBoo.isTabletMode()) {
-        UITimer.timer(2000, false, this, () -> new Person().show());
-    } else {
-        UITimer.timer(2000, false, this, () -> new Main().show());
-    }
+```java
+if(SocialBoo.isTabletMode()) {
+    UITimer.timer(2000, false, this, () -> new Person().show());
+} else {
+    UITimer.timer(2000, false, this, () -> new Main().show());
+}
+```
 
 Notice that we used the `SocialBoo.isTabletMode()` call instead of `Display.getInstance().isTablet()`. We did that  
 to allow forcing tablet/phone mode which is great for a demo although not really necessary for a “real world app”.
@@ -60,7 +60,7 @@ plugin updates.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **salah Alhaddabi** — December 22, 2016 at 4:43 pm ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-22957))
+### **salah Alhaddabi** — December 22, 2016 at 4:43 pm ([permalink](/blog/social-boo-revisited/#comment-22957))
 
 > salah Alhaddabi says:
 >
@@ -72,10 +72,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks a lot in advance…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsocial-boo-revisited.html)
 
 
-### **Shai Almog** — December 23, 2016 at 6:36 am ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-23016))
+
+### **Shai Almog** — December 23, 2016 at 6:36 am ([permalink](/blog/social-boo-revisited/#comment-23016))
 
 > Shai Almog says:
 >
@@ -84,29 +84,29 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You need to create a new project with the right package names and copy the source/properties and resources into the eclipse workspace.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsocial-boo-revisited.html)
 
 
-### **salah Alhaddabi** — December 24, 2016 at 7:13 am ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-23187))
+
+### **salah Alhaddabi** — December 24, 2016 at 7:13 am ([permalink](/blog/social-boo-revisited/#comment-23187))
 
 > salah Alhaddabi says:
 >
 > Dear Shai I am using netbeans  
 > I want to know how to clone the project using netbeans please
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsocial-boo-revisited.html)
 
 
-### **Shai Almog** — December 24, 2016 at 9:12 am ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-23285))
+
+### **Shai Almog** — December 24, 2016 at 9:12 am ([permalink](/blog/social-boo-revisited/#comment-23285))
 
 > Shai Almog says:
 >
 > File -> New Project -> Codename One -> Demos -> Social Boo…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsocial-boo-revisited.html)
 
 
-### **salah Alhaddabi** — December 24, 2016 at 5:53 pm ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-23001))
+
+### **salah Alhaddabi** — December 24, 2016 at 5:53 pm ([permalink](/blog/social-boo-revisited/#comment-23001))
 
 > salah Alhaddabi says:
 >
@@ -128,10 +128,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Due to that I am not able to run the app. Please help.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsocial-boo-revisited.html)
 
 
-### **Shai Almog** — December 25, 2016 at 8:23 am ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-23233))
+
+### **Shai Almog** — December 25, 2016 at 8:23 am ([permalink](/blog/social-boo-revisited/#comment-23233))
 
 > Shai Almog says:
 >
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We’ve committed a fix for this but because it needs a plugin update it might take a couple of weeks to release it as it’s a longer cycle than the typical library cycle.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsocial-boo-revisited.html)
+
 
 ---
 

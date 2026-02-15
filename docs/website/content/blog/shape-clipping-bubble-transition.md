@@ -62,13 +62,13 @@ __ |  The original publication of this code was missing the second translate cal
 ---|---  
   
 __ |  Notice that this functionality isn’t available on all platforms so you normally need to test if shaped clipping is  
-supported using [isShapeClipSupported()](https://www.codenameone.com/javadoc/com/codename1/ui/Graphics.html#isShapeClipSupported--).   
+supported using [isShapeClipSupported()](/javadoc/com/codename1/ui/Graphics/#isShapeClipSupported--).   
 ---|---  
   
 ### Bubble Transition
 
 One of the reasons for adding shaped clipping is the new  
-[BubbleTransiton](https://www.codenameone.com/javadoc/com/codename1/ui/animations/BubbleTransition.html) class.  
+[BubbleTransiton](/javadoc/com/codename1/ui/animations/BubbleTransition/) class.  
 It’s a transition that morphs a component into another component using a circular growth motion.
 
 The `BubbleTransition` accepts the component that will grow into the bubble effect as one of its arguments. It’s generally  
@@ -134,14 +134,14 @@ Figure 1. Bubble transition converting a circular button to a Dialog
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **java_dev** — March 23, 2016 at 9:53 am ([permalink](https://www.codenameone.com/blog/shape-clipping-bubble-transition.html#comment-22518))
+### **java_dev** — March 23, 2016 at 9:53 am ([permalink](/blog/shape-clipping-bubble-transition/#comment-22518))
 
 > Is this feature released in eclipse plugin?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshape-clipping-bubble-transition.html)
 
 
-### **Shai Almog** — March 24, 2016 at 3:29 am ([permalink](https://www.codenameone.com/blog/shape-clipping-bubble-transition.html#comment-22781))
+
+### **Shai Almog** — March 24, 2016 at 3:29 am ([permalink](/blog/shape-clipping-bubble-transition/#comment-22781))
 
 > Shai Almog says:
 >
@@ -149,10 +149,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > So it’s already in although we made some improvements to the implementation which will go in this Friday. To get this just use “Update Client Libs” in the Codename One section in the preferences.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshape-clipping-bubble-transition.html)
 
 
-### **Javier Anton** — May 21, 2020 at 10:15 am ([permalink](https://www.codenameone.com/blog/shape-clipping-bubble-transition.html#comment-21406))
+
+### **Javier Anton** — May 21, 2020 at 10:15 am ([permalink](/blog/shape-clipping-bubble-transition/#comment-21406))
 
 > [Javier Anton](https://lh3.googleusercontent.com/a-/AAuE7mDRjHkEvAZNXquh9p7Oo00ey1yOwNzZ0SrFwD0IVA) says:
 >
@@ -160,16 +160,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Edit: solved by extending BubbleTransition and setting the transparency within
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshape-clipping-bubble-transition.html)
 
 
-### **Shai Almog** — May 22, 2020 at 4:08 am ([permalink](https://www.codenameone.com/blog/shape-clipping-bubble-transition.html#comment-21405))
+
+### **Shai Almog** — May 22, 2020 at 4:08 am ([permalink](/blog/shape-clipping-bubble-transition/#comment-21405))
 
 > Shai Almog says:
 >
 > If you can see a bug in the code feel free to submit a pull request.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshape-clipping-bubble-transition.html)
+
 
 ---
 

@@ -71,7 +71,7 @@ Notice that this isn’t always possible and is a bit flaky
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — August 8, 2020 at 7:58 am ([permalink](https://www.codenameone.com/blog/security-issues-cross-platform-tools.html#comment-24312))
+### **Francesco Galgani** — August 8, 2020 at 7:58 am ([permalink](/blog/security-issues-cross-platform-tools/#comment-24312))
 
 > [Francesco Galgani](https://lh6.googleusercontent.com/-4K0ax_DVJf4/AAAAAAAAAAI/AAAAAAAAAAA/AMZuuckEd1kcni0y8k6NMzNtxwOCEPatQQ/photo.jpg) says:
 >
@@ -89,40 +89,40 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > On the subject of computer security, I wrote a short section in my thesis “The Age of Technological Persuasion and Education in the Use of Technology”, I refer to paragraph 3.11.2, p. 56, 57 and 58. The text is in Italian: <https://www.informatica-libera.net/content/era-della-persuasione-tecnologica>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsecurity-issues-cross-platform-tools.html)
 
 
-### **Javier Anton** — August 8, 2020 at 6:07 pm ([permalink](https://www.codenameone.com/blog/security-issues-cross-platform-tools.html#comment-24313))
+
+### **Javier Anton** — August 8, 2020 at 6:07 pm ([permalink](/blog/security-issues-cross-platform-tools/#comment-24313))
 
 > [Javier Anton](https://lh3.googleusercontent.com/a-/AAuE7mDRjHkEvAZNXquh9p7Oo00ey1yOwNzZ0SrFwD0IVA) says:
 >
 > Thanks Shai and Francesco. I got a specific question, sorry for being so direct in such a general discussion.  
 > If the source code is obfuscated, how can the NativeLogs reader tell me the specific file name and code lines in stack traces?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsecurity-issues-cross-platform-tools.html)
 
 
-### **Shai Almog** — August 9, 2020 at 1:36 am ([permalink](https://www.codenameone.com/blog/security-issues-cross-platform-tools.html#comment-24316))
+
+### **Shai Almog** — August 9, 2020 at 1:36 am ([permalink](/blog/security-issues-cross-platform-tools/#comment-24316))
 
 > Shai Almog says:
 >
 > The default obfuscation settings from Google leave these things in place. So method names, variables etc. are all obfuscated and even the class names. But file names and line numbers are preserved so stack traces will make some sense. I think that’s a sensible default.
 >
-> Yes it makes the code a bit less obfuscated but there’s always a trade-off. When we obfuscate completely stacks become ambiguous and really hard to follow even with the map file. BTW if you don’t know about the mapping file: <https://www.codenameone.com/blog/tip-obfuscation-mapping-file.html>
+> Yes it makes the code a bit less obfuscated but there’s always a trade-off. When we obfuscate completely stacks become ambiguous and really hard to follow even with the map file. BTW if you don’t know about the mapping file: </blog/tip-obfuscation-mapping-file/>
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsecurity-issues-cross-platform-tools.html)
 
 
-### **Shai Almog** — August 9, 2020 at 1:39 am ([permalink](https://www.codenameone.com/blog/security-issues-cross-platform-tools.html#comment-24314))
+
+### **Shai Almog** — August 9, 2020 at 1:39 am ([permalink](/blog/security-issues-cross-platform-tools/#comment-24314))
 
 > Shai Almog says:
 >
 > Agreed. I usually give the multi-layered security analogy as an “onion”. It’s hard to block a truly motivated hacker in some tiers but you can make him cry on every damn layer.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsecurity-issues-cross-platform-tools.html)
 
 
-### **Francesco Galgani** — August 9, 2020 at 10:38 am ([permalink](https://www.codenameone.com/blog/security-issues-cross-platform-tools.html#comment-24315))
+
+### **Francesco Galgani** — August 9, 2020 at 10:38 am ([permalink](/blog/security-issues-cross-platform-tools/#comment-24315))
 
 > [Francesco Galgani](https://lh6.googleusercontent.com/-4K0ax_DVJf4/AAAAAAAAAAI/AAAAAAAAAAA/AMZuuckEd1kcni0y8k6NMzNtxwOCEPatQQ/photo.jpg) says:
 >
@@ -135,16 +135,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Finally, I examine the case of the web-apps made with Codename One, listing in detail the levels of obfuscation used, and then conclude that going back from the Javascript code produced by the Codename One build server to “usable” Java code is unrealistic (and I report an example to clarify any doubt).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsecurity-issues-cross-platform-tools.html)
 
 
-### **Javier Anton** — August 10, 2020 at 7:05 pm ([permalink](https://www.codenameone.com/blog/security-issues-cross-platform-tools.html#comment-24318))
+
+### **Javier Anton** — August 10, 2020 at 7:05 pm ([permalink](/blog/security-issues-cross-platform-tools/#comment-24318))
 
 > [Javier Anton](https://lh3.googleusercontent.com/a-/AAuE7mDRjHkEvAZNXquh9p7Oo00ey1yOwNzZ0SrFwD0IVA) says:
 >
 > Thank you both. My intuition told me that it must be something like what Shai said but it’s nice to have it confirmed. Really useful to see the resulting code in Francesco’s example
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsecurity-issues-cross-platform-tools.html)
+
 
 ---
 

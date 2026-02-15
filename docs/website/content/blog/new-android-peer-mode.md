@@ -48,16 +48,16 @@ We plan to add something similar to iOS and the simulator as we move forward.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Fabrizio Grassi** — July 11, 2016 at 2:11 pm ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-21427))
+### **Fabrizio Grassi** — July 11, 2016 at 2:11 pm ([permalink](/blog/new-android-peer-mode/#comment-21427))
 
 > Fabrizio Grassi says:
 >
 > Could this affect also the text editing?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-android-peer-mode.html)
 
 
-### **Diamond** — July 11, 2016 at 8:44 pm ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-22842))
+
+### **Diamond** — July 11, 2016 at 8:44 pm ([permalink](/blog/new-android-peer-mode/#comment-22842))
 
 > Diamond says:
 >
@@ -65,48 +65,48 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I tested this feature on Samsung S5 mini. App crashes when I tried to open web browser. Some transparency on components overlaid on Google Maps and Google Maps requires touching to get refreshed before it shows, while the overlaid component is already shown. These are the issues I found so far, I will keep testing.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-android-peer-mode.html)
 
 
-### **Shai Almog** — July 12, 2016 at 3:19 am ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-24224))
+
+### **Shai Almog** — July 12, 2016 at 3:19 am ([permalink](/blog/new-android-peer-mode/#comment-24224))
 
 > Shai Almog says:
 >
 > Right now we didn’t touch the text editing code which is a bit of a special case. We might change it in the future.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-android-peer-mode.html)
 
 
-### **Shai Almog** — July 12, 2016 at 3:21 am ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-22759))
+
+### **Shai Almog** — July 12, 2016 at 3:21 am ([permalink](/blog/new-android-peer-mode/#comment-22759))
 
 > Shai Almog says:
 >
 > Thanks. Can you try and get a stack trace from the crash?  
 > I’m not sure how well transparency will work in these situations. Transparency requires the underlying component to paint itself and we don’t always have a way to force that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-android-peer-mode.html)
 
 
-### **Jonathan** — August 3, 2016 at 6:14 am ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-22767))
+
+### **Jonathan** — August 3, 2016 at 6:14 am ([permalink](/blog/new-android-peer-mode/#comment-22767))
 
 > Jonathan says:
 >
 > Can you use it on the camera live mode ( Capture.capturePhoto()) ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-android-peer-mode.html)
 
 
-### **Shai Almog** — August 4, 2016 at 4:25 am ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-24204))
+
+### **Shai Almog** — August 4, 2016 at 4:25 am ([permalink](/blog/new-android-peer-mode/#comment-24204))
 
 > Shai Almog says:
 >
 > Capture doesn’t use peer components. It’s a monolithic API.  
 > One could use a peer component to map to low lever camera native API’s in a cn1lib in a similar way to the native maps implementation. We might do this ourselves at some point but right now our task list is so full I just don’t see this happening.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-android-peer-mode.html)
 
 
-### **Lukman Javalove Idealist Jaji** — August 16, 2016 at 7:09 am ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-24225))
+
+### **Lukman Javalove Idealist Jaji** — August 16, 2016 at 7:09 am ([permalink](/blog/new-android-peer-mode/#comment-24225))
 
 > Lukman Javalove Idealist Jaji says:
 >
@@ -114,10 +114,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Could you help with how you laid components on a Map? I’ve been wanting to do that
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-android-peer-mode.html)
 
 
-### **Diamond** — August 16, 2016 at 10:35 am ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-22760))
+
+### **Diamond** — August 16, 2016 at 10:35 am ([permalink](/blog/new-android-peer-mode/#comment-22760))
 
 > Diamond says:
 >
@@ -156,16 +156,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > THIS code is written here and was not tested.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-android-peer-mode.html)
 
 
-### **Lukman Javalove Idealist Jaji** — August 16, 2016 at 10:47 am ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-22529))
+
+### **Lukman Javalove Idealist Jaji** — August 16, 2016 at 10:47 am ([permalink](/blog/new-android-peer-mode/#comment-22529))
 
 > Lukman Javalove Idealist Jaji says:
 >
 > Ngiyabonga Diamond ..it worked … 🙂 Thanks for your help once again….
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnew-android-peer-mode.html)
+
 
 ---
 

@@ -17,7 +17,7 @@ There are a lot of small changes so I’ll divide them to avoid confusion.
 
 ### JSObject toString
 
-Up until now if you got a callback or had obtained a [JSObject](https://www.codenameone.com/javadoc/com/codename1/javascript/JSObject.html) and wanted to know what it contained e.g. via:
+Up until now if you got a callback or had obtained a [JSObject](/javadoc/com/codename1/javascript/JSObject/) and wanted to know what it contained e.g. via:
     
     
     Log.p("My JSObject is: " + myJSObject);
@@ -71,7 +71,7 @@ I didn’t specify the age but in the old parser age would be removed so I would
 
 ### Localizable SignatureComponent:
 
-Last but not least Steve added the ability to localize the signature component by setting some values in the resource bundle. You can learn more about resource bundles and localization [here](https://www.codenameone.com/how-do-i---localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app.html).
+Last but not least Steve added the ability to localize the signature component by setting some values in the resource bundle. You can learn more about resource bundles and localization [here](/how-do-i---localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app/).
 
 You can use the following keys when localizing:
 

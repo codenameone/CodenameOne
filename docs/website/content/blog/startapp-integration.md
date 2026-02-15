@@ -39,16 +39,16 @@ The new integration is quite simple.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **ugochukwu** — August 24, 2015 at 4:15 pm ([permalink](https://www.codenameone.com/blog/startapp-integration.html#comment-21559))
+### **ugochukwu** — August 24, 2015 at 4:15 pm ([permalink](/blog/startapp-integration/#comment-21559))
 
 > ugochukwu says:
 >
 > shai thanks for this great tutorial
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstartapp-integration.html)
 
 
-### **Valeriy Skachko** — January 11, 2016 at 2:07 pm ([permalink](https://www.codenameone.com/blog/startapp-integration.html#comment-22591))
+
+### **Valeriy Skachko** — January 11, 2016 at 2:07 pm ([permalink](/blog/startapp-integration/#comment-22591))
 
 > Valeriy Skachko says:
 >
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > But, receive on android device – An internal application error occurred: java.lang. AssertionError
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fstartapp-integration.html)
+
 
 ---
 

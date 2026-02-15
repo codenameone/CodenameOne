@@ -15,7 +15,7 @@ A while back someone asked on stackoverflow [how to adapt a Codename One app to 
 
 I call this approach the “phone first” approach for universal app development. It starts by forgetting about the tablet and focusing on building a good looking phone app. In this app I usually subclass `Form` for all the classes which instantly creates an app that’s very suitable for phones.
 
-When this is done I give some thought to how I would like the app to work as a tablet app. In general I want the app to have a [permanent side menu](https://www.codenameone.com/blog/permanent-sidemenu-getAllStyles-scrollbar-and-more.html) and one `Form` where the content is replaced.
+When this is done I give some thought to how I would like the app to work as a tablet app. In general I want the app to have a [permanent side menu](/blog/permanent-sidemenu-getAllStyles-scrollbar-and-more/) and one `Form` where the content is replaced.
 
 To accomplish this I change all the existing subclasses of `Form` so they will derive from my private class `BaseForm` which is basically something like this:
     

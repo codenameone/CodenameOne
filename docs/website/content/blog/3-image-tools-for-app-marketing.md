@@ -72,13 +72,13 @@ Good promotional material is no substitute for good app design, but it’s a ste
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chris Moore** — May 30, 2019 at 7:49 am ([permalink](https://www.codenameone.com/blog/3-image-tools-for-app-marketing.html#comment-24041))
+### **Chris Moore** — May 30, 2019 at 7:49 am ([permalink](/blog/3-image-tools-for-app-marketing/#comment-24041))
 
 > Hey Shai!
 >
 > Nice tips. I wonder whether you’ve tried Promomatic ([https://www.promomatic.com/)](<https://www.promomatic.com/>)) for building app screenshots instead of AppLaunchPad? Super easy to use and cost effective when building for the app store launch. Found them on Product Hunt a few months back.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2F3-image-tools-for-app-marketing.html)
+
 
 ---
 

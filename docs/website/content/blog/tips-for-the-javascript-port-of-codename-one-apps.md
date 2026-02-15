@@ -303,13 +303,13 @@ In this example we used a modal dialog to prompt the user, but you can use any U
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Francesco Galgani** — June 6, 2021 at 1:03 pm ([permalink](https://www.codenameone.com/blog/tips-for-the-javascript-port-of-codename-one-apps.html#comment-24465))
+### **Francesco Galgani** — June 6, 2021 at 1:03 pm ([permalink](/blog/tips-for-the-javascript-port-of-codename-one-apps/#comment-24465))
 
 > Francesco Galgani says:
 >
 > This is just a theoretical curiosity of mine: in which real use cases could a Codename One project like «”Headless” Javascript App» be useful? Could you give some concrete examples?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftips-for-the-javascript-port-of-codename-one-apps.html)
+
 
 ---
 

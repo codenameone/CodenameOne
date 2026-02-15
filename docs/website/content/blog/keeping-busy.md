@@ -37,22 +37,22 @@ This is the second server update that’s user noticeable although there were a 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bitvest** — January 11, 2018 at 9:41 pm ([permalink](https://www.codenameone.com/blog/keeping-busy.html#comment-23886))
+### **bitvest** — January 11, 2018 at 9:41 pm ([permalink](/blog/keeping-busy/#comment-23886))
 
 > bitvest says:
 >
 > I have build a website [http://www.bitvest.com.au/](<http://www.bitvest.com.au/>) and now i would like to build a mobile app for this website.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkeeping-busy.html)
 
 
-### **Shai Almog** — January 12, 2018 at 7:06 am ([permalink](https://www.codenameone.com/blog/keeping-busy.html#comment-23835))
+
+### **Shai Almog** — January 12, 2018 at 7:06 am ([permalink](/blog/keeping-busy/#comment-23835))
 
 > Shai Almog says:
 >
-> Check out this post covering tutorials, documentation and resources available to developers [https://www.codenameone.com…](<https://www.codenameone.com/blog/tutorials-resources-learn-java-mobile-videos-courses-ios-android.html>)
+> Check out this post covering tutorials, documentation and resources available to developers [https://www.codenameone.com…](</blog/tutorials-resources-learn-java-mobile-videos-courses-ios-android/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fkeeping-busy.html)
+
 
 ---
 

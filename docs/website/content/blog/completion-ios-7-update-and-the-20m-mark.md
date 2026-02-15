@@ -122,16 +122,16 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — August 29, 2013 at 3:45 am ([permalink](https://www.codenameone.com/blog/completion-ios-7-update-and-the-20m-mark.html#comment-21745))
+### **Anonymous** — August 29, 2013 at 3:45 am ([permalink](/blog/completion-ios-7-update-and-the-20m-mark/#comment-21745))
 
 > Anonymous says:
 >
 > just thought you should know, that the title to this post is different, from the title on the front page of the website
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcompletion-ios-7-update-and-the-20m-mark.html)
 
 
-### **Anonymous** — August 29, 2013 at 3:50 am ([permalink](https://www.codenameone.com/blog/completion-ios-7-update-and-the-20m-mark.html#comment-21788))
+
+### **Anonymous** — August 29, 2013 at 3:50 am ([permalink](/blog/completion-ios-7-update-and-the-20m-mark/#comment-21788))
 
 > Anonymous says:
 >
@@ -139,34 +139,34 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The dangers of Copy & Paste…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcompletion-ios-7-update-and-the-20m-mark.html)
 
 
-### **Anonymous** — September 11, 2014 at 1:25 pm ([permalink](https://www.codenameone.com/blog/completion-ios-7-update-and-the-20m-mark.html#comment-22224))
+
+### **Anonymous** — September 11, 2014 at 1:25 pm ([permalink](/blog/completion-ios-7-update-and-the-20m-mark/#comment-22224))
 
 > Anonymous says:
 >
 > Is there any setModel method to pass the autocomplete data other than putting it in the contructor
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcompletion-ios-7-update-and-the-20m-mark.html)
 
 
-### **Anonymous** — September 12, 2014 at 6:12 am ([permalink](https://www.codenameone.com/blog/completion-ios-7-update-and-the-20m-mark.html#comment-22061))
+
+### **Anonymous** — September 12, 2014 at 6:12 am ([permalink](/blog/completion-ios-7-update-and-the-20m-mark/#comment-22061))
 
 > Anonymous says:
 >
 > No but you can override the filter method to get more elaborate filtering capabilities.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcompletion-ios-7-update-and-the-20m-mark.html)
 
 
-### **Anonymous** — January 27, 2015 at 6:55 am ([permalink](https://www.codenameone.com/blog/completion-ios-7-update-and-the-20m-mark.html#comment-22294))
+
+### **Anonymous** — January 27, 2015 at 6:55 am ([permalink](/blog/completion-ios-7-update-and-the-20m-mark/#comment-22294))
 
 > Anonymous says:
 >
 > always saying “you can filter”. please show us one example..
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcompletion-ios-7-update-and-the-20m-mark.html)
+
 
 ---
 

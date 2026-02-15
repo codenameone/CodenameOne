@@ -27,22 +27,22 @@ Note that this only applies to the send email via cloud API’s and not to the s
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — August 14, 2018 at 12:39 pm ([permalink](https://www.codenameone.com/blog/sendgrid-cn1lib.html#comment-23792))
+### **Francesco Galgani** — August 14, 2018 at 12:39 pm ([permalink](/blog/sendgrid-cn1lib/#comment-23792))
 
 > Francesco Galgani says:
 >
 > Thank you. I suppose that you suggest to replace the use of `Message.sendMessageViaCloudSync`, while we can continue to use the `Log.sendLog`, right?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsendgrid-cn1lib.html)
 
 
-### **Shai Almog** — August 15, 2018 at 3:24 am ([permalink](https://www.codenameone.com/blog/sendgrid-cn1lib.html#comment-23963))
+
+### **Shai Almog** — August 15, 2018 at 3:24 am ([permalink](/blog/sendgrid-cn1lib/#comment-23963))
 
 > Shai Almog says:
 >
 > Yes!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsendgrid-cn1lib.html)
+
 
 ---
 

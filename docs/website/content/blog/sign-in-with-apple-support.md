@@ -118,7 +118,7 @@ Some screenshots from the demo:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Javier Anton** — April 1, 2020 at 12:30 pm ([permalink](https://www.codenameone.com/blog/sign-in-with-apple-support.html#comment-21373))
+### **Javier Anton** — April 1, 2020 at 12:30 pm ([permalink](/blog/sign-in-with-apple-support/#comment-21373))
 
 > This cn1 lib breaks the host app that imports it at compile time. The reason is that the native javase bit of the lib has incorrect package names and some imports aren’t available (in AppleSignInNativeImpl and WebViewBrowserWindow). The host app will compile when manually commenting these things out, but it might be worth updating the cn1lib so it doesn’t throw these errors as currently the native interface gets reset to faulty code each time the cn1lib is refreshed
 >
@@ -128,10 +128,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Could it be that java.io.StringReader was used instead of com.codename1.util .regex.StringReader?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsign-in-with-apple-support.html)
 
 
-### **Steve Hannah** — April 1, 2020 at 1:52 pm ([permalink](https://www.codenameone.com/blog/sign-in-with-apple-support.html#comment-21375))
+
+### **Steve Hannah** — April 1, 2020 at 1:52 pm ([permalink](/blog/sign-in-with-apple-support/#comment-21375))
 
 > [Steve Hannah](https://lh3.googleusercontent.com/a-/AAuE7mBmUCgKSZtJ2cqeHgj6bdPY2AAQ10roHlMpgRWc) says:
 >
@@ -139,17 +139,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The gist of it is that the build.xml file needs to be updated, and you need to run an update libs. This won’t be needed for long as the build.xml file will come updated with the next plugin update.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsign-in-with-apple-support.html)
 
 
-### **Javier Anton** — April 1, 2020 at 2:40 pm ([permalink](https://www.codenameone.com/blog/sign-in-with-apple-support.html#comment-21374))
+
+### **Javier Anton** — April 1, 2020 at 2:40 pm ([permalink](/blog/sign-in-with-apple-support/#comment-21374))
 
 > [Javier Anton](https://lh3.googleusercontent.com/a-/AAuE7mDRjHkEvAZNXquh9p7Oo00ey1yOwNzZ0SrFwD0IVA) says:
 >
 > I’ll wait until the next update then as I don’t need this right now, was just toying with it in preparation of Apple making this a requirement (apparently that has been rolled back to June last I heard because of the coronavirus crisis)  
 > Thanks for this
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsign-in-with-apple-support.html)
+
 
 ---
 

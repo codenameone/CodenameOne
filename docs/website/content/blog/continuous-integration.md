@@ -57,22 +57,22 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — December 8, 2014 at 3:40 pm ([permalink](https://www.codenameone.com/blog/continuous-integration.html#comment-22236))
+### **Anonymous** — December 8, 2014 at 3:40 pm ([permalink](/blog/continuous-integration/#comment-22236))
 
 > Anonymous says:
 >
 > Thanks, this is a great addition to Codename One, any chances it will have some basic support to Pro users ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcontinuous-integration.html)
 
 
-### **Anonymous** — December 9, 2014 at 11:52 am ([permalink](https://www.codenameone.com/blog/continuous-integration.html#comment-24241))
+
+### **Anonymous** — December 9, 2014 at 11:52 am ([permalink](/blog/continuous-integration/#comment-24241))
 
 > Anonymous says:
 >
 > That is unlikely, too much server load.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcontinuous-integration.html)
+
 
 ---
 

@@ -103,16 +103,16 @@ is pretty relevant to the subject of this post.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **James Hastings** — July 6, 2015 at 5:19 pm ([permalink](https://www.codenameone.com/blog/java-8-support.html#comment-22329))
+### **James Hastings** — July 6, 2015 at 5:19 pm ([permalink](/blog/java-8-support/#comment-22329))
 
 > James Hastings says:
 >
 > This is great news. What about the localdate class? I have a program I wrote that uses a bunch of localdate functionality that I wanted to port into a mobile app. Refactoring everything to Calendar and Date objects has kept this on the backburner for me.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-8-support.html)
 
 
-### **Shai Almog** — July 7, 2015 at 5:47 am ([permalink](https://www.codenameone.com/blog/java-8-support.html#comment-22434))
+
+### **Shai Almog** — July 7, 2015 at 5:47 am ([permalink](/blog/java-8-support/#comment-22434))
 
 > Shai Almog says:
 >
@@ -121,39 +121,39 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I feel your pain, every Java developer who dealt with dates in any way hates Calendar/Date. I am looking forward to migrating to something decent, but that might be a while.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-8-support.html)
 
 
-### **Codrut Gusoi** — July 7, 2015 at 6:39 pm ([permalink](https://www.codenameone.com/blog/java-8-support.html#comment-21543))
+
+### **Codrut Gusoi** — July 7, 2015 at 6:39 pm ([permalink](/blog/java-8-support/#comment-21543))
 
 > Codrut Gusoi says:
 >
 > Yay lambdas!  
 > Brace yourselves, assertException() is coming… at least when I will have time for a pull request.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-8-support.html)
 
 
-### **Sanny Sanoff** — August 2, 2015 at 10:52 am ([permalink](https://www.codenameone.com/blog/java-8-support.html#comment-22356))
+
+### **Sanny Sanoff** — August 2, 2015 at 10:52 am ([permalink](/blog/java-8-support/#comment-22356))
 
 > Sanny Sanoff says:
 >
 > Will they (lambdas) work on Android, too? How do you implement this feature if you just pass user java to dalvik?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-8-support.html)
 
 
-### **Shai Almog** — August 4, 2015 at 4:27 am ([permalink](https://www.codenameone.com/blog/java-8-support.html#comment-22150))
+
+### **Shai Almog** — August 4, 2015 at 4:27 am ([permalink](/blog/java-8-support/#comment-22150))
 
 > Shai Almog says:
 >
 > Yes.  
 > It works on all platforms even J2ME since it uses retrolambda on the server before the main processing of the bytecode.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-8-support.html)
 
 
-### **Martin Grajcar** — November 27, 2019 at 2:21 pm ([permalink](https://www.codenameone.com/blog/java-8-support.html#comment-24272))
+
+### **Martin Grajcar** — November 27, 2019 at 2:21 pm ([permalink](/blog/java-8-support/#comment-24272))
 
 > [Martin Grajcar](https://lh6.googleusercontent.com/-gclegbxVkVE/AAAAAAAAAAI/AAAAAAAAAAA/ACHi3reP0qIwi57AHP6gC6BhvXA4p34zZA/photo.jpg) says:
 >
@@ -161,16 +161,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Do retrolambdas retain the reference to the enclosing class?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-8-support.html)
 
 
-### **Shai Almog** — November 28, 2019 at 2:25 am ([permalink](https://www.codenameone.com/blog/java-8-support.html#comment-24271))
+
+### **Shai Almog** — November 28, 2019 at 2:25 am ([permalink](/blog/java-8-support/#comment-24271))
 
 > Shai Almog says:
 >
 > Retrolambda translates Java 8 lambdas to inner classes internally. Lambdas use `this` as a reference to their surrounding class so they have a reference to their parent just like non-static inner classes.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-8-support.html)
+
 
 ---
 

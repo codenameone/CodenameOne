@@ -717,7 +717,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — December 23, 2013 at 11:14 am ([permalink](https://www.codenameone.com/blog/release-notes-for-codename-one-201.html#comment-21835))
+### **Anonymous** — December 23, 2013 at 11:14 am ([permalink](/blog/release-notes-for-codename-one-201/#comment-21835))
 
 > Anonymous says:
 >
@@ -725,52 +725,52 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can’t wait, right on time!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frelease-notes-for-codename-one-201.html)
 
 
-### **Anonymous** — December 24, 2013 at 3:19 am ([permalink](https://www.codenameone.com/blog/release-notes-for-codename-one-201.html#comment-21659))
+
+### **Anonymous** — December 24, 2013 at 3:19 am ([permalink](/blog/release-notes-for-codename-one-201/#comment-21659))
 
 > Anonymous says:
 >
 > this is literally the best xmas gift im getting this year 😀 awesome work guys love that list of fixes!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frelease-notes-for-codename-one-201.html)
 
 
-### **Anonymous** — December 26, 2013 at 1:32 pm ([permalink](https://www.codenameone.com/blog/release-notes-for-codename-one-201.html#comment-21716))
+
+### **Anonymous** — December 26, 2013 at 1:32 pm ([permalink](/blog/release-notes-for-codename-one-201/#comment-21716))
 
 > Anonymous says:
 >
 > Thanks so much guys… You rock
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frelease-notes-for-codename-one-201.html)
 
 
-### **Anonymous** — December 31, 2013 at 9:45 am ([permalink](https://www.codenameone.com/blog/release-notes-for-codename-one-201.html#comment-21828))
+
+### **Anonymous** — December 31, 2013 at 9:45 am ([permalink](/blog/release-notes-for-codename-one-201/#comment-21828))
 
 > Anonymous says:
 >
 > This is awesome! I’m proud of you guys…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frelease-notes-for-codename-one-201.html)
 
 
-### **Anonymous** — February 11, 2014 at 10:18 am ([permalink](https://www.codenameone.com/blog/release-notes-for-codename-one-201.html#comment-21836))
+
+### **Anonymous** — February 11, 2014 at 10:18 am ([permalink](/blog/release-notes-for-codename-one-201/#comment-21836))
 
 > Anonymous says:
 >
 > where is it?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frelease-notes-for-codename-one-201.html)
 
 
-### **Anonymous** — February 11, 2014 at 1:44 pm ([permalink](https://www.codenameone.com/blog/release-notes-for-codename-one-201.html#comment-21682))
+
+### **Anonymous** — February 11, 2014 at 1:44 pm ([permalink](/blog/release-notes-for-codename-one-201/#comment-21682))
 
 > Anonymous says:
 >
 > Everywhere. If you use the plugin and keep it up to date you are always on the latest version.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frelease-notes-for-codename-one-201.html)
+
 
 ---
 

@@ -35,13 +35,13 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — August 10, 2013 at 11:36 am ([permalink](https://www.codenameone.com/blog/ota-device-skin-downloads.html#comment-21714))
+### **Anonymous** — August 10, 2013 at 11:36 am ([permalink](/blog/ota-device-skin-downloads/#comment-21714))
 
 > Anonymous says:
 >
 > Cool feature..very usefull
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fota-device-skin-downloads.html)
+
 
 ---
 

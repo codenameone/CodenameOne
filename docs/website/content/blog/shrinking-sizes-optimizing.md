@@ -62,13 +62,13 @@ to scan the state machine class intelligently.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jeff Brower** — October 18, 2015 at 1:22 pm ([permalink](https://www.codenameone.com/blog/shrinking-sizes-optimizing.html#comment-22421))
+### **Jeff Brower** — October 18, 2015 at 1:22 pm ([permalink](/blog/shrinking-sizes-optimizing/#comment-22421))
 
 > Jeff Brower says:
 >
 > I am impressed that I received an email from you directing me to this link when my build went over size. Anyone else would just consider a great opportunity to upsell me and not be so helpful. I was disappointed that I ran over my maximum size by just doing a straight compile of one of the sample CodenameOne programs in Netbeans (even though it was Kitchen Sink), but now I know why and how to fix it!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fshrinking-sizes-optimizing.html)
+
 
 ---
 

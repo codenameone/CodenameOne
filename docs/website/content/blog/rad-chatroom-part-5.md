@@ -100,56 +100,56 @@ In this tutorial we created a mock chat application in order to demostrate the C
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Gareth Murfin** — May 29, 2020 at 10:28 am ([permalink](https://www.codenameone.com/blog/rad-chatroom-part-5.html#comment-21408))
+### **Gareth Murfin** — May 29, 2020 at 10:28 am ([permalink](/blog/rad-chatroom-part-5/#comment-21408))
 
 > Super cool!!.. is there a github link for the finished product so we can check it out? I think you should cover the server side too to be honest, what would it link to, firebase?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frad-chatroom-part-5.html)
 
 
-### **Steve Hannah** — May 29, 2020 at 3:09 pm ([permalink](https://www.codenameone.com/blog/rad-chatroom-part-5.html#comment-21411))
+
+### **Steve Hannah** — May 29, 2020 at 3:09 pm ([permalink](/blog/rad-chatroom-part-5/#comment-21411))
 
 > I’ll likely add some sample servers at some point, but that isn’t really the focus here. Most people will either want to roll their own server anyways. There are so many different server-side technologies out there, and most devs are already married to one or another, so a sample server would basically just be to make the demo more interactive. 
 >
 > The most likely “server-side” sample would be to plug this into the existing WebSockets chat demo.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frad-chatroom-part-5.html)
 
 
-### **Lukman Jaji** — May 29, 2020 at 7:29 pm ([permalink](https://www.codenameone.com/blog/rad-chatroom-part-5.html#comment-21410))
+
+### **Lukman Jaji** — May 29, 2020 at 7:29 pm ([permalink](/blog/rad-chatroom-part-5/#comment-21410))
 
 > [Lukman Jaji](https://lh3.googleusercontent.com/a-/AOh14Gjee6sridKOKBngKXUpIHSBJjBaoJbuEK3h_iRT) says:
 >
 > Hi Steve. This is really cool. However, I installed the ap for this. When I snapped a photo, there is some delay before the photo is added to the chat. I am guessing it’s some resizing operations going on? No?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frad-chatroom-part-5.html)
 
 
-### **Steve Hannah** — May 29, 2020 at 9:41 pm ([permalink](https://www.codenameone.com/blog/rad-chatroom-part-5.html#comment-21409))
+
+### **Steve Hannah** — May 29, 2020 at 9:41 pm ([permalink](/blog/rad-chatroom-part-5/#comment-21409))
 
 > [Steve Hannah](https://lh3.googleusercontent.com/a-/AAuE7mBmUCgKSZtJ2cqeHgj6bdPY2AAQ10roHlMpgRWc) says:
 >
 > Thanks for reminding me. This has been reported by some other users as well. Yes, it is likely related to hi-res cameras and taking some time to resize the photos. This can be resolved by providing size parameters to the capturePhoto() method. I’ll be updating the sample to do this soon.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frad-chatroom-part-5.html)
 
 
-### **Gareth Murfin** — July 14, 2020 at 10:52 pm ([permalink](https://www.codenameone.com/blog/rad-chatroom-part-5.html#comment-24296))
+
+### **Gareth Murfin** — July 14, 2020 at 10:52 pm ([permalink](/blog/rad-chatroom-part-5/#comment-24296))
 
 > [Gareth Murfin](https://lh3.googleusercontent.com/a-/AOh14GiKSl5jm7N1Rsw8eobcYTOzEcg7dMk62FKKC_SboA) says:
 >
 > I’d like to see a way that we can link this chat system to firebase. Is there any starting point for this? examples etc in cn1.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frad-chatroom-part-5.html)
 
 
-### **Shai Almog** — July 15, 2020 at 2:33 am ([permalink](https://www.codenameone.com/blog/rad-chatroom-part-5.html#comment-24295))
+
+### **Shai Almog** — July 15, 2020 at 2:33 am ([permalink](/blog/rad-chatroom-part-5/#comment-24295))
 
 > Shai Almog says:
 >
 > We don’t have builtin support for firebase features other than push at this time.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Frad-chatroom-part-5.html)
+
 
 ---
 

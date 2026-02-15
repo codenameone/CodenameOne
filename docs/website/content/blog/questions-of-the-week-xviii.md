@@ -147,7 +147,7 @@ The title is misleading, the real issue relates to the different style objects f
 
 ### How to handle a button pressed when it’s in a list cell
 
-The short answer is “don’t”. Use a `Container` as we explain in the [List JavaDocs](https://www.codenameone.com/javadoc/com/codename1/ui/List.html)…​d
+The short answer is “don’t”. Use a `Container` as we explain in the [List JavaDocs](/javadoc/com/codename1/ui/List/)…​d
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38773910/how-to-handle-a-button-pressed-when-its-in-a-list-cell)
 

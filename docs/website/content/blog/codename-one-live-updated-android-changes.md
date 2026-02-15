@@ -53,7 +53,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — December 16, 2013 at 7:37 pm ([permalink](https://www.codenameone.com/blog/codename-one-live-updated-android-changes.html#comment-22001))
+### **Anonymous** — December 16, 2013 at 7:37 pm ([permalink](/blog/codename-one-live-updated-android-changes/#comment-22001))
 
 > Anonymous says:
 >
@@ -63,10 +63,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There is a Hackathon coming up here Thu/Fri and I would like to delve again into your framework but would prefer 2.0 if is already out.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-live-updated-android-changes.html)
 
 
-### **Anonymous** — December 17, 2013 at 2:54 am ([permalink](https://www.codenameone.com/blog/codename-one-live-updated-android-changes.html#comment-21859))
+
+### **Anonymous** — December 17, 2013 at 2:54 am ([permalink](/blog/codename-one-live-updated-android-changes/#comment-21859))
 
 > Anonymous says:
 >
@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > With a cloud service version releases have a very different meaning.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-live-updated-android-changes.html)
+
 
 ---
 

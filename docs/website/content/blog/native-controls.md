@@ -66,7 +66,7 @@ You can use the `NTextField` like this:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Ch Hjelm** — February 1, 2019 at 12:30 pm ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-24110))
+### **Ch Hjelm** — February 1, 2019 at 12:30 pm ([permalink](/blog/native-controls/#comment-24110))
 
 > Ch Hjelm says:
 >
@@ -82,19 +82,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > When I look in the cn1 GitHub repository, I don’t see any ‘nui’ package…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-controls.html)
 
 
-### **shannah78** — February 1, 2019 at 1:01 pm ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-24101))
+
+### **shannah78** — February 1, 2019 at 1:01 pm ([permalink](/blog/native-controls/#comment-24101))
 
 > shannah78 says:
 >
 > When you first install the lib, you may need to do a clean and build once before it will pick up the native classes.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-controls.html)
 
 
-### **Ch Hjelm** — February 1, 2019 at 7:06 pm ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-24003))
+
+### **Ch Hjelm** — February 1, 2019 at 7:06 pm ([permalink](/blog/native-controls/#comment-24003))
 
 > Ch Hjelm says:
 >
@@ -117,53 +117,53 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I tried adding it to my Kitchensink example and there it works. Can my build files somehow be corrupted (and any tips on how to fix it – I’m no expert)?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-controls.html)
 
 
-### **Ch Hjelm** — February 2, 2019 at 9:57 am ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-24035))
+
+### **Ch Hjelm** — February 2, 2019 at 9:57 am ([permalink](/blog/native-controls/#comment-24035))
 
 > Ch Hjelm says:
 >
 > I tried a number of things, update the cn1 binaries, recompile my local copy of CN1 sources with Java 8, but nothing helped, I’m stuck with the above errors. Any help or suggestions for what I can investigate would be much appreciated 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-controls.html)
 
 
-### **Shai Almog** — February 3, 2019 at 4:26 am ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-24077))
+
+### **Shai Almog** — February 3, 2019 at 4:26 am ([permalink](/blog/native-controls/#comment-24077))
 
 > Shai Almog says:
 >
 > What’s the version of the build.xml file? It’s on the top of the file.  
 > Can you post a screenshot of your build classpath from the netbeans properties?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-controls.html)
 
 
-### **Ch Hjelm** — February 3, 2019 at 10:55 am ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-24104))
+
+### **Ch Hjelm** — February 3, 2019 at 10:55 am ([permalink](/blog/native-controls/#comment-24104))
 
 > Ch Hjelm says:
 >
 > I compared my class paths with the KitchenSink example, and realized I had deleted the lib/impl/, override/ and native/internal_tmp folders. I added them manually, and now it works. That reminded me of somewhere in the CN1 manual there’s a screenshot of the class path list in Netbeans saying don’t change this if you don’t know what you’re doing – I now realize why 🙂 Thanks a lot for pointing me in the right direction.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-controls.html)
 
 
-### **Ch Hjelm** — February 8, 2019 at 12:03 pm ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-24086))
+
+### **Ch Hjelm** — February 8, 2019 at 12:03 pm ([permalink](/blog/native-controls/#comment-24086))
 
 > Ch Hjelm says:
 >
 > I would like to use the NTextField in the login screen, and when that screen is shown, automatically enter edit mode for the email field. With a normal TextField I can use Form.setEditOnShow(emailField), but it doesn’t accept the NTextField. Is there some way to achieve the same effect when using the NTextField?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-controls.html)
 
 
-### **Shai Almog** — February 9, 2019 at 6:00 am ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-23966))
+
+### **Shai Almog** — February 9, 2019 at 6:00 am ([permalink](/blog/native-controls/#comment-23966))
 
 > Shai Almog says:
 >
 > No you can’t use it like that. However, you can add an onShow listener and start editing at that point which should be equivalent.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fnative-controls.html)
+
 
 ---
 

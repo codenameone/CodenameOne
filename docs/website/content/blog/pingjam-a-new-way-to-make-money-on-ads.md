@@ -83,7 +83,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — April 29, 2013 at 8:53 pm ([permalink](https://www.codenameone.com/blog/pingjam-a-new-way-to-make-money-on-ads.html#comment-21694))
+### **Anonymous** — April 29, 2013 at 8:53 pm ([permalink](/blog/pingjam-a-new-way-to-make-money-on-ads/#comment-21694))
 
 > Anonymous says:
 >
@@ -93,10 +93,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The source is here: [http://support.andromo.com/…](<http://support.andromo.com/kb/common-questions/pingjam-caller-id-ads>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpingjam-a-new-way-to-make-money-on-ads.html)
 
 
-### **Anonymous** — April 30, 2013 at 12:52 am ([permalink](https://www.codenameone.com/blog/pingjam-a-new-way-to-make-money-on-ads.html#comment-21759))
+
+### **Anonymous** — April 30, 2013 at 12:52 am ([permalink](/blog/pingjam-a-new-way-to-make-money-on-ads/#comment-21759))
 
 > Anonymous says:
 >
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Another benefit is that this is a relatively young network so your chances of reaching a “virgin” device are very high.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpingjam-a-new-way-to-make-money-on-ads.html)
+
 
 ---
 

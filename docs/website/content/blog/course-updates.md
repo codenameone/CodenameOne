@@ -37,23 +37,23 @@ Thanks!
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Michael Lindvall** — July 25, 2017 at 2:20 pm ([permalink](https://www.codenameone.com/blog/course-updates.html#comment-23470))
+### **Michael Lindvall** — July 25, 2017 at 2:20 pm ([permalink](/blog/course-updates/#comment-23470))
 
 > Michael Lindvall says:
 >
 > I thought the additional module for parse4cn1 was a great addition to the training.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcourse-updates.html)
 
 
-### **Shai Almog** — August 9, 2017 at 8:04 am ([permalink](https://www.codenameone.com/blog/course-updates.html#comment-23720))
+
+### **Shai Almog** — August 9, 2017 at 8:04 am ([permalink](/blog/course-updates/#comment-23720))
 
 > Shai Almog says:
 >
 > I would create new content with the GUI builder. There is no reason to redo things I already covered.  
 > GUI builder content takes longer to create as everything needs to be done via video and editing. The GUI builder is still evolving so it’s unclear when I’ll get to it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcourse-updates.html)
+
 
 ---
 

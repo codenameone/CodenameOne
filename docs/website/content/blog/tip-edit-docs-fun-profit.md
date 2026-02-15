@@ -81,7 +81,7 @@ The one hurdle is that the guide is written using asciidoc which is a simple lan
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — August 19, 2017 at 7:37 pm ([permalink](https://www.codenameone.com/blog/tip-edit-docs-fun-profit.html#comment-23761))
+### **Francesco Galgani** — August 19, 2017 at 7:37 pm ([permalink](/blog/tip-edit-docs-fun-profit/#comment-23761))
 
 > Thank you Shai.  
 > Are the wiki modifications by users automatically converted to the manual pages in the Codename One site without any check by the Codename One team?
@@ -89,16 +89,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I’ve seen few errors and several incompleteness in the manual and in the API about the code examples, I’ll try to contribute the next time that I’ll find something strange.  
 > Of course, I’m only an user of Codename One and I’m studying it, so at the moment I feel better to tell a problem in the “Issues page” of GitHub than to try to do changes by myself.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-edit-docs-fun-profit.html)
 
 
-### **Shai Almog** — August 20, 2017 at 4:58 am ([permalink](https://www.codenameone.com/blog/tip-edit-docs-fun-profit.html#comment-23434))
+
+### **Shai Almog** — August 20, 2017 at 4:58 am ([permalink](/blog/tip-edit-docs-fun-profit/#comment-23434))
 
 > No. We monitor the edits and review every change. Then when we choose we sync it to the site.
 >
 > Feel free to edit or clarify, worst case scenario we’ll fix mistakes or omissions.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftip-edit-docs-fun-profit.html)
+
 
 ---
 

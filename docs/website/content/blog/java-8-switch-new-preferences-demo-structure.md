@@ -64,14 +64,14 @@ new plugin implementation.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Maaike Z** — May 10, 2016 at 9:07 am ([permalink](https://www.codenameone.com/blog/java-8-switch-new-preferences-demo-structure.html#comment-21510))
+### **Maaike Z** — May 10, 2016 at 9:07 am ([permalink](/blog/java-8-switch-new-preferences-demo-structure/#comment-21510))
 
 > Can we also use the Java 8 Date/Time functions or is this just for running the plugin etc?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-8-switch-new-preferences-demo-structure.html)
 
 
-### **Shai Almog** — May 11, 2016 at 5:40 am ([permalink](https://www.codenameone.com/blog/java-8-switch-new-preferences-demo-structure.html#comment-22832))
+
+### **Shai Almog** — May 11, 2016 at 5:40 am ([permalink](/blog/java-8-switch-new-preferences-demo-structure/#comment-22832))
 
 > Shai Almog says:
 >
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There is an open source implementation of JSR 310 (date time) which we could possibly add (I already filed an RFE on that a while back) but I’m not sure how practical it is to add that.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjava-8-switch-new-preferences-demo-structure.html)
+
 
 ---
 

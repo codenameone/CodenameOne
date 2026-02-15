@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/wkwebview-prs/new-features-5.jpg)
 
-We still have features to cover from our summer vacation but we need to make a short de-tour through newer things that landed recently. One of the big highlights is the switch to [WKWebView](https://www.codenameone.com/blog/wkwebview.html). We effectively changed the default iOS browser component to `WKWebView` instead of `UIWebView`. This resolved warnings Apple started sending out to developers about using the out of date `UIWebView`.
+We still have features to cover from our summer vacation but we need to make a short de-tour through newer things that landed recently. One of the big highlights is the switch to [WKWebView](/blog/wkwebview/). We effectively changed the default iOS browser component to `WKWebView` instead of `UIWebView`. This resolved warnings Apple started sending out to developers about using the out of date `UIWebView`.
 
 This mostly went unnoticed by most developers as it should. But if your browser starts acting up this is the reason. There isn’t much we can do here as we knew that day would come where Apple will demand a switch.
 
@@ -48,13 +48,13 @@ The [second PR #2925](https://github.com/codenameone/CodenameOne/pull/2925) incl
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Durank** — October 22, 2019 at 8:54 pm ([permalink](https://www.codenameone.com/blog/wkwebview-prs.html#comment-24264))
+### **Durank** — October 22, 2019 at 8:54 pm ([permalink](/blog/wkwebview-prs/#comment-24264))
 
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
 > hi, In download the video library and I refresh my cn1 libs but the class VideoOptimizer isn’t imported. Please hel me.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fwkwebview-prs.html)
+
 
 ---
 

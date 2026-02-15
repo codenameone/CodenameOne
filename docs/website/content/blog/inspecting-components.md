@@ -48,40 +48,40 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — February 24, 2013 at 6:51 pm ([permalink](https://www.codenameone.com/blog/inspecting-components.html#comment-21637))
+### **Anonymous** — February 24, 2013 at 6:51 pm ([permalink](/blog/inspecting-components/#comment-21637))
 
 > Anonymous says:
 >
 > This feature sounds like exactly what I need. Where do I find it? I have the plugin version 1.0.33 and no updates available but I can’t find this tool
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finspecting-components.html)
 
 
-### **Anonymous** — February 25, 2013 at 4:53 am ([permalink](https://www.codenameone.com/blog/inspecting-components.html#comment-21728))
+
+### **Anonymous** — February 25, 2013 at 4:53 am ([permalink](/blog/inspecting-components/#comment-21728))
 
 > Anonymous says:
 >
 > I was sure it was there already… Updated the version to 34 right now so it has to be there now.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finspecting-components.html)
 
 
-### **Anonymous** — February 27, 2013 at 8:35 am ([permalink](https://www.codenameone.com/blog/inspecting-components.html#comment-21831))
+
+### **Anonymous** — February 27, 2013 at 8:35 am ([permalink](/blog/inspecting-components/#comment-21831))
 
 > Anonymous says:
 >
 > Very neat. Refresh doesn’t seem to work. I need to close the inspector dialog and re-open when I change forms to get an updated component tree.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finspecting-components.html)
 
 
-### **Anonymous** — February 27, 2013 at 9:12 am ([permalink](https://www.codenameone.com/blog/inspecting-components.html#comment-24248))
+
+### **Anonymous** — February 27, 2013 at 9:12 am ([permalink](/blog/inspecting-components/#comment-24248))
 
 > Anonymous says:
 >
 > Oops. Wrote the code but forgot to wire it. Will be fixed for the next update.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Finspecting-components.html)
+
 
 ---
 

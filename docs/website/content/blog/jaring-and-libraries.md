@@ -122,25 +122,25 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 6, 2014 at 10:32 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-22246))
+### **Anonymous** — October 6, 2014 at 10:32 am ([permalink](/blog/jaring-and-libraries/#comment-22246))
 
 > Anonymous says:
 >
 > Hello. Sorry for noob question, but I not fully understand, Codename1 supported JNI libraries? I have Android project with few JNI dependencies (source code – C/C++) and would be great to port this project to WinPhone/Blackberry, but I don’t understand is this real with Codename1?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjaring-and-libraries.html)
 
 
-### **Anonymous** — October 7, 2014 at 3:17 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-22259))
+
+### **Anonymous** — October 7, 2014 at 3:17 am ([permalink](/blog/jaring-and-libraries/#comment-22259))
 
 > Anonymous says:
 >
 > JNI makes sense on Android where you call from Java to C you can use JNI in the Android port by wrapping in an andlib. In iOS we support an Objective-C bridge not JNI so you can invoke your C code from objective-c. Blackberry has no ability to define native C code, in Windows Phone we support C# not C but you might be able to do something with unsafe although I haven’t tried this.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjaring-and-libraries.html)
 
 
-### **Anonymous** — October 16, 2014 at 11:42 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-22164))
+
+### **Anonymous** — October 16, 2014 at 11:42 am ([permalink](/blog/jaring-and-libraries/#comment-22164))
 
 > Anonymous says:
 >
@@ -148,10 +148,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m very skeptical about this claim after working with robovm, almost 99.99% of the time the arbitrary jar libraries that I downloaded from the internet and used worked out of the box.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjaring-and-libraries.html)
 
 
-### **Anonymous** — October 16, 2014 at 10:33 pm ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-22282))
+
+### **Anonymous** — October 16, 2014 at 10:33 pm ([permalink](/blog/jaring-and-libraries/#comment-22282))
 
 > Anonymous says:
 >
@@ -161,19 +161,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This can be OK for some games to hack something together, but its not an option if you need something to be forward compatible and warranted.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjaring-and-libraries.html)
 
 
-### **Anonymous** — October 18, 2014 at 7:19 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-21662))
+
+### **Anonymous** — October 18, 2014 at 7:19 am ([permalink](/blog/jaring-and-libraries/#comment-21662))
 
 > Anonymous says:
 >
 > the java.lang.*, java.util.*, etc in robovm are based on Android’s runtime, they don’t suffer from the size problems as in Java SE but still allows a lot of flexibility regarding the usage of third party libraries. I hope codenameone could learn something from robovm’s approach in using Java for IOS developement
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjaring-and-libraries.html)
 
 
-### **Anonymous** — October 18, 2014 at 8:54 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-22176))
+
+### **Anonymous** — October 18, 2014 at 8:54 am ([permalink](/blog/jaring-and-libraries/#comment-22176))
 
 > Anonymous says:
 >
@@ -185,10 +185,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > works for me right now != works for all use cases always
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjaring-and-libraries.html)
 
 
-### **Anonymous** — October 24, 2014 at 4:07 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-21926))
+
+### **Anonymous** — October 24, 2014 at 4:07 am ([permalink](/blog/jaring-and-libraries/#comment-21926))
 
 > Anonymous says:
 >
@@ -200,10 +200,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > an analogy to this could be the python run-time app in Symbian.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjaring-and-libraries.html)
 
 
-### **Anonymous** — October 24, 2014 at 10:02 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-22052))
+
+### **Anonymous** — October 24, 2014 at 10:02 am ([permalink](/blog/jaring-and-libraries/#comment-22052))
 
 > Anonymous says:
 >
@@ -211,19 +211,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Both RoboVM and us take a very similar approach with the difference that we took a far more conservative route.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjaring-and-libraries.html)
 
 
-### **Anonymous** — November 24, 2014 at 6:16 pm ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-21927))
+
+### **Anonymous** — November 24, 2014 at 6:16 pm ([permalink](/blog/jaring-and-libraries/#comment-21927))
 
 > Anonymous says:
 >
 > I think i can use codename one for my project, but I wonder if It’ll support some complex libraries like Picasso or retrofit… and as there is no iOS alternative for those libraries what can i do about it. If not i may try it anyway for less complex projects. Thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjaring-and-libraries.html)
 
 
-### **Anonymous** — November 25, 2014 at 4:50 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-22309))
+
+### **Anonymous** — November 25, 2014 at 4:50 am ([permalink](/blog/jaring-and-libraries/#comment-22309))
 
 > Anonymous says:
 >
@@ -233,7 +233,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Retrofit is nice but if you have access to the server a more portable (and much faster) approach would be to use the webservice wizard [http://www.codenameone.com/…]([http://www.codenameone.com/how-do-i—access-remote-webservices-perform-operations-on-the-server.html](http://www.codenameone.com/how-do-i---access-remote-webservices-perform-operations-on-the-server.html))
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fjaring-and-libraries.html)
+
 
 ---
 

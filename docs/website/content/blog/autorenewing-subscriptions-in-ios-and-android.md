@@ -11,7 +11,7 @@ author: Steve Hannah
 
 ![Header Image](/blog/autorenewing-subscriptions-in-ios-and-android/in-app-purchase.jpg)
 
-__ |  This is the third post in a three-part series on In-App purchase. Please check out [Part I: Introduction to In-App Purchase](https://www.codenameone.com/blog/intro-to-in-app-purchase.html) and [Part 2: Implementing Non-Renewable Subscriptions](https://www.codenameone.com/blog/in-app-purchase-non-renewable-subscriptions.html).   
+__ |  This is the third post in a three-part series on In-App purchase. Please check out [Part I: Introduction to In-App Purchase](/blog/intro-to-in-app-purchase/) and [Part 2: Implementing Non-Renewable Subscriptions](/blog/in-app-purchase-non-renewable-subscriptions/).   
 ---|---  
   
 Auto-renewable subscriptions provide, arguably, an easier path to recurring revenue than non-renewable subscriptions because all of the subscription stuff is handled by the app store. You defer almost entirely to the app store (iTunes for iOS, and Play for Android) for billing and management.
@@ -95,7 +95,7 @@ Open the project in Netbeans
 
 ![Edit persistence.xml file data source](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-persistence-file.png)
 
-If you’re not sure how to create a data source, see my [previous tutorial on connecting to a MySQL database](https://www.codenameone.com/blog/connecting-to-a-mysql-database-part-2.html).
+If you’re not sure how to create a data source, see my [previous tutorial on connecting to a MySQL database](/blog/connecting-to-a-mysql-database-part-2/).
 
 ### Testing the Project
 
@@ -734,14 +734,14 @@ Setting up in-app purchase is not for the faint of heart. Having to jump through
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — January 3, 2017 at 9:19 pm ([permalink](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html#comment-23265))
+### **bryan** — January 3, 2017 at 9:19 pm ([permalink](/blog/autorenewing-subscriptions-in-ios-and-android/#comment-23265))
 
 > Thanks Steve – great tutorial.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautorenewing-subscriptions-in-ios-and-android.html)
 
 
-### **salah Alhaddabi** — August 13, 2017 at 9:46 pm ([permalink](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html#comment-23501))
+
+### **salah Alhaddabi** — August 13, 2017 at 9:46 pm ([permalink](/blog/autorenewing-subscriptions-in-ios-and-android/#comment-23501))
 
 > Dear Steve,  
 > when I try to run the demo client, I get the following erros: (I have changed the package name to be com.salah.trails.iapdemo.IAPDemo)
@@ -772,17 +772,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > at java.awt.EventDispatchThread.pumpEvents([EventDispatchThread.java](<http://EventDispatchThread.java>):93)  
 > at [java.awt.EventDispatchThrea…](<http://java.awt.EventDispatchThread.run)([EventDispatchThread.java](http://EventDispatchThread.java)>:82)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautorenewing-subscriptions-in-ios-and-android.html)
 
 
-### **Shai Almog** — August 14, 2017 at 7:04 am ([permalink](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html#comment-23511))
+
+### **Shai Almog** — August 14, 2017 at 7:04 am ([permalink](/blog/autorenewing-subscriptions-in-ios-and-android/#comment-23511))
 
 > You refactored the package name without updating it in the [codenameone_settings.proper…](<http://codenameone_settings.properties>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautorenewing-subscriptions-in-ios-and-android.html)
 
 
-### **Brenden** — June 11, 2019 at 9:15 am ([permalink](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html#comment-24009))
+
+### **Brenden** — June 11, 2019 at 9:15 am ([permalink](/blog/autorenewing-subscriptions-in-ios-and-android/#comment-24009))
 
 > Dear Steve
 >
@@ -790,18 +790,18 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Regards Brenden
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautorenewing-subscriptions-in-ios-and-android.html)
 
 
-### **Shai Almog** — June 12, 2019 at 4:11 am ([permalink](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html#comment-24099))
+
+### **Shai Almog** — June 12, 2019 at 4:11 am ([permalink](/blog/autorenewing-subscriptions-in-ios-and-android/#comment-24099))
 
 > Hi,  
 > it should work fine locally but you need to still configure everything in itunes connect otherwise it won’t work.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautorenewing-subscriptions-in-ios-and-android.html)
 
 
-### **Rochana Sawatzky** — November 27, 2019 at 1:36 am ([permalink](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html#comment-24269))
+
+### **Rochana Sawatzky** — November 27, 2019 at 1:36 am ([permalink](/blog/autorenewing-subscriptions-in-ios-and-android/#comment-24269))
 
 > Hey Steve – no matter what I seem to do, when trying to ant-install deps I get the error:
 >
@@ -809,16 +809,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I have installed maven, and added it to my path, as well as adding maven_home, m2_home, java_home environment variables. I can run mvn -version fine, so I’m at a loss for why I’m getting the error. Any ideas?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautorenewing-subscriptions-in-ios-and-android.html)
 
 
-### **Shai Almog** — November 27, 2019 at 2:59 am ([permalink](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html#comment-24267))
+
+### **Shai Almog** — November 27, 2019 at 2:59 am ([permalink](/blog/autorenewing-subscriptions-in-ios-and-android/#comment-24267))
 
 > If you added it to the path in Windows GUI it might not impact the currently open shell. If you’re using windows shell this might conflict with spaces you have in the path so make sure you use quotes e.g. `set PATH=”PATH TO MAVEN”;%PATH%`
 >
 > If this doesn’t help try to provide more details about your environment so we can help.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautorenewing-subscriptions-in-ios-and-android.html)
+
 
 ---
 

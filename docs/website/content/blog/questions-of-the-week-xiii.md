@@ -133,7 +133,7 @@ these questions pave the way to a smoother overall process…​
 
 ### Getting an OOM when rendering Bitmap for videoPlayer
 
-Peer components are a pain, it’s a good thing we are looking into a [major ovehaul for them](https://www.codenameone.com/blog/peering-revisited.html)…​
+Peer components are a pain, it’s a good thing we are looking into a [major ovehaul for them](/blog/peering-revisited/)…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38135558/getting-an-oom-when-rendering-bitmap-for-videoplayer-in-codename-one-app)
 

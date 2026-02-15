@@ -31,7 +31,7 @@ Even if we ask you for a change we really appreciate the involvement as we think
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **João Bastos** — February 19, 2017 at 9:53 am ([permalink](https://www.codenameone.com/blog/questions-of-the-week-42.html#comment-23019))
+### **João Bastos** — February 19, 2017 at 9:53 am ([permalink](/blog/questions-of-the-week-42/#comment-23019))
 
 > João Bastos says:
 >
@@ -47,16 +47,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Just a thought, dont know if it already exists, but havent found it.  
 > P.S.- I know i should get my feet wet…but lets go one step at a time
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fquestions-of-the-week-42.html)
 
 
-### **Shai Almog** — February 20, 2017 at 8:28 am ([permalink](https://www.codenameone.com/blog/questions-of-the-week-42.html#comment-22823))
+
+### **Shai Almog** — February 20, 2017 at 8:28 am ([permalink](/blog/questions-of-the-week-42/#comment-22823))
 
 > Shai Almog says:
 >
 > Go ahead and contribute this, it’s easy. I would recommend using a varargs argument so one can submit only some of the lines and not all 4 so it will be setTextLines(String… lines).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fquestions-of-the-week-42.html)
+
 
 ---
 

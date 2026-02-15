@@ -140,28 +140,28 @@ I hope to address all of those quicker than I got around to doing this installme
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **3lix** — February 11, 2018 at 2:19 am ([permalink](https://www.codenameone.com/blog/pixel-perfect-text-input.html#comment-24137))
+### **3lix** — February 11, 2018 at 2:19 am ([permalink](/blog/pixel-perfect-text-input/#comment-24137))
 
 > Is there a way I can get the same code above to produce the Android style on IOS using the TextComponent?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpixel-perfect-text-input.html)
 
 
-### **Shai Almog** — February 11, 2018 at 7:32 am ([permalink](https://www.codenameone.com/blog/pixel-perfect-text-input.html#comment-23828))
 
-> Are you referring to this API or the improved one from part 2: [https://www.codenameone.com…](<https://www.codenameone.com/blog/pixel-perfect-text-input-part-2.html>)
+### **Shai Almog** — February 11, 2018 at 7:32 am ([permalink](/blog/pixel-perfect-text-input/#comment-23828))
+
+> Are you referring to this API or the improved one from part 2: [https://www.codenameone.com…](</blog/pixel-perfect-text-input-part-2/>)
 >
 > Generally you can get this to work by styling the text and defining the theme constants in your theme to make it look like the Android version. After working with the Uber app one of my conclusions is that we need a Material theme that’s cross platform. I’m not sure when I’ll get around to do that but I think it’s generally a good idea to offer that as one of the options. I have some thoughts on this that I still need to define as there are some edge cases.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpixel-perfect-text-input.html)
 
 
-### **3lix** — February 11, 2018 at 5:22 pm ([permalink](https://www.codenameone.com/blog/pixel-perfect-text-input.html#comment-23756))
+
+### **3lix** — February 11, 2018 at 5:22 pm ([permalink](/blog/pixel-perfect-text-input/#comment-23756))
 
 > I meant the API from part 2. I just noticed the newly added theme constants! Thanks  
 > +1 for cross platform Material theme.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fpixel-perfect-text-input.html)
+
 
 ---
 

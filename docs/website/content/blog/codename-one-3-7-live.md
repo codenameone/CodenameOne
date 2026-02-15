@@ -28,7 +28,7 @@ Codename One is the only platform that…​
 
   * Lets you use native widgets (views) and mix them with Codename One components within the same hierarchy (heavyweight/lightweight mixing)
 
-To learn more about Codename One check out the [about page](/about.html) you can [download it for free right now](/download.html).
+To learn more about Codename One check out the [about page](/about-us/) you can [download it for free right now](/getting-started/).
 
 ### From Lowlight to Feature
 
@@ -109,7 +109,7 @@ Thanks for reading this far and if you have any thoughts/suggestions of any kind
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Dalvik** — June 27, 2017 at 1:11 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23423))
+### **Dalvik** — June 27, 2017 at 1:11 pm ([permalink](/blog/codename-one-3-7-live/#comment-23423))
 
 > Dalvik says:
 >
@@ -117,7 +117,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I really like the drag and drop UI of the GUI builder, it’s pretty smooth… Was it built with JavaFX?
 
 
-### **Shai Almog** — June 27, 2017 at 1:16 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-24208))
+### **Shai Almog** — June 27, 2017 at 1:16 pm ([permalink](/blog/codename-one-3-7-live/#comment-24208))
 
 > Shai Almog says:
 >
@@ -125,7 +125,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > No, it’s actually written in Codename One… Just like the Codename One Settings. Just goes to show you what you can do with some attention to detail.
 
 
-### **Mac Flanegan** — June 27, 2017 at 1:30 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23525))
+### **Mac Flanegan** — June 27, 2017 at 1:30 pm ([permalink](/blog/codename-one-3-7-live/#comment-23525))
 
 > Mac Flanegan says:
 >
@@ -134,7 +134,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > PS: In Delphi this feature is called “Anchors” what I think would be a more appropriate name.
 
 
-### **Shai Almog** — June 27, 2017 at 1:37 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-24149))
+### **Shai Almog** — June 27, 2017 at 1:37 pm ([permalink](/blog/codename-one-3-7-live/#comment-24149))
 
 > Shai Almog says:
 >
@@ -145,14 +145,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I was for constraints and in Java there is a Spring layout (which I glad he didn’t pick as Spring is already deeply used in Java).
 
 
-### **Pugazhendi E** — June 27, 2017 at 1:46 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23217))
+### **Pugazhendi E** — June 27, 2017 at 1:46 pm ([permalink](/blog/codename-one-3-7-live/#comment-23217))
 
 > Pugazhendi E says:
 >
 > Congrats 🙂
 
 
-### **Mac Flanegan** — June 28, 2017 at 5:08 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23572))
+### **Mac Flanegan** — June 28, 2017 at 5:08 pm ([permalink](/blog/codename-one-3-7-live/#comment-23572))
 
 > Mac Flanegan says:
 >
@@ -165,14 +165,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > But again, congratulations to the new features …
 
 
-### **Shai Almog** — June 29, 2017 at 3:54 am ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23580))
+### **Shai Almog** — June 29, 2017 at 3:54 am ([permalink](/blog/codename-one-3-7-live/#comment-23580))
 
 > Shai Almog says:
 >
 > Autolayout is a term used in iOS so we chose it to keep it familiar.
 
 
-### **Francesco Leoni** — June 29, 2017 at 6:35 am ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23589))
+### **Francesco Leoni** — June 29, 2017 at 6:35 am ([permalink](/blog/codename-one-3-7-live/#comment-23589))
 
 > Francesco Leoni says:
 >
@@ -182,7 +182,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > At present I can use the new GB interface only wher I create a brand new Form.
 
 
-### **Shai Almog** — June 29, 2017 at 8:56 am ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23459))
+### **Shai Almog** — June 29, 2017 at 8:56 am ([permalink](/blog/codename-one-3-7-live/#comment-23459))
 
 > Shai Almog says:
 >
@@ -190,7 +190,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Right now there are 3 modes:  
 > – Old GUI builder – that’s the old designer tool where we still have theming. That’s a completely separate tool with the state machine etc.  
-> You can use the conversion tool command line as explained here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/using-designer-command-line-options.html>) to convert that old GUI to the new GUI builder. Notice that it will not take advantage of the new auto-layout…
+> You can use the conversion tool command line as explained here: [https://www.codenameone.com…](</blog/using-designer-command-line-options/>) to convert that old GUI to the new GUI builder. Notice that it will not take advantage of the new auto-layout…
 >
 > – New GUI builder code created pre-3.7. These forms have auto-layout off by default for maximum compatibility as this might break some existing logic.
 >
@@ -199,7 +199,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > If you are referring to converting the GUI builder code pre-3.7 to post 3.7 you can easily do that but it will require a bit of hacking. Just open the .gui XML file and set the layout of the form to be layered layout. Then set autoLayout=”true” in the top level component tag. This will enable the new layout mode on an older form. Everything might be “messed up” after you do that which might require some work of fixing.
 
 
-### **Francesco Leoni** — June 29, 2017 at 7:55 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23636))
+### **Francesco Leoni** — June 29, 2017 at 7:55 pm ([permalink](/blog/codename-one-3-7-live/#comment-23636))
 
 > Francesco Leoni says:
 >
@@ -223,21 +223,21 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > at [com.codename1.impl.Codename…](<http://com.codename1.impl.CodenameOneThread.run)([CodenameOneThread.java](http://CodenameOneThread.java)>:176)
 
 
-### **Shai Almog** — June 30, 2017 at 3:59 am ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23349))
+### **Shai Almog** — June 30, 2017 at 3:59 am ([permalink](/blog/codename-one-3-7-live/#comment-23349))
 
 > Shai Almog says:
 >
 > Sorry, it seems I remembered this incorrectly and the attribute should be autolayout lower case not camel case.
 
 
-### **Francesco Galgani** — June 30, 2017 at 11:27 am ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23376))
+### **Francesco Galgani** — June 30, 2017 at 11:27 am ([permalink](/blog/codename-one-3-7-live/#comment-23376))
 
 > Francesco Galgani says:
 >
 > Are these new features (in particular the new Gui Builder) covered in the three courses of the Codename One Academy?
 
 
-### **Shai Almog** — June 30, 2017 at 12:46 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-7-live.html#comment-23518))
+### **Shai Almog** — June 30, 2017 at 12:46 pm ([permalink](/blog/codename-one-3-7-live/#comment-23518))
 
 > Shai Almog says:
 >

@@ -129,35 +129,35 @@ complete in time.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — October 19, 2016 at 12:50 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-22917))
+### **bryan** — October 19, 2016 at 12:50 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-22917))
 
 > bryan says:
 >
 > Just downloaded onto a device, and it looks nice. Good job.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-clean-modern-ui-kit.html)
 
 
-### **Ross Taylor** — October 19, 2016 at 9:27 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-22753))
+
+### **Ross Taylor** — October 19, 2016 at 9:27 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-22753))
 
 > Ross Taylor says:
 >
 > I was playing with the javascript port of the app from the browser. It looks good, but the app froze in the browser when accessing profile info and clicking on the search button. Not sure if this is the exact cause.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-clean-modern-ui-kit.html)
 
 
-### **Shai Almog** — October 20, 2016 at 2:10 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-22764))
+
+### **Shai Almog** — October 20, 2016 at 2:10 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-22764))
 
 > Shai Almog says:
 >
 > Thanks, I just added a search button for the look and didn’t test it.  
 > Turns out that the search bar feature doesn’t work with the layered toolbar mode
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-clean-modern-ui-kit.html)
 
 
-### **leroadrunner** — November 1, 2016 at 2:43 pm ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23024))
+
+### **leroadrunner** — November 1, 2016 at 2:43 pm ([permalink](/blog/template-clean-modern-ui-kit/#comment-23024))
 
 > leroadrunner says:
 >
@@ -167,19 +167,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I updated to latest plugin…what I am missing?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-clean-modern-ui-kit.html)
 
 
-### **Shai Almog** — November 2, 2016 at 1:36 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-22998))
+
+### **Shai Almog** — November 2, 2016 at 1:36 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-22998))
 
 > Shai Almog says:
 >
 > Go to settings and click the update client libs button to update the packaged libraries.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-clean-modern-ui-kit.html)
 
 
-### **leroadrunner** — November 2, 2016 at 1:01 pm ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-22909))
+
+### **leroadrunner** — November 2, 2016 at 1:01 pm ([permalink](/blog/template-clean-modern-ui-kit/#comment-22909))
 
 > leroadrunner says:
 >
@@ -187,29 +187,29 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Love this new design!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-clean-modern-ui-kit.html)
 
 
-### **salah Alhaddabi** — January 16, 2017 at 6:52 pm ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23017))
+
+### **salah Alhaddabi** — January 16, 2017 at 6:52 pm ([permalink](/blog/template-clean-modern-ui-kit/#comment-23017))
 
 > salah Alhaddabi says:
 >
 > Dear Shai, I have tested this app from the plugin in the simulator but found that in all forms the title area in the middle between the search button and the side menu symbol is always a black rectangle. I tried setting the TitleArea UIID transparency to zero but still didn’t work. The right and the left side of the toolbar are showing the background image but only the rectangle between the search button and the side menu symbol is black!!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-clean-modern-ui-kit.html)
 
 
-### **Shai Almog** — January 17, 2017 at 5:25 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23002))
+
+### **Shai Almog** — January 17, 2017 at 5:25 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-23002))
 
 > Shai Almog says:
 >
 > Can you provide a screenshot?  
 > How did you test the app? Did you use the wizard?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-clean-modern-ui-kit.html)
 
 
-### **salah Alhaddabi** — January 17, 2017 at 5:47 pm ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-22958))
+
+### **salah Alhaddabi** — January 17, 2017 at 5:47 pm ([permalink](/blog/template-clean-modern-ui-kit/#comment-22958))
 
 > salah Alhaddabi says:
 >
@@ -217,10 +217,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is a screen shot of the Profile form, for example, as you can see with a black rectangle on the middle of the tool bar. I have used the wizard as part of the demo that is bundled with the plugin. I have codename one plugin version 3.6 in netbeans. I have used the simulator in this screen shot.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-clean-modern-ui-kit.html)
 
 
-### **Shai Almog** — January 18, 2017 at 7:24 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23018))
+
+### **Shai Almog** — January 18, 2017 at 7:24 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-23018))
 
 > Shai Almog says:
 >
@@ -231,52 +231,52 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/c9a32186e7d4bcd03687b5cb0f7419f22edbe9f0330b60390c41682c17a8a880.png>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-clean-modern-ui-kit.html)
 
 
-### **salah Alhaddabi** — January 18, 2017 at 3:02 pm ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23296))
+
+### **salah Alhaddabi** — January 18, 2017 at 3:02 pm ([permalink](/blog/template-clean-modern-ui-kit/#comment-23296))
 
 > salah Alhaddabi says:
 >
 > Dear Shai, you are right. This is only happening with the iphone6plus skin. I am using netbeans 8.2. Does this mean if I deploy the app to a 6plus iPhone it will have the same issue??
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-clean-modern-ui-kit.html)
 
 
-### **Shai Almog** — January 19, 2017 at 6:27 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23243))
+
+### **Shai Almog** — January 19, 2017 at 6:27 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-23243))
 
 > Shai Almog says:
 >
 > No that’s a bug in the skin. We just fixed that. Can you please go to the more skins menu and update the skin from there. It should fix the problem after restarting the simulator.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-clean-modern-ui-kit.html)
 
 
-### **salah Alhaddabi** — January 19, 2017 at 8:08 pm ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-22991))
+
+### **salah Alhaddabi** — January 19, 2017 at 8:08 pm ([permalink](/blog/template-clean-modern-ui-kit/#comment-22991))
 
 > salah Alhaddabi says:
 >
 > Thanks a lot Shai. It’s working even better now with a very nice animation!!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-clean-modern-ui-kit.html)
 
 
-### **Faten Sahli** — April 27, 2017 at 9:58 pm ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23109))
+
+### **Faten Sahli** — April 27, 2017 at 9:58 pm ([permalink](/blog/template-clean-modern-ui-kit/#comment-23109))
 
 > Faten Sahli says:
 >
 > how can i downoald a template ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-clean-modern-ui-kit.html)
 
 
-### **Shai Almog** — April 28, 2017 at 5:41 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23505))
+
+### **Shai Almog** — April 28, 2017 at 5:41 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-23505))
 
 > Shai Almog says:
 >
 > It’s in the plugin
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ftemplate-clean-modern-ui-kit.html)
+
 
 ---
 

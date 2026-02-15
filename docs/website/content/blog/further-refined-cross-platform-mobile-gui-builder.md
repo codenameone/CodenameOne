@@ -82,7 +82,7 @@ can’t entertain every request/suggestion but we try to listen and base our wor
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **disqus** — October 12, 2016 at 4:14 pm ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-22874))
+### **disqus** — October 12, 2016 at 4:14 pm ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-22874))
 
 > Updated netbeans plugin to Version: 3.5.5. Post update GUI Builder button events not functional after update. On looking at the generated code found this  
 > public void actionPerformed(com.codename1.ui.events.ActionEvent ev) {  
@@ -102,61 +102,61 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Kindly fix the problem and let me know how can I do a dirty fix till then because this is generated code and gets overwritten everytime.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffurther-refined-cross-platform-mobile-gui-builder.html)
 
 
-### **Chen Fishbein** — October 12, 2016 at 6:33 pm ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-23051))
+
+### **Chen Fishbein** — October 12, 2016 at 6:33 pm ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-23051))
 
 > Thanks, it will be fixed for the next update.  
 > In the meantime you can just add an ActionListener to your Button right after the call to initGuiBuilderComponents
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffurther-refined-cross-platform-mobile-gui-builder.html)
 
 
-### **Chidiebere Okwudire** — November 1, 2016 at 10:02 am ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-23157))
+
+### **Chidiebere Okwudire** — November 1, 2016 at 10:02 am ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-23157))
 
 > How does the new GUI builder paradigm work with (UI) inheritance?
 >
 > Use case: Several forms share a lot in common (custom header/footer/common body layout). As such I would like to have a base form and in subsequent forms, include the form content in my custom body layout. A quick look didn’t reveal any obvious way to achieve this without overriding the Form.addComponent() methods…. Please share your thoughts on how this can best be realized
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffurther-refined-cross-platform-mobile-gui-builder.html)
 
 
-### **Shai Almog** — November 1, 2016 at 10:17 am ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-22974))
+
+### **Shai Almog** — November 1, 2016 at 10:17 am ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-22974))
 
 > We did just that in the new Phoenix demo, all forms derive from a common base form for the common side menu.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffurther-refined-cross-platform-mobile-gui-builder.html)
 
 
-### **Chidiebere Okwudire** — November 1, 2016 at 11:00 am ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-23173))
+
+### **Chidiebere Okwudire** — November 1, 2016 at 11:00 am ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-23173))
 
 > Chidiebere Okwudire says:
 >
 > Perfect timing. I’ll have a look!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffurther-refined-cross-platform-mobile-gui-builder.html)
 
 
-### **disqus** — November 5, 2016 at 8:59 pm ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-21506))
+
+### **disqus** — November 5, 2016 at 8:59 pm ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-21506))
 
 > disqus says:
 >
 > working in the new version of the plugin 3.5.7
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffurther-refined-cross-platform-mobile-gui-builder.html)
 
 
-### **Shai Almog** — November 6, 2016 at 4:23 am ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-23194))
+
+### **Shai Almog** — November 6, 2016 at 4:23 am ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-23194))
 
 > Shai Almog says:
 >
 > Right click the project. Select properties and click OK in the properties dialog. Try running the project again.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffurther-refined-cross-platform-mobile-gui-builder.html)
 
 
-### **Francesco Galgani** — June 16, 2017 at 1:30 pm ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-23514))
+
+### **Francesco Galgani** — June 16, 2017 at 1:30 pm ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-23514))
 
 > Francesco Galgani says:
 >
@@ -166,10 +166,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There is also a small bug both in the Gui Builder and in the Codename One Designer: some menu items are not shown when I click on the menu. For example, in the Gui Builder if I click on “File” I’ll see the underlying commands (Save, Exit), but if I move the mouse cursor to “Edit” or “Help” no commands underlying Edit or Help are shown (to get them, I have to click again on Edit or Help). In the Codename One Designer, the issue is a bit different: for example, I click on the menu voice “Codename One”, I see: Signup, Login, a blank space, Advanced. To see the “Live preview” item istead of the blank space (and other missing items replaced by blank spaces), I have to set the Look&Feel as cross-platform every time that I open the Designer (however I prefer the System Look&Feel).
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffurther-refined-cross-platform-mobile-gui-builder.html)
 
 
-### **Shai Almog** — June 17, 2017 at 7:08 am ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-23413))
+
+### **Shai Almog** — June 17, 2017 at 7:08 am ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-23413))
 
 > Shai Almog says:
 >
@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Also include screenshots with the issues as some of these things I don’t follow like the voice menu which isn’t something that’s a part of our app.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Ffurther-refined-cross-platform-mobile-gui-builder.html)
+
 
 ---
 

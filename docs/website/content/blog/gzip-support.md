@@ -57,31 +57,31 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — June 17, 2013 at 8:31 am ([permalink](https://www.codenameone.com/blog/gzip-support.html#comment-21691))
+### **Anonymous** — June 17, 2013 at 8:31 am ([permalink](/blog/gzip-support/#comment-21691))
 
 > Anonymous says:
 >
 > This is great news ! I will update my blog post about compression with this, keep up the good work !
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgzip-support.html)
 
 
-### **Anonymous** — February 6, 2014 at 5:47 am ([permalink](https://www.codenameone.com/blog/gzip-support.html#comment-21434))
+
+### **Anonymous** — February 6, 2014 at 5:47 am ([permalink](/blog/gzip-support/#comment-21434))
 
 > Anonymous says:
 >
 > Is it also supported on the WebBrowser component when fetching HTML?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgzip-support.html)
 
 
-### **Anonymous** — February 7, 2014 at 3:13 am ([permalink](https://www.codenameone.com/blog/gzip-support.html#comment-21767))
+
+### **Anonymous** — February 7, 2014 at 3:13 am ([permalink](/blog/gzip-support/#comment-21767))
 
 > Anonymous says:
 >
 > Since the web browser uses native connections and doesn’t go thru connection request gzip should “just work” for that case.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fgzip-support.html)
+
 
 ---
 

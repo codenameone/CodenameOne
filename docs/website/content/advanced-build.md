@@ -18,4 +18,4 @@ Build hints/arguments allow us to manipulate the build process on the build serv
 
 When sending a build to the server you can provide additional parameters to the build which will be incorporated into the build process on the server to hint on multiple different build time options.You can do this by right clicking the Codename One project and entering the project properties. There you will find the "Build Hints" tab in which you can just type the arguments and the appropriate values from the list below.
 
-We removed this page since it duplicates content from the developer guide and we should probably maintain only one **authoritative** list. The up to date list is [here](https://www.codenameone.com/manual/advanced-topics.html#_sending_arguments_to_the_build_server).
+We removed this page since it duplicates content from the developer guide and we should probably maintain only one **authoritative** list. The up to date list is [here](/manual/advanced-topics/#_sending_arguments_to_the_build_server).

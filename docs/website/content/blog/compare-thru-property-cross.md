@@ -29,7 +29,7 @@ tools Codename One’s advantages become pretty clear.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — July 6, 2016 at 3:12 pm ([permalink](https://www.codenameone.com/blog/compare-thru-property-cross.html#comment-21631))
+### **Chidiebere Okwudire** — July 6, 2016 at 3:12 pm ([permalink](/blog/compare-thru-property-cross/#comment-21631))
 
 > Chidiebere Okwudire says:
 >
@@ -37,10 +37,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > By the way, the CN1 implementation is still missing from the property cross website – a lost (but redeemable) opportunity for some free PR if you ask me! Maybe time to give it another shot?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcompare-thru-property-cross.html)
 
 
-### **Shai Almog** — July 6, 2016 at 5:38 pm ([permalink](https://www.codenameone.com/blog/compare-thru-property-cross.html#comment-22828))
+
+### **Shai Almog** — July 6, 2016 at 5:38 pm ([permalink](/blog/compare-thru-property-cross/#comment-22828))
 
 > Shai Almog says:
 >
@@ -52,10 +52,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I did try again recently, tried contacting the guy who did the last commit to their repo etc. both thru twitter, his email account etc. There is an issue HE opened asking for a Codename One version. I submitted a pull request and commented a few times… Nothing.  
 > This is quite frustrating.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcompare-thru-property-cross.html)
 
 
-### **Chidiebere Okwudire** — July 8, 2016 at 8:09 am ([permalink](https://www.codenameone.com/blog/compare-thru-property-cross.html#comment-22545))
+
+### **Chidiebere Okwudire** — July 8, 2016 at 8:09 am ([permalink](/blog/compare-thru-property-cross/#comment-22545))
 
 > Chidiebere Okwudire says:
 >
@@ -67,7 +67,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > As you rightly mentioned, most of the solutions are open-source at the core but often have paid extras which make a huge difference. It must be possible to compare these quite objectively – free against free, paid against paid (grouped by feature set not subscription model), etc. I’m not saying you have to do that; all I’m trying to point out is that while you’re obviously positively biased towards CN1, it’s still possible to do more rigorous comparisons 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcompare-thru-property-cross.html)
+
 
 ---
 

@@ -47,7 +47,7 @@ As part of migrating away from Google App Engine we shifted crash reports to use
 them far more usable by embedding the logs directly into the email body.  
 Read more about this work in [this blog post](/blog/migrating-away-from-app-engine.html). 
 
-You can also read the far more detailed list of release notes [here](/codenameone-3-1-release-notes.html).
+You can also read the far more detailed list of release notes [here](/codename-one-3-1-release-notes/).
 ---
 
 ## Archived Comments
@@ -55,7 +55,7 @@ You can also read the far more detailed list of release notes [here](/codenameon
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — July 27, 2015 at 4:22 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-1-now-live.html#comment-21485))
+### **Chidiebere Okwudire** — July 27, 2015 at 4:22 pm ([permalink](/blog/codename-one-3-1-now-live/#comment-21485))
 
 > Chidiebere Okwudire says:
 >
@@ -63,16 +63,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > BTW, the ‘detailed list of release notes’ link is broken.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-1-now-live.html)
 
 
-### **Shai Almog** — July 27, 2015 at 4:30 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-1-now-live.html#comment-22412))
+
+### **Shai Almog** — July 27, 2015 at 4:30 pm ([permalink](/blog/codename-one-3-1-now-live/#comment-22412))
 
 > Shai Almog says:
 >
 > Thanks, its updated now.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-3-1-now-live.html)
+
 
 ---
 

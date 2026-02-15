@@ -65,58 +65,58 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — November 6, 2013 at 5:27 pm ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21844))
+### **Anonymous** — November 6, 2013 at 5:27 pm ([permalink](/blog/surprises-and-changes/#comment-21844))
 
 > Anonymous says:
 >
 > Thanks for the updates.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsurprises-and-changes.html)
 
 
-### **Anonymous** — November 12, 2013 at 1:09 pm ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21765))
+
+### **Anonymous** — November 12, 2013 at 1:09 pm ([permalink](/blog/surprises-and-changes/#comment-21765))
 
 > Anonymous says:
 >
 > nice! when will the update be released?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsurprises-and-changes.html)
 
 
-### **Anonymous** — November 12, 2013 at 3:47 pm ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21834))
+
+### **Anonymous** — November 12, 2013 at 3:47 pm ([permalink](/blog/surprises-and-changes/#comment-21834))
 
 > Anonymous says:
 >
 > This week, hopefully tomorrow.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsurprises-and-changes.html)
 
 
-### **Anonymous** — November 20, 2013 at 5:51 am ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21777))
+
+### **Anonymous** — November 20, 2013 at 5:51 am ([permalink](/blog/surprises-and-changes/#comment-21777))
 
 > Anonymous says:
 >
 > i’ve got the update but the support for adding arrays as arguments in the connection request is not there or i’m missing something?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsurprises-and-changes.html)
 
 
-### **Anonymous** — November 20, 2013 at 1:00 pm ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21794))
+
+### **Anonymous** — November 20, 2013 at 1:00 pm ([permalink](/blog/surprises-and-changes/#comment-21794))
 
 > Anonymous says:
 >
 > I’m guessing you updated the plugin and not the library. Go to project properties and select update client libraries.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsurprises-and-changes.html)
 
 
-### **Anonymous** — November 21, 2013 at 5:12 am ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21750))
+
+### **Anonymous** — November 21, 2013 at 5:12 am ([permalink](/blog/surprises-and-changes/#comment-21750))
 
 > Anonymous says:
 >
 > thanks! thought it was automatic when updating 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsurprises-and-changes.html)
+
 
 ---
 

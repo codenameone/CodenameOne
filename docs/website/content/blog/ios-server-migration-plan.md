@@ -124,22 +124,22 @@ If you need support for QR/bar code scanning you need to migrate your code to us
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Shai Almog** — May 25, 2016 at 5:54 pm ([permalink](https://www.codenameone.com/blog/ios-server-migration-plan.html#comment-22598))
+### **Shai Almog** — May 25, 2016 at 5:54 pm ([permalink](/blog/ios-server-migration-plan/#comment-22598))
 
 > Shai Almog says:
 >
 > We just added ios.bitcode=false as an option to disable bitcode. If you are running into issues please try that build hint and let us know either way.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-server-migration-plan.html)
 
 
-### **Gareth Murfin** — May 27, 2016 at 12:06 am ([permalink](https://www.codenameone.com/blog/ios-server-migration-plan.html#comment-21511))
+
+### **Gareth Murfin** — May 27, 2016 at 12:06 am ([permalink](/blog/ios-server-migration-plan/#comment-21511))
 
 > Gareth Murfin says:
 >
 > Will try this out Shai and let you know the results. Cheers, Gaz.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fios-server-migration-plan.html)
+
 
 ---
 

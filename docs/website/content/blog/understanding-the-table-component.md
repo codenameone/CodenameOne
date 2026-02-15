@@ -11,13 +11,13 @@ author: Shai Almog
 
 ![Header Image](/blog/understanding-the-table-component/table-post-title.png)
 
-[Table](https://www.codenameone.com/javadoc/com/codename1/ui/table/Table.html) is a composite component  
-(but it isn’t a [lead component](https://www.codenameone.com/manual/components.html#lead-component-sidebar)),  
-this means it is a subclass of [Container](https://www.codenameone.com/javadoc/com/codename1/ui/Container.html).  
+[Table](/javadoc/com/codename1/ui/table/Table/) is a composite component  
+(but it isn’t a [lead component](/manual/components/#lead-component-sidebar)),  
+this means it is a subclass of [Container](/javadoc/com/codename1/ui/Container/).  
 It’s effectively built from multiple components.
 
 __ |  `Table` is heavily based on the  
-[TableLayout](https://www.codenameone.com/javadoc/com/codename1/ui/table/TableLayout.html) class. It’s important  
+[TableLayout](/javadoc/com/codename1/ui/table/TableLayout/) class. It’s important  
 to be familiar with that layout manager when working with `Table`.   
 ---|---  
   
@@ -139,7 +139,7 @@ Figure 4. Picker table cell during edit
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Tommy Mogaka** — February 14, 2016 at 5:03 am ([permalink](https://www.codenameone.com/blog/understanding-the-table-component.html#comment-22607))
+### **Tommy Mogaka** — February 14, 2016 at 5:03 am ([permalink](/blog/understanding-the-table-component/#comment-22607))
 
 > In the case that cell contents are too long, is it possible to stretch the cell vertically by wordwraping its contents so that they don’t truncate out or push the content of the cell next to it out of view?
 >
@@ -147,7 +147,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > On the work on the documentation, a thumbs up! It will go a long way to making CN1 easily adopted by more developers.
 
 
-### **Shai Almog** — February 15, 2016 at 3:24 am ([permalink](https://www.codenameone.com/blog/understanding-the-table-component.html#comment-22627))
+### **Shai Almog** — February 15, 2016 at 3:24 am ([permalink](/blog/understanding-the-table-component/#comment-22627))
 
 > Thanks, that’s a great headsup on something that we missed in the table docs!
 >

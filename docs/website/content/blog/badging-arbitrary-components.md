@@ -52,29 +52,24 @@ material icons. This is something we need to work on more as we move forward.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **João Bastos** — November 3, 2016 at 8:47 am ([permalink](https://www.codenameone.com/blog/badging-arbitrary-components.html#comment-22949))
+### **João Bastos** — November 3, 2016 at 8:47 am ([permalink](/blog/badging-arbitrary-components/#comment-22949))
 
 > createBadge error. Is it missing “public” statement in the method? or i´m missing something here?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbadging-arbitrary-components.html)
 
 
-### **Shai Almog** — November 4, 2016 at 5:47 am ([permalink](https://www.codenameone.com/blog/badging-arbitrary-components.html#comment-22930))
+### **Shai Almog** — November 4, 2016 at 5:47 am ([permalink](/blog/badging-arbitrary-components/#comment-22930))
 
 > Shai Almog says:
 >
 > Sorry, I neglected to mention that this is landing in the Friday release today so when you get a new update the code should compile fine. You can use Update Client Libraries later today to get the update.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbadging-arbitrary-components.html)
 
 
-### **João Bastos** — November 4, 2016 at 8:43 am ([permalink](https://www.codenameone.com/blog/badging-arbitrary-components.html#comment-23013))
+### **João Bastos** — November 4, 2016 at 8:43 am ([permalink](/blog/badging-arbitrary-components/#comment-23013))
 
 > João Bastos says:
 >
 > Ok. Thanks Shai
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbadging-arbitrary-components.html)
 
 ---
 

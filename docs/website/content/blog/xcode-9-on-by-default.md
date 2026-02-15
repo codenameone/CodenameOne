@@ -48,16 +48,16 @@ We are considering delaying the release that is planned for March 6th by a week 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Stefan Eder** — February 20, 2018 at 2:04 pm ([permalink](https://www.codenameone.com/blog/xcode-9-on-by-default.html#comment-23528))
+### **Stefan Eder** — February 20, 2018 at 2:04 pm ([permalink](/blog/xcode-9-on-by-default/#comment-23528))
 
 > Stefan Eder says:
 >
 > Does that mean one could use Swift code, too?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fxcode-9-on-by-default.html)
 
 
-### **Shai Almog** — February 21, 2018 at 5:25 am ([permalink](https://www.codenameone.com/blog/xcode-9-on-by-default.html#comment-23923))
+
+### **Shai Almog** — February 21, 2018 at 5:25 am ([permalink](/blog/xcode-9-on-by-default/#comment-23923))
 
 > Shai Almog says:
 >
@@ -67,28 +67,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can use swift in a static library and invoke it from a native interface wrapper.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fxcode-9-on-by-default.html)
 
 
-### **Stefan Eder** — February 21, 2018 at 6:20 am ([permalink](https://www.codenameone.com/blog/xcode-9-on-by-default.html#comment-23731))
+
+### **Stefan Eder** — February 21, 2018 at 6:20 am ([permalink](/blog/xcode-9-on-by-default/#comment-23731))
 
 > Stefan Eder says:
 >
 > It would be nice to have an example on how to do this
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fxcode-9-on-by-default.html)
 
 
-### **Shai Almog** — February 22, 2018 at 8:41 am ([permalink](https://www.codenameone.com/blog/xcode-9-on-by-default.html#comment-23853))
+
+### **Shai Almog** — February 22, 2018 at 8:41 am ([permalink](/blog/xcode-9-on-by-default/#comment-23853))
 
 > Shai Almog says:
 >
 > Doing this is not intuitive and most of the sample would be in xcode so would step too deep out of the comfort zone. It won’t produce any benefit either in simplicity, maintainability or performance. If you have a large library of swift code you can use it this way but if you have a large library of swift code you probably know how to do it to begin with an don’t need our help…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fxcode-9-on-by-default.html)
 
 
-### **Stefan Eder** — February 23, 2018 at 6:49 am ([permalink](https://www.codenameone.com/blog/xcode-9-on-by-default.html#comment-23836))
+
+### **Stefan Eder** — February 23, 2018 at 6:49 am ([permalink](/blog/xcode-9-on-by-default/#comment-23836))
 
 > Stefan Eder says:
 >
@@ -96,10 +96,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > In an ideal situation I’d love to support Codename One by providing solutions for everyone but the world is not ideal and my situation is not either.  
 > I have about four hours a week for Codename One and yet I can not accept that some things just do not work. Of course it would help if, in exceptional cases and only for me, I could make additions and corrections. Preventing that from happening prevents me from using Codename One – that’s how easy it is.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fxcode-9-on-by-default.html)
 
 
-### **Shai Almog** — February 24, 2018 at 4:59 am ([permalink](https://www.codenameone.com/blog/xcode-9-on-by-default.html#comment-23690))
+
+### **Shai Almog** — February 24, 2018 at 4:59 am ([permalink](/blog/xcode-9-on-by-default/#comment-23690))
 
 > Shai Almog says:
 >
@@ -107,7 +107,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > That has nothing to do with Swift support which is a technical issue related to ARC.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fxcode-9-on-by-default.html)
+
 
 ---
 

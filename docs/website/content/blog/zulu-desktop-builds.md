@@ -21,7 +21,7 @@ If you think that a 23 page document explaining that something is “free” sou
 
 ### ZuluFX
 
-Unfortunately we need JavaFX. My [opinion of JavaFX](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html) hasn’t changed, if anything I think it’s worse off than ever before. But in the Java world there is no other option. We need video, HTML and other capabilities for our simulator and desktop port so we need JavaFX support.
+Unfortunately we need JavaFX. My [opinion of JavaFX](/blog/should-oracle-spring-clean-javafx/) hasn’t changed, if anything I think it’s worse off than ever before. But in the Java world there is no other option. We need video, HTML and other capabilities for our simulator and desktop port so we need JavaFX support.
 
 Luckily, Azul releases a packaged OpenJDK distribution called [ZuluFX](https://www.azul.com/downloads/zulu/zulufx/) which includes JavaFX within sparing us the need to package it ourselves. Unfortunately, basic things in `javapackager` just don’t work properly with Zulu. It seems it picks the full JDK instead of the JRE causing it to produce a 200mb hello world application. It doesn’t work at all on Windows and on Mac OS it’s remarkably flaky, it just fails on random.
 

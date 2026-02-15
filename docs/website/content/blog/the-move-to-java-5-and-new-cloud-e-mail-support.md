@@ -57,25 +57,25 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — July 4, 2013 at 2:48 am ([permalink](https://www.codenameone.com/blog/the-move-to-java-5-and-new-cloud-e-mail-support.html#comment-21616))
+### **Anonymous** — July 4, 2013 at 2:48 am ([permalink](/blog/the-move-to-java-5-and-new-cloud-e-mail-support/#comment-21616))
 
 > Anonymous says:
 >
 > I for one would appreciate Generifying the interface. The most important thing for me is (#1) Being able to write the same code for iPhone and Android apps. (#2) A nice API, (#3) Windows 8 Phone and Blackberry 10 support.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthe-move-to-java-5-and-new-cloud-e-mail-support.html)
 
 
-### **Anonymous** — July 6, 2013 at 8:52 am ([permalink](https://www.codenameone.com/blog/the-move-to-java-5-and-new-cloud-e-mail-support.html#comment-21928))
+
+### **Anonymous** — July 6, 2013 at 8:52 am ([permalink](/blog/the-move-to-java-5-and-new-cloud-e-mail-support/#comment-21928))
 
 > Anonymous says:
 >
 > I am new to codename one, but based on your blog post, it seems that there are few things which are still used just to support CLDC profile, I would suggest that make framework separate for smart ;phone and CLDC so that you guys can make full use of Smart phones capabilities.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthe-move-to-java-5-and-new-cloud-e-mail-support.html)
 
 
-### **Anonymous** — July 6, 2013 at 9:04 am ([permalink](https://www.codenameone.com/blog/the-move-to-java-5-and-new-cloud-e-mail-support.html#comment-21690))
+
+### **Anonymous** — July 6, 2013 at 9:04 am ([permalink](/blog/the-move-to-java-5-and-new-cloud-e-mail-support/#comment-21690))
 
 > Anonymous says:
 >
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We hide some Java language capabilities so our distribution size can be smaller and more efficient on iOS/Windows Phone.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fthe-move-to-java-5-and-new-cloud-e-mail-support.html)
+
 
 ---
 

@@ -86,49 +86,49 @@ __ |  Note that the `ios.pods.sources` directive is optional
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — January 24, 2017 at 2:14 am ([permalink](https://www.codenameone.com/blog/cocoapods.html#comment-23114))
+### **Chidiebere Okwudire** — January 24, 2017 at 2:14 am ([permalink](/blog/cocoapods/#comment-23114))
 
 > Chidiebere Okwudire says:
 >
 > This is really great! It’s made integrating the Parse iOS SDK *much* simpler. Thanks!!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcocoapods.html)
 
 
-### **3lix** — February 13, 2017 at 3:55 pm ([permalink](https://www.codenameone.com/blog/cocoapods.html#comment-24126))
+
+### **3lix** — February 13, 2017 at 3:55 pm ([permalink](/blog/cocoapods/#comment-24126))
 
 > 3lix says:
 >
 > Would these pods work on all three platforms (iOS, Android and Windows) or are these iOS specific?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcocoapods.html)
 
 
-### **Shai Almog** — February 14, 2017 at 8:02 am ([permalink](https://www.codenameone.com/blog/cocoapods.html#comment-23239))
+
+### **Shai Almog** — February 14, 2017 at 8:02 am ([permalink](/blog/cocoapods/#comment-23239))
 
 > Shai Almog says:
 >
 > No it’s designed for iOS native code.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcocoapods.html)
 
 
-### **Francesco Galgani** — October 17, 2018 at 9:40 pm ([permalink](https://www.codenameone.com/blog/cocoapods.html#comment-23942))
+
+### **Francesco Galgani** — October 17, 2018 at 9:40 pm ([permalink](/blog/cocoapods/#comment-23942))
 
 > Francesco Galgani says:
 >
 > Is there anything similar for Android?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcocoapods.html)
 
 
-### **Shai Almog** — October 18, 2018 at 4:04 am ([permalink](https://www.codenameone.com/blog/cocoapods.html#comment-23919))
+
+### **Shai Almog** — October 18, 2018 at 4:04 am ([permalink](/blog/cocoapods/#comment-23919))
 
 > Shai Almog says:
 >
-> Sure, Gradle: [https://www.codenameone.com…](<https://www.codenameone.com/blog/tip-use-android-gradle-dependencies-native-code.html>)
+> Sure, Gradle: [https://www.codenameone.com…](</blog/tip-use-android-gradle-dependencies-native-code/>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcocoapods.html)
+
 
 ---
 

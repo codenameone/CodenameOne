@@ -32,7 +32,7 @@ Codename One is the only platform that…​
 
   * Supports **seamless Continuous Integration** out of the box
 
-To learn more about Codename One check out the [about page](https://www.codenameone.com/about.html) you can [download it for free right now](https://www.codenameone.com/download.html).
+To learn more about Codename One check out the [about page](/about/) you can [download it for free right now](/download/).
 
 Version 4.0 is nicknamed Taxi because of the Uber Clone application that was developed with it for [the online course](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java) in the Codename One Academy.
 
@@ -48,23 +48,23 @@ Figure 2. The Uber login form next to the clone
 
 The top 5 features of this release are covered in this short video, check out further details below…​
 
-  * **Progressive Web App Support (PWA)** – Progressive Web Apps allow us to try an application on the web and seamlessly transition to a native app. This makes user acquisition easier and installation frictionless. Codename One is the only tool in the world that [supports PWA’s seamlessly](https://www.codenameone.com/blog/progressive-web-apps.html)
+  * **Progressive Web App Support (PWA)** – Progressive Web Apps allow us to try an application on the web and seamlessly transition to a native app. This makes user acquisition easier and installation frictionless. Codename One is the only tool in the world that [supports PWA’s seamlessly](/blog/progressive-web-apps/)
 
-  * **New Device Skins** – We updated the look of Codename One by releasing [33 new device skins](https://www.codenameone.com/blog/new-skins-san-francisco-font.html) including iPhone X & Pixel 2 XL. We included support for non-rectangular device skins and better device fidelity. We also added the ability to grab a screenshot that includes the skin frame around it
+  * **New Device Skins** – We updated the look of Codename One by releasing [33 new device skins](/blog/new-skins-san-francisco-font/) including iPhone X & Pixel 2 XL. We included support for non-rectangular device skins and better device fidelity. We also added the ability to grab a screenshot that includes the skin frame around it
 
-  * **Xcode 9.2** – Codename One apps are built using xcode 9.2. This [change is seamless](https://www.codenameone.com/blog/xcode-9-on-by-default.html) for most developers as the update happened on the build servers. Xcode 9.2 requires additional permission messages which are [added automatically by the simulator](https://www.codenameone.com/blog/xcode-9-mode.html)
+  * **Xcode 9.2** – Codename One apps are built using xcode 9.2. This [change is seamless](/blog/xcode-9-on-by-default/) for most developers as the update happened on the build servers. Xcode 9.2 requires additional permission messages which are [added automatically by the simulator](/blog/xcode-9-mode/)
 
-  * **Update Framework** – Updates to Codename One libraries are now delivered using a [unified framework](https://www.codenameone.com/blog/new-update-framework.html) instead of separate adhoc tools
+  * **Update Framework** – Updates to Codename One libraries are now delivered using a [unified framework](/blog/new-update-framework/) instead of separate adhoc tools
 
-  * **Continuous Integration Support** – We now support [Travis CI](https://www.codenameone.com/blog/travis-ci-integration.html) out of the box seamlessly. Adding support for additional CI tools should be just as easy
+  * **Continuous Integration Support** – We now support [Travis CI](/blog/travis-ci-integration/) out of the box seamlessly. Adding support for additional CI tools should be just as easy
 
-  * **New Async JavaScript Interop API** – The Java → JavaScript bridge with the embeddable browser component was completely replaced. The [new implementation](https://www.codenameone.com/blog/new-async-java-javascript-interop-api.html) should be faster than the old system
+  * **New Async JavaScript Interop API** – The Java → JavaScript bridge with the embeddable browser component was completely replaced. The [new implementation](/blog/new-async-java-javascript-interop-api/) should be faster than the old system
 
-  * **Builtin Unit Tests** – Unit tests to Codename One are [integrated into the core repository](https://www.codenameone.com/blog/updates-holidays.html) and are executed with every commit
+  * **Builtin Unit Tests** – Unit tests to Codename One are [integrated into the core repository](/blog/updates-holidays/) and are executed with every commit
 
-  * **Improved Peer Components** – Multiple bugs and minor issues were fixed in the peer component layer this effectively enabled the Uber clone to [work properly with the native map](https://www.codenameone.com/blog/map-layout-update.html)
+  * **Improved Peer Components** – Multiple bugs and minor issues were fixed in the peer component layer this effectively enabled the Uber clone to [work properly with the native map](/blog/map-layout-update/)
 
-  * **Better Hello World** – The new Codename One projects [generate better code](https://www.codenameone.com/blog/new-default-code.html) that handles things such as network errors more effectively
+  * **Better Hello World** – The new Codename One projects [generate better code](/blog/new-default-code/) that handles things such as network errors more effectively
 
   * **GUI Builder Refinements** – There were many refinements to the new GUI builder most notably:
 
@@ -74,7 +74,7 @@ The top 5 features of this release are covered in this short video, check out fu
 
     * Tabs component is supported again
 
-  * **Test Push In the Simulator** – The simulator now supports [testing push notification](https://www.codenameone.com/blog/meltdown-updates.html)
+  * **Test Push In the Simulator** – The simulator now supports [testing push notification](/blog/meltdown-updates/)
 
 There are many other features both big and small. Check out our [blog](https://www.codenameone.com/blog/) and the github [project history](https://github.com/codenameone/CodenameOne/commits/master).
 
@@ -94,7 +94,7 @@ The 5.0 release cycle is relatively short & we already have a lot of things plan
 
 We should have the new social app tutorial in the [Codename One Academy](https://codenameone.teachable.com/) which will cover cloning Facebook.
 
-Check out our [survey results](https://www.codenameone.com/blog/survey-results-2018.html) to see the future apps we’ll release into the academy. Even if you never plan to signup to the academy this should be interesting as it gives you a good notion of what can be built with Codename One.
+Check out our [survey results](/blog/survey-results-2018/) to see the future apps we’ll release into the academy. Even if you never plan to signup to the academy this should be interesting as it gives you a good notion of what can be built with Codename One.
 
 Other than that we’ll try to launch better docs and designs. We’ve put a lot of effort into improving our design capabilities and one of the big things we’d like to pick up again is app templates. In the past we released a few free themes as Codename One stubs. We’d like to do that again so developers can start from “something”.
 
@@ -102,11 +102,11 @@ Other than that we’ll try to launch better docs and designs. We’ve put a lot
 
 If you think we are doing a good job and appreciate our help please help us by:
 
-  * [Spreading the word](https://www.codenameone.com/blog/how-you-can-help-spread-codenameone.html)
+  * [Spreading the word](/blog/how-you-can-help-spread-codenameone/)
 
-  * [Edit our docs](https://www.codenameone.com/blog/tip-edit-docs-fun-profit.html)
+  * [Edit our docs](/blog/tip-edit-docs-fun-profit/)
 
-  * [Edit our sources and submit bug fixes](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html)
+  * [Edit our sources and submit bug fixes](/blog/how-to-use-the-codename-one-sources/)
 
   * Or just sign up for enterprise accounts which literally keep the lights on here…​ If your company can afford it please take the time and upgrade to enterprise, this will allow us to work on the things that are important for your company!
 
@@ -118,46 +118,36 @@ Thanks for reading this far and if you have any thoughts/suggestions of any kind
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Dalvik** — March 20, 2018 at 10:58 am ([permalink](https://www.codenameone.com/blog/codename-one-4-0-taxi-live.html#comment-23631))
+### **Dalvik** — March 20, 2018 at 10:58 am ([permalink](/blog/codename-one-4-0-taxi-live/#comment-23631))
 
 > Congratulations, I hadn’t noticed half of these features as they went in 😉
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-4-0-taxi-live.html)
 
 
-### **Bluewater** — March 22, 2018 at 6:05 am ([permalink](https://www.codenameone.com/blog/codename-one-4-0-taxi-live.html#comment-24138))
+### **Bluewater** — March 22, 2018 at 6:05 am ([permalink](/blog/codename-one-4-0-taxi-live/#comment-24138))
 
 > Nice work! Were any of the deprecated APIs removed or is 4.0 fully backward compatible with 3x code?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-4-0-taxi-live.html)
 
 
-### **Shai Almog** — March 22, 2018 at 8:43 am ([permalink](https://www.codenameone.com/blog/codename-one-4-0-taxi-live.html#comment-23817))
+### **Shai Almog** — March 22, 2018 at 8:43 am ([permalink](/blog/codename-one-4-0-taxi-live/#comment-23817))
 
 > Shai Almog says:
 >
 > Thanks!  
 > It should be compatible. We didn’t remove any deprecated API’s but there are changes and some things can always break.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-4-0-taxi-live.html)
 
 
-### **Ross Taylor** — March 31, 2018 at 10:31 am ([permalink](https://www.codenameone.com/blog/codename-one-4-0-taxi-live.html#comment-23743))
+### **Ross Taylor** — March 31, 2018 at 10:31 am ([permalink](/blog/codename-one-4-0-taxi-live/#comment-23743))
 
 > Ross Taylor says:
 >
 > Towards around 1:57 – 59 of the video, I notice a slight flicker of the menu when displayed over the map. Is this a problem of the Google Map you were referring?
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-4-0-taxi-live.html)
 
 
-### **Shai Almog** — April 1, 2018 at 4:07 am ([permalink](https://www.codenameone.com/blog/codename-one-4-0-taxi-live.html#comment-23724))
+### **Shai Almog** — April 1, 2018 at 4:07 am ([permalink](/blog/codename-one-4-0-taxi-live/#comment-23724))
 
 > Shai Almog says:
 >
 > That’s related to the incoming animation. I used a background painter in one of the elements and I think I have an issue in that.
->
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fcodename-one-4-0-taxi-live.html)
 
 ---
 

@@ -16,7 +16,7 @@ were miles apart when comparing Android 2.x and iOS 4.x…​ So we created a ve
 (command behavior) that served as a set of patch framework we could live with for a while.
 
 But like any patch framework this started crumbling under its shear weight and this lead us to the  
-[Toolbar API](https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html). The reason we  
+[Toolbar API](/javadoc/com/codename1/ui/Toolbar/). The reason we  
 could do that is that a lot of the platform differences have converged, in 2012 it was blasphemy to have  
 a back button in Android title area and now it’s the official material design guideline.
 
@@ -34,7 +34,7 @@ In the previous implementation we would just call:
 
 This would implicitly place the command in the title for iOS and wouldn’t do it for other platforms.
 
-When you use this with the [Toolbar API](https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html)  
+When you use this with the [Toolbar API](/javadoc/com/codename1/ui/Toolbar/)  
 you would only get the hardware back button behavior and the command wouldn’t map to the title area leaving  
 iOS users with no other means to navigate.
 
@@ -78,7 +78,7 @@ for completeness.
 The old GUI builder has a navigation stack that automatically adds back buttons. Thus apps built with the old  
 GUI builder had a problem mapping to back behavior with the `Toolbar`.
 
-We now fixed that so the [UIBuilder](https://www.codenameone.com/javadoc/com/codename1/ui/util/UIBuilder.html)  
+We now fixed that so the [UIBuilder](/javadoc/com/codename1/ui/util/UIBuilder/)  
 checks if a `Toolbar` is installed and if so calls its version of `setBackCommand` effectively using the `AS_ARROW`  
 back behavior.
 
@@ -116,28 +116,28 @@ UIID.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Lukman Javalove Idealist Jaji** — May 20, 2016 at 8:25 am ([permalink](https://www.codenameone.com/blog/toolbar-back-easier-material-icons.html#comment-22718))
+### **Lukman Javalove Idealist Jaji** — May 20, 2016 at 8:25 am ([permalink](/blog/toolbar-back-easier-material-icons/#comment-22718))
 
 > Lukman Javalove Idealist Jaji says:
 >
 > Thanks Shai for this post. I am particularly happy with the new Material Icon Code …. Means I don’t have to create several UIIDS in the designer which sometimes slows me down….
 
 
-### **Mo** — May 28, 2016 at 6:19 pm ([permalink](https://www.codenameone.com/blog/toolbar-back-easier-material-icons.html#comment-22926))
+### **Mo** — May 28, 2016 at 6:19 pm ([permalink](/blog/toolbar-back-easier-material-icons/#comment-22926))
 
 > Mo says:
 >
 > I am on 3.4.0 plugin but unable to use the Toolbar.setBackCommand, which version of the lib the above function is available on?? should the lib be updated manually or via the Plugin??
 
 
-### **Shai Almog** — May 29, 2016 at 3:12 am ([permalink](https://www.codenameone.com/blog/toolbar-back-easier-material-icons.html#comment-22900))
+### **Shai Almog** — May 29, 2016 at 3:12 am ([permalink](/blog/toolbar-back-easier-material-icons/#comment-22900))
 
 > Shai Almog says:
 >
 > Go to the preferences, under the Codename One section select “Update Client Libs”.
 
 
-### **Mo** — May 31, 2016 at 9:01 pm ([permalink](https://www.codenameone.com/blog/toolbar-back-easier-material-icons.html#comment-22933))
+### **Mo** — May 31, 2016 at 9:01 pm ([permalink](/blog/toolbar-back-easier-material-icons/#comment-22933))
 
 > Mo says:
 >
@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I am using Netbeans 8.1 with JDK1.8 and CodenameOnePlugin 3.4.0.
 
 
-### **Shai Almog** — June 1, 2016 at 3:46 am ([permalink](https://www.codenameone.com/blog/toolbar-back-easier-material-icons.html#comment-21453))
+### **Shai Almog** — June 1, 2016 at 3:46 am ([permalink](/blog/toolbar-back-easier-material-icons/#comment-21453))
 
 > Shai Almog says:
 >
@@ -154,7 +154,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > what’s the unexpected behavior?
 
 
-### **Mo** — June 1, 2016 at 11:30 am ([permalink](https://www.codenameone.com/blog/toolbar-back-easier-material-icons.html#comment-22603))
+### **Mo** — June 1, 2016 at 11:30 am ([permalink](/blog/toolbar-back-easier-material-icons/#comment-22603))
 
 > Mo says:
 >
@@ -173,11 +173,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Please let me know if you would like any additional clarification on this?
 
 
-### **Shai Almog** — June 2, 2016 at 3:34 am ([permalink](https://www.codenameone.com/blog/toolbar-back-easier-material-icons.html#comment-22911))
+### **Shai Almog** — June 2, 2016 at 3:34 am ([permalink](/blog/toolbar-back-easier-material-icons/#comment-22911))
 
 > Shai Almog says:
 >
-> I didn’t see that but looking at the commit history I see Chen committed a fix that looks to be related to that so I guess it will be resolved this Friday. You can easily follow commits as explained here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/keep-track-of-codename-one-changes-duplicates.html>)
+> I didn’t see that but looking at the commit history I see Chen committed a fix that looks to be related to that so I guess it will be resolved this Friday. You can easily follow commits as explained here: [https://www.codenameone.com…](</blog/keep-track-of-codename-one-changes-duplicates/>)
 
 ---
 

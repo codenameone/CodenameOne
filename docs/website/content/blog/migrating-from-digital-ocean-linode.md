@@ -46,35 +46,35 @@ Another thing on our todo list for the past couple of years is packaging everyth
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Mark Korsak** — January 13, 2017 at 5:29 pm ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-22847))
+### **Mark Korsak** — January 13, 2017 at 5:29 pm ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-22847))
 
 > Mark Korsak says:
 >
 > This is great to see! Glad to hear the transition went so smooth. Let us know if there’s ever anything we can do for you! – Linode Community Advocate
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-from-digital-ocean-linode.html)
 
 
-### **João Bastos** — January 13, 2017 at 11:43 pm ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23259))
+
+### **João Bastos** — January 13, 2017 at 11:43 pm ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23259))
 
 > João Bastos says:
 >
 > Well, my doubts about linode are no longer here… Thank You 🙂
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-from-digital-ocean-linode.html)
 
 
-### **Ahmed Kamel Taha** — January 16, 2017 at 11:21 pm ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23286))
+
+### **Ahmed Kamel Taha** — January 16, 2017 at 11:21 pm ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23286))
 
 > Ahmed Kamel Taha says:
 >
 > Have you considered jelastic? Mirhousting provide a really competitive prices for PaaS & CaaS only $1.15a month for the cloudlet and they only charge for the real usage with automatic vertical & horizontal scaling  
 > [https://jelastic.cloud/deta…](<https://jelastic.cloud/details/mirhosting>)
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-from-digital-ocean-linode.html)
 
 
-### **Shai Almog** — January 17, 2017 at 5:21 am ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23295))
+
+### **Shai Almog** — January 17, 2017 at 5:21 am ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23295))
 
 > Shai Almog says:
 >
@@ -82,10 +82,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I tried them a few years ago mostly thinking about replacing App Engine with them. I like the idea in general but I’m not sure I want to go there and financially I’m not sure it makes sense. In our case the servers we use are pretty darn sophisticated (build servers) and PaaS might be over simplistic.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-from-digital-ocean-linode.html)
 
 
-### **Nkansah Rexford** — January 17, 2017 at 9:57 am ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23145))
+
+### **Nkansah Rexford** — January 17, 2017 at 9:57 am ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23145))
 
 > Nkansah Rexford says:
 >
@@ -100,10 +100,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Fortunately for me, my applications haven’t scaled enough for the price difference to mean a lot. The 5$ got me into DO. Good to know Linode has great options too. It might come handy.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-from-digital-ocean-linode.html)
 
 
-### **Shai Almog** — January 20, 2017 at 12:37 pm ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-24123))
+
+### **Shai Almog** — January 20, 2017 at 12:37 pm ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-24123))
 
 > Shai Almog says:
 >
@@ -111,49 +111,49 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Just to be clear I really like Digital Ocean too, they were super nice when I asked them about the prices of Linode. They wouldn’t match the prices but after we moved they refunded the remainder balance back into our paypal which I totally didn’t expect…
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-from-digital-ocean-linode.html)
 
 
-### **noxiouz** — January 25, 2017 at 6:01 pm ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23003))
+
+### **noxiouz** — January 25, 2017 at 6:01 pm ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23003))
 
 > noxiouz says:
 >
 > I’m still a big fan of PaaS.  
 > Could you please write some words about your negative experience?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-from-digital-ocean-linode.html)
 
 
-### **Shai Almog** — January 26, 2017 at 6:58 am ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23176))
+
+### **Shai Almog** — January 26, 2017 at 6:58 am ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23176))
 
 > Shai Almog says:
 >
-> I wrote a bit about it here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/migrating-away-from-app-engine.html>)  
+> I wrote a bit about it here: [https://www.codenameone.com…](</blog/migrating-away-from-app-engine/>)  
 > Generally Google just started overcharging us at a rate that would have bankrupted us very quickly.
 >
 > The problem is that to be effective PaaS sometimes hides details and in this case we had no way to track the cause of the HUGE expenses. I opened a ticket with Google as a gold customer (400USD per month for that “privilege”) and essentially got an “it’s a problem on your end, we checked in our logs”. Which is essentially a big F U.
 >
 > This went back and forth a lot but basically the gist of it is you have no way of “knowing” what you are paying for with PaaS as it’s way too big. After migrating away our scaling improved because we could write better code (without all the app engine restrictions) and because we could add affordable servers/CDN.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-from-digital-ocean-linode.html)
 
 
-### **John Scarborough** — February 21, 2017 at 10:09 am ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23090))
+
+### **John Scarborough** — February 21, 2017 at 10:09 am ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23090))
 
 > John Scarborough says:
 >
 > Well this has just changed with Linode offering a $5 option now. Ive already moved some droplets over! I dont need snapshots/block storage for them … Good luck!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-from-digital-ocean-linode.html)
 
 
-### **smaugstheswagger** — November 25, 2017 at 10:46 am ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23827))
+
+### **smaugstheswagger** — November 25, 2017 at 10:46 am ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23827))
 
 > smaugstheswagger says:
 >
 > Linode is much better than any shared hosting. Shared hosting has lots of issues regarding performance and security, while Linode doesn’t because it is a VPS. Try Linode on Cloudways and you will see the difference in performance. This platform has its own custom stack optimized for performance. Together with Linode, you will experience a significant increase in performance.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fmigrating-from-digital-ocean-linode.html)
+
 
 ---
 

@@ -88,7 +88,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — July 3, 2014 at 5:38 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-22163))
+### **Anonymous** — July 3, 2014 at 5:38 am ([permalink](/blog/same-size-back-swipe/#comment-22163))
 
 > Anonymous says:
 >
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks.
 
 
-### **Anonymous** — July 3, 2014 at 11:25 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-21730))
+### **Anonymous** — July 3, 2014 at 11:25 am ([permalink](/blog/same-size-back-swipe/#comment-21730))
 
 > Anonymous says:
 >
@@ -109,10 +109,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Updating the guide continuously is both tedious and problematic since things often change too fast and by the time we reach a point release a specific post might no longer be relevant.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsame-size-back-swipe.html)
 
 
-### **Anonymous** — July 6, 2014 at 6:25 pm ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-21925))
+
+### **Anonymous** — July 6, 2014 at 6:25 pm ([permalink](/blog/same-size-back-swipe/#comment-21925))
 
 > Anonymous says:
 >
@@ -124,10 +124,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > to set each cell to a comfortable height for selecting a row. If this method is to be deprecated, how should I do this ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsame-size-back-swipe.html)
 
 
-### **Anonymous** — July 7, 2014 at 2:51 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-22087))
+### **Anonymous** — July 7, 2014 at 2:51 am ([permalink](/blog/same-size-back-swipe/#comment-22087))
 
 > Anonymous says:
 >
@@ -137,10 +136,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You need to define a rendering prototype for a list (which will also make it faster) that includes the exact type of data that will give it the right size e.g. the text XXXXXXXXXXXXX and this will be used to calculate the height of the list element to match the text/images that you provide.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsame-size-back-swipe.html)
 
 
-### **Anonymous** — July 7, 2014 at 3:11 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-22014))
+
+### **Anonymous** — July 7, 2014 at 3:11 am ([permalink](/blog/same-size-back-swipe/#comment-22014))
 
 > Anonymous says:
 >
@@ -170,10 +169,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I want every cell to be 8mm (or thereabouts) high. I thought convertToPixels took account of DPI etc ?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsame-size-back-swipe.html)
 
 
-### **Anonymous** — July 7, 2014 at 11:20 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-21661))
+
+### **Anonymous** — July 7, 2014 at 11:20 am ([permalink](/blog/same-size-back-swipe/#comment-21661))
 
 > Anonymous says:
 >
@@ -181,19 +180,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hardcoding 8 might not look good in all the ranges you want to size these things based on the content and the content is determined by the renderingPrototype. Your renderer wouldn’t matter and you won’t need to change the preferred size, it would “just work”.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsame-size-back-swipe.html)
 
 
-### **Anonymous** — July 7, 2014 at 6:24 pm ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-22173))
+
+### **Anonymous** — July 7, 2014 at 6:24 pm ([permalink](/blog/same-size-back-swipe/#comment-22173))
 
 > Anonymous says:
 >
 > I take on board what you say, but what I’m trying to achieve is a minimum list cell height so that the list cells are easy to select. If a list cell has only a label, the height is obviously determined by the font/DPI etc, but on a regular sized phone, the cells are not big enough to be easily selected and I’d like some way to make sure they are atleast 8mm high.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsame-size-back-swipe.html)
 
 
-### **Anonymous** — July 7, 2014 at 6:25 pm ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-21441))
+
+### **Anonymous** — July 7, 2014 at 6:25 pm ([permalink](/blog/same-size-back-swipe/#comment-21441))
 
 > Anonymous says:
 >
@@ -201,10 +200,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > “There was an error submitting your comment. Please try again”
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsame-size-back-swipe.html)
 
 
-### **Anonymous** — July 8, 2014 at 1:47 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-22097))
+
+### **Anonymous** — July 8, 2014 at 1:47 am ([permalink](/blog/same-size-back-swipe/#comment-22097))
 
 > Anonymous says:
 >
@@ -214,10 +213,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Generally one line will indeed be smaller than 8mm. However, 8mm on a watch is an entirely different thing from 8mm on a television so its probably not a good idea to code something like this to the height of the row. If it were just padding this wouldn’t be a big deal but for actual row height you would get cut off rows etc.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsame-size-back-swipe.html)
 
 
-### **Anonymous** — July 8, 2014 at 2:50 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-21783))
+
+### **Anonymous** — July 8, 2014 at 2:50 am ([permalink](/blog/same-size-back-swipe/#comment-21783))
 
 > Anonymous says:
 >
@@ -231,16 +230,15 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > which should be OK for all except perhaps watches.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsame-size-back-swipe.html)
 
 
-### **Anonymous** — July 8, 2014 at 11:53 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-21731))
+### **Anonymous** — July 8, 2014 at 11:53 am ([permalink](/blog/same-size-back-swipe/#comment-21731))
 
 > Anonymous says:
 >
 > This can work. Just to be clear, we have no intention of removing those methods. Just discouraging their use which we always deemed problematic at best.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fsame-size-back-swipe.html)
+
 
 ---
 

@@ -27,13 +27,13 @@ While the writing itself is quite easy the production aspect is a pain in the ne
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — June 16, 2018 at 6:10 am ([permalink](https://www.codenameone.com/blog/uber-clone-book.html#comment-23864))
+### **Francesco Galgani** — June 16, 2018 at 6:10 am ([permalink](/blog/uber-clone-book/#comment-23864))
 
 > Francesco Galgani says:
 >
 > Thank you very much Shai 😉
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fuber-clone-book.html)
+
 
 ---
 

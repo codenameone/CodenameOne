@@ -352,7 +352,7 @@ You can check out the final source code of this tutorial [here](https://github.c
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — September 18, 2015 at 1:50 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-6.html#comment-22478))
+### **Chidiebere Okwudire** — September 18, 2015 at 1:50 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-6/#comment-22478))
 
 > Nice to see the concluding ‘edition’ of this series. I’ve scanned quickly through the post and I have a few questions:
 >
@@ -362,10 +362,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > (a) Why is that needed?  
 > (b) For a GUI builder application this would be the StateMachine class right?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-6.html)
 
 
-### **Shai Almog** — September 18, 2015 at 3:34 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-6.html#comment-21601))
+
+### **Shai Almog** — September 18, 2015 at 3:34 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-6/#comment-21601))
 
 > 1\. Both iOS and Android allow delivering a payload that is hidden so we can just update application state from the server.  
 > Hidden push is just push type==2 and type 3 means we are sending two push entries in a single operation: [http://www.codenameone.com/…](<http://www.codenameone.com/blog/pushing-it.html>)
@@ -374,17 +374,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 2\. The main class represents the lifecycle (start, stop etc.) and that is effectively where push resides in the native platform. So we mapped it to there. A main class exists even in a GUI builder app, its not the statemachine class.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-6.html)
 
 
-### **Chidiebere Okwudire** — September 24, 2015 at 7:15 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-6.html#comment-22232))
+
+### **Chidiebere Okwudire** — September 24, 2015 at 7:15 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-6/#comment-22232))
 
 > Clear. Thanks
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-6.html)
 
 
-### **Hristo Vrigazov** — July 19, 2016 at 6:42 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-6.html#comment-22969))
+
+### **Hristo Vrigazov** — July 19, 2016 at 6:42 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-6/#comment-22969))
 
 > Cloned the chat, and the following is shown just after I login with Google:
 >
@@ -404,24 +404,24 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > What could be the problem?
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-6.html)
 
 
-### **Shai Almog** — July 20, 2016 at 4:26 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-6.html#comment-22682))
+
+### **Shai Almog** — July 20, 2016 at 4:26 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-6/#comment-22682))
 
 > Make sure you are running under Java 8. You are falling back to use code that doesn’t have access to the webkit browser.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-6.html)
 
 
-### **Hristo Vrigazov** — July 20, 2016 at 2:01 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-6.html#comment-22902))
+
+### **Hristo Vrigazov** — July 20, 2016 at 2:01 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-6/#comment-22902))
 
 > Thanks, that was the problem! Awesome tutorials by the way
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-6.html)
 
 
-### **Ayushi Gupta** — December 7, 2016 at 10:32 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-6.html#comment-23207))
+
+### **Ayushi Gupta** — December 7, 2016 at 10:32 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-6/#comment-23207))
 
 > Ayushi Gupta says:
 >
@@ -469,20 +469,20 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Please help this is 2nd time i m trying to make this chat app
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-6.html)
 
 
-### **Shai Almog** — December 8, 2016 at 6:18 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-6.html#comment-22990))
+
+### **Shai Almog** — December 8, 2016 at 6:18 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-6/#comment-22990))
 
 > Shai Almog says:
 >
 > It clearly says: ClassNotFoundException: com.mycompany.myapp.MyApplication  
 > You created a project and then modified the package/class name after the fact without fixing it everywhere.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-6.html)
 
 
-### **Ayushi Gupta** — December 8, 2016 at 4:16 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-6.html#comment-22932))
+
+### **Ayushi Gupta** — December 8, 2016 at 4:16 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-6/#comment-22932))
 
 > Ayushi Gupta says:
 >
@@ -509,10 +509,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > at [com.codename1.impl.Codename…](<http://com.codename1.impl.CodenameOneThread.run)([CodenameOneThread.java](http://CodenameOneThread.java)>:176)  
 > plz let me know how to fix it
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-6.html)
 
 
-### **Ayushi Gupta** — December 9, 2016 at 4:10 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-6.html#comment-23284))
+
+### **Ayushi Gupta** — December 9, 2016 at 4:10 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-6/#comment-23284))
 
 > Ayushi Gupta says:
 >
@@ -533,20 +533,20 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Java Result: 1  
 > Plzzz let me know how to fix it
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-6.html)
 
 
-### **Ayushi Gupta** — December 9, 2016 at 5:44 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-6.html#comment-23293))
+
+### **Ayushi Gupta** — December 9, 2016 at 5:44 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-6/#comment-23293))
 
 > Ayushi Gupta says:
 >
 > i fixed it …but now when i press signin with google after asking my e-mail and password it goes to codenameone page and says PAGE NOT FOUND and when i press signin with facebook it says “Can’t Load URL: The domain of this URL isn’t included in the app’s domains. To be able to load this URL, add all domains and subdomains of your app to the App Domains field in your app settings”  
 > Pllzzz let me know how to fix it
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-6.html)
 
 
-### **Shai Almog** — December 10, 2016 at 6:16 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-6.html#comment-23000))
+
+### **Shai Almog** — December 10, 2016 at 6:16 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-6/#comment-23000))
 
 > Shai Almog says:
 >
@@ -554,7 +554,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Make sure you defined the app correctly and have the right calls within the login success/fail.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fbuilding-a-chat-app-with-codename-one-part-6.html)
+
 
 ---
 

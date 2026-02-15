@@ -31,7 +31,7 @@ The Clock Demo shows an analog clock that animates while showing the time. It us
 Notice that the JavaScript HTML5 demo is not what we have on the device where applications are translated to native code!  
 Since Apple doesn’t allow demos on itunes and doesn’t allow installing apps without itunes we can’t distribute the native app demos, you would need to build from source with an itunes demo account.
 
-Blog Post: [link](/codename-one-graphics-part-2-drawing-an-analog-clock.html)
+Blog Post: [link](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/)
 
 Source: [link](https://github.com/codenameone/ClockDemo)
 

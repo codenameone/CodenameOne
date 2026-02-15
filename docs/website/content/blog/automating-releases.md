@@ -60,58 +60,58 @@ on a frequent basis even a minute automation like this makes a big difference.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Blessing Mahlalela** — February 9, 2017 at 4:35 pm ([permalink](https://www.codenameone.com/blog/automating-releases.html#comment-23223))
+### **Blessing Mahlalela** — February 9, 2017 at 4:35 pm ([permalink](/blog/automating-releases/#comment-23223))
 
 > Blessing Mahlalela says:
 >
 > Hi during development I noticed that if I try to send multiple builds ie Send Android, Send iOS.. on Netbeans etc. I would receive a compile error if I send them too quickly (simultaneously), I think CN1 deletes some files during the send build process. In any case the reason why I saying that is, I have Jenkins setup and would like to return a [result.zip](<http://result.zip>) containing multiple platform result files ie Android, iOS, Web, Desktop. How can I go about doing this on Jenkins build.xml? I am currently able to set ANT targets on Jenkins pre and post build.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautomating-releases.html)
 
 
-### **Shai Almog** — February 9, 2017 at 6:32 pm ([permalink](https://www.codenameone.com/blog/automating-releases.html#comment-21563))
+
+### **Shai Almog** — February 9, 2017 at 6:32 pm ([permalink](/blog/automating-releases/#comment-21563))
 
 > Shai Almog says:
 >
 > Yes, you can send concurrent builds but not at once. If you use automation to do this your user can’t send a build at that exact time. It’s just a limitation in the way the system was designed as the code that allocates a build needs to reserve a spot.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautomating-releases.html)
 
 
-### **Blessing Mahlalela** — February 9, 2017 at 6:43 pm ([permalink](https://www.codenameone.com/blog/automating-releases.html#comment-23319))
+
+### **Blessing Mahlalela** — February 9, 2017 at 6:43 pm ([permalink](/blog/automating-releases/#comment-23319))
 
 > Blessing Mahlalela says:
 >
 > Ok, I have now managed to call an ANT “build-for-javascript” target from the build xml. Thanks a lot for this, no more sitting and waiting for builds, secondly the automated test recorder will become a great resource to small dev organisations that just don’t have budget for dedicated test teams!
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautomating-releases.html)
 
 
-### **Blessing Mahlalela** — February 9, 2017 at 6:46 pm ([permalink](https://www.codenameone.com/blog/automating-releases.html#comment-23071))
+
+### **Blessing Mahlalela** — February 9, 2017 at 6:46 pm ([permalink](/blog/automating-releases/#comment-23071))
 
 > Blessing Mahlalela says:
 >
 > One more question. How can I add multiple ANT arguments on Jenkins? I would like to automate the building of Android, iOS & web on every successful CI build.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautomating-releases.html)
 
 
-### **Blessing Mahlalela** — February 9, 2017 at 8:21 pm ([permalink](https://www.codenameone.com/blog/automating-releases.html#comment-23237))
+
+### **Blessing Mahlalela** — February 9, 2017 at 8:21 pm ([permalink](/blog/automating-releases/#comment-23237))
 
 > Blessing Mahlalela says:
 >
 > Managed to do multiple builds by adding additional ANT build steps. Had to configure signing certificates also.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautomating-releases.html)
 
 
-### **Shai Almog** — February 9, 2017 at 8:49 pm ([permalink](https://www.codenameone.com/blog/automating-releases.html#comment-23077))
+
+### **Shai Almog** — February 9, 2017 at 8:49 pm ([permalink](/blog/automating-releases/#comment-23077))
 
 > Shai Almog says:
 >
 > Yes we do them one by one since they are synchronous. I hope to write a more detailed blog on doing this in a future update just didn’t get around to doing it.
 >
-> [Log in to Reply](https://www.codenameone.com/wp-login.php?redirect_to=https%3A%2F%2Fwww.codenameone.com%2Fblog%2Fautomating-releases.html)
+
 
 ---
 
