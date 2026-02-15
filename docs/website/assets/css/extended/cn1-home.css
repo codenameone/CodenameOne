@@ -214,6 +214,11 @@ body:not(.dark) .cn1-brand-logo {
     z-index: 80;
 }
 
+.cn1-homepage #menu .sub-menu li {
+    margin: 0;
+    padding: 0;
+}
+
 .cn1-homepage #menu .sub-menu li + li {
     border-top: 1px solid var(--cn1-home-submenu-border);
 }
@@ -225,6 +230,7 @@ body:not(.dark) .cn1-brand-logo {
     font-size: 17px;
     font-weight: 600;
     display: block;
+    text-align: left;
 }
 
 .cn1-homepage .cn1-nav-toggle {
@@ -368,6 +374,11 @@ body:not(.dark) .cn1-brand-logo {
     z-index: 80;
 }
 
+.cn1-header #menu .sub-menu li {
+    margin: 0;
+    padding: 0;
+}
+
 .cn1-header #menu .sub-menu li + li {
     border-top: 1px solid var(--cn1-home-submenu-border);
 }
@@ -379,6 +390,7 @@ body:not(.dark) .cn1-brand-logo {
     font-size: 17px;
     font-weight: 600;
     display: block;
+    text-align: left;
 }
 
 .cn1-header #menu > li.has-children:hover > .sub-menu,
@@ -1860,11 +1872,13 @@ body:not(.dark) .cn1-theme-toggle-btn {
     .cn1-homepage #menu .sub-menu a {
         padding: 15px 28px;
         font-size: 15px;
+        text-align: left;
     }
 
     .cn1-header #menu .sub-menu a {
         padding: 15px 28px;
         font-size: 15px;
+        text-align: left;
     }
 
     .cn1-header #menu > li.has-children.open > .sub-menu {

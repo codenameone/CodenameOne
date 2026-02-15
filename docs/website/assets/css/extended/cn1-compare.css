@@ -1,0 +1,86 @@
+.post-single--compare .post-content table:not(.highlighttable, .highlight table, .gist .highlight) {
+  width: 100%;
+  margin: 20px 0 28px;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+  border-radius: 14px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--entry) 84%, white);
+  box-shadow: 0 12px 30px -24px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+body.dark .post-single--compare .post-content table:not(.highlighttable, .highlight table, .gist .highlight) {
+  background: color-mix(in srgb, var(--entry) 92%, black);
+}
+
+.post-single--compare .post-content table thead th {
+  border-bottom: 2px solid color-mix(in srgb, var(--primary) 40%, var(--border));
+  background: color-mix(in srgb, var(--primary) 10%, var(--entry));
+  color: var(--primary);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+body.dark .post-single--compare .post-content table thead th {
+  background: color-mix(in srgb, var(--primary) 20%, var(--entry));
+}
+
+.post-single--compare .post-content table th,
+.post-single--compare .post-content table td {
+  border-right: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+  padding: 22px 24px !important;
+  vertical-align: top;
+}
+
+@media (max-width: 900px) {
+  .post-single--compare .post-content table th,
+  .post-single--compare .post-content table td {
+    padding: 18px 20px !important;
+  }
+}
+
+.post-single--compare .post-content table th:last-child,
+.post-single--compare .post-content table td:last-child {
+  border-right: 0;
+}
+
+.post-single--compare .post-content table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.post-single--compare .post-content table tbody tr:nth-child(odd) {
+  background: color-mix(in srgb, var(--entry) 90%, white);
+}
+
+.post-single--compare .post-content table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--entry) 96%, var(--primary) 4%);
+}
+
+body.dark .post-single--compare .post-content table tbody tr:nth-child(odd) {
+  background: color-mix(in srgb, var(--entry) 96%, black);
+}
+
+body.dark .post-single--compare .post-content table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--entry) 90%, var(--primary) 8%);
+}
+
+.post-single--compare .post-content table tbody tr:hover {
+  background: color-mix(in srgb, var(--primary) 12%, var(--entry));
+}
+
+.post-single--compare .post-content table tbody td:first-child {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+@media (max-width: 900px) {
+  .post-single--compare .post-content table:not(.highlighttable, .highlight table, .gist .highlight) {
+    display: block;
+    min-width: 700px;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
