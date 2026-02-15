@@ -32,7 +32,7 @@ Another option is to migrate to CEF which might not be an option right now if yo
 
 ### Why?
 
-I wrote before about our [desire to kick JavaFX and its problems to the curve](https://www.codenameone.com/blog/moving-away-from-fx.html). There’s no way around it. It’s outdated and buggy.
+I wrote before about our [desire to kick JavaFX and its problems to the curve](/blog/moving-away-from-fx/). There’s no way around it. It’s outdated and buggy.
 
 CEF is literally Chrome. It’s modern and up to date, so newer browser features behave as expected. It’s also easy to debug and has a lot of other great features we can use. It would also free us from some of the JVM dependencies and let us build smaller desktop apps moving forward.
 
@@ -131,7 +131,7 @@ Once this migration is done we’ll follow up with some posts on debugging under
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Durank** — July 17, 2020 at 12:12 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24298))
+### **Durank** — July 17, 2020 at 12:12 pm ([permalink](/blog/big-changes-jcef/#comment-24298))
 
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 20, 2021 at 2:26 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24384))
+### **Shai Almog** — January 20, 2021 at 2:26 am ([permalink](/blog/big-changes-jcef/#comment-24384))
 
 > Shai Almog says:
 >
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — July 17, 2020 at 1:48 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24299))
+### **Steve Hannah** — July 17, 2020 at 1:48 pm ([permalink](/blog/big-changes-jcef/#comment-24299))
 
 > [Steve Hannah](https://lh3.googleusercontent.com/a-/AAuE7mBmUCgKSZtJ2cqeHgj6bdPY2AAQ10roHlMpgRWc) says:
 >
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Angelo** — August 3, 2020 at 1:53 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24303))
+### **Angelo** — August 3, 2020 at 1:53 pm ([permalink](/blog/big-changes-jcef/#comment-24303))
 
 > Angelo says:
 >
@@ -168,7 +168,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Angelo** — August 3, 2020 at 2:01 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24304))
+### **Angelo** — August 3, 2020 at 2:01 pm ([permalink](/blog/big-changes-jcef/#comment-24304))
 
 > Angelo says:
 >
@@ -177,7 +177,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 4, 2020 at 3:34 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24305))
+### **Shai Almog** — August 4, 2020 at 3:34 am ([permalink](/blog/big-changes-jcef/#comment-24305))
 
 > Shai Almog says:
 >
@@ -186,7 +186,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 4, 2020 at 3:36 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24302))
+### **Shai Almog** — August 4, 2020 at 3:36 am ([permalink](/blog/big-changes-jcef/#comment-24302))
 
 > Shai Almog says:
 >
@@ -196,7 +196,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Angelo** — August 4, 2020 at 7:42 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24309))
+### **Angelo** — August 4, 2020 at 7:42 am ([permalink](/blog/big-changes-jcef/#comment-24309))
 
 > Angelo says:
 >
@@ -206,7 +206,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Richard Matovu** — August 9, 2020 at 9:13 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24317))
+### **Richard Matovu** — August 9, 2020 at 9:13 am ([permalink](/blog/big-changes-jcef/#comment-24317))
 
 > [Richard Matovu](https://lh3.googleusercontent.com/a-/AOh14Ggv6DF23oF-udh-1mkmXOx1WryNt3gP1I1fADw2) says:
 >
@@ -260,7 +260,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 10, 2020 at 5:09 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24311))
+### **Shai Almog** — August 10, 2020 at 5:09 am ([permalink](/blog/big-changes-jcef/#comment-24311))
 
 > Shai Almog says:
 >
@@ -269,7 +269,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Carlos Verdier** — August 14, 2020 at 9:28 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24323))
+### **Carlos Verdier** — August 14, 2020 at 9:28 am ([permalink](/blog/big-changes-jcef/#comment-24323))
 
 > [Carlos Verdier](https://lh3.googleusercontent.com/-y-v_mMAwszk/AAAAAAAAAAI/AAAAAAAAAAA/AMZuucmcoea9nf4P3gRHGzB7T7jxG98R1w/photo.jpg) says:
 >
@@ -283,7 +283,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — August 14, 2020 at 12:52 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24324))
+### **Steve Hannah** — August 14, 2020 at 12:52 pm ([permalink](/blog/big-changes-jcef/#comment-24324))
 
 > [Steve Hannah](https://lh3.googleusercontent.com/a-/AAuE7mBmUCgKSZtJ2cqeHgj6bdPY2AAQ10roHlMpgRWc) says:
 >
@@ -294,7 +294,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Artur Hefczyc** — August 27, 2020 at 9:20 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24331))
+### **Artur Hefczyc** — August 27, 2020 at 9:20 pm ([permalink](/blog/big-changes-jcef/#comment-24331))
 
 > [Artur Hefczyc](https://avatars3.githubusercontent.com/u/1848738?v=4) says:
 >
@@ -306,7 +306,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Artur Hefczyc** — August 28, 2020 at 7:21 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24326))
+### **Artur Hefczyc** — August 28, 2020 at 7:21 pm ([permalink](/blog/big-changes-jcef/#comment-24326))
 
 > [Artur Hefczyc](https://avatars3.githubusercontent.com/u/1848738?v=4) says:
 >
@@ -319,7 +319,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 29, 2020 at 4:34 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24330))
+### **Shai Almog** — August 29, 2020 at 4:34 am ([permalink](/blog/big-changes-jcef/#comment-24330))
 
 > Shai Almog says:
 >
@@ -328,7 +328,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Artur Hefczyc** — September 11, 2020 at 3:44 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24334))
+### **Artur Hefczyc** — September 11, 2020 at 3:44 am ([permalink](/blog/big-changes-jcef/#comment-24334))
 
 > [Artur Hefczyc](https://avatars3.githubusercontent.com/u/1848738?v=4) says:
 >
@@ -337,7 +337,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 11, 2020 at 3:45 am ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24332))
+### **Shai Almog** — September 11, 2020 at 3:45 am ([permalink](/blog/big-changes-jcef/#comment-24332))
 
 > Shai Almog says:
 >
@@ -346,7 +346,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Artur Hefczyc** — September 11, 2020 at 4:49 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24336))
+### **Artur Hefczyc** — September 11, 2020 at 4:49 pm ([permalink](/blog/big-changes-jcef/#comment-24336))
 
 > [Artur Hefczyc](https://avatars3.githubusercontent.com/u/1848738?v=4) says:
 >
@@ -370,7 +370,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 11, 2020 at 4:51 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24333))
+### **Shai Almog** — September 11, 2020 at 4:51 pm ([permalink](/blog/big-changes-jcef/#comment-24333))
 
 > Shai Almog says:
 >
@@ -379,7 +379,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Julio Valeriron Ochoa** — January 19, 2021 at 8:49 pm ([permalink](https://www.codenameone.com/blog/big-changes-jcef.html#comment-24383))
+### **Julio Valeriron Ochoa** — January 19, 2021 at 8:49 pm ([permalink](/blog/big-changes-jcef/#comment-24383))
 
 > Julio Valeriron Ochoa says:
 >

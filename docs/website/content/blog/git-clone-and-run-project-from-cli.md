@@ -136,7 +136,7 @@ I’ve create a short screencast demonstrating the use of the `cn1 git-clone` co
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Nick Koirala** — November 29, 2017 at 3:36 am ([permalink](https://www.codenameone.com/blog/git-clone-and-run-project-from-cli.html#comment-23689))
+### **Nick Koirala** — November 29, 2017 at 3:36 am ([permalink](/blog/git-clone-and-run-project-from-cli/#comment-23689))
 
 > Nick Koirala says:
 >
@@ -145,7 +145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mohammed Kamal** — November 12, 2019 at 2:56 pm ([permalink](https://www.codenameone.com/blog/git-clone-and-run-project-from-cli.html#comment-24266))
+### **Mohammed Kamal** — November 12, 2019 at 2:56 pm ([permalink](/blog/git-clone-and-run-project-from-cli/#comment-24266))
 
 > [Mohammed Kamal](https://lh3.googleusercontent.com/a-/AAuE7mCCX8URBU8WJDWqV22i4h7HBcx_AKz6hh_WX4-U) says:
 >

@@ -36,7 +36,7 @@ Check it out and let us know what you think…​
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Nick Koirala** — June 2, 2016 at 2:55 am ([permalink](https://www.codenameone.com/blog/bluetooth-support.html#comment-22554))
+### **Nick Koirala** — June 2, 2016 at 2:55 am ([permalink](/blog/bluetooth-support/#comment-22554))
 
 > Nick Koirala says:
 >

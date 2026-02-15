@@ -47,7 +47,7 @@ Figure 3. The "Components" panel toolbar, which includes a toggle button to enab
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **plumberg** — March 29, 2022 at 5:28 pm ([permalink](https://www.codenameone.com/blog/inspect-component.html#comment-24528))
+### **plumberg** — March 29, 2022 at 5:28 pm ([permalink](/blog/inspect-component/#comment-24528))
 
 > plumberg says:
 >
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ThomasH99** — April 5, 2022 at 11:21 am ([permalink](https://www.codenameone.com/blog/inspect-component.html#comment-24530))
+### **ThomasH99** — April 5, 2022 at 11:21 am ([permalink](/blog/inspect-component/#comment-24530))
 
 > ThomasH99 says:
 >
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — April 5, 2022 at 11:15 pm ([permalink](https://www.codenameone.com/blog/inspect-component.html#comment-24531))
+### **Steve Hannah** — April 5, 2022 at 11:15 pm ([permalink](/blog/inspect-component/#comment-24531))
 
 > Steve Hannah says:
 >
@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ThomasH99** — April 10, 2022 at 12:30 pm ([permalink](https://www.codenameone.com/blog/inspect-component.html#comment-24533))
+### **ThomasH99** — April 10, 2022 at 12:30 pm ([permalink](/blog/inspect-component/#comment-24533))
 
 > ThomasH99 says:
 >

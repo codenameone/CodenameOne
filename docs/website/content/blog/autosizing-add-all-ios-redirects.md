@@ -84,14 +84,14 @@ We might still revert this fix if we run into too many problems so with this Fri
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **João Bastos** — February 13, 2017 at 12:32 pm ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23210))
+### **João Bastos** — February 13, 2017 at 12:32 pm ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23210))
 
 > Is the addAll shortcut already available? Cant see it in netbeans…
 >
 
 
 
-### **Shai Almog** — February 14, 2017 at 8:05 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23119))
+### **Shai Almog** — February 14, 2017 at 8:05 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23119))
 
 > Shai Almog says:
 >
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **João Bastos** — February 14, 2017 at 5:23 pm ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24230))
+### **João Bastos** — February 14, 2017 at 5:23 pm ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24230))
 
 > João Bastos says:
 >
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — September 20, 2018 at 8:06 pm ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24001))
+### **Denis** — September 20, 2018 at 8:06 pm ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24001))
 
 > Denis says:
 >
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — September 21, 2018 at 10:38 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24033))
+### **Denis** — September 21, 2018 at 10:38 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24033))
 
 > Denis says:
 >
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 22, 2018 at 6:09 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23934))
+### **Shai Almog** — September 22, 2018 at 6:09 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23934))
 
 > Shai Almog says:
 >
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — September 23, 2018 at 9:02 pm ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24070))
+### **Denis** — September 23, 2018 at 9:02 pm ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24070))
 
 > Denis says:
 >
@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 24, 2018 at 4:33 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24082))
+### **Shai Almog** — September 24, 2018 at 4:33 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24082))
 
 > Shai Almog says:
 >
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — September 24, 2018 at 6:54 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23785))
+### **Denis** — September 24, 2018 at 6:54 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23785))
 
 > Denis says:
 >
@@ -180,7 +180,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 25, 2018 at 8:23 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24019))
+### **Shai Almog** — September 25, 2018 at 8:23 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24019))
 
 > Shai Almog says:
 >
@@ -189,7 +189,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — September 25, 2018 at 12:05 pm ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24025))
+### **Denis** — September 25, 2018 at 12:05 pm ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24025))
 
 > Denis says:
 >
@@ -198,7 +198,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — September 26, 2018 at 9:01 pm ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24052))
+### **Denis** — September 26, 2018 at 9:01 pm ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24052))
 
 > Denis says:
 >
@@ -207,7 +207,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — September 27, 2018 at 8:48 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24084))
+### **Denis** — September 27, 2018 at 8:48 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24084))
 
 > Denis says:
 >
@@ -221,7 +221,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — September 27, 2018 at 10:43 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23964))
+### **Denis** — September 27, 2018 at 10:43 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23964))
 
 > Denis says:
 >
@@ -230,7 +230,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 28, 2018 at 5:31 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24048))
+### **Shai Almog** — September 28, 2018 at 5:31 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24048))
 
 > Shai Almog says:
 >
@@ -239,7 +239,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — September 28, 2018 at 7:17 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23866))
+### **Denis** — September 28, 2018 at 7:17 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23866))
 
 > Denis says:
 >
@@ -255,7 +255,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 29, 2018 at 4:27 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24069))
+### **Shai Almog** — September 29, 2018 at 4:27 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24069))
 
 > Shai Almog says:
 >
@@ -264,7 +264,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 29, 2018 at 4:31 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24074))
+### **Shai Almog** — September 29, 2018 at 4:31 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24074))
 
 > Shai Almog says:
 >
@@ -275,7 +275,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 30, 2018 at 9:27 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24044))
+### **Shai Almog** — September 30, 2018 at 9:27 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24044))
 
 > Shai Almog says:
 >
@@ -284,7 +284,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 30, 2018 at 9:28 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-21580))
+### **Shai Almog** — September 30, 2018 at 9:28 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-21580))
 
 > Shai Almog says:
 >
@@ -293,7 +293,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — October 1, 2018 at 9:07 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-24087))
+### **Denis** — October 1, 2018 at 9:07 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-24087))
 
 > Denis says:
 >
@@ -302,7 +302,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 2, 2018 at 4:49 am ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23822))
+### **Shai Almog** — October 2, 2018 at 4:49 am ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23822))
 
 > Shai Almog says:
 >
@@ -312,7 +312,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — October 2, 2018 at 12:21 pm ([permalink](https://www.codenameone.com/blog/autosizing-add-all-ios-redirects.html#comment-23893))
+### **Denis** — October 2, 2018 at 12:21 pm ([permalink](/blog/autosizing-add-all-ios-redirects/#comment-23893))
 
 > Denis says:
 >

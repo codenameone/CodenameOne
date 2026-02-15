@@ -242,7 +242,7 @@ Feel free to use the comments section for suggestions of future comparison segme
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **J Master** — May 13, 2016 at 9:50 am ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-22538))
+### **J Master** — May 13, 2016 at 9:50 am ([permalink](/blog/comparing-xamarin-and-codename-one/#comment-22538))
 
 > J Master says:
 >
@@ -251,7 +251,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 120,000,000 is based from which figure?
 
 
-### **Shai Almog** — May 14, 2016 at 3:19 am ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-22663))
+### **Shai Almog** — May 14, 2016 at 3:19 am ([permalink](/blog/comparing-xamarin-and-codename-one/#comment-22663))
 
 > Shai Almog says:
 >
@@ -260,14 +260,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > By default we include device counting code in builds (this can be disabled) so we composed that number from verified installed which we then correlated to actual appstore installs and to apps/devices where we know this was developed to come up with a composite number. The number is actually much larger by now but we didn’t get around to go thru this process to update it.
 
 
-### **Siva Mamidi** — June 2, 2016 at 8:32 pm ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-22757))
+### **Siva Mamidi** — June 2, 2016 at 8:32 pm ([permalink](/blog/comparing-xamarin-and-codename-one/#comment-22757))
 
 > Siva Mamidi says:
 >
 > Very nice article and informative.
 
 
-### **Benjamin Hamilton** — June 18, 2016 at 1:10 am ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-22613))
+### **Benjamin Hamilton** — June 18, 2016 at 1:10 am ([permalink](/blog/comparing-xamarin-and-codename-one/#comment-22613))
 
 > Benjamin Hamilton says:
 >
@@ -280,7 +280,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > JNI is the Java Native Interface. It defines a way for managed code (written in the Java programming language) to interact with native code (written in C/C++). It’s vendor-neutral, has support for loading code from dynamic shared libraries, and while cumbersome at times is reasonably efficient.
 
 
-### **Shai Almog** — June 18, 2016 at 4:56 am ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-22941))
+### **Shai Almog** — June 18, 2016 at 4:56 am ([permalink](/blog/comparing-xamarin-and-codename-one/#comment-22941))
 
 > Shai Almog says:
 >
@@ -300,7 +300,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > it.
 
 
-### **Marcin** — July 15, 2016 at 1:28 am ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-22793))
+### **Marcin** — July 15, 2016 at 1:28 am ([permalink](/blog/comparing-xamarin-and-codename-one/#comment-22793))
 
 > Marcin says:
 >
@@ -324,7 +324,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Marcin
 
 
-### **Shai Almog** — July 15, 2016 at 4:00 am ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-22801))
+### **Shai Almog** — July 15, 2016 at 4:00 am ([permalink](/blog/comparing-xamarin-and-codename-one/#comment-22801))
 
 > Shai Almog says:
 >
@@ -334,14 +334,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > We don’t support JUnit etc. so you will need to use our test framework which includes a test recorder etc. I think a lot of the problems solved by DI are server problems and not as pertinent to the front end developer landscape.
 
 
-### **Martin Grajcar** — September 9, 2017 at 1:26 am ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-23350))
+### **Martin Grajcar** — September 9, 2017 at 1:26 am ([permalink](/blog/comparing-xamarin-and-codename-one/#comment-23350))
 
 > Martin Grajcar says:
 >
 > Dagger 2 uses no reflection at all, so in theory it must work. As this is the only relevant search result for “codenameone” and “dependency injection”, I’m afraid that nobody has really tried it yet.
 
 
-### **Shai Almog** — September 9, 2017 at 7:13 am ([permalink](https://www.codenameone.com/blog/comparing-xamarin-and-codename-one.html#comment-23502))
+### **Shai Almog** — September 9, 2017 at 7:13 am ([permalink](/blog/comparing-xamarin-and-codename-one/#comment-23502))
 
 > Shai Almog says:
 >

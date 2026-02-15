@@ -60,7 +60,7 @@ on a frequent basis even a minute automation like this makes a big difference.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Blessing Mahlalela** — February 9, 2017 at 4:35 pm ([permalink](https://www.codenameone.com/blog/automating-releases.html#comment-23223))
+### **Blessing Mahlalela** — February 9, 2017 at 4:35 pm ([permalink](/blog/automating-releases/#comment-23223))
 
 > Blessing Mahlalela says:
 >
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 9, 2017 at 6:32 pm ([permalink](https://www.codenameone.com/blog/automating-releases.html#comment-21563))
+### **Shai Almog** — February 9, 2017 at 6:32 pm ([permalink](/blog/automating-releases/#comment-21563))
 
 > Shai Almog says:
 >
@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Blessing Mahlalela** — February 9, 2017 at 6:43 pm ([permalink](https://www.codenameone.com/blog/automating-releases.html#comment-23319))
+### **Blessing Mahlalela** — February 9, 2017 at 6:43 pm ([permalink](/blog/automating-releases/#comment-23319))
 
 > Blessing Mahlalela says:
 >
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Blessing Mahlalela** — February 9, 2017 at 6:46 pm ([permalink](https://www.codenameone.com/blog/automating-releases.html#comment-23071))
+### **Blessing Mahlalela** — February 9, 2017 at 6:46 pm ([permalink](/blog/automating-releases/#comment-23071))
 
 > Blessing Mahlalela says:
 >
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Blessing Mahlalela** — February 9, 2017 at 8:21 pm ([permalink](https://www.codenameone.com/blog/automating-releases.html#comment-23237))
+### **Blessing Mahlalela** — February 9, 2017 at 8:21 pm ([permalink](/blog/automating-releases/#comment-23237))
 
 > Blessing Mahlalela says:
 >
@@ -105,7 +105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 9, 2017 at 8:49 pm ([permalink](https://www.codenameone.com/blog/automating-releases.html#comment-23077))
+### **Shai Almog** — February 9, 2017 at 8:49 pm ([permalink](/blog/automating-releases/#comment-23077))
 
 > Shai Almog says:
 >

@@ -32,7 +32,7 @@ If this will trigger a regression in your code (possible if you have a native de
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Julio Valeriron Ochoa** — October 7, 2021 at 1:28 pm ([permalink](https://www.codenameone.com/blog/moving-to-xcode-12.html#comment-24499))
+### **Julio Valeriron Ochoa** — October 7, 2021 at 1:28 pm ([permalink](/blog/moving-to-xcode-12/#comment-24499))
 
 > Julio Valeriron Ochoa says:
 >
@@ -41,7 +41,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 7, 2021 at 1:35 pm ([permalink](https://www.codenameone.com/blog/moving-to-xcode-12.html#comment-24500))
+### **Shai Almog** — October 7, 2021 at 1:35 pm ([permalink](/blog/moving-to-xcode-12/#comment-24500))
 
 > Shai Almog says:
 >

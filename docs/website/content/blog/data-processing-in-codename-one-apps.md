@@ -17,11 +17,11 @@ The following recipes relate to data processing and conversion in Codename One a
 
 ## Problem
 
-You want to parse some HTML content into a data structure. You can’t simply use the [XMLParser](https://www.codenameone.com/javadoc/com/codename1/xml/XMLParser.html) class because the content is not well-formed XML, but you would like to be able to work with the parsed document using the same tools (e.g. [Result](https://www.codenameone.com/javadoc/com/codename1/processing/Result.html) and [Element](https://www.codenameone.com/javadoc/com/codename1/xml/Element.html).)
+You want to parse some HTML content into a data structure. You can’t simply use the [XMLParser](/javadoc/com/codename1/xml/XMLParser/) class because the content is not well-formed XML, but you would like to be able to work with the parsed document using the same tools (e.g. [Result](/javadoc/com/codename1/processing/Result/) and [Element](/javadoc/com/codename1/xml/Element/).)
 
 ## Solution
 
-Use the HTMLParser class from the [CN1HTMLParser cn1lib](https://github.com/shannah/CN1HTMLParser). It contains a simple API for parsing an HTML string into an [Element](https://www.codenameone.com/javadoc/com/codename1/xml/Element.html), the same type of element that [XMLParser](https://www.codenameone.com/javadoc/com/codename1/xml/XMLParser.html) returns.
+Use the HTMLParser class from the [CN1HTMLParser cn1lib](https://github.com/shannah/CN1HTMLParser). It contains a simple API for parsing an HTML string into an [Element](/javadoc/com/codename1/xml/Element/), the same type of element that [XMLParser](/javadoc/com/codename1/xml/XMLParser/) returns.
 
 ## Usage Example:
 
@@ -82,7 +82,7 @@ The HTMLParser class wraps an off-screen BrowserComponent to use the platform’
 
 ## Further Reading
 
-[XMLParser Javadocs](https://www.codenameone.com/javadoc/com/codename1/xml/XMLParser.html) – Since the output of HTMLParser is the same as XMLParser, you can find some useful examples in the XMLParser javadocs.
+[XMLParser Javadocs](/javadoc/com/codename1/xml/XMLParser/) – Since the output of HTMLParser is the same as XMLParser, you can find some useful examples in the XMLParser javadocs.
 
 ### Using the Clipboard
 

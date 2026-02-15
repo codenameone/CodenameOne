@@ -606,7 +606,7 @@ Username: demo, Password: demo (case sensitive)
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Toby Mundy** — December 1, 2016 at 10:02 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-24243))
+### **Toby Mundy** — December 1, 2016 at 10:02 pm ([permalink](/blog/connecting-to-a-mysql-database/#comment-24243))
 
 > I followed the tutorial but could not get the server setup properly. All appeared to go well but when I pointed the web browser at <http://localhost/sakila> to test the server setup I just got the following error in the browser:
 >
@@ -619,7 +619,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — December 2, 2016 at 4:23 am ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23230))
+### **shannah78** — December 2, 2016 at 4:23 am ([permalink](/blog/connecting-to-a-mysql-database/#comment-23230))
 
 > It appears that the database user wasn’t created properly. Check the conf.db.ini file. It should list the username and password that it is trying to connect with. Then ensure that mysql has that user.
 >
@@ -632,14 +632,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Toby Mundy** — December 2, 2016 at 1:11 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-22821))
+### **Toby Mundy** — December 2, 2016 at 1:11 pm ([permalink](/blog/connecting-to-a-mysql-database/#comment-22821))
 
 > Thanks, I had not added mysql to environment PATH.
 >
 
 
 
-### **Rudy Lemaitre** — February 8, 2017 at 3:18 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-21562))
+### **Rudy Lemaitre** — February 8, 2017 at 3:18 pm ([permalink](/blog/connecting-to-a-mysql-database/#comment-21562))
 
 > Hi all,  
 > i have juste a question for the lib.  
@@ -655,14 +655,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — February 8, 2017 at 4:43 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23147))
+### **shannah78** — February 8, 2017 at 4:43 pm ([permalink](/blog/connecting-to-a-mysql-database/#comment-23147))
 
 > Did you refresh cn1libs in your project after adding the cn1-xataface.cn1lib? Note: You can also install it via Codename One settings (in extensions). But you’d still need to to the refresh cn1libs step after that.
 >
 
 
 
-### **Rudy Lemaitre** — February 8, 2017 at 6:14 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-22992))
+### **Rudy Lemaitre** — February 8, 2017 at 6:14 pm ([permalink](/blog/connecting-to-a-mysql-database/#comment-22992))
 
 > Rudy Lemaitre says:
 >
@@ -672,7 +672,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Rudy Lemaitre** — February 9, 2017 at 8:30 am ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-24125))
+### **Rudy Lemaitre** — February 9, 2017 at 8:30 am ([permalink](/blog/connecting-to-a-mysql-database/#comment-24125))
 
 > Rudy Lemaitre says:
 >
@@ -682,7 +682,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Rudy Lemaitre** — February 9, 2017 at 10:44 am ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23167))
+### **Rudy Lemaitre** — February 9, 2017 at 10:44 am ([permalink](/blog/connecting-to-a-mysql-database/#comment-23167))
 
 > Rudy Lemaitre says:
 >
@@ -693,7 +693,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chris** — April 10, 2017 at 8:10 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-21570))
+### **Chris** — April 10, 2017 at 8:10 pm ([permalink](/blog/connecting-to-a-mysql-database/#comment-21570))
 
 > Chris says:
 >
@@ -702,7 +702,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — April 11, 2017 at 3:58 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23222))
+### **shannah78** — April 11, 2017 at 3:58 pm ([permalink](/blog/connecting-to-a-mysql-database/#comment-23222))
 
 > shannah78 says:
 >
@@ -711,7 +711,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chris** — April 11, 2017 at 4:09 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23108))
+### **Chris** — April 11, 2017 at 4:09 pm ([permalink](/blog/connecting-to-a-mysql-database/#comment-23108))
 
 > Chris says:
 >
@@ -720,7 +720,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — April 12, 2017 at 4:40 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23131))
+### **shannah78** — April 12, 2017 at 4:40 pm ([permalink](/blog/connecting-to-a-mysql-database/#comment-23131))
 
 > shannah78 says:
 >
@@ -729,7 +729,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Brutus** — April 27, 2017 at 1:17 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23339))
+### **Brutus** — April 27, 2017 at 1:17 pm ([permalink](/blog/connecting-to-a-mysql-database/#comment-23339))
 
 > Brutus says:
 >
@@ -738,16 +738,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 28, 2017 at 5:24 am ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-23132))
+### **Shai Almog** — April 28, 2017 at 5:24 am ([permalink](/blog/connecting-to-a-mysql-database/#comment-23132))
 
 > Shai Almog says:
 >
-> [https://www.codenameone.com…](<https://www.codenameone.com/javadoc/com/codename1/io/MultipartRequest.html>)
+> [https://www.codenameone.com…](</javadoc/com/codename1/io/MultipartRequest/>)
 >
 
 
 
-### **Pawan Jain** — September 13, 2020 at 8:01 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-24338))
+### **Pawan Jain** — September 13, 2020 at 8:01 pm ([permalink](/blog/connecting-to-a-mysql-database/#comment-24338))
 
 > [Pawan Jain](https://lh4.googleusercontent.com/-0r85m23OrDM/AAAAAAAAAAI/AAAAAAAAAAA/AMZuucnCeH5OcGgKnuB6aIIm5xdVdmFh3Q/photo.jpg) says:
 >
@@ -770,7 +770,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — September 16, 2020 at 9:52 pm ([permalink](https://www.codenameone.com/blog/connecting-to-a-mysql-database.html#comment-24340))
+### **Steve Hannah** — September 16, 2020 at 9:52 pm ([permalink](/blog/connecting-to-a-mysql-database/#comment-24340))
 
 > [Steve Hannah](https://lh3.googleusercontent.com/a-/AAuE7mBmUCgKSZtJ2cqeHgj6bdPY2AAQ10roHlMpgRWc) says:
 >

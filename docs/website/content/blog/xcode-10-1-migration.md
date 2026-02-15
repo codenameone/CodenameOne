@@ -23,7 +23,7 @@ We also considered updating the Android target SDK from 27 to 28 but since that 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — January 10, 2019 at 11:29 am ([permalink](https://www.codenameone.com/blog/xcode-10-1-migration.html#comment-23911))
+### **Francesco Galgani** — January 10, 2019 at 11:29 am ([permalink](/blog/xcode-10-1-migration/#comment-23911))
 
 > Francesco Galgani says:
 >
@@ -32,7 +32,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 10, 2019 at 11:52 am ([permalink](https://www.codenameone.com/blog/xcode-10-1-migration.html#comment-23902))
+### **Shai Almog** — January 10, 2019 at 11:52 am ([permalink](/blog/xcode-10-1-migration/#comment-23902))
 
 > Shai Almog says:
 >
@@ -41,7 +41,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — January 10, 2019 at 11:53 am ([permalink](https://www.codenameone.com/blog/xcode-10-1-migration.html#comment-23973))
+### **Francesco Galgani** — January 10, 2019 at 11:53 am ([permalink](/blog/xcode-10-1-migration/#comment-23973))
 
 > Francesco Galgani says:
 >

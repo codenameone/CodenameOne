@@ -49,7 +49,7 @@ We think the “right thing” to do in the case of Android is to import only th
 the Java code which you would need to migrate manually (as there are no activities etc.). Codename One has  
 the theoretically perfect destinations, the resource files can serve as a great destination for the res files.
 
-The XML’s can be imported directly into the XML file format used by the [new GUI builder](https://www.codenameone.com/blog/new-gui-builder.html).
+The XML’s can be imported directly into the XML file format used by the [new GUI builder](/blog/new-gui-builder/).
 
 However, the technical aspects are challenging to say the least!
 
@@ -87,7 +87,7 @@ So before we see a stable version of Windows, GUI builder etc. this probably won
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Scott Turner** — April 22, 2017 at 6:21 pm ([permalink](https://www.codenameone.com/blog/why-we-dont-import-android-native-code.html#comment-23262))
+### **Scott Turner** — April 22, 2017 at 6:21 pm ([permalink](/blog/why-we-dont-import-android-native-code/#comment-23262))
 
 > Scott Turner says:
 >

@@ -37,7 +37,7 @@ The best approach is an Android Strings file. It’s XML which is very well unde
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **salah Alhaddabi** — September 6, 2017 at 6:05 am ([permalink](https://www.codenameone.com/blog/tip-outsource-app-translations.html#comment-21526))
+### **salah Alhaddabi** — September 6, 2017 at 6:05 am ([permalink](/blog/tip-outsource-app-translations/#comment-21526))
 
 > Thanks a lot Shai. Even during your leave you try to blog.  
 > Thanks a lot for all your help!!!

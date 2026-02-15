@@ -99,7 +99,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — November 27, 2014 at 5:37 am ([permalink](https://www.codenameone.com/blog/sms-custom-commands.html#comment-21605))
+### **Anonymous** — November 27, 2014 at 5:37 am ([permalink](/blog/sms-custom-commands/#comment-21605))
 
 > Anonymous says:
 >
@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 28, 2014 at 4:18 pm ([permalink](https://www.codenameone.com/blog/sms-custom-commands.html#comment-21504))
+### **Anonymous** — November 28, 2014 at 4:18 pm ([permalink](/blog/sms-custom-commands/#comment-21504))
 
 > Anonymous says:
 >
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 29, 2014 at 12:28 am ([permalink](https://www.codenameone.com/blog/sms-custom-commands.html#comment-22107))
+### **Anonymous** — November 29, 2014 at 12:28 am ([permalink](/blog/sms-custom-commands/#comment-22107))
 
 > Anonymous says:
 >
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 29, 2014 at 3:31 am ([permalink](https://www.codenameone.com/blog/sms-custom-commands.html#comment-22272))
+### **Anonymous** — November 29, 2014 at 3:31 am ([permalink](/blog/sms-custom-commands/#comment-22272))
 
 > Anonymous says:
 >

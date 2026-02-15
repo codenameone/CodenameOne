@@ -77,7 +77,7 @@ Its not a big deal but small things like that make the code slightly more readab
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **davidwaf** — November 4, 2015 at 9:35 pm ([permalink](https://www.codenameone.com/blog/properties-continued-terseness.html#comment-22255))
+### **davidwaf** — November 4, 2015 at 9:35 pm ([permalink](/blog/properties-continued-terseness/#comment-22255))
 
 > davidwaf says:
 >

@@ -282,7 +282,7 @@ tool but knowing Oracle… I’m not holding my breath.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Andrea Liana** — November 19, 2015 at 11:18 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22561))
+### **Andrea Liana** — November 19, 2015 at 11:18 am ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22561))
 
 > Andrea Liana says:
 >
@@ -298,7 +298,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 19, 2015 at 11:43 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22569))
+### **Shai Almog** — November 19, 2015 at 11:43 am ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22569))
 
 > Shai Almog says:
 >
@@ -316,7 +316,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Andrea Liana** — November 19, 2015 at 12:02 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22317))
+### **Andrea Liana** — November 19, 2015 at 12:02 pm ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22317))
 
 > Andrea Liana says:
 >
@@ -326,7 +326,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 19, 2015 at 12:07 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22325))
+### **Shai Almog** — November 19, 2015 at 12:07 pm ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22325))
 
 > Shai Almog says:
 >
@@ -340,7 +340,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Andrea Liana** — November 19, 2015 at 12:53 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22479))
+### **Andrea Liana** — November 19, 2015 at 12:53 pm ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22479))
 
 > Andrea Liana says:
 >
@@ -349,7 +349,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Michael Stover** — November 19, 2015 at 6:22 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-24163))
+### **Michael Stover** — November 19, 2015 at 6:22 pm ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-24163))
 
 > Michael Stover says:
 >
@@ -360,7 +360,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bryan** — November 19, 2015 at 11:44 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22347))
+### **bryan** — November 19, 2015 at 11:44 pm ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22347))
 
 > bryan says:
 >
@@ -375,7 +375,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **critic** — November 20, 2015 at 7:19 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22332))
+### **critic** — November 20, 2015 at 7:19 pm ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22332))
 
 > critic says:
 >
@@ -384,7 +384,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jeff Martin** — November 23, 2015 at 4:48 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22289))
+### **Jeff Martin** — November 23, 2015 at 4:48 pm ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22289))
 
 > Jeff Martin says:
 >
@@ -393,7 +393,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 23, 2015 at 8:03 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-21480))
+### **Shai Almog** — November 23, 2015 at 8:03 pm ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-21480))
 
 > Shai Almog says:
 >
@@ -409,7 +409,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jeff Martin** — November 23, 2015 at 8:52 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22181))
+### **Jeff Martin** — November 23, 2015 at 8:52 pm ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22181))
 
 > Jeff Martin says:
 >
@@ -418,7 +418,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Pablo Rodriguez Pina** — November 25, 2015 at 1:27 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22513))
+### **Pablo Rodriguez Pina** — November 25, 2015 at 1:27 am ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22513))
 
 > Pablo Rodriguez Pina says:
 >
@@ -477,7 +477,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 25, 2015 at 3:25 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22256))
+### **Shai Almog** — November 25, 2015 at 3:25 am ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22256))
 
 > Shai Almog says:
 >
@@ -488,7 +488,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **RuRu** — November 25, 2015 at 9:58 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22268))
+### **RuRu** — November 25, 2015 at 9:58 am ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22268))
 
 > RuRu says:
 >
@@ -502,7 +502,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **RuRu** — November 25, 2015 at 10:03 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22388))
+### **RuRu** — November 25, 2015 at 10:03 am ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22388))
 
 > RuRu says:
 >
@@ -511,7 +511,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Sid** — November 27, 2015 at 4:20 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22474))
+### **Sid** — November 27, 2015 at 4:20 pm ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22474))
 
 > Sid says:
 >
@@ -520,7 +520,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 27, 2015 at 4:51 pm ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22416))
+### **Shai Almog** — November 27, 2015 at 4:51 pm ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22416))
 
 > Shai Almog says:
 >
@@ -537,7 +537,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Pablo Rodriguez Pina** — November 30, 2015 at 7:49 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22489))
+### **Pablo Rodriguez Pina** — November 30, 2015 at 7:49 am ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22489))
 
 > Pablo Rodriguez Pina says:
 >
@@ -546,7 +546,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Pablo Rodriguez Pina** — November 30, 2015 at 7:53 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22307))
+### **Pablo Rodriguez Pina** — November 30, 2015 at 7:53 am ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22307))
 
 > Pablo Rodriguez Pina says:
 >
@@ -555,7 +555,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **First Last** — March 27, 2016 at 11:02 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22719))
+### **First Last** — March 27, 2016 at 11:02 am ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22719))
 
 > First Last says:
 >
@@ -564,7 +564,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 27, 2016 at 11:11 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22491))
+### **Shai Almog** — March 27, 2016 at 11:11 am ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22491))
 
 > Shai Almog says:
 >
@@ -579,7 +579,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 14, 2016 at 5:19 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-23072))
+### **Shai Almog** — September 14, 2016 at 5:19 am ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-23072))
 
 > Shai Almog says:
 >
@@ -590,7 +590,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 15, 2016 at 4:15 am ([permalink](https://www.codenameone.com/blog/should-oracle-spring-clean-javafx.html#comment-22938))
+### **Shai Almog** — September 15, 2016 at 4:15 am ([permalink](/blog/should-oracle-spring-clean-javafx/#comment-22938))
 
 > Shai Almog says:
 >

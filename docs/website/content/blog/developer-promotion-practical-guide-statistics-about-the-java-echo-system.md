@@ -167,7 +167,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — July 10, 2014 at 5:30 am ([permalink](https://www.codenameone.com/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system.html#comment-21886))
+### **Anonymous** — July 10, 2014 at 5:30 am ([permalink](/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system/#comment-21886))
 
 > Anonymous says:
 >
@@ -176,7 +176,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 10, 2014 at 6:35 am ([permalink](https://www.codenameone.com/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system.html#comment-22059))
+### **Anonymous** — July 10, 2014 at 6:35 am ([permalink](/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system/#comment-22059))
 
 > Anonymous says:
 >
@@ -193,7 +193,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 10, 2014 at 7:32 am ([permalink](https://www.codenameone.com/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system.html#comment-22196))
+### **Anonymous** — July 10, 2014 at 7:32 am ([permalink](/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system/#comment-22196))
 
 > Anonymous says:
 >
@@ -202,7 +202,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 10, 2014 at 11:17 am ([permalink](https://www.codenameone.com/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system.html#comment-24183))
+### **Anonymous** — July 10, 2014 at 11:17 am ([permalink](/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system/#comment-24183))
 
 > Anonymous says:
 >
@@ -215,7 +215,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 10, 2014 at 12:40 pm ([permalink](https://www.codenameone.com/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system.html#comment-22028))
+### **Anonymous** — July 10, 2014 at 12:40 pm ([permalink](/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system/#comment-22028))
 
 > Anonymous says:
 >
@@ -224,7 +224,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 11, 2014 at 1:34 am ([permalink](https://www.codenameone.com/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system.html#comment-22131))
+### **Anonymous** — July 11, 2014 at 1:34 am ([permalink](/blog/developer-promotion-practical-guide-statistics-about-the-java-echo-system/#comment-22131))
 
 > Anonymous says:
 >

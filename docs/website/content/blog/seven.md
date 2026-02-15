@@ -71,7 +71,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 28, 2013 at 1:51 pm ([permalink](https://www.codenameone.com/blog/seven.html#comment-21741))
+### **Anonymous** — October 28, 2013 at 1:51 pm ([permalink](/blog/seven/#comment-21741))
 
 > Anonymous says:
 >
@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 29, 2013 at 2:36 am ([permalink](https://www.codenameone.com/blog/seven.html#comment-22000))
+### **Anonymous** — October 29, 2013 at 2:36 am ([permalink](/blog/seven/#comment-22000))
 
 > Anonymous says:
 >
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 23, 2014 at 11:16 am ([permalink](https://www.codenameone.com/blog/seven.html#comment-21967))
+### **Anonymous** — January 23, 2014 at 11:16 am ([permalink](/blog/seven/#comment-21967))
 
 > Anonymous says:
 >
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 23, 2014 at 4:30 pm ([permalink](https://www.codenameone.com/blog/seven.html#comment-24161))
+### **Anonymous** — January 23, 2014 at 4:30 pm ([permalink](/blog/seven/#comment-24161))
 
 > Anonymous says:
 >

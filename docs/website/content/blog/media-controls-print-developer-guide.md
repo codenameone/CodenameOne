@@ -38,7 +38,7 @@ So far the on-top side menu is a huge improvement especially in UI’s that cont
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — October 18, 2017 at 10:28 am ([permalink](https://www.codenameone.com/blog/media-controls-print-developer-guide.html#comment-23815))
+### **Francesco Galgani** — October 18, 2017 at 10:28 am ([permalink](/blog/media-controls-print-developer-guide/#comment-23815))
 
 > Francesco Galgani says:
 >
@@ -49,7 +49,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 19, 2017 at 5:56 am ([permalink](https://www.codenameone.com/blog/media-controls-print-developer-guide.html#comment-23605))
+### **Shai Almog** — October 19, 2017 at 5:56 am ([permalink](/blog/media-controls-print-developer-guide/#comment-23605))
 
 > Shai Almog says:
 >

@@ -82,7 +82,7 @@ can’t entertain every request/suggestion but we try to listen and base our wor
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **disqus** — October 12, 2016 at 4:14 pm ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-22874))
+### **disqus** — October 12, 2016 at 4:14 pm ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-22874))
 
 > Updated netbeans plugin to Version: 3.5.5. Post update GUI Builder button events not functional after update. On looking at the generated code found this  
 > public void actionPerformed(com.codename1.ui.events.ActionEvent ev) {  
@@ -105,7 +105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chen Fishbein** — October 12, 2016 at 6:33 pm ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-23051))
+### **Chen Fishbein** — October 12, 2016 at 6:33 pm ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-23051))
 
 > Thanks, it will be fixed for the next update.  
 > In the meantime you can just add an ActionListener to your Button right after the call to initGuiBuilderComponents
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — November 1, 2016 at 10:02 am ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-23157))
+### **Chidiebere Okwudire** — November 1, 2016 at 10:02 am ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-23157))
 
 > How does the new GUI builder paradigm work with (UI) inheritance?
 >
@@ -122,14 +122,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 1, 2016 at 10:17 am ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-22974))
+### **Shai Almog** — November 1, 2016 at 10:17 am ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-22974))
 
 > We did just that in the new Phoenix demo, all forms derive from a common base form for the common side menu.
 >
 
 
 
-### **Chidiebere Okwudire** — November 1, 2016 at 11:00 am ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-23173))
+### **Chidiebere Okwudire** — November 1, 2016 at 11:00 am ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-23173))
 
 > Chidiebere Okwudire says:
 >
@@ -138,7 +138,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **disqus** — November 5, 2016 at 8:59 pm ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-21506))
+### **disqus** — November 5, 2016 at 8:59 pm ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-21506))
 
 > disqus says:
 >
@@ -147,7 +147,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 6, 2016 at 4:23 am ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-23194))
+### **Shai Almog** — November 6, 2016 at 4:23 am ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-23194))
 
 > Shai Almog says:
 >
@@ -156,7 +156,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — June 16, 2017 at 1:30 pm ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-23514))
+### **Francesco Galgani** — June 16, 2017 at 1:30 pm ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-23514))
 
 > Francesco Galgani says:
 >
@@ -169,7 +169,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 17, 2017 at 7:08 am ([permalink](https://www.codenameone.com/blog/further-refined-cross-platform-mobile-gui-builder.html#comment-23413))
+### **Shai Almog** — June 17, 2017 at 7:08 am ([permalink](/blog/further-refined-cross-platform-mobile-gui-builder/#comment-23413))
 
 > Shai Almog says:
 >

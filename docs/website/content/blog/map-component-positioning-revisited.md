@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/map-component-positioning-revisited/maps.jpg)
 
-I published two articles on `MapLayout` [here](https://www.codenameone.com/blog/map-layout-update.html) and [here](https://www.codenameone.com/blog/tip-map-layout-manager.html). After all that work they are now effectively obsolete thanks to a new API in `MapContainer` that builds component placement directly into the map itself.
+I published two articles on `MapLayout` [here](/blog/map-layout-update/) and [here](/blog/tip-map-layout-manager/). After all that work they are now effectively obsolete thanks to a new API in `MapContainer` that builds component placement directly into the map itself.
 
 Unfortunately the Google API doesn’t let us position components (native or otherwise) accurately as it pans the map. This creates a small delay when panning/zooming as the components try to catch up to the map. The only workaround is to convert the components to images and ask the map to move images within it. Then convert the images back when the map finishes panning. That’s exactly what Steve implemented within the native maps.
 
@@ -32,7 +32,7 @@ This makes the Uber demo app much simpler.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — April 10, 2018 at 1:50 pm ([permalink](https://www.codenameone.com/blog/map-component-positioning-revisited.html#comment-23732))
+### **Francesco Galgani** — April 10, 2018 at 1:50 pm ([permalink](/blog/map-component-positioning-revisited/#comment-23732))
 
 > Francesco Galgani says:
 >
@@ -43,7 +43,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 11, 2018 at 7:16 am ([permalink](https://www.codenameone.com/blog/map-component-positioning-revisited.html#comment-23844))
+### **Shai Almog** — April 11, 2018 at 7:16 am ([permalink](/blog/map-component-positioning-revisited/#comment-23844))
 
 > Shai Almog says:
 >

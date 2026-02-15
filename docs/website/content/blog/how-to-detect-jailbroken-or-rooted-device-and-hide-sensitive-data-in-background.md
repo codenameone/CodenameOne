@@ -171,7 +171,7 @@ This strategy will work in some platforms, but not on iOS because the screenshot
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Javier Anton** — May 24, 2021 at 11:06 am ([permalink](https://www.codenameone.com/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background.html#comment-24454))
+### **Javier Anton** — May 24, 2021 at 11:06 am ([permalink](/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background/#comment-24454))
 
 > Javier Anton says:
 >
@@ -180,7 +180,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — May 24, 2021 at 12:30 pm ([permalink](https://www.codenameone.com/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background.html#comment-24455))
+### **Javier Anton** — May 24, 2021 at 12:30 pm ([permalink](/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background/#comment-24455))
 
 > Javier Anton says:
 >
@@ -189,7 +189,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — May 24, 2021 at 12:45 pm ([permalink](https://www.codenameone.com/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background.html#comment-24456))
+### **Javier Anton** — May 24, 2021 at 12:45 pm ([permalink](/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background/#comment-24456))
 
 > Javier Anton says:
 >
@@ -198,7 +198,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — May 24, 2021 at 2:49 pm ([permalink](https://www.codenameone.com/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background.html#comment-24457))
+### **Javier Anton** — May 24, 2021 at 2:49 pm ([permalink](/blog/how-to-detect-jailbroken-or-rooted-device-and-hide-sensitive-data-in-background/#comment-24457))
 
 > Javier Anton says:
 >

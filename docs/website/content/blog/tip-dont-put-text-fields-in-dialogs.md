@@ -31,7 +31,7 @@ These issues apply to other UI types where the text field is stuck in a position
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Martin Grajcar** — November 28, 2018 at 7:06 pm ([permalink](https://www.codenameone.com/blog/tip-dont-put-text-fields-in-dialogs.html#comment-24071))
+### **Martin Grajcar** — November 28, 2018 at 7:06 pm ([permalink](/blog/tip-dont-put-text-fields-in-dialogs/#comment-24071))
 
 > Martin Grajcar says:
 >
@@ -40,7 +40,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 29, 2018 at 7:37 am ([permalink](https://www.codenameone.com/blog/tip-dont-put-text-fields-in-dialogs.html#comment-21581))
+### **Shai Almog** — November 29, 2018 at 7:37 am ([permalink](/blog/tip-dont-put-text-fields-in-dialogs/#comment-21581))
 
 > Shai Almog says:
 >
@@ -49,7 +49,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Martin Grajcar** — November 29, 2018 at 10:30 pm ([permalink](https://www.codenameone.com/blog/tip-dont-put-text-fields-in-dialogs.html#comment-23978))
+### **Martin Grajcar** — November 29, 2018 at 10:30 pm ([permalink](/blog/tip-dont-put-text-fields-in-dialogs/#comment-23978))
 
 > Martin Grajcar says:
 >

@@ -34,7 +34,7 @@ time this code occurs in a pre-existing app.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Maaike Z** — May 6, 2015 at 5:58 pm ([permalink](https://www.codenameone.com/blog/storage-migration.html#comment-24189))
+### **Maaike Z** — May 6, 2015 at 5:58 pm ([permalink](/blog/storage-migration/#comment-24189))
 
 > Maaike Z says:
 >
@@ -43,7 +43,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 7, 2015 at 4:09 am ([permalink](https://www.codenameone.com/blog/storage-migration.html#comment-22215))
+### **Shai Almog** — May 7, 2015 at 4:09 am ([permalink](/blog/storage-migration/#comment-22215))
 
 > Shai Almog says:
 >
@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **kazza186** — August 2, 2016 at 9:59 am ([permalink](https://www.codenameone.com/blog/storage-migration.html#comment-22780))
+### **kazza186** — August 2, 2016 at 9:59 am ([permalink](/blog/storage-migration/#comment-22780))
 
 > kazza186 says:
 >
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 3, 2016 at 4:54 am ([permalink](https://www.codenameone.com/blog/storage-migration.html#comment-21451))
+### **Shai Almog** — August 3, 2016 at 4:54 am ([permalink](/blog/storage-migration/#comment-21451))
 
 > Shai Almog says:
 >
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **kazza186** — August 4, 2016 at 4:21 am ([permalink](https://www.codenameone.com/blog/storage-migration.html#comment-22895))
+### **kazza186** — August 4, 2016 at 4:21 am ([permalink](/blog/storage-migration/#comment-22895))
 
 > kazza186 says:
 >

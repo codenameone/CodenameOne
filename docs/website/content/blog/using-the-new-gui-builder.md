@@ -197,7 +197,7 @@ UI is represented as:
 
 In this section we won’t try to discuss layouts in depth as this is a deep and complex subject. You can read  
 more about the properties of the Codename One layouts in  
-[the developer guide](https://www.codenameone.com/manual/basics.html).
+[the developer guide](/manual/basics/).
 
 In general layouts define the mathematical logic for component positions that we can then apply to the  
 resolutions supported by the devices. If we didn’t have layouts the UI wouldn’t fit on the multitude of devices  
@@ -384,14 +384,14 @@ Take the time to work with it and let us know what you think.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Yaakov Gesher** — August 31, 2016 at 5:19 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22943))
+### **Yaakov Gesher** — August 31, 2016 at 5:19 am ([permalink](/blog/using-the-new-gui-builder/#comment-22943))
 
 > How do we handle localization in the new GUI builder? What’s the equivalent to StaeMachine’s findMyComponent() methods?
 >
 
 
 
-### **Yngve Moe** — August 31, 2016 at 10:38 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22945))
+### **Yngve Moe** — August 31, 2016 at 10:38 pm ([permalink](/blog/using-the-new-gui-builder/#comment-22945))
 
 > I can’t scroll the advanced properties list for a MultiButton, so a number of properties can’t be accessed. This is on a Windows 10 PC.
 >
@@ -400,28 +400,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 1, 2016 at 5:42 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23031))
+### **Shai Almog** — September 1, 2016 at 5:42 am ([permalink](/blog/using-the-new-gui-builder/#comment-23031))
 
 > Because the GUI builder is decoupled from the resource file at the moment the only solution is to add a string to the localization bundle in the resource file matching a string in the GUI builder. Ideally we’d like to rework localization and themeing in the same way we reworked the GUI workflow and remove the need for the old resource editor completely.
 >
 
 
 
-### **Yaakov Gesher** — September 1, 2016 at 6:01 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-21461))
+### **Yaakov Gesher** — September 1, 2016 at 6:01 am ([permalink](/blog/using-the-new-gui-builder/#comment-21461))
 
 > What about getting a handle on components?
 >
 
 
 
-### **Shai Almog** — September 2, 2016 at 5:13 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22803))
+### **Shai Almog** — September 2, 2016 at 5:13 am ([permalink](/blog/using-the-new-gui-builder/#comment-22803))
 
 > In the new GUI builder all components are just class fields e.g. gui_MyComponent. To get them just compile the project and the source will be generated.
 >
 
 
 
-### **Adebisi Oladipupo** — September 2, 2016 at 5:59 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22853))
+### **Adebisi Oladipupo** — September 2, 2016 at 5:59 pm ([permalink](/blog/using-the-new-gui-builder/#comment-22853))
 
 > I have followed the new GUI builder overview and tried using it but it seems not matured. I am unable to attach background image to a form and/or container as it is possible with the old guy builder by creating new UIID. The property list for for components seem to be abbreviated (not enough) as compared to the old builder.
 >
@@ -432,7 +432,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 3, 2016 at 4:31 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-21655))
+### **Shai Almog** — September 3, 2016 at 4:31 am ([permalink](/blog/using-the-new-gui-builder/#comment-21655))
 
 > The old GUI builder is 6+ years old so undoubtedly it’s more mature. For styling you need to launch the designer (old UI) and create the style, you don’t have the shortcuts we used to have because the tools are now completely separate.
 >
@@ -443,21 +443,21 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 3, 2016 at 4:36 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22558))
+### **Shai Almog** — September 3, 2016 at 4:36 am ([permalink](/blog/using-the-new-gui-builder/#comment-22558))
 
 > Thanks, we’ll fix it for the next GUI builder update!
 >
 
 
 
-### **Yngve Moe** — September 3, 2016 at 6:56 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22676))
+### **Yngve Moe** — September 3, 2016 at 6:56 am ([permalink](/blog/using-the-new-gui-builder/#comment-22676))
 
 > A very nice feature would have been if the GUI builder were able to see your CSS files and render the GUI accordingly. I suppose one would have to load the CSS file manually into the builder environment.
 >
 
 
 
-### **Shai Almog** — September 4, 2016 at 5:43 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22985))
+### **Shai Almog** — September 4, 2016 at 5:43 am ([permalink](/blog/using-the-new-gui-builder/#comment-22985))
 
 > On the very right side of the toolbar (top) you will see 3 vertical dots (overflow) pressing that will allow you to change the theme.
 >
@@ -466,14 +466,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Yngve Moe** — September 4, 2016 at 3:29 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-24226))
+### **Yngve Moe** — September 4, 2016 at 3:29 pm ([permalink](/blog/using-the-new-gui-builder/#comment-24226))
 
 > Ok, that sound reasonable. However I can’t find the vertical dots. The rightmost items on my toolbar are “Save” and “Preview Design”. Am I looking in the wrong place? I can’t find that button anywhere on this page, either.
 >
 
 
 
-### **Shai Almog** — September 5, 2016 at 4:29 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22787))
+### **Shai Almog** — September 5, 2016 at 4:29 am ([permalink](/blog/using-the-new-gui-builder/#comment-22787))
 
 > If the overflow menu is missing that means the GUI builder found one theme only and is using that.  
 > I’m guessing Steve generated the res file as part of the CSS build process which makes some sense but it’s obviously problematic for use cases like this.
@@ -483,7 +483,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Adebisi Oladipupo** — September 5, 2016 at 6:28 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22963))
+### **Adebisi Oladipupo** — September 5, 2016 at 6:28 pm ([permalink](/blog/using-the-new-gui-builder/#comment-22963))
 
 > Thanks Shai and sorry for not being clear. I am trying to adopt the new GUI builder since that’s the future. I am having difficult time nesting containers as you showed in the calculator example. I am not asking to be told “drag this here and there”.  
 > It would be great if one can drag components in the component tree to structure the layout rather than dragging elements into their outlines on the right side of the screen (an action that is more of a trial and error). Doing so has actually resulted in deleting or making components disappear from the tree. I applaud you and your team for a great product. I am not being critical but rather providing input for making it better.  
@@ -498,28 +498,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Adebisi Oladipupo** — September 5, 2016 at 6:31 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22994))
+### **Adebisi Oladipupo** — September 5, 2016 at 6:31 pm ([permalink](/blog/using-the-new-gui-builder/#comment-22994))
 
 > See a sample frustrated attempt to nest containers. All subsequent containers on the form are supposed to be nested under the first one …
 >
 
 
 
-### **Adebisi Oladipupo** — September 6, 2016 at 1:15 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22888))
+### **Adebisi Oladipupo** — September 6, 2016 at 1:15 am ([permalink](/blog/using-the-new-gui-builder/#comment-22888))
 
 > To understand my last post, here’s the login form I am trying to reproduce. I got the free PSD files from one of codenameone tutorial links. I have retrieved and added all the relevant images into the res editor as instructed. Any help with advice on layout structures to use will be greatly appreciated. Thanks. P.S. I have the png file that makes the background translucent under the content pane.
 >
 
 
 
-### **Adebisi Oladipupo** — September 6, 2016 at 1:21 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22815))
+### **Adebisi Oladipupo** — September 6, 2016 at 1:21 am ([permalink](/blog/using-the-new-gui-builder/#comment-22815))
 
 > This is how far I got. May get further if only I can nest containers easily and reliably in the new GUI builder (at least that is what I think, but could be wrong).
 >
 
 
 
-### **Shai Almog** — September 6, 2016 at 4:01 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22714))
+### **Shai Almog** — September 6, 2016 at 4:01 am ([permalink](/blog/using-the-new-gui-builder/#comment-22714))
 
 > Thanks. We are aware of some issues related to nesting that trigger exceptions. These exceptions are hard to recover from…
 >
@@ -530,7 +530,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Adebisi Oladipupo** — September 8, 2016 at 1:01 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-21462))
+### **Adebisi Oladipupo** — September 8, 2016 at 1:01 am ([permalink](/blog/using-the-new-gui-builder/#comment-21462))
 
 > Thanks again Shai. One more question.
 >
@@ -539,35 +539,35 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 8, 2016 at 4:40 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22873))
+### **Shai Almog** — September 8, 2016 at 4:40 am ([permalink](/blog/using-the-new-gui-builder/#comment-22873))
 
 > JFormDesigner is for Swing code and not Codename One API. You might be able to edit the code it generates for Codename One compatibility but it will stop working as a visual tool once you do that…
 >
 
 
 
-### **Adebisi Oladipupo** — September 8, 2016 at 11:49 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23050))
+### **Adebisi Oladipupo** — September 8, 2016 at 11:49 pm ([permalink](/blog/using-the-new-gui-builder/#comment-23050))
 
 > It may not b worth the effort to use JFormdesigner in that respect. I will stick with Codenameone GUI knowing better days are ahead. Patience is a virtue. Thanks
 >
 
 
 
-### **Akinniranye James** — September 9, 2016 at 12:30 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22804))
+### **Akinniranye James** — September 9, 2016 at 12:30 am ([permalink](/blog/using-the-new-gui-builder/#comment-22804))
 
 > I share your pain. Trying to create this layout for almost a day. The GUI Builder is far from okay. I just resolved to editing xml by hand (not as difficult as it sounds).
 >
 
 
 
-### **Yngve Moe** — September 13, 2016 at 6:56 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22995))
+### **Yngve Moe** — September 13, 2016 at 6:56 pm ([permalink](/blog/using-the-new-gui-builder/#comment-22995))
 
 > Found a bug: if I try to add a “DataChange Event” to a Slider, the emitted Java code calls “addDataChangeListener(…)”, which is a syntax error (should be “addDataChangedListener(…)”).
 >
 
 
 
-### **Shai Almog** — September 14, 2016 at 4:51 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-22889))
+### **Shai Almog** — September 14, 2016 at 4:51 am ([permalink](/blog/using-the-new-gui-builder/#comment-22889))
 
 > Ugh. This was actually something we changed in reverse without noticing: [https://github.com/codename…](<https://github.com/codenameone/CodenameOne/commit/5f41a94984e8c16dd1a292aad475ffd2964a8d61>)
 >
@@ -576,14 +576,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Phil ip** — March 29, 2017 at 4:25 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23399))
+### **Phil ip** — March 29, 2017 at 4:25 pm ([permalink](/blog/using-the-new-gui-builder/#comment-23399))
 
 > Tried the new gui builder. Promissing, but not easy to handle at this state. I am wondering about using FXML like JavaFX2? Are there any plans in this direction?
 >
 
 
 
-### **Shai Almog** — March 30, 2017 at 6:09 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23080))
+### **Shai Almog** — March 30, 2017 at 6:09 am ([permalink](/blog/using-the-new-gui-builder/#comment-23080))
 
 > No. JavaFX hasn’t picked industry traction and since it’s remarkably heavy supporting it would cripple any mobile app. FXML is tied up too deep into FX and isn’t useful without it.
 >
@@ -592,7 +592,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Michael du Plessis** — April 6, 2017 at 3:03 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23503))
+### **Michael du Plessis** — April 6, 2017 at 3:03 pm ([permalink](/blog/using-the-new-gui-builder/#comment-23503))
 
 > Hi! I’m really keen on using CodeNameOne, I’ve got Java down fine, I’m just needing to get used to the GUI Builder. The code you mentioned for the GUI elements being generated within the “magical comments” aren’t generating. I notice this is post is about 9 months old and have seen there are updates to the new GUI Builder, it looks slightly different to the above screenshots.  
 > I followed the instructions but like I said, even created a complete new project to make sure, but the code isn’t generating on it’s own within the .java file. The XML file is fine though. Any advice forward would be majorly appreciated, I’m very excited since I discovered this and wouldn’t want my excitement and motivation to wane because of a slight mishap.
@@ -600,7 +600,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 7, 2017 at 5:50 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23199))
+### **Shai Almog** — April 7, 2017 at 5:50 am ([permalink](/blog/using-the-new-gui-builder/#comment-23199))
 
 > Shai Almog says:
 >
@@ -609,7 +609,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Michael du Plessis** — April 7, 2017 at 6:28 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23142))
+### **Michael du Plessis** — April 7, 2017 at 6:28 am ([permalink](/blog/using-the-new-gui-builder/#comment-23142))
 
 > Michael du Plessis says:
 >
@@ -618,7 +618,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 8, 2017 at 11:44 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23409))
+### **Shai Almog** — April 8, 2017 at 11:44 am ([permalink](/blog/using-the-new-gui-builder/#comment-23409))
 
 > Shai Almog says:
 >
@@ -629,7 +629,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Michael du Plessis** — April 8, 2017 at 9:35 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23421))
+### **Michael du Plessis** — April 8, 2017 at 9:35 pm ([permalink](/blog/using-the-new-gui-builder/#comment-23421))
 
 > Michael du Plessis says:
 >
@@ -643,7 +643,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 9, 2017 at 4:06 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23101))
+### **Shai Almog** — April 9, 2017 at 4:06 am ([permalink](/blog/using-the-new-gui-builder/#comment-23101))
 
 > Shai Almog says:
 >
@@ -654,7 +654,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jean Naude** — May 6, 2017 at 3:35 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23449))
+### **Jean Naude** — May 6, 2017 at 3:35 pm ([permalink](/blog/using-the-new-gui-builder/#comment-23449))
 
 > Jean Naude says:
 >
@@ -663,17 +663,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 7, 2017 at 3:55 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-24146))
+### **Shai Almog** — May 7, 2017 at 3:55 am ([permalink](/blog/using-the-new-gui-builder/#comment-24146))
 
 > Shai Almog says:
 >
-> Can you try this: [https://www.codenameone.com…](<https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html>)  
+> Can you try this: [https://www.codenameone.com…](</blog/tip-track-designer-guibuilder-issues/>)  
 > Let me know what’s printed in the prompt when you get this crash.
 >
 
 
 
-### **Jean Naude** — May 7, 2017 at 9:32 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23394))
+### **Jean Naude** — May 7, 2017 at 9:32 pm ([permalink](/blog/using-the-new-gui-builder/#comment-23394))
 
 > Jean Naude says:
 >
@@ -706,7 +706,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 8, 2017 at 5:18 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23475))
+### **Shai Almog** — May 8, 2017 at 5:18 am ([permalink](/blog/using-the-new-gui-builder/#comment-23475))
 
 > Shai Almog says:
 >
@@ -716,7 +716,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jean Naude** — May 8, 2017 at 7:39 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23568))
+### **Jean Naude** — May 8, 2017 at 7:39 am ([permalink](/blog/using-the-new-gui-builder/#comment-23568))
 
 > Jean Naude says:
 >
@@ -749,7 +749,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 9, 2017 at 5:54 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-24131))
+### **Shai Almog** — May 9, 2017 at 5:54 am ([permalink](/blog/using-the-new-gui-builder/#comment-24131))
 
 > Shai Almog says:
 >
@@ -767,7 +767,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jean Naude** — May 9, 2017 at 7:11 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23576))
+### **Jean Naude** — May 9, 2017 at 7:11 am ([permalink](/blog/using-the-new-gui-builder/#comment-23576))
 
 > Jean Naude says:
 >
@@ -776,7 +776,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 10, 2017 at 5:44 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-21585))
+### **Shai Almog** — May 10, 2017 at 5:44 am ([permalink](/blog/using-the-new-gui-builder/#comment-21585))
 
 > Shai Almog says:
 >
@@ -785,7 +785,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — July 7, 2017 at 8:29 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-21852))
+### **Ch Hjelm** — July 7, 2017 at 8:29 pm ([permalink](/blog/using-the-new-gui-builder/#comment-21852))
 
 > Ch Hjelm says:
 >
@@ -794,7 +794,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 8, 2017 at 5:31 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23612))
+### **Shai Almog** — July 8, 2017 at 5:31 am ([permalink](/blog/using-the-new-gui-builder/#comment-23612))
 
 > Shai Almog says:
 >
@@ -805,7 +805,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — July 8, 2017 at 6:21 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23676))
+### **Ch Hjelm** — July 8, 2017 at 6:21 am ([permalink](/blog/using-the-new-gui-builder/#comment-23676))
 
 > Ch Hjelm says:
 >
@@ -814,7 +814,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shawn Ikope** — August 22, 2017 at 11:57 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-24142))
+### **Shawn Ikope** — August 22, 2017 at 11:57 pm ([permalink](/blog/using-the-new-gui-builder/#comment-24142))
 
 > Shawn Ikope says:
 >
@@ -823,18 +823,18 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 23, 2017 at 6:13 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-24143))
+### **Shai Almog** — August 23, 2017 at 6:13 am ([permalink](/blog/using-the-new-gui-builder/#comment-24143))
 
 > Shai Almog says:
 >
-> I suggest you check out this post, the new mode is far superior: [https://www.codenameone.com…](<https://www.codenameone.com/blog/gui-builder-improvements-3.7.html>)
+> I suggest you check out this post, the new mode is far superior: [https://www.codenameone.com…](</blog/gui-builder-improvements-3.7/>)
 >
 > You can just create a new GUI builder file and uncheck autolayout if you want.
 >
 
 
 
-### **Jill M** — February 13, 2018 at 5:07 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23778))
+### **Jill M** — February 13, 2018 at 5:07 am ([permalink](/blog/using-the-new-gui-builder/#comment-23778))
 
 > Jill M says:
 >
@@ -843,16 +843,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 13, 2018 at 5:20 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23597))
+### **Shai Almog** — February 13, 2018 at 5:20 am ([permalink](/blog/using-the-new-gui-builder/#comment-23597))
 
 > Shai Almog says:
 >
-> In version 3.8 we added a new auto layout mode which is now the default. It should make it much easier to build a UI without changing the layout. Steve discussed this in depth here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/tutorial-gui-builder-autolayout-signin-form-responsive.html>)
+> In version 3.8 we added a new auto layout mode which is now the default. It should make it much easier to build a UI without changing the layout. Steve discussed this in depth here: [https://www.codenameone.com…](</blog/tutorial-gui-builder-autolayout-signin-form-responsive/>)
 >
 
 
 
-### **linnet maruve** — June 18, 2018 at 12:09 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23890))
+### **linnet maruve** — June 18, 2018 at 12:09 pm ([permalink](/blog/using-the-new-gui-builder/#comment-23890))
 
 > linnet maruve says:
 >
@@ -861,7 +861,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 19, 2018 at 5:13 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23981))
+### **Shai Almog** — June 19, 2018 at 5:13 am ([permalink](/blog/using-the-new-gui-builder/#comment-23981))
 
 > Shai Almog says:
 >
@@ -871,7 +871,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **linnet maruve** — June 19, 2018 at 9:41 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23775))
+### **linnet maruve** — June 19, 2018 at 9:41 am ([permalink](/blog/using-the-new-gui-builder/#comment-23775))
 
 > linnet maruve says:
 >
@@ -880,7 +880,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **linnet maruve** — June 19, 2018 at 10:01 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-21591))
+### **linnet maruve** — June 19, 2018 at 10:01 am ([permalink](/blog/using-the-new-gui-builder/#comment-21591))
 
 > linnet maruve says:
 >
@@ -889,7 +889,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 20, 2018 at 4:13 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23798))
+### **Shai Almog** — June 20, 2018 at 4:13 am ([permalink](/blog/using-the-new-gui-builder/#comment-23798))
 
 > Shai Almog says:
 >
@@ -898,7 +898,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **linnet maruve** — June 20, 2018 at 6:59 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23717))
+### **linnet maruve** — June 20, 2018 at 6:59 am ([permalink](/blog/using-the-new-gui-builder/#comment-23717))
 
 > linnet maruve says:
 >
@@ -907,16 +907,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 21, 2018 at 6:07 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23735))
+### **Shai Almog** — June 21, 2018 at 6:07 am ([permalink](/blog/using-the-new-gui-builder/#comment-23735))
 
 > Shai Almog says:
 >
-> Sure, it’s in the developer guide: [https://www.codenameone.com…](<https://www.codenameone.com/manual/theme-basics.html>) just open it Images -> Add
+> Sure, it’s in the developer guide: [https://www.codenameone.com…](</manual/theme-basics/>) just open it Images -> Add
 >
 
 
 
-### **linnet maruve** — June 21, 2018 at 2:21 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23620))
+### **linnet maruve** — June 21, 2018 at 2:21 pm ([permalink](/blog/using-the-new-gui-builder/#comment-23620))
 
 > linnet maruve says:
 >
@@ -925,7 +925,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jack Dore** — August 22, 2018 at 1:25 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23971))
+### **Jack Dore** — August 22, 2018 at 1:25 pm ([permalink](/blog/using-the-new-gui-builder/#comment-23971))
 
 > Jack Dore says:
 >
@@ -934,7 +934,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 23, 2018 at 5:25 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-24072))
+### **Shai Almog** — August 23, 2018 at 5:25 am ([permalink](/blog/using-the-new-gui-builder/#comment-24072))
 
 > Shai Almog says:
 >
@@ -943,7 +943,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Medo Boui** — September 12, 2018 at 3:59 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23776))
+### **Medo Boui** — September 12, 2018 at 3:59 pm ([permalink](/blog/using-the-new-gui-builder/#comment-23776))
 
 > Medo Boui says:
 >
@@ -952,7 +952,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 13, 2018 at 10:45 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23874))
+### **Shai Almog** — September 13, 2018 at 10:45 am ([permalink](/blog/using-the-new-gui-builder/#comment-23874))
 
 > Shai Almog says:
 >
@@ -961,7 +961,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Medo Boui** — September 13, 2018 at 3:58 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-23675))
+### **Medo Boui** — September 13, 2018 at 3:58 pm ([permalink](/blog/using-the-new-gui-builder/#comment-23675))
 
 > Medo Boui says:
 >
@@ -970,7 +970,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **tobi adegoroye** — October 26, 2019 at 6:49 pm ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-24262))
+### **tobi adegoroye** — October 26, 2019 at 6:49 pm ([permalink](/blog/using-the-new-gui-builder/#comment-24262))
 
 > [tobi adegoroye](https://lh3.googleusercontent.com/-BWeQERwJuuU/AAAAAAAAAAI/AAAAAAAAAAA/ACHi3rfX2FANvmhqEYMU-mwi7M8EXmS-ig/photo.jpg) says:
 >
@@ -979,12 +979,12 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 27, 2019 at 2:19 am ([permalink](https://www.codenameone.com/blog/using-the-new-gui-builder.html#comment-24265))
+### **Shai Almog** — October 27, 2019 at 2:19 am ([permalink](/blog/using-the-new-gui-builder/#comment-24265))
 
 > Shai Almog says:
 >
 > Hi,  
-> see <https://www.codenameone.com/blog/tutorial-gui-builder-autolayout-signin-form-responsive.html>
+> see </blog/tutorial-gui-builder-autolayout-signin-form-responsive/>
 >
 
 

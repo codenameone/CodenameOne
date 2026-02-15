@@ -25,7 +25,7 @@ and updated with changes. Hopefully we will complete all this work by the releas
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **ftp27** — April 29, 2015 at 8:58 am ([permalink](https://www.codenameone.com/blog/new-developer-guide.html#comment-24168))
+### **ftp27** — April 29, 2015 at 8:58 am ([permalink](/blog/new-developer-guide/#comment-24168))
 
 > ftp27 says:
 >

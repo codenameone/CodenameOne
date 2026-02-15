@@ -11,9 +11,9 @@ author: Chen Fishbein
 
 ![Header Image](/blog/accordion-component/accordion-post.png)
 
-The [Accordion](https://www.codenameone.com/javadoc/com/codename1/components/Accordion.html) ui pattern  
+The [Accordion](/javadoc/com/codename1/components/Accordion/) ui pattern  
 is a vertically stacked list of items. Each item can be opened/closed to reveal more content similarly to a  
-[Tree](https://www.codenameone.com/javadoc/com/codename1/ui/tree/Tree.html) however unlike the  
+[Tree](/javadoc/com/codename1/ui/tree/Tree/) however unlike the  
 `Tree` the `Accordion` is designed to include containers or arbitrary components rather than model based data.
 
 This makes the `Accordion` more convenient as a tool for folding/collapsing UI elements known in advance  

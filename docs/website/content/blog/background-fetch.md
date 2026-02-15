@@ -22,7 +22,7 @@ __ |  Since the app will be launched directly to the background, you cannot assu
 ### Implementing Background Fetch
 
 Apps that wish to implement background fetch must implement the  
-[BackgroundFetch](https://www.codenameone.com/javadoc/com/codename1/background/BackgroundFetch.html)  
+[BackgroundFetch](/javadoc/com/codename1/background/BackgroundFetch/)  
 interface in their main class.
 
 __ |  The main class is the one mentioned in the preferences not the state machine or some other class!   
@@ -164,7 +164,7 @@ The following code demonstrates simple usage of the API:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Nick Koirala** — June 22, 2016 at 5:13 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-21454))
+### **Nick Koirala** — June 22, 2016 at 5:13 am ([permalink](/blog/background-fetch/#comment-21454))
 
 > Nick Koirala says:
 >
@@ -177,7 +177,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lukman Javalove Idealist Jaji** — June 23, 2016 at 9:00 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-22912))
+### **Lukman Javalove Idealist Jaji** — June 23, 2016 at 9:00 am ([permalink](/blog/background-fetch/#comment-22912))
 
 > Lukman Javalove Idealist Jaji says:
 >
@@ -186,7 +186,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 24, 2016 at 6:24 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-22748))
+### **Shai Almog** — June 24, 2016 at 6:24 am ([permalink](/blog/background-fetch/#comment-22748))
 
 > Shai Almog says:
 >
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lukman Javalove Idealist Jaji** — June 26, 2016 at 6:36 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-22813))
+### **Lukman Javalove Idealist Jaji** — June 26, 2016 at 6:36 am ([permalink](/blog/background-fetch/#comment-22813))
 
 > Lukman Javalove Idealist Jaji says:
 >
@@ -204,7 +204,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 27, 2016 at 3:04 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-22724))
+### **Shai Almog** — June 27, 2016 at 3:04 am ([permalink](/blog/background-fetch/#comment-22724))
 
 > Shai Almog says:
 >
@@ -213,7 +213,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Scott Turner** — May 11, 2017 at 2:21 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-23401))
+### **Scott Turner** — May 11, 2017 at 2:21 pm ([permalink](/blog/background-fetch/#comment-23401))
 
 > Scott Turner says:
 >
@@ -222,7 +222,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 12, 2017 at 12:25 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-23533))
+### **Shai Almog** — May 12, 2017 at 12:25 pm ([permalink](/blog/background-fetch/#comment-23533))
 
 > Shai Almog says:
 >
@@ -231,7 +231,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Scott Turner** — May 12, 2017 at 12:48 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-23333))
+### **Scott Turner** — May 12, 2017 at 12:48 pm ([permalink](/blog/background-fetch/#comment-23333))
 
 > Scott Turner says:
 >
@@ -240,7 +240,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — May 20, 2019 at 8:28 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-24093))
+### **Ch Hjelm** — May 20, 2019 at 8:28 pm ([permalink](/blog/background-fetch/#comment-24093))
 
 > Ch Hjelm says:
 >
@@ -249,7 +249,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 21, 2019 at 4:26 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-23991))
+### **Shai Almog** — May 21, 2019 at 4:26 am ([permalink](/blog/background-fetch/#comment-23991))
 
 > Shai Almog says:
 >
@@ -260,7 +260,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — May 21, 2019 at 6:42 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-24058))
+### **Ch Hjelm** — May 21, 2019 at 6:42 am ([permalink](/blog/background-fetch/#comment-24058))
 
 > Ch Hjelm says:
 >
@@ -279,7 +279,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 22, 2019 at 9:33 am ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-23998))
+### **Shai Almog** — May 22, 2019 at 9:33 am ([permalink](/blog/background-fetch/#comment-23998))
 
 > Shai Almog says:
 >
@@ -288,7 +288,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Arthur Major** — July 23, 2021 at 4:42 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-24470))
+### **Arthur Major** — July 23, 2021 at 4:42 pm ([permalink](/blog/background-fetch/#comment-24470))
 
 > Arthur Major says:
 >
@@ -297,7 +297,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — July 23, 2021 at 5:04 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-24471))
+### **Steve Hannah** — July 23, 2021 at 5:04 pm ([permalink](/blog/background-fetch/#comment-24471))
 
 > Steve Hannah says:
 >
@@ -306,7 +306,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Arthur Major** — July 23, 2021 at 11:57 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-24472))
+### **Arthur Major** — July 23, 2021 at 11:57 pm ([permalink](/blog/background-fetch/#comment-24472))
 
 > Arthur Major says:
 >
@@ -338,7 +338,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — July 28, 2021 at 12:54 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-24473))
+### **Steve Hannah** — July 28, 2021 at 12:54 pm ([permalink](/blog/background-fetch/#comment-24473))
 
 > Steve Hannah says:
 >
@@ -353,7 +353,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Arthur Major** — July 28, 2021 at 4:44 pm ([permalink](https://www.codenameone.com/blog/background-fetch.html#comment-24474))
+### **Arthur Major** — July 28, 2021 at 4:44 pm ([permalink](/blog/background-fetch/#comment-24474))
 
 > Arthur Major says:
 >

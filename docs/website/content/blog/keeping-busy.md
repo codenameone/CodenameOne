@@ -37,7 +37,7 @@ This is the second server update that’s user noticeable although there were a 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bitvest** — January 11, 2018 at 9:41 pm ([permalink](https://www.codenameone.com/blog/keeping-busy.html#comment-23886))
+### **bitvest** — January 11, 2018 at 9:41 pm ([permalink](/blog/keeping-busy/#comment-23886))
 
 > bitvest says:
 >
@@ -46,11 +46,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 12, 2018 at 7:06 am ([permalink](https://www.codenameone.com/blog/keeping-busy.html#comment-23835))
+### **Shai Almog** — January 12, 2018 at 7:06 am ([permalink](/blog/keeping-busy/#comment-23835))
 
 > Shai Almog says:
 >
-> Check out this post covering tutorials, documentation and resources available to developers [https://www.codenameone.com…](<https://www.codenameone.com/blog/tutorials-resources-learn-java-mobile-videos-courses-ios-android.html>)
+> Check out this post covering tutorials, documentation and resources available to developers [https://www.codenameone.com…](</blog/tutorials-resources-learn-java-mobile-videos-courses-ios-android/>)
 >
 
 

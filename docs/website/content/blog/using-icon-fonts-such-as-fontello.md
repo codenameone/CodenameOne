@@ -89,7 +89,7 @@ If you have any thoughts on how to make the font image API’s easier to use let
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **3lix** — August 23, 2016 at 4:39 pm ([permalink](https://www.codenameone.com/blog/using-icon-fonts-such-as-fontello.html#comment-22962))
+### **3lix** — August 23, 2016 at 4:39 pm ([permalink](/blog/using-icon-fonts-such-as-fontello/#comment-22962))
 
 > Hi, I noticed with the material design support , the back button (more so the back command) now has a ripple effect when clicked, but not the hamburger menu (at least testing on android).  
 > Can I add this ripple effect to any button in general , or icon ? If so, I would like to know how.  
@@ -98,7 +98,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 24, 2016 at 3:54 am ([permalink](https://www.codenameone.com/blog/using-icon-fonts-such-as-fontello.html#comment-22944))
+### **Shai Almog** — August 24, 2016 at 3:54 am ([permalink](/blog/using-icon-fonts-such-as-fontello/#comment-22944))
 
 > This isn’t ripple, it’s a pressed color. Did you define the theme constant sideMenuImage?  
 > If so try removing it and see if the pressed color for the item changes.
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **3lix** — August 24, 2016 at 3:23 pm ([permalink](https://www.codenameone.com/blog/using-icon-fonts-such-as-fontello.html#comment-22742))
+### **3lix** — August 24, 2016 at 3:23 pm ([permalink](/blog/using-icon-fonts-such-as-fontello/#comment-22742))
 
 > I believe that what I am seeing on my device is a ripple effect. The background button has a circular background The background color for the back button when clicked / long pressed changes gradually starting from the center down to the circle’s edges over about a half a second time period.
 >
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 25, 2016 at 5:23 am ([permalink](https://www.codenameone.com/blog/using-icon-fonts-such-as-fontello.html#comment-22655))
+### **Shai Almog** — August 25, 2016 at 5:23 am ([permalink](/blog/using-icon-fonts-such-as-fontello/#comment-22655))
 
 > Shai Almog says:
 >
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **3lix** — August 25, 2016 at 2:38 pm ([permalink](https://www.codenameone.com/blog/using-icon-fonts-such-as-fontello.html#comment-22896))
+### **3lix** — August 25, 2016 at 2:38 pm ([permalink](/blog/using-icon-fonts-such-as-fontello/#comment-22896))
 
 > 3lix says:
 >
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — April 13, 2019 at 9:51 am ([permalink](https://www.codenameone.com/blog/using-icon-fonts-such-as-fontello.html#comment-24113))
+### **Ch Hjelm** — April 13, 2019 at 9:51 am ([permalink](/blog/using-icon-fonts-such-as-fontello/#comment-24113))
 
 > Ch Hjelm says:
 >
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 14, 2019 at 3:57 am ([permalink](https://www.codenameone.com/blog/using-icon-fonts-such-as-fontello.html#comment-24106))
+### **Shai Almog** — April 14, 2019 at 3:57 am ([permalink](/blog/using-icon-fonts-such-as-fontello/#comment-24106))
 
 > Shai Almog says:
 >
@@ -163,7 +163,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — April 14, 2019 at 9:07 am ([permalink](https://www.codenameone.com/blog/using-icon-fonts-such-as-fontello.html#comment-24092))
+### **Ch Hjelm** — April 14, 2019 at 9:07 am ([permalink](/blog/using-icon-fonts-such-as-fontello/#comment-24092))
 
 > Ch Hjelm says:
 >

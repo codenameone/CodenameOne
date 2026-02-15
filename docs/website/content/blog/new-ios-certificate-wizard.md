@@ -78,7 +78,7 @@ Figure 7. The iOS signing section will automatically be updated to reflect the l
 
 ## Tip
 
-> The new certificate wizard also generates a provisioning profile for the Notification Service Extension, which is used in the case that you are using [rich push notifications.](https://www.codenameone.com/blog/tich-push-notification-improved-validation.html)
+> The new certificate wizard also generates a provisioning profile for the Notification Service Extension, which is used in the case that you are using [rich push notifications.](/blog/tich-push-notification-improved-validation/)
 ---
 
 ## Archived Comments
@@ -86,7 +86,7 @@ Figure 7. The iOS signing section will automatically be updated to reflect the l
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **ThomasH99** — March 27, 2022 at 6:48 pm ([permalink](https://www.codenameone.com/blog/new-ios-certificate-wizard.html#comment-24520))
+### **ThomasH99** — March 27, 2022 at 6:48 pm ([permalink](/blog/new-ios-certificate-wizard/#comment-24520))
 
 > ThomasH99 says:
 >
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ThomasH99** — March 27, 2022 at 7:16 pm ([permalink](https://www.codenameone.com/blog/new-ios-certificate-wizard.html#comment-24521))
+### **ThomasH99** — March 27, 2022 at 7:16 pm ([permalink](/blog/new-ios-certificate-wizard/#comment-24521))
 
 > ThomasH99 says:
 >
@@ -104,7 +104,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — March 28, 2022 at 1:43 pm ([permalink](https://www.codenameone.com/blog/new-ios-certificate-wizard.html#comment-24522))
+### **Steve Hannah** — March 28, 2022 at 1:43 pm ([permalink](/blog/new-ios-certificate-wizard/#comment-24522))
 
 > Steve Hannah says:
 >
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Paul Beardow** — September 17, 2023 at 9:32 am ([permalink](https://www.codenameone.com/blog/new-ios-certificate-wizard.html#comment-24572))
+### **Paul Beardow** — September 17, 2023 at 9:32 am ([permalink](/blog/new-ios-certificate-wizard/#comment-24572))
 
 > Paul Beardow says:
 >
@@ -123,7 +123,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 18, 2023 at 2:25 am ([permalink](https://www.codenameone.com/blog/new-ios-certificate-wizard.html#comment-24574))
+### **Shai Almog** — September 18, 2023 at 2:25 am ([permalink](/blog/new-ios-certificate-wizard/#comment-24574))
 
 > Shai Almog says:
 >

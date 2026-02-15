@@ -17,7 +17,7 @@ __ |  It’s LIVE! Check out the bootcamp signup [here](https://codenameone.teac
 I’m going to build a new mobile startup within 2 weeks and teach some of you how that is done while doing that. Most people might assume I’m talking about one of those “MVP” cardboard startups…​ This isn’t the case!  
 We’ll build a real ground breaking app with a server component that handles storage, push and a few other things you wouldn’t expect and I plan to fit the whole thing in a two week time frame.
 
-This is essentially what I said in the [last two](https://www.codenameone.com/blog/full-stack-java-bootcamp.html) posts [in this series](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html). We’ll build the **full stack** of a real world startup from the ground up to server and client production within 2 weeks of hard work!
+This is essentially what I said in the [last two](/blog/full-stack-java-bootcamp/) posts [in this series](/blog/spring-template-more-about-bootcamp/). We’ll build the **full stack** of a real world startup from the ground up to server and client production within 2 weeks of hard work!
 
 Famous last words?
 
@@ -95,7 +95,7 @@ Signup will last until Friday afternoon (GMT) and will close at that point, I’
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Dalvik** — March 8, 2017 at 7:17 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23106))
+### **Dalvik** — March 8, 2017 at 7:17 pm ([permalink](/blog/build-something-big/#comment-23106))
 
 > Dalvik says:
 >
@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 8, 2017 at 7:44 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23120))
+### **Shai Almog** — March 8, 2017 at 7:44 pm ([permalink](/blog/build-something-big/#comment-23120))
 
 > Shai Almog says:
 >
@@ -123,7 +123,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — March 8, 2017 at 9:21 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-21566))
+### **Chidiebere Okwudire** — March 8, 2017 at 9:21 pm ([permalink](/blog/build-something-big/#comment-21566))
 
 > Chidiebere Okwudire says:
 >
@@ -132,7 +132,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 8, 2017 at 9:25 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23298))
+### **Shai Almog** — March 8, 2017 at 9:25 pm ([permalink](/blog/build-something-big/#comment-23298))
 
 > Shai Almog says:
 >
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Dalvik** — March 9, 2017 at 4:31 am ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23056))
+### **Dalvik** — March 9, 2017 at 4:31 am ([permalink](/blog/build-something-big/#comment-23056))
 
 > Dalvik says:
 >
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 9, 2017 at 4:45 am ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23304))
+### **Shai Almog** — March 9, 2017 at 4:45 am ([permalink](/blog/build-something-big/#comment-23304))
 
 > Shai Almog says:
 >
@@ -163,7 +163,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — March 9, 2017 at 8:34 am ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23046))
+### **salah Alhaddabi** — March 9, 2017 at 8:34 am ([permalink](/blog/build-something-big/#comment-23046))
 
 > salah Alhaddabi says:
 >
@@ -172,7 +172,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 9, 2017 at 9:00 am ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23435))
+### **Shai Almog** — March 9, 2017 at 9:00 am ([permalink](/blog/build-something-big/#comment-23435))
 
 > Shai Almog says:
 >
@@ -200,7 +200,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chad Elofson** — March 9, 2017 at 5:00 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23246))
+### **Chad Elofson** — March 9, 2017 at 5:00 pm ([permalink](/blog/build-something-big/#comment-23246))
 
 > Chad Elofson says:
 >
@@ -213,7 +213,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chad Elofson** — March 9, 2017 at 5:10 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23388))
+### **Chad Elofson** — March 9, 2017 at 5:10 pm ([permalink](/blog/build-something-big/#comment-23388))
 
 > Chad Elofson says:
 >
@@ -222,7 +222,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 9, 2017 at 5:47 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-24129))
+### **Shai Almog** — March 9, 2017 at 5:47 pm ([permalink](/blog/build-something-big/#comment-24129))
 
 > Shai Almog says:
 >
@@ -233,7 +233,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chad Elofson** — March 9, 2017 at 5:51 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23169))
+### **Chad Elofson** — March 9, 2017 at 5:51 pm ([permalink](/blog/build-something-big/#comment-23169))
 
 > Chad Elofson says:
 >
@@ -242,7 +242,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **faenze e.** — March 9, 2017 at 7:16 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-21572))
+### **faenze e.** — March 9, 2017 at 7:16 pm ([permalink](/blog/build-something-big/#comment-21572))
 
 > faenze e. says:
 >
@@ -251,7 +251,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 9, 2017 at 7:49 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23178))
+### **Shai Almog** — March 9, 2017 at 7:49 pm ([permalink](/blog/build-something-big/#comment-23178))
 
 > Shai Almog says:
 >
@@ -261,7 +261,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **faenze e.** — March 9, 2017 at 8:16 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23029))
+### **faenze e.** — March 9, 2017 at 8:16 pm ([permalink](/blog/build-something-big/#comment-23029))
 
 > faenze e. says:
 >
@@ -270,7 +270,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Andrew Nyago** — March 14, 2017 at 5:09 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23270))
+### **Andrew Nyago** — March 14, 2017 at 5:09 pm ([permalink](/blog/build-something-big/#comment-23270))
 
 > Andrew Nyago says:
 >
@@ -279,7 +279,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 14, 2017 at 6:13 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-21568))
+### **Shai Almog** — March 14, 2017 at 6:13 pm ([permalink](/blog/build-something-big/#comment-21568))
 
 > Shai Almog says:
 >
@@ -288,7 +288,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Andrew Nyago** — March 15, 2017 at 3:44 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23362))
+### **Andrew Nyago** — March 15, 2017 at 3:44 pm ([permalink](/blog/build-something-big/#comment-23362))
 
 > Andrew Nyago says:
 >
@@ -297,7 +297,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 15, 2017 at 4:28 pm ([permalink](https://www.codenameone.com/blog/build-something-big.html#comment-23370))
+### **Shai Almog** — March 15, 2017 at 4:28 pm ([permalink](/blog/build-something-big/#comment-23370))
 
 > Shai Almog says:
 >

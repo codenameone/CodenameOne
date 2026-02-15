@@ -45,7 +45,7 @@ This is a bit confusing, you need to open the xworkspace file in the new pods bu
 ### Codenameone theming sidemenu
 
 We just showed how deeply you can customize the sidemenu in the  
-[latest template demo](https://www.codenameone.com/blog/1template-mobile-material-screens-ui-kit.html)
+[latest template demo](/blog/1template-mobile-material-screens-ui-kit/)
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39959882/codenameone-theming-sidemenu)
 

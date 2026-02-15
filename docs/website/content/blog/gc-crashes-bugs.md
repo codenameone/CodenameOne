@@ -60,7 +60,7 @@ VM’s have come such a long way its actually proving to be a pretty interesting
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **shannah78** — April 6, 2015 at 6:07 pm ([permalink](https://www.codenameone.com/blog/gc-crashes-bugs.html#comment-22043))
+### **shannah78** — April 6, 2015 at 6:07 pm ([permalink](/blog/gc-crashes-bugs/#comment-22043))
 
 > shannah78 says:
 >

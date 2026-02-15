@@ -30,7 +30,7 @@ everything else.
 
 ### JavaScript Promotion Ended
 
-We ended the [JavaScript build promotion](https://www.codenameone.com/blog/a-thank-you-an-important-update-on-android-builds.html)  
+We ended the [JavaScript build promotion](/blog/a-thank-you-an-important-update-on-android-builds/)  
 we started last month. If you were a pro user and remain a pro user  
 you should have that ability into 2017. Everyone else now needs an enterprise license to enjoy that feature.
 
@@ -43,7 +43,7 @@ from everyone else.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — March 18, 2016 at 7:15 am ([permalink](https://www.codenameone.com/blog/weekly-release-developer-guide-javascript-promotion-end.html#comment-22526))
+### **Chidiebere Okwudire** — March 18, 2016 at 7:15 am ([permalink](/blog/weekly-release-developer-guide-javascript-promotion-end/#comment-22526))
 
 > Chidiebere Okwudire says:
 >
@@ -52,7 +52,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 18, 2016 at 7:30 am ([permalink](https://www.codenameone.com/blog/weekly-release-developer-guide-javascript-promotion-end.html#comment-22661))
+### **Shai Almog** — March 18, 2016 at 7:30 am ([permalink](/blog/weekly-release-developer-guide-javascript-promotion-end/#comment-22661))
 
 > Shai Almog says:
 >
@@ -63,7 +63,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **AdAlbert** — April 3, 2016 at 7:29 am ([permalink](https://www.codenameone.com/blog/weekly-release-developer-guide-javascript-promotion-end.html#comment-22789))
+### **AdAlbert** — April 3, 2016 at 7:29 am ([permalink](/blog/weekly-release-developer-guide-javascript-promotion-end/#comment-22789))
 
 > AdAlbert says:
 >
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 4, 2016 at 2:26 am ([permalink](https://www.codenameone.com/blog/weekly-release-developer-guide-javascript-promotion-end.html#comment-21625))
+### **Shai Almog** — April 4, 2016 at 2:26 am ([permalink](/blog/weekly-release-developer-guide-javascript-promotion-end/#comment-21625))
 
 > Shai Almog says:
 >

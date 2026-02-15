@@ -88,16 +88,16 @@ As I mentioned at the top of this post, this is still the tip of the iceberg of 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — September 14, 2019 at 8:23 am ([permalink](https://www.codenameone.com/blog/icon-fonts-popups-infinite-scroll.html#comment-24090))
+### **Francesco Galgani** — September 14, 2019 at 8:23 am ([permalink](/blog/icon-fonts-popups-infinite-scroll/#comment-24090))
 
 > Francesco Galgani says:
 >
-> I’ve just tested that a Popup Dialog works fine also with an Android skin, thank you! About the Popup Dialog, isn’t the developer guide section “Styling The Arrow Of The Popup Dialog” more valid? Should this part of the developer guide be changed? Link: [https://www.codenameone.com…](<https://www.codenameone.com/manual/components.html#_styling_the_arrow_of_the_popup_dialog>)
+> I’ve just tested that a Popup Dialog works fine also with an Android skin, thank you! About the Popup Dialog, isn’t the developer guide section “Styling The Arrow Of The Popup Dialog” more valid? Should this part of the developer guide be changed? Link: [https://www.codenameone.com…](</manual/components/#_styling_the_arrow_of_the_popup_dialog>)
 >
 
 
 
-### **Shai Almog** — September 15, 2019 at 3:44 am ([permalink](https://www.codenameone.com/blog/icon-fonts-popups-infinite-scroll.html#comment-23825))
+### **Shai Almog** — September 15, 2019 at 3:44 am ([permalink](/blog/icon-fonts-popups-infinite-scroll/#comment-23825))
 
 > Shai Almog says:
 >

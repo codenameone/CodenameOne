@@ -671,14 +671,14 @@ You can check out the final source code of this tutorial [here](https://github.c
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Nigel Chomba** — August 6, 2015 at 12:58 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-4.html#comment-22128))
+### **Nigel Chomba** — August 6, 2015 at 12:58 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-4/#comment-22128))
 
 > I like this,i wish i could do this all day.Questions will come soon
 >
 
 
 
-### **Diamond** — August 6, 2015 at 3:34 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-4.html#comment-21600))
+### **Diamond** — August 6, 2015 at 3:34 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-4/#comment-21600))
 
 > For the image placeholder, will it be possible to use fullName’s first character in Font Icon? For example, My name Diamond having “D” as the placeholder image just in case user doesn’t have a profile pic.
 >
@@ -687,7 +687,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 7, 2015 at 5:02 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-4.html#comment-22345))
+### **Shai Almog** — August 7, 2015 at 5:02 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-4/#comment-22345))
 
 > Sure. You can do this dynamically e.g. Map<character, encodedimage=””> mm =…; Then use an Image.create(int, int, int) and get the graphics from it to draw the character on it. Cache it in the map so you don’t have to do this all the time…
 >
@@ -696,49 +696,49 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **♫☆ Alex Goretoy ☭ ☁** — August 8, 2015 at 1:57 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-4.html#comment-22330))
+### **♫☆ Alex Goretoy ☭ ☁** — August 8, 2015 at 1:57 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-4/#comment-22330))
 
 > This is great! Thanks so much.
 >
 
 
 
-### **ugochukwu** — August 12, 2015 at 9:41 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-4.html#comment-22275))
+### **ugochukwu** — August 12, 2015 at 9:41 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-4/#comment-22275))
 
 > shai am still desprately waiting for next series
 >
 
 
 
-### **ugochukwu** — August 12, 2015 at 9:42 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-4.html#comment-22083))
+### **ugochukwu** — August 12, 2015 at 9:42 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-4/#comment-22083))
 
 > this is a great tutorial series! thanks somuch
 >
 
 
 
-### **Omar Suleiman** — March 6, 2017 at 5:42 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-4.html#comment-23140))
+### **Omar Suleiman** — March 6, 2017 at 5:42 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-4/#comment-23140))
 
 > I want to ask about chat group room is supported with codename one, or one chat per application without allowing user to create new group and chatting.
 >
 
 
 
-### **Shai Almog** — March 7, 2017 at 6:35 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-4.html#comment-23352))
+### **Shai Almog** — March 7, 2017 at 6:35 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-4/#comment-23352))
 
-> This specific demo is for 1 on 1 conversations but the platform has no such restrictions. Check out this post covering a 3rd party who built a pretty nice looking whatsapp clone using Codename One: [https://www.codenameone.com…](<https://www.codenameone.com/blog/featured-app-jat-communication.html>)
+> This specific demo is for 1 on 1 conversations but the platform has no such restrictions. Check out this post covering a 3rd party who built a pretty nice looking whatsapp clone using Codename One: [https://www.codenameone.com…](</blog/featured-app-jat-communication/>)
 >
 
 
 
-### **Francesco Galgani** — November 28, 2017 at 10:03 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-4.html#comment-23606))
+### **Francesco Galgani** — November 28, 2017 at 10:03 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-4/#comment-23606))
 
 > A simple question that is not related to the tutorial itself: how did you record the small video of the app? Thank you
 >
 
 
 
-### **Shai Almog** — November 29, 2017 at 6:40 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-4.html#comment-21474))
+### **Shai Almog** — November 29, 2017 at 6:40 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-4/#comment-21474))
 
 > With Android it’s really easy. My device has a screen capture app that’s shipped by the vendor and allows recording video so this is really trivial (it’s an OPO with the original cyanogen so probably not applicable).  
 > But all modern android devices allow you to capture video via ADB see [https://developer.android.c…](<https://developer.android.com/studio/command-line/adb.html#screenrecord>)

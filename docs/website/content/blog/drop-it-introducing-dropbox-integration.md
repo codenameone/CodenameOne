@@ -104,7 +104,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — May 16, 2013 at 9:20 pm ([permalink](https://www.codenameone.com/blog/drop-it-introducing-dropbox-integration.html#comment-21751))
+### **Anonymous** — May 16, 2013 at 9:20 pm ([permalink](/blog/drop-it-introducing-dropbox-integration/#comment-21751))
 
 > Anonymous says:
 >
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — May 17, 2013 at 6:19 pm ([permalink](https://www.codenameone.com/blog/drop-it-introducing-dropbox-integration.html#comment-21737))
+### **Anonymous** — May 17, 2013 at 6:19 pm ([permalink](/blog/drop-it-introducing-dropbox-integration/#comment-21737))
 
 > Anonymous says:
 >
@@ -122,7 +122,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 31, 2013 at 11:43 am ([permalink](https://www.codenameone.com/blog/drop-it-introducing-dropbox-integration.html#comment-21771))
+### **Anonymous** — October 31, 2013 at 11:43 am ([permalink](/blog/drop-it-introducing-dropbox-integration/#comment-21771))
 
 > Anonymous says:
 >
@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 24, 2014 at 11:44 am ([permalink](https://www.codenameone.com/blog/drop-it-introducing-dropbox-integration.html#comment-21642))
+### **Anonymous** — January 24, 2014 at 11:44 am ([permalink](/blog/drop-it-introducing-dropbox-integration/#comment-21642))
 
 > Anonymous says:
 >
@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 24, 2014 at 3:40 pm ([permalink](https://www.codenameone.com/blog/drop-it-introducing-dropbox-integration.html#comment-22037))
+### **Anonymous** — January 24, 2014 at 3:40 pm ([permalink](/blog/drop-it-introducing-dropbox-integration/#comment-22037))
 
 > Anonymous says:
 >

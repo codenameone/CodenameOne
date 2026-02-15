@@ -37,7 +37,7 @@ This is so much easier in the new GUI builder, hopefully this weeks update will 
 
 ### List adding functionality
 
-Lists are always a pain which is why we recommend [avoiding them](https://www.codenameone.com/blog/avoiding-lists.html)
+Lists are always a pain which is why we recommend [avoiding them](/blog/avoiding-lists/)
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39494963/codenameone-list-adding-functionality)
 
@@ -141,7 +141,7 @@ This is one of those “Codename One doesn’t support Java feature X” which p
 
 ### Calling custom JavaScript function
 
-The [javascript package](https://www.codenameone.com/javadoc/com/codename1/javascript/package-summary.html)  
+The [javascript package](/javadoc/com/codename1/javascript/package-summary/)  
 contains pretty extensive documentation on this
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39417360/calling-custom-javascript-function-from-codename-one)

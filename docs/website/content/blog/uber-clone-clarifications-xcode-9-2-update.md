@@ -39,7 +39,7 @@ Next month I will publish two new modules into the academy.
 
 The first I’m pretty clear about and it’s currently tentatively titled: “Working with the Codename One Source code: working without the build servers”.
 
-It will walk through the process of setting up an environment based mostly on the source code without using the build servers. It will continue where [include the source](https://www.codenameone.com/blog/tutorial-include-source.html) left off by going into device build complexities without the servers.
+It will walk through the process of setting up an environment based mostly on the source code without using the build servers. It will continue where [include the source](/blog/tutorial-include-source/) left off by going into device build complexities without the servers.
 
 I’m still open for suggestions about second module so feel free to comment below. A good suggestion I received was “performance” which I think I can probably spend hours talking about…​
 
@@ -61,7 +61,7 @@ There are a lot of new features and news I hope to get into in February but I’
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Lee** — November 28, 2018 at 3:26 pm ([permalink](https://www.codenameone.com/blog/uber-clone-clarifications-xcode-9-2-update.html#comment-23965))
+### **Lee** — November 28, 2018 at 3:26 pm ([permalink](/blog/uber-clone-clarifications-xcode-9-2-update/#comment-23965))
 
 > Lee says:
 >
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 28, 2018 at 4:06 pm ([permalink](https://www.codenameone.com/blog/uber-clone-clarifications-xcode-9-2-update.html#comment-23999))
+### **Shai Almog** — November 28, 2018 at 4:06 pm ([permalink](/blog/uber-clone-clarifications-xcode-9-2-update/#comment-23999))
 
 > Shai Almog says:
 >
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lee** — November 28, 2018 at 4:57 pm ([permalink](https://www.codenameone.com/blog/uber-clone-clarifications-xcode-9-2-update.html#comment-23786))
+### **Lee** — November 28, 2018 at 4:57 pm ([permalink](/blog/uber-clone-clarifications-xcode-9-2-update/#comment-23786))
 
 > Lee says:
 >

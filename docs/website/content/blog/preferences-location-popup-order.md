@@ -53,7 +53,7 @@ upload.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jérémy MARQUER** — December 21, 2016 at 1:00 pm ([permalink](https://www.codenameone.com/blog/preferences-location-popup-order.html#comment-21558))
+### **Jérémy MARQUER** — December 21, 2016 at 1:00 pm ([permalink](/blog/preferences-location-popup-order/#comment-21558))
 
 > Jérémy MARQUER says:
 >
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **M Usman Nu** — February 1, 2017 at 7:27 pm ([permalink](https://www.codenameone.com/blog/preferences-location-popup-order.html#comment-24121))
+### **M Usman Nu** — February 1, 2017 at 7:27 pm ([permalink](/blog/preferences-location-popup-order/#comment-24121))
 
 > M Usman Nu says:
 >
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 2, 2017 at 6:19 am ([permalink](https://www.codenameone.com/blog/preferences-location-popup-order.html#comment-23257))
+### **Shai Almog** — February 2, 2017 at 6:19 am ([permalink](/blog/preferences-location-popup-order/#comment-23257))
 
 > Shai Almog says:
 >
@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Peng** — April 13, 2017 at 9:46 am ([permalink](https://www.codenameone.com/blog/preferences-location-popup-order.html#comment-23300))
+### **Peng** — April 13, 2017 at 9:46 am ([permalink](/blog/preferences-location-popup-order/#comment-23300))
 
 > Peng says:
 >
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 14, 2017 at 4:36 am ([permalink](https://www.codenameone.com/blog/preferences-location-popup-order.html#comment-23154))
+### **Shai Almog** — April 14, 2017 at 4:36 am ([permalink](/blog/preferences-location-popup-order/#comment-23154))
 
 > Shai Almog says:
 >
@@ -123,7 +123,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Peng** — April 19, 2017 at 8:11 am ([permalink](https://www.codenameone.com/blog/preferences-location-popup-order.html#comment-23474))
+### **Peng** — April 19, 2017 at 8:11 am ([permalink](/blog/preferences-location-popup-order/#comment-23474))
 
 > Peng says:
 >
@@ -138,7 +138,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 20, 2017 at 4:45 am ([permalink](https://www.codenameone.com/blog/preferences-location-popup-order.html#comment-23512))
+### **Shai Almog** — April 20, 2017 at 4:45 am ([permalink](/blog/preferences-location-popup-order/#comment-23512))
 
 > Shai Almog says:
 >

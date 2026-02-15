@@ -35,7 +35,7 @@ In the past this also applied for apps like mapping apps, e.g. up until recently
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Maxim Geraskyn** — April 10, 2017 at 5:47 pm ([permalink](https://www.codenameone.com/blog/tip-when-shouldnt-i-use-codename-one.html#comment-23213))
+### **Maxim Geraskyn** — April 10, 2017 at 5:47 pm ([permalink](/blog/tip-when-shouldnt-i-use-codename-one/#comment-23213))
 
 > Maxim Geraskyn says:
 >
@@ -50,7 +50,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 11, 2017 at 4:32 am ([permalink](https://www.codenameone.com/blog/tip-when-shouldnt-i-use-codename-one.html#comment-23345))
+### **Shai Almog** — April 11, 2017 at 4:32 am ([permalink](/blog/tip-when-shouldnt-i-use-codename-one/#comment-23345))
 
 > Shai Almog says:
 >

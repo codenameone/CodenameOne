@@ -86,42 +86,42 @@ This tells the app to load your theme_legacy.res file instead of theme.res. Beca
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — February 14, 2020 at 11:06 am ([permalink](https://www.codenameone.com/blog/migrating-legacy-applications-to-css.html#comment-21383))
+### **Francesco Galgani** — February 14, 2020 at 11:06 am ([permalink](/blog/migrating-legacy-applications-to-css/#comment-21383))
 
 > Another tip about CSS is the support for multiple CSS files in the same project, as explained here: <https://stackoverflow.com/a/53488737>. I have thousands of lines of CSS, and I feel convenient to use multiple CSS files. This also allows me to have a separate CSS files for Android, for iOS and Javascript, that are useful in the (very few) cases that it’s necessary. The downside is that, in this way, the support for recompiling CSS on saving and the updating of UI on the fly is lost. It could be interesting a native support for multiple CSS that doesn’t require to manually edit the build.xml and that can update the UI on the fly.
 >
 
 
 
-### **Javier Anton** — February 16, 2020 at 7:22 am ([permalink](https://www.codenameone.com/blog/migrating-legacy-applications-to-css.html#comment-21385))
+### **Javier Anton** — February 16, 2020 at 7:22 am ([permalink](/blog/migrating-legacy-applications-to-css/#comment-21385))
 
 > Nice post, thanks. Once we have CSS enabled, are we able to continue editing our designer theme, or is that no longer editable?
 >
 
 
 
-### **Shai Almog** — February 17, 2020 at 2:10 am ([permalink](https://www.codenameone.com/blog/migrating-legacy-applications-to-css.html#comment-21386))
+### **Shai Almog** — February 17, 2020 at 2:10 am ([permalink](/blog/migrating-legacy-applications-to-css/#comment-21386))
 
 > You can edit the non-CSS resource files using the designer. You can also open the CSS file in the designer but all changes will be overwritten so it’s mostly useful as a debugging tool to see what the CSS generated which is often interesting (e.g. it sometimes generates images to implement some UI settings).
 >
 
 
 
-### **Durank** — February 18, 2020 at 3:02 pm ([permalink](https://www.codenameone.com/blog/migrating-legacy-applications-to-css.html#comment-21387))
+### **Durank** — February 18, 2020 at 3:02 pm ([permalink](/blog/migrating-legacy-applications-to-css/#comment-21387))
 
 > this migration create all my styles, contants, containers, etc in the theme.css file from theme.res? when I migrated to css file I need to continue editting .css file ?
 >
 
 
 
-### **Shai Almog** — February 19, 2020 at 3:12 am ([permalink](https://www.codenameone.com/blog/migrating-legacy-applications-to-css.html#comment-21388))
+### **Shai Almog** — February 19, 2020 at 3:12 am ([permalink](/blog/migrating-legacy-applications-to-css/#comment-21388))
 
 > No. You will need to maintain both.
 >
 
 
 
-### **Durank** — March 3, 2020 at 3:37 pm ([permalink](https://www.codenameone.com/blog/migrating-legacy-applications-to-css.html#comment-21418))
+### **Durank** — March 3, 2020 at 3:37 pm ([permalink](/blog/migrating-legacy-applications-to-css/#comment-21418))
 
 > When I made the migration following the up steps recommended. If I compile and run my app in simulator it will continue working with out doing nothing?
 >
@@ -130,28 +130,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Durank** — March 3, 2020 at 4:52 pm ([permalink](https://www.codenameone.com/blog/migrating-legacy-applications-to-css.html#comment-21417))
+### **Durank** — March 3, 2020 at 4:52 pm ([permalink](/blog/migrating-legacy-applications-to-css/#comment-21417))
 
 > But could you tell me what is the purpose of this post? I need to migrate manually all my styles to the .css file?
 >
 
 
 
-### **Shai Almog** — March 4, 2020 at 2:12 am ([permalink](https://www.codenameone.com/blog/migrating-legacy-applications-to-css.html#comment-21419))
+### **Shai Almog** — March 4, 2020 at 2:12 am ([permalink](/blog/migrating-legacy-applications-to-css/#comment-21419))
 
 > Both would be editable. The idea is that you’d want to start moving stuff to the css but do it at your own pace
 >
 
 
 
-### **Shai Almog** — March 4, 2020 at 2:15 am ([permalink](https://www.codenameone.com/blog/migrating-legacy-applications-to-css.html#comment-21416))
+### **Shai Almog** — March 4, 2020 at 2:15 am ([permalink](/blog/migrating-legacy-applications-to-css/#comment-21416))
 
 > It looks like you created a recursive dependency between the CSS and the theme. Did you follow all the instructions?
 >
 
 
 
-### **Shai Almog** — March 4, 2020 at 2:16 am ([permalink](https://www.codenameone.com/blog/migrating-legacy-applications-to-css.html#comment-21420))
+### **Shai Almog** — March 4, 2020 at 2:16 am ([permalink](/blog/migrating-legacy-applications-to-css/#comment-21420))
 
 > Shai Almog says:
 >
@@ -160,7 +160,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Durank** — March 5, 2020 at 5:27 pm ([permalink](https://www.codenameone.com/blog/migrating-legacy-applications-to-css.html#comment-21422))
+### **Durank** — March 5, 2020 at 5:27 pm ([permalink](/blog/migrating-legacy-applications-to-css/#comment-21422))
 
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
@@ -192,7 +192,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 6, 2020 at 5:15 am ([permalink](https://www.codenameone.com/blog/migrating-legacy-applications-to-css.html#comment-21421))
+### **Shai Almog** — March 6, 2020 at 5:15 am ([permalink](/blog/migrating-legacy-applications-to-css/#comment-21421))
 
 > Shai Almog says:
 >

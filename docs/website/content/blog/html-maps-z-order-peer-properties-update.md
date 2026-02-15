@@ -48,14 +48,14 @@ The `NumericProperty` also introduces support for non-nullable elements in this 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Blessing Mahlalela** — February 16, 2017 at 11:46 am ([permalink](https://www.codenameone.com/blog/html-maps-z-order-peer-properties-update.html#comment-23303))
+### **Blessing Mahlalela** — February 16, 2017 at 11:46 am ([permalink](/blog/html-maps-z-order-peer-properties-update/#comment-23303))
 
 > Blessing Mahlalela says:
 >
 > Hi, currently trying latest Github CN1 Google maps code. I added Java script api key, however on simulator it shows Open street maps. Is it possible to display html5 JS maps on simulator and every other device that does not have the SDK?
 
 
-### **Blessing Mahlalela** — February 16, 2017 at 12:12 pm ([permalink](https://www.codenameone.com/blog/html-maps-z-order-peer-properties-update.html#comment-23151))
+### **Blessing Mahlalela** — February 16, 2017 at 12:12 pm ([permalink](/blog/html-maps-z-order-peer-properties-update/#comment-23151))
 
 > Blessing Mahlalela says:
 >
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > org.gradle.api.tasks.TaskExecutionException: Execution failed for task ‘:transformClassesAndResourcesWithProguardForRelease’.
 
 
-### **Shai Almog** — February 16, 2017 at 2:34 pm ([permalink](https://www.codenameone.com/blog/html-maps-z-order-peer-properties-update.html#comment-23266))
+### **Shai Almog** — February 16, 2017 at 2:34 pm ([permalink](/blog/html-maps-z-order-peer-properties-update/#comment-23266))
 
 > Shai Almog says:
 >

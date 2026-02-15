@@ -17,7 +17,7 @@ Learn how to build Codename One from source and use this "local" version in your
 
 > This post is targeted at experienced Codename One users. If you haven’t built an app with Codename One before, I recommend you start with this [Getting Started tutorial](https://shannah.github.io/cn1-maven-archetypes/cn1app-archetype-tutorial/getting-started.html) (for Java) or [this tutorial](https://shannah.github.io/cn1app-archetype-kotlin-template/getting-started.html) (for Kotlin).
 
-One of the benefits of [moving to Maven](https://www.codenameone.com/blog/moving-to-maven.html) is improved project hygiene. It is now trivial to build Codename One from source.
+One of the benefits of [moving to Maven](/blog/moving-to-maven/) is improved project hygiene. It is now trivial to build Codename One from source.
 
 In this video, I show you how to build Codename One from source and use this “local” version in your Codename One projects.
 
@@ -90,7 +90,7 @@ If you want to dig deeper into Codename One’s Maven support, check out the [Co
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Dave Dyer** — July 20, 2023 at 10:07 pm ([permalink](https://www.codenameone.com/blog/building-codename-one-from-source-maven-edition.html#comment-24563))
+### **Dave Dyer** — July 20, 2023 at 10:07 pm ([permalink](/blog/building-codename-one-from-source-maven-edition/#comment-24563))
 
 > Dave Dyer says:
 >
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Dave Dyer** — July 21, 2023 at 7:35 pm ([permalink](https://www.codenameone.com/blog/building-codename-one-from-source-maven-edition.html#comment-24564))
+### **Dave Dyer** — July 21, 2023 at 7:35 pm ([permalink](/blog/building-codename-one-from-source-maven-edition/#comment-24564))
 
 > Dave Dyer says:
 >

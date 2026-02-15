@@ -303,7 +303,7 @@ In this example we used a modal dialog to prompt the user, but you can use any U
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Francesco Galgani** — June 6, 2021 at 1:03 pm ([permalink](https://www.codenameone.com/blog/tips-for-the-javascript-port-of-codename-one-apps.html#comment-24465))
+### **Francesco Galgani** — June 6, 2021 at 1:03 pm ([permalink](/blog/tips-for-the-javascript-port-of-codename-one-apps/#comment-24465))
 
 > Francesco Galgani says:
 >

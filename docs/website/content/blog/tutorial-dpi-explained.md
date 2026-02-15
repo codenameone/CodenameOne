@@ -23,14 +23,14 @@ Figure 1. Device Density Explained in One Image
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **maxii123** — April 11, 2018 at 11:30 am ([permalink](https://www.codenameone.com/blog/tutorial-dpi-explained.html#comment-23854))
+### **maxii123** — April 11, 2018 at 11:30 am ([permalink](/blog/tutorial-dpi-explained/#comment-23854))
 
 > I think you need to step back and re-evaluate. That picture explains nothing. And I’m a professional programmer well versed in dpi and scaling issues. That’s just a lot of figures that only mean anything if you already understand it.
 >
 
 
 
-### **Shai Almog** — April 11, 2018 at 1:11 pm ([permalink](https://www.codenameone.com/blog/tutorial-dpi-explained.html#comment-23862))
+### **Shai Almog** — April 11, 2018 at 1:11 pm ([permalink](/blog/tutorial-dpi-explained/#comment-23862))
 
 > Shai Almog says:
 >

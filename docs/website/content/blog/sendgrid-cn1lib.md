@@ -27,7 +27,7 @@ Note that this only applies to the send email via cloud API’s and not to the s
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — August 14, 2018 at 12:39 pm ([permalink](https://www.codenameone.com/blog/sendgrid-cn1lib.html#comment-23792))
+### **Francesco Galgani** — August 14, 2018 at 12:39 pm ([permalink](/blog/sendgrid-cn1lib/#comment-23792))
 
 > Francesco Galgani says:
 >
@@ -36,7 +36,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 15, 2018 at 3:24 am ([permalink](https://www.codenameone.com/blog/sendgrid-cn1lib.html#comment-23963))
+### **Shai Almog** — August 15, 2018 at 3:24 am ([permalink](/blog/sendgrid-cn1lib/#comment-23963))
 
 > Shai Almog says:
 >

@@ -69,7 +69,7 @@ the build.xml in version control so an accidental overwrite won’t destroy your
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — September 16, 2016 at 5:29 am ([permalink](https://www.codenameone.com/blog/different-icons.html#comment-22726))
+### **bryan** — September 16, 2016 at 5:29 am ([permalink](/blog/different-icons/#comment-22726))
 
 > bryan says:
 >
@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 16, 2016 at 9:41 am ([permalink](https://www.codenameone.com/blog/different-icons.html#comment-23091))
+### **Shai Almog** — September 16, 2016 at 9:41 am ([permalink](/blog/different-icons/#comment-23091))
 
 > Shai Almog says:
 >

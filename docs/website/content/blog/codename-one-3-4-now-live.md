@@ -25,18 +25,18 @@ and the [JavaDocs](https://www.codenameone.com/javadoc/) were significantly impr
   * **IntelliJ IDEA Plugin rewrite** – the new [IntelliJ IDEA support](/blog/a-new-idea.html) is  
 as good as the NetBeans plugin
 
-  * **Shape Clipping** – it is now possible to [clip a graphics context based on an arbitrary shape](https://www.codenameone.com/blog/shape-clipping-bubble-transition.html)
+  * **Shape Clipping** – it is now possible to [clip a graphics context based on an arbitrary shape](/blog/shape-clipping-bubble-transition/)
 
-  * **ToastBar** – allows [posting “hints” visually](https://www.codenameone.com/blog/toastbar-gaussian-blur.html) to a hint area
+  * **ToastBar** – allows [posting “hints” visually](/blog/toastbar-gaussian-blur/) to a hint area
 
-  * **Toolbar** is [now the default](https://www.codenameone.com/blog/toolbar-default-millimeter-sizes-weekly-releases.html) &  
+  * **Toolbar** is [now the default](/blog/toolbar-default-millimeter-sizes-weekly-releases/) &  
 has a refined implementation/usage
 
-  * **SignatureComponent** – allows us to [accept user signatures](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html)
+  * **SignatureComponent** – allows us to [accept user signatures](/blog/downloads-callbacks-signature-more/)
 
-  * **Gaussian Blur** – supported on [images and dialogs](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html)
+  * **Gaussian Blur** – supported on [images and dialogs](/blog/downloads-callbacks-signature-more/)
 
-  * **ParparVM** – now has [better performance in micro-benchmarks](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html)
+  * **ParparVM** – now has [better performance in micro-benchmarks](/blog/seo-gallery-performance-javascript-gradle/)
 
 You can see the full list of changes to Codename One in [the github repository](https://github.com/codenameone/CodenameOne/commits/master).
 
@@ -48,8 +48,8 @@ them and are working on improving them:
   * Demos – We were supposed to modernize our demos. Almost all of them still use Java 5 and old themes. None  
 use the new material design icon fonts. This makes them feel antiquated, we hope to fix this early in the 3.5 cycle
 
-  * Windows port – We actually [made great progress on this](https://www.codenameone.com/blog/new-windows-port.html) &  
-also [posted the full source code](https://www.codenameone.com/blog/windows-idea-enum-values-contactsmanager-refresh.html).  
+  * Windows port – We actually [made great progress on this](/blog/new-windows-port/) &  
+also [posted the full source code](/blog/windows-idea-enum-values-contactsmanager-refresh/).  
 Just yesterday we posted [additional good news on the subject](/blog/windows-phone-8-1-uwp-support.html)!  
 However, it’s still incomplete for release and needs quite a bit of work as it is a **huge** task. We are making a lot  
 of progress though and we are optimistic that 3.5 could have UWP support.
@@ -87,7 +87,7 @@ Codename One 3.5 is scheduled for Tuesday August 2nd 2016. Version 3.6 is curren
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Kyri Ioulianou** — May 3, 2016 at 8:33 am ([permalink](https://www.codenameone.com/blog/codename-one-3-4-now-live.html#comment-22858))
+### **Kyri Ioulianou** — May 3, 2016 at 8:33 am ([permalink](/blog/codename-one-3-4-now-live/#comment-22858))
 
 > Kyri Ioulianou says:
 >
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 3, 2016 at 10:57 am ([permalink](https://www.codenameone.com/blog/codename-one-3-4-now-live.html#comment-22461))
+### **Shai Almog** — May 3, 2016 at 10:57 am ([permalink](/blog/codename-one-3-4-now-live/#comment-22461))
 
 > Shai Almog says:
 >
@@ -105,7 +105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Geertjan** — May 3, 2016 at 11:08 am ([permalink](https://www.codenameone.com/blog/codename-one-3-4-now-live.html#comment-22449))
+### **Geertjan** — May 3, 2016 at 11:08 am ([permalink](/blog/codename-one-3-4-now-live/#comment-22449))
 
 > Geertjan says:
 >
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gareth Murfin** — May 3, 2016 at 11:24 am ([permalink](https://www.codenameone.com/blog/codename-one-3-4-now-live.html#comment-22493))
+### **Gareth Murfin** — May 3, 2016 at 11:24 am ([permalink](/blog/codename-one-3-4-now-live/#comment-22493))
 
 > Gareth Murfin says:
 >
@@ -123,7 +123,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 3, 2016 at 11:25 am ([permalink](https://www.codenameone.com/blog/codename-one-3-4-now-live.html#comment-22567))
+### **Shai Almog** — May 3, 2016 at 11:25 am ([permalink](/blog/codename-one-3-4-now-live/#comment-22567))
 
 > Shai Almog says:
 >
@@ -132,7 +132,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chen Fishbein** — May 3, 2016 at 12:36 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-4-now-live.html#comment-22622))
+### **Chen Fishbein** — May 3, 2016 at 12:36 pm ([permalink](/blog/codename-one-3-4-now-live/#comment-22622))
 
 > Chen Fishbein says:
 >

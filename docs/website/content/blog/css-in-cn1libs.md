@@ -46,7 +46,7 @@ Now, whenever you build the library project, it will automatically copy it into 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — February 23, 2020 at 10:06 am ([permalink](https://www.codenameone.com/blog/css-in-cn1libs.html#comment-21390))
+### **Francesco Galgani** — February 23, 2020 at 10:06 am ([permalink](/blog/css-in-cn1libs/#comment-21390))
 
 > [Francesco Galgani](https://lh6.googleusercontent.com/-4K0ax_DVJf4/AAAAAAAAAAI/AAAAAAAAAAA/AMZuuckEd1kcni0y8k6NMzNtxwOCEPatQQ/photo.jpg) says:
 >
@@ -55,7 +55,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 24, 2020 at 3:06 am ([permalink](https://www.codenameone.com/blog/css-in-cn1libs.html#comment-21389))
+### **Shai Almog** — February 24, 2020 at 3:06 am ([permalink](/blog/css-in-cn1libs/#comment-21389))
 
 > Shai Almog says:
 >

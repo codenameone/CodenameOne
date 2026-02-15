@@ -103,7 +103,7 @@ Both of these classes will probably be around and won’t be deprecated any time
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — May 30, 2017 at 3:13 pm ([permalink](https://www.codenameone.com/blog/static-global-context.html#comment-23499))
+### **Diamond** — May 30, 2017 at 3:13 pm ([permalink](/blog/static-global-context/#comment-23499))
 
 > Diamond says:
 >
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 31, 2017 at 4:41 am ([permalink](https://www.codenameone.com/blog/static-global-context.html#comment-23059))
+### **Shai Almog** — May 31, 2017 at 4:41 am ([permalink](/blog/static-global-context/#comment-23059))
 
 > Shai Almog says:
 >

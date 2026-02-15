@@ -74,7 +74,7 @@ For a detailed pricing matrix and FAQ check out [this page](/comparison-chart.ht
 Payment can be done using credit cards (thru PayPal) or via SWIFT bank transfers (and invoice) for annual accounts of pro grade or higher. To use the SWIFT invoicing/purchase order option just signup for a free account and click the right invoicing option within the subscription tab.
 
 Build size restrictions relate to the size of the user JAR before compilation not the final app on which there is no such restriction.  
-Notice you can [increase the quotas](https://www.codenameone.com/blog/increase-your-build-quotas.html) for the builds by inviting your friends to use Codename One!
+Notice you can [increase the quotas](/blog/increase-your-build-quotas/) for the builds by inviting your friends to use Codename One!
 
 Please notice that accounts can't be shared and must be uniform within the organization. E.g. a single company can't have one developer in enterprise grade and another one in pro grade.
 

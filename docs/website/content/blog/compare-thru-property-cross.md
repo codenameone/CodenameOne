@@ -29,7 +29,7 @@ tools Codename One’s advantages become pretty clear.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — July 6, 2016 at 3:12 pm ([permalink](https://www.codenameone.com/blog/compare-thru-property-cross.html#comment-21631))
+### **Chidiebere Okwudire** — July 6, 2016 at 3:12 pm ([permalink](/blog/compare-thru-property-cross/#comment-21631))
 
 > Chidiebere Okwudire says:
 >
@@ -40,7 +40,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 6, 2016 at 5:38 pm ([permalink](https://www.codenameone.com/blog/compare-thru-property-cross.html#comment-22828))
+### **Shai Almog** — July 6, 2016 at 5:38 pm ([permalink](/blog/compare-thru-property-cross/#comment-22828))
 
 > Shai Almog says:
 >
@@ -55,7 +55,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — July 8, 2016 at 8:09 am ([permalink](https://www.codenameone.com/blog/compare-thru-property-cross.html#comment-22545))
+### **Chidiebere Okwudire** — July 8, 2016 at 8:09 am ([permalink](/blog/compare-thru-property-cross/#comment-22545))
 
 > Chidiebere Okwudire says:
 >

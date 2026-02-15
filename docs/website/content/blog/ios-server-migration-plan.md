@@ -124,7 +124,7 @@ If you need support for QR/bar code scanning you need to migrate your code to us
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Shai Almog** — May 25, 2016 at 5:54 pm ([permalink](https://www.codenameone.com/blog/ios-server-migration-plan.html#comment-22598))
+### **Shai Almog** — May 25, 2016 at 5:54 pm ([permalink](/blog/ios-server-migration-plan/#comment-22598))
 
 > Shai Almog says:
 >
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gareth Murfin** — May 27, 2016 at 12:06 am ([permalink](https://www.codenameone.com/blog/ios-server-migration-plan.html#comment-21511))
+### **Gareth Murfin** — May 27, 2016 at 12:06 am ([permalink](/blog/ios-server-migration-plan/#comment-21511))
 
 > Gareth Murfin says:
 >

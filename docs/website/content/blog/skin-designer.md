@@ -74,7 +74,7 @@ a bug fix in the simulator
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Gareth Murfin** — February 5, 2018 at 10:18 am ([permalink](https://www.codenameone.com/blog/skin-designer.html#comment-23681))
+### **Gareth Murfin** — February 5, 2018 at 10:18 am ([permalink](/blog/skin-designer/#comment-23681))
 
 > Gareth Murfin says:
 >
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 6, 2018 at 7:16 am ([permalink](https://www.codenameone.com/blog/skin-designer.html#comment-23944))
+### **Shai Almog** — February 6, 2018 at 7:16 am ([permalink](/blog/skin-designer/#comment-23944))
 
 > Shai Almog says:
 >

@@ -146,7 +146,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — December 18, 2013 at 6:59 pm ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-24235))
+### **Anonymous** — December 18, 2013 at 6:59 pm ([permalink](/blog/deeper-in-the-renderer/#comment-24235))
 
 > Anonymous says:
 >
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 19, 2013 at 3:19 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21904))
+### **Anonymous** — December 19, 2013 at 3:19 am ([permalink](/blog/deeper-in-the-renderer/#comment-21904))
 
 > Anonymous says:
 >
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 19, 2013 at 3:22 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21845))
+### **Anonymous** — December 19, 2013 at 3:22 am ([permalink](/blog/deeper-in-the-renderer/#comment-21845))
 
 > Anonymous says:
 >
@@ -173,7 +173,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 19, 2013 at 3:27 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21766))
+### **Anonymous** — December 19, 2013 at 3:27 am ([permalink](/blog/deeper-in-the-renderer/#comment-21766))
 
 > Anonymous says:
 >
@@ -184,7 +184,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — May 10, 2014 at 5:43 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-22013))
+### **Anonymous** — May 10, 2014 at 5:43 am ([permalink](/blog/deeper-in-the-renderer/#comment-22013))
 
 > Anonymous says:
 >
@@ -199,7 +199,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — May 10, 2014 at 12:00 pm ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21660))
+### **Anonymous** — May 10, 2014 at 12:00 pm ([permalink](/blog/deeper-in-the-renderer/#comment-21660))
 
 > Anonymous says:
 >
@@ -212,7 +212,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — August 14, 2014 at 2:21 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-22144))
+### **Anonymous** — August 14, 2014 at 2:21 am ([permalink](/blog/deeper-in-the-renderer/#comment-22144))
 
 > Anonymous says:
 >
@@ -221,7 +221,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — August 14, 2014 at 3:46 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-22005))
+### **Anonymous** — August 14, 2014 at 3:46 am ([permalink](/blog/deeper-in-the-renderer/#comment-22005))
 
 > Anonymous says:
 >
@@ -230,7 +230,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — August 14, 2014 at 5:41 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21444))
+### **Anonymous** — August 14, 2014 at 5:41 am ([permalink](/blog/deeper-in-the-renderer/#comment-21444))
 
 > Anonymous says:
 >
@@ -251,7 +251,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kaneda** — December 11, 2015 at 1:18 pm ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21623))
+### **Kaneda** — December 11, 2015 at 1:18 pm ([permalink](/blog/deeper-in-the-renderer/#comment-21623))
 
 > Kaneda says:
 >
@@ -262,7 +262,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 12, 2015 at 5:30 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-22221))
+### **Shai Almog** — December 12, 2015 at 5:30 am ([permalink](/blog/deeper-in-the-renderer/#comment-22221))
 
 > Shai Almog says:
 >
@@ -275,7 +275,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kaneda** — December 14, 2015 at 11:10 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-22300))
+### **Kaneda** — December 14, 2015 at 11:10 am ([permalink](/blog/deeper-in-the-renderer/#comment-22300))
 
 > Kaneda says:
 >
@@ -284,7 +284,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kaneda** — December 14, 2015 at 4:07 pm ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21499))
+### **Kaneda** — December 14, 2015 at 4:07 pm ([permalink](/blog/deeper-in-the-renderer/#comment-21499))
 
 > Kaneda says:
 >
@@ -298,7 +298,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 15, 2015 at 5:15 am ([permalink](https://www.codenameone.com/blog/deeper-in-the-renderer.html#comment-21490))
+### **Shai Almog** — December 15, 2015 at 5:15 am ([permalink](/blog/deeper-in-the-renderer/#comment-21490))
 
 > Shai Almog says:
 >

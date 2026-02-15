@@ -64,7 +64,7 @@ of your application to remain decoupled while supporting a single setting attrib
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — December 13, 2016 at 11:46 pm ([permalink](https://www.codenameone.com/blog/cache-sorted-properties-preferences-listener.html#comment-23066))
+### **bryan** — December 13, 2016 at 11:46 pm ([permalink](/blog/cache-sorted-properties-preferences-listener/#comment-23066))
 
 > bryan says:
 >
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 14, 2016 at 5:12 am ([permalink](https://www.codenameone.com/blog/cache-sorted-properties-preferences-listener.html#comment-23232))
+### **Shai Almog** — December 14, 2016 at 5:12 am ([permalink](/blog/cache-sorted-properties-preferences-listener/#comment-23232))
 
 > Shai Almog says:
 >

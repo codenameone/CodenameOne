@@ -26,7 +26,7 @@ __ |  We suggest removing this build hint once your done so you can use the defa
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Javier Anton** — March 8, 2020 at 9:03 pm ([permalink](https://www.codenameone.com/blog/xcode-11-migration.html#comment-21423))
+### **Javier Anton** — March 8, 2020 at 9:03 pm ([permalink](/blog/xcode-11-migration/#comment-21423))
 
 > [Javier Anton](https://lh3.googleusercontent.com/a-/AAuE7mDRjHkEvAZNXquh9p7Oo00ey1yOwNzZ0SrFwD0IVA) says:
 >

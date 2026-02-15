@@ -39,7 +39,7 @@ use this framework instead of the mix and match options we have right now.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chris Smith** — April 28, 2017 at 4:45 am ([permalink](https://www.codenameone.com/blog/sign-in-with.html#comment-23123))
+### **Chris Smith** — April 28, 2017 at 4:45 am ([permalink](/blog/sign-in-with/#comment-23123))
 
 > Chris Smith says:
 >
@@ -48,7 +48,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 29, 2017 at 6:12 am ([permalink](https://www.codenameone.com/blog/sign-in-with.html#comment-23400))
+### **Shai Almog** — April 29, 2017 at 6:12 am ([permalink](/blog/sign-in-with/#comment-23400))
 
 > Shai Almog says:
 >

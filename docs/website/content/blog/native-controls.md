@@ -66,7 +66,7 @@ You can use the `NTextField` like this:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Ch Hjelm** — February 1, 2019 at 12:30 pm ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-24110))
+### **Ch Hjelm** — February 1, 2019 at 12:30 pm ([permalink](/blog/native-controls/#comment-24110))
 
 > Ch Hjelm says:
 >
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — February 1, 2019 at 1:01 pm ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-24101))
+### **shannah78** — February 1, 2019 at 1:01 pm ([permalink](/blog/native-controls/#comment-24101))
 
 > shannah78 says:
 >
@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — February 1, 2019 at 7:06 pm ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-24003))
+### **Ch Hjelm** — February 1, 2019 at 7:06 pm ([permalink](/blog/native-controls/#comment-24003))
 
 > Ch Hjelm says:
 >
@@ -120,7 +120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — February 2, 2019 at 9:57 am ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-24035))
+### **Ch Hjelm** — February 2, 2019 at 9:57 am ([permalink](/blog/native-controls/#comment-24035))
 
 > Ch Hjelm says:
 >
@@ -129,7 +129,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 3, 2019 at 4:26 am ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-24077))
+### **Shai Almog** — February 3, 2019 at 4:26 am ([permalink](/blog/native-controls/#comment-24077))
 
 > Shai Almog says:
 >
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — February 3, 2019 at 10:55 am ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-24104))
+### **Ch Hjelm** — February 3, 2019 at 10:55 am ([permalink](/blog/native-controls/#comment-24104))
 
 > Ch Hjelm says:
 >
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — February 8, 2019 at 12:03 pm ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-24086))
+### **Ch Hjelm** — February 8, 2019 at 12:03 pm ([permalink](/blog/native-controls/#comment-24086))
 
 > Ch Hjelm says:
 >
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 9, 2019 at 6:00 am ([permalink](https://www.codenameone.com/blog/native-controls.html#comment-23966))
+### **Shai Almog** — February 9, 2019 at 6:00 am ([permalink](/blog/native-controls/#comment-23966))
 
 > Shai Almog says:
 >

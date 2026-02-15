@@ -355,14 +355,14 @@ I think we can take this feature much further than what we have above, I think t
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **kutoman** — April 14, 2017 at 10:27 am ([permalink](https://www.codenameone.com/blog/properties-are-amazing.html#comment-24144))
+### **kutoman** — April 14, 2017 at 10:27 am ([permalink](/blog/properties-are-amazing/#comment-24144))
 
 > thanks for the post! The UI binding part was new to me 🙂
 >
 
 
 
-### **Shai Almog** — April 15, 2017 at 4:26 am ([permalink](https://www.codenameone.com/blog/properties-are-amazing.html#comment-23390))
+### **Shai Almog** — April 15, 2017 at 4:26 am ([permalink](/blog/properties-are-amazing/#comment-23390))
 
 > Shai Almog says:
 >
@@ -371,7 +371,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Sachin Shah** — April 28, 2017 at 5:56 pm ([permalink](https://www.codenameone.com/blog/properties-are-amazing.html#comment-23312))
+### **Sachin Shah** — April 28, 2017 at 5:56 pm ([permalink](/blog/properties-are-amazing/#comment-23312))
 
 > Sachin Shah says:
 >
@@ -380,7 +380,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 29, 2017 at 6:17 am ([permalink](https://www.codenameone.com/blog/properties-are-amazing.html#comment-23464))
+### **Shai Almog** — April 29, 2017 at 6:17 am ([permalink](/blog/properties-are-amazing/#comment-23464))
 
 > Shai Almog says:
 >
@@ -391,7 +391,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **james agada** — June 1, 2017 at 12:10 pm ([permalink](https://www.codenameone.com/blog/properties-are-amazing.html#comment-23402))
+### **james agada** — June 1, 2017 at 12:10 pm ([permalink](/blog/properties-are-amazing/#comment-23402))
 
 > james agada says:
 >
@@ -400,7 +400,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **james agada** — June 8, 2017 at 1:16 pm ([permalink](https://www.codenameone.com/blog/properties-are-amazing.html#comment-23544))
+### **james agada** — June 8, 2017 at 1:16 pm ([permalink](/blog/properties-are-amazing/#comment-23544))
 
 > james agada says:
 >
@@ -409,7 +409,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — August 25, 2017 at 7:23 pm ([permalink](https://www.codenameone.com/blog/properties-are-amazing.html#comment-23670))
+### **Francesco Galgani** — August 25, 2017 at 7:23 pm ([permalink](/blog/properties-are-amazing/#comment-23670))
 
 > Francesco Galgani says:
 >
@@ -434,13 +434,13 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 26, 2017 at 4:45 am ([permalink](https://www.codenameone.com/blog/properties-are-amazing.html#comment-23583))
+### **Shai Almog** — August 26, 2017 at 4:45 am ([permalink](/blog/properties-are-amazing/#comment-23583))
 
 > Shai Almog says:
 >
 > I saw the emails but I assumed you deleted the comments. disqus is sometimes annoying, sorry about that.
 >
-> 1\. Unfortunately there is no way to get the “parent” declaring I explained the need for this here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/properties.html>)  
+> 1\. Unfortunately there is no way to get the “parent” declaring I explained the need for this here: [https://www.codenameone.com…](</blog/properties/>)  
 > The only reason this is needed is for chained set calls e.g. MyObject m = new MyObject().dateOfBirth.set(date).gender.set(“M”);
 >
 > 2\. Erasure. Generics are syntactic sugar. They are removed during compile and we have no idea what they were during runtime where we might need them e.g. for things like database mapping. The default mapping is string so that works. That’s also why we added DoubleProperty, IntProperty etc.
@@ -453,7 +453,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — August 28, 2017 at 1:23 am ([permalink](https://www.codenameone.com/blog/properties-are-amazing.html#comment-21429))
+### **Francesco Galgani** — August 28, 2017 at 1:23 am ([permalink](/blog/properties-are-amazing/#comment-21429))
 
 > Francesco Galgani says:
 >

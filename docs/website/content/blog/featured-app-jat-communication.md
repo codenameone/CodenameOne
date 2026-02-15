@@ -41,14 +41,14 @@ __ |  If you want to add your app to the featured app list just let us know here
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Stefan Eder** — April 25, 2016 at 7:17 am ([permalink](https://www.codenameone.com/blog/featured-app-jat-communication.html#comment-22621))
+### **Stefan Eder** — April 25, 2016 at 7:17 am ([permalink](/blog/featured-app-jat-communication/#comment-22621))
 
 > Apparently the app is only available in the israel app store
 >
 
 
 
-### **Shai Almog** — April 26, 2016 at 4:15 am ([permalink](https://www.codenameone.com/blog/featured-app-jat-communication.html#comment-22485))
+### **Shai Almog** — April 26, 2016 at 4:15 am ([permalink](/blog/featured-app-jat-communication/#comment-22485))
 
 > Thanks for the headsup. I didn’t notice this when I posted this, it seems they are still in tiered beta.  
 > I’ll try to update when this becomes available globally.
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Fabrizio Grassi** — June 15, 2016 at 4:45 pm ([permalink](https://www.codenameone.com/blog/featured-app-jat-communication.html#comment-21513))
+### **Fabrizio Grassi** — June 15, 2016 at 4:45 pm ([permalink](/blog/featured-app-jat-communication/#comment-21513))
 
 > Fabrizio Grassi says:
 >

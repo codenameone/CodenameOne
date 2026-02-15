@@ -11,9 +11,9 @@ author: Shai Almog
 
 ![Header Image](/blog/tip-fix-issue-missing-builds/tip.jpg)
 
-A while back we announced the migration to the [new build cloud](https://www.codenameone.com/blog/new-build-cloud.html). The migration worked very smoothly and mostly seamlessly but there was one caveat: client libraries must be up to date. This is a confusing point so hopefully this long overdue post will clarify it.
+A while back we announced the migration to the [new build cloud](/blog/new-build-cloud/). The migration worked very smoothly and mostly seamlessly but there was one caveat: client libraries must be up to date. This is a confusing point so hopefully this long overdue post will clarify it.
 
-The core of the problem is `CodeNameOneBuildClient.jar`. It’s a relatively simple jar with a few ant tasks that performs a lot of “under the hood” services such as sending the build to the cloud. It’s shipped within the IDE plugin and old versions of the IDE plugins would replace it automatically. We now update it via the [update framework](https://www.codenameone.com/blog/new-update-framework.html) which is better but might cause a few issues.
+The core of the problem is `CodeNameOneBuildClient.jar`. It’s a relatively simple jar with a few ant tasks that performs a lot of “under the hood” services such as sending the build to the cloud. It’s shipped within the IDE plugin and old versions of the IDE plugins would replace it automatically. We now update it via the [update framework](/blog/new-update-framework/) which is better but might cause a few issues.
 
 Generally the issues can be expressed either via a build that doesn’t appear. You might get an error that a build is already in the queue and once we remove app engine entirely you’ll get a connection error.
 
@@ -38,7 +38,7 @@ The problem is that these two steps might fail. Here are things you need to look
 
 When in doubt you can delete `Versions.properties` and Update Project Libs again. This should work but if that doesn’t do it you can go with the “nuclear option” and delete the `.codenameone` directory and `Versions.properties`. After that do an Update Project Libs.
 
-If this still doesn’t work let us know via the chat. Ideally try to run the [update framework](https://www.codenameone.com/blog/new-update-framework.html) from command line to figure out what went wrong.
+If this still doesn’t work let us know via the chat. Ideally try to run the [update framework](/blog/new-update-framework/) from command line to figure out what went wrong.
 ---
 
 ## Archived Comments
@@ -46,7 +46,7 @@ If this still doesn’t work let us know via the chat. Ideally try to run the [u
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Andrew** — May 7, 2020 at 5:08 am ([permalink](https://www.codenameone.com/blog/tip-fix-issue-missing-builds.html#comment-21401))
+### **Andrew** — May 7, 2020 at 5:08 am ([permalink](/blog/tip-fix-issue-missing-builds/#comment-21401))
 
 > Andrew says:
 >
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Be Safe!
 
 
-### **Shai Almog** — May 8, 2020 at 4:53 am ([permalink](https://www.codenameone.com/blog/tip-fix-issue-missing-builds.html#comment-21403))
+### **Shai Almog** — May 8, 2020 at 4:53 am ([permalink](/blog/tip-fix-issue-missing-builds/#comment-21403))
 
 > Shai Almog says:
 >

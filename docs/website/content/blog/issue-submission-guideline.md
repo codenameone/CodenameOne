@@ -121,7 +121,7 @@ issues faster.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jérémy MARQUER** — April 27, 2016 at 4:31 pm ([permalink](https://www.codenameone.com/blog/issue-submission-guideline.html#comment-22662))
+### **Jérémy MARQUER** — April 27, 2016 at 4:31 pm ([permalink](/blog/issue-submission-guideline/#comment-22662))
 
 > Jérémy MARQUER says:
 >

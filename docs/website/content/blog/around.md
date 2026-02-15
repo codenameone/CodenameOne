@@ -70,14 +70,14 @@ plugins.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Msizi** — March 31, 2016 at 5:06 pm ([permalink](https://www.codenameone.com/blog/around.html#comment-22728))
+### **Msizi** — March 31, 2016 at 5:06 pm ([permalink](/blog/around/#comment-22728))
 
 > Great work!!!! just a question, how to change the color of the circle. instead of blue maybe use red or any different color
 >
 
 
 
-### **Chen Fishbein** — April 1, 2016 at 6:38 am ([permalink](https://www.codenameone.com/blog/around.html#comment-22460))
+### **Chen Fishbein** — April 1, 2016 at 6:38 am ([permalink](/blog/around/#comment-22460))
 
 > Chen Fishbein says:
 >

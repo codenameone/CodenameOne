@@ -270,7 +270,7 @@ __ |  Ultimately I opted not to include the “shareTarget” functionality in t
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Carlos** — November 8, 2016 at 4:03 pm ([permalink](https://www.codenameone.com/blog/associating-your-app-with-file-extension-mime-types-iphone-android-windows.html#comment-23053))
+### **Carlos** — November 8, 2016 at 4:03 pm ([permalink](/blog/associating-your-app-with-file-extension-mime-types-iphone-android-windows/#comment-23053))
 
 > Excelent.
 >
@@ -279,14 +279,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bryan** — November 8, 2016 at 7:37 pm ([permalink](https://www.codenameone.com/blog/associating-your-app-with-file-extension-mime-types-iphone-android-windows.html#comment-22806))
+### **bryan** — November 8, 2016 at 7:37 pm ([permalink](/blog/associating-your-app-with-file-extension-mime-types-iphone-android-windows/#comment-22806))
 
 > Great tutorial Steve – thanks.
 >
 
 
 
-### **Shai Almog** — November 9, 2016 at 7:31 am ([permalink](https://www.codenameone.com/blog/associating-your-app-with-file-extension-mime-types-iphone-android-windows.html#comment-23043))
+### **Shai Almog** — November 9, 2016 at 7:31 am ([permalink](/blog/associating-your-app-with-file-extension-mime-types-iphone-android-windows/#comment-23043))
 
 > Thanks.
 >
@@ -295,7 +295,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Carlos** — November 9, 2016 at 9:09 am ([permalink](https://www.codenameone.com/blog/associating-your-app-with-file-extension-mime-types-iphone-android-windows.html#comment-23085))
+### **Carlos** — November 9, 2016 at 9:09 am ([permalink](/blog/associating-your-app-with-file-extension-mime-types-iphone-android-windows/#comment-23085))
 
 > This is what I get in what should be a vertical pic…
 >
@@ -304,7 +304,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 10, 2016 at 4:57 am ([permalink](https://www.codenameone.com/blog/associating-your-app-with-file-extension-mime-types-iphone-android-windows.html#comment-22989))
+### **Shai Almog** — November 10, 2016 at 4:57 am ([permalink](/blog/associating-your-app-with-file-extension-mime-types-iphone-android-windows/#comment-22989))
 
 > Looking at the code it seems to no longer be there, not sure why. I’ll have to ask on that.
 >

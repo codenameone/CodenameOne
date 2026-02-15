@@ -31,7 +31,7 @@ Unlike the language change you could still revert this change manually by defini
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Simone Peirani** — September 7, 2016 at 7:16 am ([permalink](https://www.codenameone.com/blog/java-8-api-23-defaults.html#comment-23032))
+### **Simone Peirani** — September 7, 2016 at 7:16 am ([permalink](/blog/java-8-api-23-defaults/#comment-23032))
 
 > Simone Peirani says:
 >

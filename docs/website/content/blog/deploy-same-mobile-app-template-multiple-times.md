@@ -102,7 +102,7 @@ of the file and the application icon and just replace them dynamically with a sc
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Nick Koirala** — October 6, 2016 at 1:28 am ([permalink](https://www.codenameone.com/blog/deploy-same-mobile-app-template-multiple-times.html#comment-22560))
+### **Nick Koirala** — October 6, 2016 at 1:28 am ([permalink](/blog/deploy-same-mobile-app-template-multiple-times/#comment-22560))
 
 > Nick Koirala says:
 >
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 6, 2016 at 5:22 am ([permalink](https://www.codenameone.com/blog/deploy-same-mobile-app-template-multiple-times.html#comment-22948))
+### **Shai Almog** — October 6, 2016 at 5:22 am ([permalink](/blog/deploy-same-mobile-app-template-multiple-times/#comment-22948))
 
 > Shai Almog says:
 >

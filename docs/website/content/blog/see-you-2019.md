@@ -21,7 +21,7 @@ During this time we won’t blog and won’t make releases unless there are cruc
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — December 18, 2018 at 3:43 pm ([permalink](https://www.codenameone.com/blog/see-you-2019.html#comment-24091))
+### **Diamond** — December 18, 2018 at 3:43 pm ([permalink](/blog/see-you-2019/#comment-24091))
 
 > Diamond says:
 >

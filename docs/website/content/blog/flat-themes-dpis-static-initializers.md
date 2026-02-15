@@ -40,7 +40,7 @@ it, ideally we’d make this fail on the simulator but that is a bit tricky.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **rhg1968** — May 13, 2015 at 6:48 pm ([permalink](https://www.codenameone.com/blog/flat-themes-dpis-static-initializers.html#comment-22262))
+### **rhg1968** — May 13, 2015 at 6:48 pm ([permalink](/blog/flat-themes-dpis-static-initializers/#comment-22262))
 
 > rhg1968 says:
 >
@@ -49,7 +49,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 14, 2015 at 6:52 pm ([permalink](https://www.codenameone.com/blog/flat-themes-dpis-static-initializers.html#comment-22192))
+### **Shai Almog** — May 14, 2015 at 6:52 pm ([permalink](/blog/flat-themes-dpis-static-initializers/#comment-22192))
 
 > Shai Almog says:
 >
@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **rhg1968** — May 14, 2015 at 7:01 pm ([permalink](https://www.codenameone.com/blog/flat-themes-dpis-static-initializers.html#comment-22229))
+### **rhg1968** — May 14, 2015 at 7:01 pm ([permalink](/blog/flat-themes-dpis-static-initializers/#comment-22229))
 
 > rhg1968 says:
 >
@@ -68,7 +68,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 15, 2015 at 9:48 am ([permalink](https://www.codenameone.com/blog/flat-themes-dpis-static-initializers.html#comment-22044))
+### **Shai Almog** — May 15, 2015 at 9:48 am ([permalink](/blog/flat-themes-dpis-static-initializers/#comment-22044))
 
 > Shai Almog says:
 >
@@ -77,7 +77,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **J.C** — May 15, 2015 at 3:04 pm ([permalink](https://www.codenameone.com/blog/flat-themes-dpis-static-initializers.html#comment-24173))
+### **J.C** — May 15, 2015 at 3:04 pm ([permalink](/blog/flat-themes-dpis-static-initializers/#comment-24173))
 
 > J.C says:
 >
@@ -97,7 +97,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 15, 2015 at 4:24 pm ([permalink](https://www.codenameone.com/blog/flat-themes-dpis-static-initializers.html#comment-22354))
+### **Shai Almog** — May 15, 2015 at 4:24 pm ([permalink](/blog/flat-themes-dpis-static-initializers/#comment-22354))
 
 > Shai Almog says:
 >
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **J.C** — May 15, 2015 at 5:45 pm ([permalink](https://www.codenameone.com/blog/flat-themes-dpis-static-initializers.html#comment-22239))
+### **J.C** — May 15, 2015 at 5:45 pm ([permalink](/blog/flat-themes-dpis-static-initializers/#comment-22239))
 
 > J.C says:
 >
@@ -115,7 +115,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 16, 2015 at 8:51 am ([permalink](https://www.codenameone.com/blog/flat-themes-dpis-static-initializers.html#comment-22263))
+### **Shai Almog** — May 16, 2015 at 8:51 am ([permalink](/blog/flat-themes-dpis-static-initializers/#comment-22263))
 
 > Shai Almog says:
 >

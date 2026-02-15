@@ -97,7 +97,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — September 30, 2014 at 11:40 am ([permalink](https://www.codenameone.com/blog/cn1ml-javaone.html#comment-21987))
+### **Anonymous** — September 30, 2014 at 11:40 am ([permalink](/blog/cn1ml-javaone/#comment-21987))
 
 > Anonymous says:
 >
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 30, 2014 at 1:25 pm ([permalink](https://www.codenameone.com/blog/cn1ml-javaone.html#comment-22235))
+### **Anonymous** — September 30, 2014 at 1:25 pm ([permalink](/blog/cn1ml-javaone/#comment-22235))
 
 > Anonymous says:
 >
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 19, 2014 at 10:44 am ([permalink](https://www.codenameone.com/blog/cn1ml-javaone.html#comment-24174))
+### **Anonymous** — October 19, 2014 at 10:44 am ([permalink](/blog/cn1ml-javaone/#comment-24174))
 
 > Anonymous says:
 >

@@ -96,7 +96,7 @@ you can also define the source style in code.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — February 19, 2016 at 9:12 am ([permalink](https://www.codenameone.com/blog/new-animation-manager.html#comment-22540))
+### **Diamond** — February 19, 2016 at 9:12 am ([permalink](/blog/new-animation-manager/#comment-22540))
 
 > Diamond says:
 >
@@ -107,17 +107,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 19, 2016 at 12:11 pm ([permalink](https://www.codenameone.com/blog/new-animation-manager.html#comment-22615))
+### **Shai Almog** — February 19, 2016 at 12:11 pm ([permalink](/blog/new-animation-manager/#comment-22615))
 
 > Shai Almog says:
 >
 > Hi Diamond,  
-> we haven’t made it into a full fledged demo but I did add a shorter standalone section on this into the Toolbar javadocs and the developer guide: [https://www.codenameone.com…](<https://www.codenameone.com/manual/components.html#_title_animations>)
+> we haven’t made it into a full fledged demo but I did add a shorter standalone section on this into the Toolbar javadocs and the developer guide: [https://www.codenameone.com…](</manual/components/#_title_animations>)
 >
 
 
 
-### **Mac Flanegan** — March 2, 2017 at 4:53 pm ([permalink](https://www.codenameone.com/blog/new-animation-manager.html#comment-23008))
+### **Mac Flanegan** — March 2, 2017 at 4:53 pm ([permalink](/blog/new-animation-manager/#comment-23008))
 
 > Mac Flanegan says:
 >
@@ -134,7 +134,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mac Flanegan** — March 2, 2017 at 5:12 pm ([permalink](https://www.codenameone.com/blog/new-animation-manager.html#comment-23165))
+### **Mac Flanegan** — March 2, 2017 at 5:12 pm ([permalink](/blog/new-animation-manager/#comment-23165))
 
 > Mac Flanegan says:
 >
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 3, 2017 at 8:03 am ([permalink](https://www.codenameone.com/blog/new-animation-manager.html#comment-23361))
+### **Shai Almog** — March 3, 2017 at 8:03 am ([permalink](/blog/new-animation-manager/#comment-23361))
 
 > Shai Almog says:
 >
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mac Flanegan** — March 3, 2017 at 7:06 pm ([permalink](https://www.codenameone.com/blog/new-animation-manager.html#comment-23279))
+### **Mac Flanegan** — March 3, 2017 at 7:06 pm ([permalink](/blog/new-animation-manager/#comment-23279))
 
 > Mac Flanegan says:
 >
@@ -174,7 +174,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 4, 2017 at 10:13 am ([permalink](https://www.codenameone.com/blog/new-animation-manager.html#comment-23369))
+### **Shai Almog** — March 4, 2017 at 10:13 am ([permalink](/blog/new-animation-manager/#comment-23369))
 
 > Shai Almog says:
 >

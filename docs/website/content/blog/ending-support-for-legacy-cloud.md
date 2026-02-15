@@ -41,7 +41,7 @@ Using our own servers has been liberating and far more powerful. This is a move 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Gareth Murfin** — August 8, 2018 at 4:38 am ([permalink](https://www.codenameone.com/blog/ending-support-for-legacy-cloud.html#comment-23987))
+### **Gareth Murfin** — August 8, 2018 at 4:38 am ([permalink](/blog/ending-support-for-legacy-cloud/#comment-23987))
 
 > Gareth Murfin says:
 >

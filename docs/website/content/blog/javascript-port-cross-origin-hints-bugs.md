@@ -42,7 +42,7 @@ build. This should be fixed for the next plugin update and shouldn’t affect ot
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **KL** — May 8, 2015 at 12:38 pm ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22337))
+### **KL** — May 8, 2015 at 12:38 pm ([permalink](/blog/javascript-port-cross-origin-hints-bugs/#comment-22337))
 
 > KL says:
 >
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — May 8, 2015 at 4:55 pm ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22208))
+### **shannah78** — May 8, 2015 at 4:55 pm ([permalink](/blog/javascript-port-cross-origin-hints-bugs/#comment-22208))
 
 > shannah78 says:
 >
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **KL** — May 9, 2015 at 10:11 am ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-21613))
+### **KL** — May 9, 2015 at 10:11 am ([permalink](/blog/javascript-port-cross-origin-hints-bugs/#comment-21613))
 
 > KL says:
 >
@@ -97,18 +97,18 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — May 9, 2015 at 3:31 pm ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22159))
+### **shannah78** — May 9, 2015 at 3:31 pm ([permalink](/blog/javascript-port-cross-origin-hints-bugs/#comment-22159))
 
 > shannah78 says:
 >
-> Are the POST requests being sent to the same host as the index.html file is being served on, or a different server? If a different server, you’ll need to set a proxy servlet as described here [https://www.codenameone.com…](<https://www.codenameone.com/manual/appendix-javascript.html>)
+> Are the POST requests being sent to the same host as the index.html file is being served on, or a different server? If a different server, you’ll need to set a proxy servlet as described here [https://www.codenameone.com…](</manual/appendix-javascript/>)
 >
 > The Javascript port will be in beta by July.
 >
 
 
 
-### **KL** — May 10, 2015 at 12:56 pm ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-24197))
+### **KL** — May 10, 2015 at 12:56 pm ([permalink](/blog/javascript-port-cross-origin-hints-bugs/#comment-24197))
 
 > KL says:
 >
@@ -117,7 +117,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 10, 2015 at 2:11 pm ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22169))
+### **Shai Almog** — May 10, 2015 at 2:11 pm ([permalink](/blog/javascript-port-cross-origin-hints-bugs/#comment-22169))
 
 > Shai Almog says:
 >
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **KL** — May 10, 2015 at 3:09 pm ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22120))
+### **KL** — May 10, 2015 at 3:09 pm ([permalink](/blog/javascript-port-cross-origin-hints-bugs/#comment-22120))
 
 > KL says:
 >
@@ -142,7 +142,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — May 11, 2015 at 5:01 am ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22286))
+### **shannah78** — May 11, 2015 at 5:01 am ([permalink](/blog/javascript-port-cross-origin-hints-bugs/#comment-22286))
 
 > shannah78 says:
 >
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **KL** — May 11, 2015 at 8:05 am ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-21938))
+### **KL** — May 11, 2015 at 8:05 am ([permalink](/blog/javascript-port-cross-origin-hints-bugs/#comment-21938))
 
 > KL says:
 >
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 11, 2015 at 2:35 pm ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22137))
+### **Shai Almog** — May 11, 2015 at 2:35 pm ([permalink](/blog/javascript-port-cross-origin-hints-bugs/#comment-22137))
 
 > Shai Almog says:
 >
@@ -170,7 +170,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **KL** — May 28, 2015 at 9:17 am ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22170))
+### **KL** — May 28, 2015 at 9:17 am ([permalink](/blog/javascript-port-cross-origin-hints-bugs/#comment-22170))
 
 > KL says:
 >
@@ -179,7 +179,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 28, 2015 at 6:53 pm ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22409))
+### **Shai Almog** — May 28, 2015 at 6:53 pm ([permalink](/blog/javascript-port-cross-origin-hints-bugs/#comment-22409))
 
 > Shai Almog says:
 >
@@ -188,7 +188,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **KL** — May 29, 2015 at 7:09 am ([permalink](https://www.codenameone.com/blog/javascript-port-cross-origin-hints-bugs.html#comment-22287))
+### **KL** — May 29, 2015 at 7:09 am ([permalink](/blog/javascript-port-cross-origin-hints-bugs/#comment-22287))
 
 > KL says:
 >

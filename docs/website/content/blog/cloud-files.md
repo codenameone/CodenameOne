@@ -103,7 +103,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 10, 2014 at 7:01 pm ([permalink](https://www.codenameone.com/blog/cloud-files.html#comment-22012))
+### **Anonymous** — March 10, 2014 at 7:01 pm ([permalink](/blog/cloud-files/#comment-22012))
 
 > Anonymous says:
 >
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 11, 2014 at 5:02 am ([permalink](https://www.codenameone.com/blog/cloud-files.html#comment-21658))
+### **Anonymous** — March 11, 2014 at 5:02 am ([permalink](/blog/cloud-files/#comment-21658))
 
 > Anonymous says:
 >

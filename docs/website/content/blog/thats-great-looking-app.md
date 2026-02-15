@@ -53,7 +53,7 @@ I’ve got something going and will write more about it during the week. We also
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — June 19, 2017 at 12:36 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23429))
+### **Francesco Galgani** — June 19, 2017 at 12:36 pm ([permalink](/blog/thats-great-looking-app/#comment-23429))
 
 > Francesco Galgani says:
 >
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Dalvik** — June 19, 2017 at 12:46 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23263))
+### **Dalvik** — June 19, 2017 at 12:46 pm ([permalink](/blog/thats-great-looking-app/#comment-23263))
 
 > Dalvik says:
 >
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 19, 2017 at 1:15 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23522))
+### **Shai Almog** — June 19, 2017 at 1:15 pm ([permalink](/blog/thats-great-looking-app/#comment-23522))
 
 > Shai Almog says:
 >
@@ -88,7 +88,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 19, 2017 at 1:18 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23341))
+### **Shai Almog** — June 19, 2017 at 1:18 pm ([permalink](/blog/thats-great-looking-app/#comment-23341))
 
 > Shai Almog says:
 >
@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Dalvik** — June 19, 2017 at 1:36 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23215))
+### **Dalvik** — June 19, 2017 at 1:36 pm ([permalink](/blog/thats-great-looking-app/#comment-23215))
 
 > Dalvik says:
 >
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — June 19, 2017 at 1:38 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-21520))
+### **salah Alhaddabi** — June 19, 2017 at 1:38 pm ([permalink](/blog/thats-great-looking-app/#comment-21520))
 
 > salah Alhaddabi says:
 >
@@ -125,7 +125,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 19, 2017 at 2:04 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23348))
+### **Shai Almog** — June 19, 2017 at 2:04 pm ([permalink](/blog/thats-great-looking-app/#comment-23348))
 
 > Shai Almog says:
 >
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **mbruner63** — June 19, 2017 at 2:05 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23347))
+### **mbruner63** — June 19, 2017 at 2:05 pm ([permalink](/blog/thats-great-looking-app/#comment-23347))
 
 > mbruner63 says:
 >
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Carlos** — June 19, 2017 at 2:23 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23251))
+### **Carlos** — June 19, 2017 at 2:23 pm ([permalink](/blog/thats-great-looking-app/#comment-23251))
 
 > Carlos says:
 >
@@ -179,7 +179,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 19, 2017 at 4:09 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23110))
+### **Shai Almog** — June 19, 2017 at 4:09 pm ([permalink](/blog/thats-great-looking-app/#comment-23110))
 
 > Shai Almog says:
 >
@@ -192,7 +192,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 19, 2017 at 4:11 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23124))
+### **Shai Almog** — June 19, 2017 at 4:11 pm ([permalink](/blog/thats-great-looking-app/#comment-23124))
 
 > Shai Almog says:
 >
@@ -201,7 +201,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mr Emma** — June 19, 2017 at 4:30 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23467))
+### **Mr Emma** — June 19, 2017 at 4:30 pm ([permalink](/blog/thats-great-looking-app/#comment-23467))
 
 > Mr Emma says:
 >
@@ -210,7 +210,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 19, 2017 at 7:09 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23506))
+### **Shai Almog** — June 19, 2017 at 7:09 pm ([permalink](/blog/thats-great-looking-app/#comment-23506))
 
 > Shai Almog says:
 >
@@ -220,7 +220,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steven Mark** — June 19, 2017 at 8:02 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23609))
+### **Steven Mark** — June 19, 2017 at 8:02 pm ([permalink](/blog/thats-great-looking-app/#comment-23609))
 
 > Steven Mark says:
 >
@@ -239,7 +239,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 19, 2017 at 8:47 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23403))
+### **Shai Almog** — June 19, 2017 at 8:47 pm ([permalink](/blog/thats-great-looking-app/#comment-23403))
 
 > Shai Almog says:
 >
@@ -253,7 +253,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 19, 2017 at 8:48 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23468))
+### **Shai Almog** — June 19, 2017 at 8:48 pm ([permalink](/blog/thats-great-looking-app/#comment-23468))
 
 > Shai Almog says:
 >
@@ -264,7 +264,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Nick Koirala** — June 19, 2017 at 10:15 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23535))
+### **Nick Koirala** — June 19, 2017 at 10:15 pm ([permalink](/blog/thats-great-looking-app/#comment-23535))
 
 > Nick Koirala says:
 >
@@ -284,7 +284,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 20, 2017 at 3:38 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23335))
+### **Shai Almog** — June 20, 2017 at 3:38 am ([permalink](/blog/thats-great-looking-app/#comment-23335))
 
 > Shai Almog says:
 >
@@ -299,7 +299,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 20, 2017 at 3:40 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23274))
+### **Shai Almog** — June 20, 2017 at 3:40 am ([permalink](/blog/thats-great-looking-app/#comment-23274))
 
 > Shai Almog says:
 >
@@ -309,7 +309,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Simphiwe Twala** — June 20, 2017 at 5:09 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23487))
+### **Simphiwe Twala** — June 20, 2017 at 5:09 am ([permalink](/blog/thats-great-looking-app/#comment-23487))
 
 > Simphiwe Twala says:
 >
@@ -318,18 +318,18 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 20, 2017 at 6:15 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23545))
+### **Shai Almog** — June 20, 2017 at 6:15 am ([permalink](/blog/thats-great-looking-app/#comment-23545))
 
 > Shai Almog says:
 >
 > Try Images -> Delete Unused Images
 >
-> See [https://www.codenameone.com…](<https://www.codenameone.com/blog/shrinking-sizes-optimizing.html>)
+> See [https://www.codenameone.com…](</blog/shrinking-sizes-optimizing/>)
 >
 
 
 
-### **bryan** — June 20, 2017 at 7:30 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23494))
+### **bryan** — June 20, 2017 at 7:30 am ([permalink](/blog/thats-great-looking-app/#comment-23494))
 
 > bryan says:
 >
@@ -338,7 +338,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **nasznjoka** — June 20, 2017 at 7:39 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23367))
+### **nasznjoka** — June 20, 2017 at 7:39 am ([permalink](/blog/thats-great-looking-app/#comment-23367))
 
 > nasznjoka says:
 >
@@ -347,7 +347,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 20, 2017 at 10:53 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23622))
+### **Shai Almog** — June 20, 2017 at 10:53 am ([permalink](/blog/thats-great-looking-app/#comment-23622))
 
 > Shai Almog says:
 >
@@ -361,18 +361,18 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 20, 2017 at 10:56 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23375))
+### **Shai Almog** — June 20, 2017 at 10:56 am ([permalink](/blog/thats-great-looking-app/#comment-23375))
 
 > Shai Almog says:
 >
 > Thanks.  
 > I don’t see anything special that should be hard in Codename One although the default theming might now be as nice and might require a bit of design work.  
-> E.g. this app was built in Codename One and has a pretty nice UI although I can think of some things I would have done differently there too: [https://www.codenameone.com…](<https://www.codenameone.com/featured-fanzcall.html>)
+> E.g. this app was built in Codename One and has a pretty nice UI although I can think of some things I would have done differently there too: [https://www.codenameone.com…](</featured-fanzcall/>)
 >
 
 
 
-### **Mr Emma** — June 20, 2017 at 11:17 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23578))
+### **Mr Emma** — June 20, 2017 at 11:17 am ([permalink](/blog/thats-great-looking-app/#comment-23578))
 
 > Mr Emma says:
 >
@@ -381,7 +381,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Housseini Moussa** — June 20, 2017 at 12:11 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23515))
+### **Housseini Moussa** — June 20, 2017 at 12:11 pm ([permalink](/blog/thats-great-looking-app/#comment-23515))
 
 > Housseini Moussa says:
 >
@@ -400,7 +400,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 20, 2017 at 1:19 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-21587))
+### **Shai Almog** — June 20, 2017 at 1:19 pm ([permalink](/blog/thats-great-looking-app/#comment-21587))
 
 > Shai Almog says:
 >
@@ -409,18 +409,18 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 20, 2017 at 1:22 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23587))
+### **Shai Almog** — June 20, 2017 at 1:22 pm ([permalink](/blog/thats-great-looking-app/#comment-23587))
 
 > Shai Almog says:
 >
-> That’s a nice looking app. Did you see this post: [https://www.codenameone.com…](<https://www.codenameone.com/blog/restaurant-app-builder.html>)
+> That’s a nice looking app. Did you see this post: [https://www.codenameone.com…](</blog/restaurant-app-builder/>)
 >
 > This will be the first app I’m teaching and the second app will be the builder app. It will cover image upload and mysql but I’m using Spring Boot not glassfish.
 >
 
 
 
-### **Mr Emma** — June 20, 2017 at 3:47 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23201))
+### **Mr Emma** — June 20, 2017 at 3:47 pm ([permalink](/blog/thats-great-looking-app/#comment-23201))
 
 > Mr Emma says:
 >
@@ -429,7 +429,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Housseini Moussa** — June 20, 2017 at 4:32 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23599))
+### **Housseini Moussa** — June 20, 2017 at 4:32 pm ([permalink](/blog/thats-great-looking-app/#comment-23599))
 
 > Housseini Moussa says:
 >
@@ -440,7 +440,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Andres Lopez** — June 20, 2017 at 6:57 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23414))
+### **Andres Lopez** — June 20, 2017 at 6:57 pm ([permalink](/blog/thats-great-looking-app/#comment-23414))
 
 > Andres Lopez says:
 >
@@ -449,7 +449,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 21, 2017 at 4:23 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23392))
+### **Shai Almog** — June 21, 2017 at 4:23 am ([permalink](/blog/thats-great-looking-app/#comment-23392))
 
 > Shai Almog says:
 >
@@ -459,7 +459,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 21, 2017 at 4:24 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23430))
+### **Shai Almog** — June 21, 2017 at 4:24 am ([permalink](/blog/thats-great-looking-app/#comment-23430))
 
 > Shai Almog says:
 >
@@ -468,7 +468,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 21, 2017 at 4:24 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23588))
+### **Shai Almog** — June 21, 2017 at 4:24 am ([permalink](/blog/thats-great-looking-app/#comment-23588))
 
 > Shai Almog says:
 >
@@ -477,7 +477,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Simphiwe Twala** — June 21, 2017 at 5:45 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-24216))
+### **Simphiwe Twala** — June 21, 2017 at 5:45 am ([permalink](/blog/thats-great-looking-app/#comment-24216))
 
 > Simphiwe Twala says:
 >
@@ -486,7 +486,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lúthien** — June 21, 2017 at 8:29 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23478))
+### **Lúthien** — June 21, 2017 at 8:29 am ([permalink](/blog/thats-great-looking-app/#comment-23478))
 
 > Lúthien says:
 >
@@ -503,7 +503,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mr Emma** — June 21, 2017 at 10:26 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23623))
+### **Mr Emma** — June 21, 2017 at 10:26 am ([permalink](/blog/thats-great-looking-app/#comment-23623))
 
 > Mr Emma says:
 >
@@ -512,7 +512,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 21, 2017 at 10:50 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23111))
+### **Shai Almog** — June 21, 2017 at 10:50 am ([permalink](/blog/thats-great-looking-app/#comment-23111))
 
 > Shai Almog says:
 >
@@ -521,7 +521,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Manuel Tijerino** — June 22, 2017 at 6:02 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-21469))
+### **Manuel Tijerino** — June 22, 2017 at 6:02 pm ([permalink](/blog/thats-great-looking-app/#comment-21469))
 
 > Manuel Tijerino says:
 >
@@ -530,7 +530,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 22, 2017 at 8:27 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23442))
+### **Shai Almog** — June 22, 2017 at 8:27 pm ([permalink](/blog/thats-great-looking-app/#comment-23442))
 
 > Shai Almog says:
 >
@@ -542,7 +542,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Manuel Tijerino** — June 22, 2017 at 9:31 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-22045))
+### **Manuel Tijerino** — June 22, 2017 at 9:31 pm ([permalink](/blog/thats-great-looking-app/#comment-22045))
 
 > Manuel Tijerino says:
 >
@@ -551,7 +551,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ElArrepentido** — June 24, 2017 at 1:39 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-24207))
+### **ElArrepentido** — June 24, 2017 at 1:39 am ([permalink](/blog/thats-great-looking-app/#comment-24207))
 
 > ElArrepentido says:
 >
@@ -588,7 +588,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 24, 2017 at 5:11 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23216))
+### **Shai Almog** — June 24, 2017 at 5:11 am ([permalink](/blog/thats-great-looking-app/#comment-23216))
 
 > Shai Almog says:
 >
@@ -630,7 +630,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **sao** — June 24, 2017 at 6:50 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23228))
+### **sao** — June 24, 2017 at 6:50 pm ([permalink](/blog/thats-great-looking-app/#comment-23228))
 
 > sao says:
 >
@@ -639,7 +639,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Thomas McNeill** — September 7, 2017 at 10:01 pm ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23654))
+### **Thomas McNeill** — September 7, 2017 at 10:01 pm ([permalink](/blog/thats-great-looking-app/#comment-23654))
 
 > Thomas McNeill says:
 >
@@ -648,7 +648,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 8, 2017 at 6:04 am ([permalink](https://www.codenameone.com/blog/thats-great-looking-app.html#comment-23754))
+### **Shai Almog** — September 8, 2017 at 6:04 am ([permalink](/blog/thats-great-looking-app/#comment-23754))
 
 > Shai Almog says:
 >

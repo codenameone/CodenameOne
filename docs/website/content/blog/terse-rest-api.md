@@ -46,7 +46,7 @@ There is a lot of additional work that we can put into this API and we’ll inve
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **salah Alhaddabi** — July 6, 2017 at 9:24 pm ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-22382))
+### **salah Alhaddabi** — July 6, 2017 at 9:24 pm ([permalink](/blog/terse-rest-api/#comment-22382))
 
 > salah Alhaddabi says:
 >
@@ -55,7 +55,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Tim Gallagher** — July 24, 2017 at 8:08 pm ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23324))
+### **Tim Gallagher** — July 24, 2017 at 8:08 pm ([permalink](/blog/terse-rest-api/#comment-23324))
 
 > Tim Gallagher says:
 >
@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 25, 2017 at 4:35 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23510))
+### **Shai Almog** — July 25, 2017 at 4:35 am ([permalink](/blog/terse-rest-api/#comment-23510))
 
 > Shai Almog says:
 >
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Tim Gallagher** — July 27, 2017 at 6:30 pm ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23736))
+### **Tim Gallagher** — July 27, 2017 at 6:30 pm ([permalink](/blog/terse-rest-api/#comment-23736))
 
 > Tim Gallagher says:
 >
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 28, 2017 at 5:24 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23625))
+### **Shai Almog** — July 28, 2017 at 5:24 am ([permalink](/blog/terse-rest-api/#comment-23625))
 
 > Shai Almog says:
 >
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Thomas** — March 20, 2018 at 12:35 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23968))
+### **Thomas** — March 20, 2018 at 12:35 am ([permalink](/blog/terse-rest-api/#comment-23968))
 
 > Thomas says:
 >
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 20, 2018 at 6:00 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23879))
+### **Shai Almog** — March 20, 2018 at 6:00 am ([permalink](/blog/terse-rest-api/#comment-23879))
 
 > Shai Almog says:
 >
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Tafadzwa Moyo** — April 17, 2018 at 5:36 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23888))
+### **Tafadzwa Moyo** — April 17, 2018 at 5:36 am ([permalink](/blog/terse-rest-api/#comment-23888))
 
 > Tafadzwa Moyo says:
 >
@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 18, 2018 at 5:19 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23837))
+### **Shai Almog** — April 18, 2018 at 5:19 am ([permalink](/blog/terse-rest-api/#comment-23837))
 
 > Shai Almog says:
 >
@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — May 6, 2018 at 8:21 pm ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23813))
+### **Francesco Galgani** — May 6, 2018 at 8:21 pm ([permalink](/blog/terse-rest-api/#comment-23813))
 
 > Francesco Galgani says:
 >
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — May 6, 2018 at 8:22 pm ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23818))
+### **Francesco Galgani** — May 6, 2018 at 8:22 pm ([permalink](/blog/terse-rest-api/#comment-23818))
 
 > Francesco Galgani says:
 >
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 7, 2018 at 4:16 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-23830))
+### **Shai Almog** — May 7, 2018 at 4:16 am ([permalink](/blog/terse-rest-api/#comment-23830))
 
 > Shai Almog says:
 >
@@ -173,7 +173,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Max Amende** — January 8, 2019 at 2:31 pm ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-24095))
+### **Max Amende** — January 8, 2019 at 2:31 pm ([permalink](/blog/terse-rest-api/#comment-24095))
 
 > Max Amende says:
 >
@@ -212,7 +212,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 9, 2019 at 3:36 am ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-24065))
+### **Shai Almog** — January 9, 2019 at 3:36 am ([permalink](/blog/terse-rest-api/#comment-24065))
 
 > Shai Almog says:
 >
@@ -225,7 +225,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Max Amende** — January 9, 2019 at 5:35 pm ([permalink](https://www.codenameone.com/blog/terse-rest-api.html#comment-24008))
+### **Max Amende** — January 9, 2019 at 5:35 pm ([permalink](/blog/terse-rest-api/#comment-24008))
 
 > Max Amende says:
 >

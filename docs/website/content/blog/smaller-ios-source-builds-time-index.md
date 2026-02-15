@@ -43,7 +43,7 @@ in which the method is defined. This is useful when you are looking for a specif
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Yaakov Gesher** — June 23, 2015 at 8:23 am ([permalink](https://www.codenameone.com/blog/smaller-ios-source-builds-time-index.html#comment-22322))
+### **Yaakov Gesher** — June 23, 2015 at 8:23 am ([permalink](/blog/smaller-ios-source-builds-time-index/#comment-22322))
 
 > Yaakov Gesher says:
 >
@@ -52,7 +52,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 23, 2015 at 2:17 pm ([permalink](https://www.codenameone.com/blog/smaller-ios-source-builds-time-index.html#comment-22127))
+### **Shai Almog** — June 23, 2015 at 2:17 pm ([permalink](/blog/smaller-ios-source-builds-time-index/#comment-22127))
 
 > Shai Almog says:
 >

@@ -94,7 +94,7 @@ We’re here to help you make great looking apps.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — July 18, 2017 at 12:00 am ([permalink](https://www.codenameone.com/blog/tip-animate-line-under-button.html#comment-24209))
+### **bryan** — July 18, 2017 at 12:00 am ([permalink](/blog/tip-animate-line-under-button/#comment-24209))
 
 > bryan says:
 >

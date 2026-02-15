@@ -35,7 +35,7 @@ Manipulating the MultiList programmatically isn’t always intuitive but it’s 
 
 ### Toolbar components
 
-Normally you shouldn’t change the [Toolbar](https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html)  
+Normally you shouldn’t change the [Toolbar](/javadoc/com/codename1/ui/Toolbar/)  
 directly as this relies on some internal implementation details that might change.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37043970/toolbar-components-codenameone)
@@ -77,7 +77,7 @@ native implementation looks like one line of code…​
 
 ### Upload to Cloudinary using REST API in CN1
 
-[Steve’s cloudinary](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html) library  
+[Steve’s cloudinary](/blog/sizing-images-just-right-with-cloudinary/) library  
 has picked up some followers, here is a question answered the guys at [Cloudinary](http://cloudinary.com/)  
 covering image upload.
 

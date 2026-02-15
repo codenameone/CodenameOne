@@ -89,47 +89,47 @@ If you want to see the wizard in action, you can check out this 2 minute screenc
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — July 19, 2015 at 1:10 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-21550))
+### **Chidiebere Okwudire** — July 19, 2015 at 1:10 pm ([permalink](/blog/ios-certificate-wizard/#comment-21550))
 
 > Great work, guys! I’ll try this out in the coming weeks
 
 
-### **Lukman Javalove Idealist Jaji** — July 20, 2015 at 8:23 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22020))
+### **Lukman Javalove Idealist Jaji** — July 20, 2015 at 8:23 am ([permalink](/blog/ios-certificate-wizard/#comment-22020))
 
 > Why do we have to select devices? Is that for testing purposes only?
 
 
-### **Shai Almog** — July 20, 2015 at 2:43 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22240))
+### **Shai Almog** — July 20, 2015 at 2:43 pm ([permalink](/blog/ios-certificate-wizard/#comment-22240))
 
 > Yes. Apple allows running on up to 100 devices and you need to add them to your account as testers.
 
 
-### **Clement Levallois** — July 23, 2015 at 8:36 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22384))
+### **Clement Levallois** — July 23, 2015 at 8:36 am ([permalink](/blog/ios-certificate-wizard/#comment-22384))
 
 > After selecting my device and clicking on Next I get an error saying that my session has expired and I should login again? See pic attached
 
 
-### **shannah78** — July 23, 2015 at 1:17 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22401))
+### **shannah78** — July 23, 2015 at 1:17 pm ([permalink](/blog/ios-certificate-wizard/#comment-22401))
 
 > Not sure yet what would cause that. If you log into your Apple developer account are there any pending agreements that you have to agree to? Are you able to access the “create certificate form” in your apple developer account? Also, does your account have multiple teams? (i.e. when you log into apple developer to you need to select a team?)
 
 
-### **shannah78** — July 23, 2015 at 3:38 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22194))
+### **shannah78** — July 23, 2015 at 3:38 pm ([permalink](/blog/ios-certificate-wizard/#comment-22194))
 
 > Actually I have just made some fixes to the wizard. Please try again and it should work.
 
 
-### **Clement Levallois** — July 23, 2015 at 7:20 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22231))
+### **Clement Levallois** — July 23, 2015 at 7:20 pm ([permalink](/blog/ios-certificate-wizard/#comment-22231))
 
 > It wooorks! Amazing, takes just 2 seconds. Congrats on an amazing job for the community! 🙂
 
 
-### **sao** — July 28, 2015 at 3:16 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-21495))
+### **sao** — July 28, 2015 at 3:16 pm ([permalink](/blog/ios-certificate-wizard/#comment-21495))
 
 > This is a great achievement. Well done CodeNameOne team
 
 
-### **Tom Arn** — August 5, 2015 at 1:05 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22315))
+### **Tom Arn** — August 5, 2015 at 1:05 pm ([permalink](/blog/ios-certificate-wizard/#comment-22315))
 
 > That’s fantastic! Especially if you are developping on Windows, certificate creation was such a pain! Very well done!
 >
@@ -139,13 +139,13 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Tom
 
 
-### **Shai Almog** — August 5, 2015 at 2:03 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22323))
+### **Shai Almog** — August 5, 2015 at 2:03 pm ([permalink](/blog/ios-certificate-wizard/#comment-22323))
 
 > It was something we wanted to add but the deployment complexity is far bigger.  
 > I want it too since that’s pretty much the only reason to own a Mac and we have at least the rudimentary understanding of how to do that.
 
 
-### **Chidiebere Okwudire** — August 13, 2015 at 3:54 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22021))
+### **Chidiebere Okwudire** — August 13, 2015 at 3:54 am ([permalink](/blog/ios-certificate-wizard/#comment-22021))
 
 > Chidiebere Okwudire says:
 >
@@ -154,21 +154,21 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I tried the wizard and it works just fine. However, I have two test apps and I noticed that after using the wizard to generate certificates for the second app, the first one’s certificates are marked as ‘invalid’ and the app no longer runs on my device. Is this a restriction from Apple or from the wizard?
 
 
-### **Shai Almog** — August 13, 2015 at 4:23 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22140))
+### **Shai Almog** — August 13, 2015 at 4:23 am ([permalink](/blog/ios-certificate-wizard/#comment-22140))
 
 > Shai Almog says:
 >
 > The wizard asks you if you already have P12 files otherwise it regenerates them for you and effectively invalidates the old ones.
 
 
-### **Chidiebere Okwudire** — August 13, 2015 at 7:24 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22365))
+### **Chidiebere Okwudire** — August 13, 2015 at 7:24 am ([permalink](/blog/ios-certificate-wizard/#comment-22365))
 
 > Chidiebere Okwudire says:
 >
 > So are you saying that I can use the p12 files generated for the first app in all others? I vaguely remember that the build failed when I tried that but I’ll have to recheck based on your answer.
 
 
-### **Sanny Sanoff** — August 14, 2015 at 8:50 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-24180))
+### **Sanny Sanoff** — August 14, 2015 at 8:50 am ([permalink](/blog/ios-certificate-wizard/#comment-24180))
 
 > Sanny Sanoff says:
 >
@@ -177,14 +177,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Moreover, in IDEA preferences, there are 2 instances of Codename One configuration nodes.
 
 
-### **Shai Almog** — August 14, 2015 at 1:14 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22419))
+### **Shai Almog** — August 14, 2015 at 1:14 pm ([permalink](/blog/ios-certificate-wizard/#comment-22419))
 
 > Shai Almog says:
 >
 > That feature isn’t available yet in the IntelliJ version of the plugin.
 
 
-### **Barak** — November 10, 2015 at 11:41 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22152))
+### **Barak** — November 10, 2015 at 11:41 pm ([permalink](/blog/ios-certificate-wizard/#comment-22152))
 
 > Barak says:
 >
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks in advance.
 
 
-### **Shai Almog** — November 11, 2015 at 4:55 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-21614))
+### **Shai Almog** — November 11, 2015 at 4:55 am ([permalink](/blog/ios-certificate-wizard/#comment-21614))
 
 > Shai Almog says:
 >
@@ -203,7 +203,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Dismissing Apple notices is horribly unintuitive.
 
 
-### **Barak** — November 11, 2015 at 6:35 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-24172))
+### **Barak** — November 11, 2015 at 6:35 am ([permalink](/blog/ios-certificate-wizard/#comment-24172))
 
 > Barak says:
 >
@@ -212,28 +212,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > is it?
 
 
-### **Shai Almog** — November 11, 2015 at 8:01 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22220))
+### **Shai Almog** — November 11, 2015 at 8:01 am ([permalink](/blog/ios-certificate-wizard/#comment-22220))
 
 > Shai Almog says:
 >
 > You need to pay Apple and wait for approval which takes a couple of days.
 
 
-### **Barak** — November 11, 2015 at 3:39 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22234))
+### **Barak** — November 11, 2015 at 3:39 pm ([permalink](/blog/ios-certificate-wizard/#comment-22234))
 
 > Barak says:
 >
 > Well that’s unfortunate,thanks anyway!
 
 
-### **Yngve Moe** — November 14, 2015 at 5:58 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22415))
+### **Yngve Moe** — November 14, 2015 at 5:58 pm ([permalink](/blog/ios-certificate-wizard/#comment-22415))
 
 > Yngve Moe says:
 >
 > I can’t see any login dialog. When i press Generate, I just get the message “This feature requires you to be logged in.” This happens on a fresh install of NetBeans with Codename One plugin, both on Mac and Windows. Am i doing something wrong?
 
 
-### **Shai Almog** — November 15, 2015 at 4:12 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22488))
+### **Shai Almog** — November 15, 2015 at 4:12 am ([permalink](/blog/ios-certificate-wizard/#comment-22488))
 
 > Shai Almog says:
 >
@@ -241,21 +241,21 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > You login in the main Codename One section of the preferences at the bottom of the UI. That might be hidden if you have a small screen.
 
 
-### **Yngve Moe** — November 15, 2015 at 10:29 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22299))
+### **Yngve Moe** — November 15, 2015 at 10:29 am ([permalink](/blog/ios-certificate-wizard/#comment-22299))
 
 > Yngve Moe says:
 >
 > You’re right, that section was hidden. I found it myself after some googling. Apart from that, the wizard is very simple and smooth – saved me a lot of work!
 
 
-### **Andrey** — December 21, 2015 at 1:24 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22506))
+### **Andrey** — December 21, 2015 at 1:24 pm ([permalink](/blog/ios-certificate-wizard/#comment-22506))
 
 > Andrey says:
 >
 > I used the free version Codename one and Intellij IDEA. Why is there no button generate? What should I do to make it come from?
 
 
-### **Shai Almog** — December 22, 2015 at 5:56 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22599))
+### **Shai Almog** — December 22, 2015 at 5:56 am ([permalink](/blog/ios-certificate-wizard/#comment-22599))
 
 > Shai Almog says:
 >
@@ -263,35 +263,35 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > We are working on a complete overhaul of the plugin but get side tracked a lot. I hope we’ll be able to bring it into feature parity with the current NetBeans/Eclipse plugins for 3.3.
 
 
-### **Andrey** — December 22, 2015 at 9:41 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22532))
+### **Andrey** — December 22, 2015 at 9:41 am ([permalink](/blog/ios-certificate-wizard/#comment-22532))
 
 > Andrey says:
 >
 > Shai, thanks for answer. I will try to set up Eclipse or NetBeans.
 
 
-### **Andrey** — December 23, 2015 at 3:12 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22360))
+### **Andrey** — December 23, 2015 at 3:12 pm ([permalink](/blog/ios-certificate-wizard/#comment-22360))
 
 > Andrey says:
 >
 > Shai, can you answer me, in last version Eclipse for java developers (mars) is there this button? I don’t found that.
 
 
-### **Shai Almog** — December 24, 2015 at 10:21 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22185))
+### **Shai Almog** — December 24, 2015 at 10:21 am ([permalink](/blog/ios-certificate-wizard/#comment-22185))
 
 > Shai Almog says:
 >
 > This is what I’m seeing, how did you install the plugin?
 
 
-### **tomm0** — January 19, 2016 at 3:47 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22658))
+### **tomm0** — January 19, 2016 at 3:47 pm ([permalink](/blog/ios-certificate-wizard/#comment-22658))
 
 > tomm0 says:
 >
 > Does each app needs its own Certificate? I am confused by that aspect. I have just been testing things out, and whenever I choose to Overwrite the certificate I get an email from Apple saying my certificate has been revoked. What should the general process be? Should each app have its own p12 certificate?
 
 
-### **Shai Almog** — January 20, 2016 at 3:41 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22515))
+### **Shai Almog** — January 20, 2016 at 3:41 am ([permalink](/blog/ios-certificate-wizard/#comment-22515))
 
 > Shai Almog says:
 >
@@ -304,28 +304,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Now this is the point where it gets hard… When doing push you DO need new P12 files that are specific to the app, they are totally unrelated to signing/building and are only used for push. So if you check the “push” checkbox you will need to generate those. You will get an automatic email message with instructions when you check that flag.
 
 
-### **Paul Willworth** — January 25, 2016 at 6:06 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-21492))
+### **Paul Willworth** — January 25, 2016 at 6:06 am ([permalink](/blog/ios-certificate-wizard/#comment-21492))
 
 > Paul Willworth says:
 >
 > This is a great feature. The one thing I don’t understand is where it gets the certificate passwords from. I can complete the wizard process successfully, but when I’m done I find that it has used the value “password” for my certificate passwords. I don’t want it to use that, how do I specify what password the wizard should use for my certificates? I am using Eclipse. I saw some talk in another thread about setting some project level password but I don’t see that.
 
 
-### **Shai Almog** — January 26, 2016 at 3:16 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22516))
+### **Shai Almog** — January 26, 2016 at 3:16 am ([permalink](/blog/ios-certificate-wizard/#comment-22516))
 
 > Shai Almog says:
 >
 > I don’t think that’s configurable for the build p12 files. Notice that the security of those files isn’t crucial as they are stored on your local machine. Normally on a Mac when building locally the keys are just protected by your OS password.
 
 
-### **James Mason** — May 24, 2016 at 12:48 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22632))
+### **James Mason** — May 24, 2016 at 12:48 pm ([permalink](/blog/ios-certificate-wizard/#comment-22632))
 
 > James Mason says:
 >
 > When I run the iOS Certificate Wizard, a window pops up saying “Select Team”. But no teams are listed and there is no response to the Next button either. How do I get beyond this?
 
 
-### **Shai Almog** — May 25, 2016 at 5:57 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22643))
+### **Shai Almog** — May 25, 2016 at 5:57 am ([permalink](/blog/ios-certificate-wizard/#comment-22643))
 
 > Shai Almog says:
 >
@@ -335,14 +335,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Is there something “special” about your account? (Enterprise, University etc.)
 
 
-### **James Mason** — May 25, 2016 at 4:03 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22869))
+### **James Mason** — May 25, 2016 at 4:03 pm ([permalink](/blog/ios-certificate-wizard/#comment-22869))
 
 > James Mason says:
 >
 > Thanks very much, Shai, for pointing me in the right direction. I think Codename One is great and have used it successfully with no problems to develop an Android app. Now, not being an Apple person, I just have to get by their hurdles to become a registered iOS developer.
 
 
-### **3lix** — August 22, 2016 at 6:24 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22814))
+### **3lix** — August 22, 2016 at 6:24 am ([permalink](/blog/ios-certificate-wizard/#comment-22814))
 
 > 3lix says:
 >
@@ -352,7 +352,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I would appreciate any help.
 
 
-### **Ian** — August 22, 2016 at 9:35 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-21654))
+### **Ian** — August 22, 2016 at 9:35 am ([permalink](/blog/ios-certificate-wizard/#comment-21654))
 
 > Ian says:
 >
@@ -361,7 +361,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > But then it doesn’t generate any certificate. Any idea why? I don’t get any error message.
 
 
-### **3lix** — August 22, 2016 at 3:08 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22913))
+### **3lix** — August 22, 2016 at 3:08 pm ([permalink](/blog/ios-certificate-wizard/#comment-22913))
 
 > 3lix says:
 >
@@ -369,14 +369,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I am not sure if this is causing any issues?
 
 
-### **Shai Almog** — August 24, 2016 at 8:03 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22588))
+### **Shai Almog** — August 24, 2016 at 8:03 am ([permalink](/blog/ios-certificate-wizard/#comment-22588))
 
 > Shai Almog says:
 >
 > There was an issue with Apple changing it’s certificate process, we’ve deployed an update that should fix this.
 
 
-### **Shai Almog** — August 24, 2016 at 8:04 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22978))
+### **Shai Almog** — August 24, 2016 at 8:04 am ([permalink](/blog/ios-certificate-wizard/#comment-22978))
 
 > Shai Almog says:
 >
@@ -385,14 +385,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > The enable push is unrelated.
 
 
-### **3lix** — August 24, 2016 at 3:09 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22684))
+### **3lix** — August 24, 2016 at 3:09 pm ([permalink](/blog/ios-certificate-wizard/#comment-22684))
 
 > 3lix says:
 >
 > Thank you very much! Looks like its working now,
 
 
-### **hesham mohamed** — October 20, 2016 at 9:09 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23125))
+### **hesham mohamed** — October 20, 2016 at 9:09 pm ([permalink](/blog/ios-certificate-wizard/#comment-23125))
 
 > hesham mohamed says:
 >
@@ -400,7 +400,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > appreciate your help
 
 
-### **Jacob Rachoene** — October 27, 2016 at 10:42 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-22796))
+### **Jacob Rachoene** — October 27, 2016 at 10:42 pm ([permalink](/blog/ios-certificate-wizard/#comment-22796))
 
 > Jacob Rachoene says:
 >
@@ -408,14 +408,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks…
 
 
-### **Shai Almog** — October 28, 2016 at 3:45 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23159))
+### **Shai Almog** — October 28, 2016 at 3:45 am ([permalink](/blog/ios-certificate-wizard/#comment-23159))
 
 > Shai Almog says:
 >
 > You need to have a paid Apple account for this to work
 
 
-### **Shubhanjan Medhi** — January 26, 2017 at 10:22 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23027))
+### **Shubhanjan Medhi** — January 26, 2017 at 10:22 am ([permalink](/blog/ios-certificate-wizard/#comment-23027))
 
 > Shubhanjan Medhi says:
 >
@@ -424,7 +424,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > How do i do it?
 
 
-### **Shai Almog** — January 27, 2017 at 7:33 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23220))
+### **Shai Almog** — January 27, 2017 at 7:33 am ([permalink](/blog/ios-certificate-wizard/#comment-23220))
 
 > Shai Almog says:
 >
@@ -435,7 +435,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > That’s a requirement to generating the certificate.
 
 
-### **Kai** — February 3, 2017 at 10:16 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23326))
+### **Kai** — February 3, 2017 at 10:16 am ([permalink](/blog/ios-certificate-wizard/#comment-23326))
 
 > Kai says:
 >
@@ -450,7 +450,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kai** — February 3, 2017 at 3:21 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23097))
+### **Kai** — February 3, 2017 at 3:21 pm ([permalink](/blog/ios-certificate-wizard/#comment-23097))
 
 > Kai says:
 >
@@ -459,7 +459,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 4, 2017 at 8:34 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-24124))
+### **Shai Almog** — February 4, 2017 at 8:34 am ([permalink](/blog/ios-certificate-wizard/#comment-24124))
 
 > Shai Almog says:
 >
@@ -469,7 +469,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kai** — February 6, 2017 at 9:08 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23104))
+### **Kai** — February 6, 2017 at 9:08 am ([permalink](/blog/ios-certificate-wizard/#comment-23104))
 
 > Kai says:
 >
@@ -478,7 +478,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 7, 2017 at 10:08 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23118))
+### **Shai Almog** — February 7, 2017 at 10:08 am ([permalink](/blog/ios-certificate-wizard/#comment-23118))
 
 > Shai Almog says:
 >
@@ -487,7 +487,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kai** — February 7, 2017 at 10:44 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23127))
+### **Kai** — February 7, 2017 at 10:44 am ([permalink](/blog/ios-certificate-wizard/#comment-23127))
 
 > Kai says:
 >
@@ -497,7 +497,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 8, 2017 at 9:05 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23236))
+### **Shai Almog** — February 8, 2017 at 9:05 am ([permalink](/blog/ios-certificate-wizard/#comment-23236))
 
 > Shai Almog says:
 >
@@ -506,7 +506,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Tommy Mogaka** — February 17, 2017 at 8:43 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23164))
+### **Tommy Mogaka** — February 17, 2017 at 8:43 am ([permalink](/blog/ios-certificate-wizard/#comment-23164))
 
 > Tommy Mogaka says:
 >
@@ -516,7 +516,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Tommy Mogaka** — February 17, 2017 at 9:24 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23360))
+### **Tommy Mogaka** — February 17, 2017 at 9:24 am ([permalink](/blog/ios-certificate-wizard/#comment-23360))
 
 > Tommy Mogaka says:
 >
@@ -527,7 +527,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 18, 2017 at 10:47 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23190))
+### **Shai Almog** — February 18, 2017 at 10:47 am ([permalink](/blog/ios-certificate-wizard/#comment-23190))
 
 > Shai Almog says:
 >
@@ -536,7 +536,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chris** — June 16, 2017 at 5:51 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23586))
+### **Chris** — June 16, 2017 at 5:51 pm ([permalink](/blog/ios-certificate-wizard/#comment-23586))
 
 > Chris says:
 >
@@ -545,7 +545,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 16, 2017 at 7:06 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23200))
+### **Shai Almog** — June 16, 2017 at 7:06 pm ([permalink](/blog/ios-certificate-wizard/#comment-23200))
 
 > Shai Almog says:
 >
@@ -555,7 +555,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **beck** — September 6, 2017 at 5:57 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23746))
+### **beck** — September 6, 2017 at 5:57 pm ([permalink](/blog/ios-certificate-wizard/#comment-23746))
 
 > beck says:
 >
@@ -564,7 +564,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 7, 2017 at 8:17 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23627))
+### **Shai Almog** — September 7, 2017 at 8:17 am ([permalink](/blog/ios-certificate-wizard/#comment-23627))
 
 > Shai Almog says:
 >
@@ -573,7 +573,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Json** — September 15, 2017 at 11:21 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-21472))
+### **Json** — September 15, 2017 at 11:21 pm ([permalink](/blog/ios-certificate-wizard/#comment-21472))
 
 > Json says:
 >
@@ -582,7 +582,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 16, 2017 at 5:19 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23769))
+### **Shai Almog** — September 16, 2017 at 5:19 am ([permalink](/blog/ios-certificate-wizard/#comment-23769))
 
 > Shai Almog says:
 >
@@ -591,7 +591,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Json** — September 17, 2017 at 1:21 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23531))
+### **Json** — September 17, 2017 at 1:21 pm ([permalink](/blog/ios-certificate-wizard/#comment-23531))
 
 > Json says:
 >
@@ -602,7 +602,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ZombieLover** — March 18, 2018 at 4:27 pm ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-21535))
+### **ZombieLover** — March 18, 2018 at 4:27 pm ([permalink](/blog/ios-certificate-wizard/#comment-21535))
 
 > ZombieLover says:
 >
@@ -611,7 +611,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 19, 2018 at 5:33 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23870))
+### **Shai Almog** — March 19, 2018 at 5:33 am ([permalink](/blog/ios-certificate-wizard/#comment-23870))
 
 > Shai Almog says:
 >
@@ -622,7 +622,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ZombieLover** — March 19, 2018 at 6:03 am ([permalink](https://www.codenameone.com/blog/ios-certificate-wizard.html#comment-23897))
+### **ZombieLover** — March 19, 2018 at 6:03 am ([permalink](/blog/ios-certificate-wizard/#comment-23897))
 
 > ZombieLover says:
 >

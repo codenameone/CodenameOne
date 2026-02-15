@@ -717,7 +717,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — December 23, 2013 at 11:14 am ([permalink](https://www.codenameone.com/blog/release-notes-for-codename-one-201.html#comment-21835))
+### **Anonymous** — December 23, 2013 at 11:14 am ([permalink](/blog/release-notes-for-codename-one-201/#comment-21835))
 
 > Anonymous says:
 >
@@ -728,7 +728,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 24, 2013 at 3:19 am ([permalink](https://www.codenameone.com/blog/release-notes-for-codename-one-201.html#comment-21659))
+### **Anonymous** — December 24, 2013 at 3:19 am ([permalink](/blog/release-notes-for-codename-one-201/#comment-21659))
 
 > Anonymous says:
 >
@@ -737,7 +737,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 26, 2013 at 1:32 pm ([permalink](https://www.codenameone.com/blog/release-notes-for-codename-one-201.html#comment-21716))
+### **Anonymous** — December 26, 2013 at 1:32 pm ([permalink](/blog/release-notes-for-codename-one-201/#comment-21716))
 
 > Anonymous says:
 >
@@ -746,7 +746,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 31, 2013 at 9:45 am ([permalink](https://www.codenameone.com/blog/release-notes-for-codename-one-201.html#comment-21828))
+### **Anonymous** — December 31, 2013 at 9:45 am ([permalink](/blog/release-notes-for-codename-one-201/#comment-21828))
 
 > Anonymous says:
 >
@@ -755,7 +755,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 11, 2014 at 10:18 am ([permalink](https://www.codenameone.com/blog/release-notes-for-codename-one-201.html#comment-21836))
+### **Anonymous** — February 11, 2014 at 10:18 am ([permalink](/blog/release-notes-for-codename-one-201/#comment-21836))
 
 > Anonymous says:
 >
@@ -764,7 +764,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 11, 2014 at 1:44 pm ([permalink](https://www.codenameone.com/blog/release-notes-for-codename-one-201.html#comment-21682))
+### **Anonymous** — February 11, 2014 at 1:44 pm ([permalink](/blog/release-notes-for-codename-one-201/#comment-21682))
 
 > Anonymous says:
 >

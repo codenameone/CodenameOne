@@ -70,7 +70,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 3, 2014 at 8:36 am ([permalink](https://www.codenameone.com/blog/pisces-string-picker.html#comment-22011))
+### **Anonymous** — January 3, 2014 at 8:36 am ([permalink](/blog/pisces-string-picker/#comment-22011))
 
 > Anonymous says:
 >
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 4, 2014 at 6:07 am ([permalink](https://www.codenameone.com/blog/pisces-string-picker.html#comment-24255))
+### **Anonymous** — January 4, 2014 at 6:07 am ([permalink](/blog/pisces-string-picker/#comment-24255))
 
 > Anonymous says:
 >

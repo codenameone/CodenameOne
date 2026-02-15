@@ -51,14 +51,14 @@ There are a few other variants like `runAndWait` and there is a `kill()` method 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chad Elofson** — May 10, 2017 at 5:14 am ([permalink](https://www.codenameone.com/blog/easy-thread.html#comment-23513))
+### **Chad Elofson** — May 10, 2017 at 5:14 am ([permalink](/blog/easy-thread/#comment-23513))
 
 > Chad Elofson says:
 >
 > That’s pretty slick!
 
 
-### **Javier Anton** — February 18, 2020 at 3:51 pm ([permalink](https://www.codenameone.com/blog/easy-thread.html#comment-21384))
+### **Javier Anton** — February 18, 2020 at 3:51 pm ([permalink](/blog/easy-thread/#comment-21384))
 
 > [Javier Anton](https://lh3.googleusercontent.com/a-/AAuE7mDRjHkEvAZNXquh9p7Oo00ey1yOwNzZ0SrFwD0IVA) says:
 >

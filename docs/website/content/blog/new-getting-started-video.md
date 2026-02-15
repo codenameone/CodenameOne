@@ -33,7 +33,7 @@ as this is probably the best time to ask for such work.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — April 19, 2016 at 3:26 pm ([permalink](https://www.codenameone.com/blog/new-getting-started-video.html#comment-22537))
+### **Chidiebere Okwudire** — April 19, 2016 at 3:26 pm ([permalink](/blog/new-getting-started-video/#comment-22537))
 
 > Chidiebere Okwudire says:
 >
@@ -42,7 +42,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 20, 2016 at 4:00 am ([permalink](https://www.codenameone.com/blog/new-getting-started-video.html#comment-22824))
+### **Shai Almog** — April 20, 2016 at 4:00 am ([permalink](/blog/new-getting-started-video/#comment-22824))
 
 > Shai Almog says:
 >

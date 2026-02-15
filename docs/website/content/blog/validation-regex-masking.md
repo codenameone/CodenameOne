@@ -148,7 +148,7 @@ failed and prevent the user from proceeding.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — April 7, 2015 at 1:43 pm ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-21688))
+### **Diamond** — April 7, 2015 at 1:43 pm ([permalink](/blog/validation-regex-masking/#comment-21688))
 
 > Diamond says:
 >
@@ -165,7 +165,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 7, 2015 at 7:15 pm ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-22191))
+### **Shai Almog** — April 7, 2015 at 7:15 pm ([permalink](/blog/validation-regex-masking/#comment-22191))
 
 > Shai Almog says:
 >
@@ -178,7 +178,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gerben** — August 12, 2015 at 8:31 am ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-22203))
+### **Gerben** — August 12, 2015 at 8:31 am ([permalink](/blog/validation-regex-masking/#comment-22203))
 
 > Gerben says:
 >
@@ -188,7 +188,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — August 12, 2015 at 5:50 pm ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-21551))
+### **shannah78** — August 12, 2015 at 5:50 pm ([permalink](/blog/validation-regex-masking/#comment-21551))
 
 > shannah78 says:
 >
@@ -200,7 +200,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mo** — June 2, 2016 at 5:03 pm ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-22568))
+### **Mo** — June 2, 2016 at 5:03 pm ([permalink](/blog/validation-regex-masking/#comment-22568))
 
 > Mo says:
 >
@@ -217,7 +217,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 3, 2016 at 4:03 am ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-22623))
+### **Shai Almog** — June 3, 2016 at 4:03 am ([permalink](/blog/validation-regex-masking/#comment-22623))
 
 > Shai Almog says:
 >
@@ -230,7 +230,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mo** — June 4, 2016 at 9:24 am ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-21518))
+### **Mo** — June 4, 2016 at 9:24 am ([permalink](/blog/validation-regex-masking/#comment-21518))
 
 > Mo says:
 >
@@ -239,7 +239,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 5, 2016 at 4:15 am ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-22777))
+### **Shai Almog** — June 5, 2016 at 4:15 am ([permalink](/blog/validation-regex-masking/#comment-22777))
 
 > Shai Almog says:
 >
@@ -248,7 +248,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chris** — April 23, 2018 at 9:03 pm ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-23542))
+### **Chris** — April 23, 2018 at 9:03 pm ([permalink](/blog/validation-regex-masking/#comment-23542))
 
 > Chris says:
 >
@@ -257,7 +257,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 24, 2018 at 5:23 am ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-23691))
+### **Shai Almog** — April 24, 2018 at 5:23 am ([permalink](/blog/validation-regex-masking/#comment-23691))
 
 > Shai Almog says:
 >
@@ -267,7 +267,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chris** — April 24, 2018 at 6:45 pm ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-23774))
+### **Chris** — April 24, 2018 at 6:45 pm ([permalink](/blog/validation-regex-masking/#comment-23774))
 
 > Chris says:
 >
@@ -276,7 +276,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 25, 2018 at 7:12 am ([permalink](https://www.codenameone.com/blog/validation-regex-masking.html#comment-23906))
+### **Shai Almog** — April 25, 2018 at 7:12 am ([permalink](/blog/validation-regex-masking/#comment-23906))
 
 > Shai Almog says:
 >

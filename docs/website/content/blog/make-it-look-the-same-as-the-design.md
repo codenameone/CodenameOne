@@ -25,7 +25,7 @@ Obviously my untrained ear didn’t know what to look for. Had **I** been playin
 
 User interface design is very similar to music in this sense. When we use a well-designed UI, it just “feels” nice, but we may not know why. Those who are skilled in design may be able to break a successful design down into components – but the rest of us can only sit and marvel at the magic.
 
-I have blogged, in the past, about UI design in Codename One. In [this tutorial](https://www.codenameone.com/blog/psd-to-app-converting-a-beautiful-design-into-a-native-mobile-app.html), I walk, step by step, through the process of converting a PSD file into a mobile app. Unfortunately, upon re-reading that tutorial, I realize that I completely skipped one of the **most** important steps. I essentially began with “let’s make our app look just like the design”, but I didn’t describe what it meant to look “just like the design”. In this blog post, I’d like to unpack what “just like the design” means to me, in the context of mobile app development.
+I have blogged, in the past, about UI design in Codename One. In [this tutorial](/blog/psd-to-app-converting-a-beautiful-design-into-a-native-mobile-app/), I walk, step by step, through the process of converting a PSD file into a mobile app. Unfortunately, upon re-reading that tutorial, I realize that I completely skipped one of the **most** important steps. I essentially began with “let’s make our app look just like the design”, but I didn’t describe what it meant to look “just like the design”. In this blog post, I’d like to unpack what “just like the design” means to me, in the context of mobile app development.
 
 So, what does “Just like the design” mean? A broad overview is that fonts, colors, padding, margin, and alignment must match the design. In addition, the sections of the UI must be retained correctly. The last part (sections), is most relevant when adapting the UI to different screen sizes. Below, I go into detail on each of these aspects of design.
 
@@ -79,7 +79,7 @@ These are the techniques that I use to recreate beautiful designs in Codename On
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — August 29, 2017 at 11:51 pm ([permalink](https://www.codenameone.com/blog/make-it-look-the-same-as-the-design.html#comment-23596))
+### **bryan** — August 29, 2017 at 11:51 pm ([permalink](/blog/make-it-look-the-same-as-the-design/#comment-23596))
 
 > bryan says:
 >
@@ -88,7 +88,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 30, 2017 at 3:51 am ([permalink](https://www.codenameone.com/blog/make-it-look-the-same-as-the-design.html#comment-23721))
+### **Shai Almog** — August 30, 2017 at 3:51 am ([permalink](/blog/make-it-look-the-same-as-the-design/#comment-23721))
 
 > Shai Almog says:
 >
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — September 13, 2017 at 8:58 am ([permalink](https://www.codenameone.com/blog/make-it-look-the-same-as-the-design.html#comment-23604))
+### **Francesco Galgani** — September 13, 2017 at 8:58 am ([permalink](/blog/make-it-look-the-same-as-the-design/#comment-23604))
 
 > Francesco Galgani says:
 >
@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 14, 2017 at 5:57 am ([permalink](https://www.codenameone.com/blog/make-it-look-the-same-as-the-design.html#comment-23687))
+### **Shai Almog** — September 14, 2017 at 5:57 am ([permalink](/blog/make-it-look-the-same-as-the-design/#comment-23687))
 
 > Shai Almog says:
 >

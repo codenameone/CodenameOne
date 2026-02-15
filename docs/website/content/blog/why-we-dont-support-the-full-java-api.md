@@ -235,7 +235,7 @@ explain the problem that can’t be solved or is awkward to solve without this.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Sanny Sanoff** — September 17, 2016 at 8:48 am ([permalink](https://www.codenameone.com/blog/why-we-dont-support-the-full-java-api.html#comment-22763))
+### **Sanny Sanoff** — September 17, 2016 at 8:48 am ([permalink](/blog/why-we-dont-support-the-full-java-api/#comment-22763))
 
 > Sanny Sanoff says:
 >
@@ -247,7 +247,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 18, 2016 at 4:03 am ([permalink](https://www.codenameone.com/blog/why-we-dont-support-the-full-java-api.html#comment-23115))
+### **Shai Almog** — September 18, 2016 at 4:03 am ([permalink](/blog/why-we-dont-support-the-full-java-api/#comment-23115))
 
 > Shai Almog says:
 >
@@ -263,7 +263,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **BENSALEH ZainElabidine** — May 2, 2018 at 1:00 pm ([permalink](https://www.codenameone.com/blog/why-we-dont-support-the-full-java-api.html#comment-23980))
+### **BENSALEH ZainElabidine** — May 2, 2018 at 1:00 pm ([permalink](/blog/why-we-dont-support-the-full-java-api/#comment-23980))
 
 > BENSALEH ZainElabidine says:
 >
@@ -279,7 +279,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 3, 2018 at 6:02 am ([permalink](https://www.codenameone.com/blog/why-we-dont-support-the-full-java-api.html#comment-23797))
+### **Shai Almog** — May 3, 2018 at 6:02 am ([permalink](/blog/why-we-dont-support-the-full-java-api/#comment-23797))
 
 > Shai Almog says:
 >
@@ -289,7 +289,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Martin Grajcar** — November 11, 2018 at 3:58 pm ([permalink](https://www.codenameone.com/blog/why-we-dont-support-the-full-java-api.html#comment-24100))
+### **Martin Grajcar** — November 11, 2018 at 3:58 pm ([permalink](/blog/why-we-dont-support-the-full-java-api/#comment-24100))
 
 > Martin Grajcar says:
 >
@@ -298,7 +298,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 12, 2018 at 4:20 am ([permalink](https://www.codenameone.com/blog/why-we-dont-support-the-full-java-api.html#comment-24002))
+### **Shai Almog** — November 12, 2018 at 4:20 am ([permalink](/blog/why-we-dont-support-the-full-java-api/#comment-24002))
 
 > Shai Almog says:
 >

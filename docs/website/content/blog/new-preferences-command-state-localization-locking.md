@@ -47,11 +47,11 @@ in buttons and how that fits well with icon fonts.
 
 A question in the post raised the issue of commands which support such states but the API isn’t there.
 
-To solve this we added a version of `setMaterialIcon` to [FontImage](https://www.codenameone.com/javadoc/com/codename1/ui/FontImage.html)  
-that accepts a [Command](https://www.codenameone.com/javadoc/com/codename1/ui/Command.html) as  
+To solve this we added a version of `setMaterialIcon` to [FontImage](/javadoc/com/codename1/ui/FontImage/)  
+that accepts a [Command](/javadoc/com/codename1/ui/Command/) as  
 its argument. This effectively makes commands work with such icon fonts.
 
-To support that further we also added to [Toolbar](https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html)  
+To support that further we also added to [Toolbar](/javadoc/com/codename1/ui/Toolbar/)  
 the methods: `addMaterialCommandToSideMenu`, `addMaterialCommandToRightBar`, `addMaterialCommandToLeftBar` &  
 `addMaterialCommandToOverflowMenu`.
 
@@ -68,7 +68,7 @@ Localization should be the default and Codename One does the right thing here, h
 turn it off e.g. if you have a user submitted string that might be identical to an application resource bundle value.
 
 In `Label` we have the  
-[setShouldLocalize](https://www.codenameone.com/javadoc/com/codename1/ui/Label.html#setShouldLocalize-boolean-)  
+[setShouldLocalize](/javadoc/com/codename1/ui/Label/#setShouldLocalize-boolean-)  
 method which works great for disabling the implicit localization. However, as  
 [issue 1744](https://github.com/codenameone/CodenameOne/issues/1744) pointed out this needs to be done for  
 other components too…​
@@ -82,7 +82,7 @@ Image locking is an esoteric performance implementation detail that most of you 
 
 If you don’t care about the nitty gritty skip this section, for those of you who care and don’t know what I’m talking  
 about you can  
-[read this section and sidebar in the developer guide](https://www.codenameone.com/manual/graphics.html#_encodedimage).
+[read this section and sidebar in the developer guide](/manual/graphics/#_encodedimage).
 
 In the coming update we fixed issue [#1746](https://github.com/codenameone/CodenameOne/issues/1746) to  
 also lock other button states (this was very visible with things like toggle buttons). But the main change was  
@@ -95,7 +95,7 @@ the cases of memory thrashing when using the same encoded image, over and over�
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chibuike Mba** — May 31, 2016 at 11:59 pm ([permalink](https://www.codenameone.com/blog/new-preferences-command-state-localization-locking.html#comment-22680))
+### **Chibuike Mba** — May 31, 2016 at 11:59 pm ([permalink](/blog/new-preferences-command-state-localization-locking/#comment-22680))
 
 > Hi Shai,
 >
@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 1, 2016 at 3:43 am ([permalink](https://www.codenameone.com/blog/new-preferences-command-state-localization-locking.html#comment-22739))
+### **Shai Almog** — June 1, 2016 at 3:43 am ([permalink](/blog/new-preferences-command-state-localization-locking/#comment-22739))
 
 > Shai Almog says:
 >
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chibuike Mba** — June 1, 2016 at 10:09 am ([permalink](https://www.codenameone.com/blog/new-preferences-command-state-localization-locking.html#comment-22651))
+### **Chibuike Mba** — June 1, 2016 at 10:09 am ([permalink](/blog/new-preferences-command-state-localization-locking/#comment-22651))
 
 > Chibuike Mba says:
 >
@@ -134,7 +134,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 2, 2016 at 3:35 am ([permalink](https://www.codenameone.com/blog/new-preferences-command-state-localization-locking.html#comment-22543))
+### **Shai Almog** — June 2, 2016 at 3:35 am ([permalink](/blog/new-preferences-command-state-localization-locking/#comment-22543))
 
 > Shai Almog says:
 >
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chibuike Mba** — June 2, 2016 at 2:32 pm ([permalink](https://www.codenameone.com/blog/new-preferences-command-state-localization-locking.html#comment-22738))
+### **Chibuike Mba** — June 2, 2016 at 2:32 pm ([permalink](/blog/new-preferences-command-state-localization-locking/#comment-22738))
 
 > Chibuike Mba says:
 >

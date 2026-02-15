@@ -45,7 +45,7 @@ Now the dependency will exist, notice you will need to have both your cn1lib and
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Kapeutini Jean Voisin** — March 13, 2018 at 5:27 pm ([permalink](https://www.codenameone.com/blog/tip-nest-cn1libs-cross-dependencies.html#comment-23914))
+### **Kapeutini Jean Voisin** — March 13, 2018 at 5:27 pm ([permalink](/blog/tip-nest-cn1libs-cross-dependencies/#comment-23914))
 
 > Kapeutini Jean Voisin says:
 >

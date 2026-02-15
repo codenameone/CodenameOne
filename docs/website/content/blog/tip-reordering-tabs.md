@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/tip-reordering-tabs/tip.jpg)
 
-The `Tabs` class is pretty powerful and flexible as I [mentioned before](https://www.codenameone.com/blog/tip-customize-tabs-behavior.html). One thing it doesn’t support is drag and drop to re-order the tabs. Here the flexibility of Codename One takes over and allows us to accomplish it.
+The `Tabs` class is pretty powerful and flexible as I [mentioned before](/blog/tip-customize-tabs-behavior/). One thing it doesn’t support is drag and drop to re-order the tabs. Here the flexibility of Codename One takes over and allows us to accomplish it.
 
 We can use the builtin drag and drop support for components within the tabs container. This is exactly how the code below works. In the drop listener we block the the default processing of drop behavior so we can move the tab manually to the new location:
     
@@ -60,7 +60,7 @@ We can use the builtin drag and drop support for components within the tabs cont
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Stefan Eder** — May 16, 2019 at 10:06 am ([permalink](https://www.codenameone.com/blog/tip-reordering-tabs.html#comment-24107))
+### **Stefan Eder** — May 16, 2019 at 10:06 am ([permalink](/blog/tip-reordering-tabs/#comment-24107))
 
 > Stefan Eder says:
 >

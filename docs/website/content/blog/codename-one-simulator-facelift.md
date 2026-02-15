@@ -59,7 +59,7 @@ Over the next few updates we will be doing some more reorganization of menu item
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Diamond Mubaarak** — March 22, 2022 at 6:22 am ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24514))
+### **Diamond Mubaarak** — March 22, 2022 at 6:22 am ([permalink](/blog/codename-one-simulator-facelift/#comment-24514))
 
 > Diamond Mubaarak says:
 >
@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — March 22, 2022 at 6:59 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24515))
+### **Steve Hannah** — March 22, 2022 at 6:59 pm ([permalink](/blog/codename-one-simulator-facelift/#comment-24515))
 
 > Steve Hannah says:
 >
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — March 28, 2022 at 1:46 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24524))
+### **Steve Hannah** — March 28, 2022 at 1:46 pm ([permalink](/blog/codename-one-simulator-facelift/#comment-24524))
 
 > Steve Hannah says:
 >
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **plumberg** — March 28, 2022 at 8:23 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24525))
+### **plumberg** — March 28, 2022 at 8:23 pm ([permalink](/blog/codename-one-simulator-facelift/#comment-24525))
 
 > plumberg says:
 >
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **plumberg** — March 28, 2022 at 8:27 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24526))
+### **plumberg** — March 28, 2022 at 8:27 pm ([permalink](/blog/codename-one-simulator-facelift/#comment-24526))
 
 > plumberg says:
 >
@@ -118,14 +118,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — March 28, 2022 at 11:06 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24527))
+### **Steve Hannah** — March 28, 2022 at 11:06 pm ([permalink](/blog/codename-one-simulator-facelift/#comment-24527))
 
 > Steve Hannah says:
 >
 > Thanks for sharing that you had trouble find it. I’ll see what I can do to make this more intuitive.
 
 
-### **Abdelaziz Makhlouf** — March 25, 2022 at 1:00 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24516))
+### **Abdelaziz Makhlouf** — March 25, 2022 at 1:00 pm ([permalink](/blog/codename-one-simulator-facelift/#comment-24516))
 
 > Abdelaziz Makhlouf says:
 >
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — March 25, 2022 at 2:16 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24517))
+### **Steve Hannah** — March 25, 2022 at 2:16 pm ([permalink](/blog/codename-one-simulator-facelift/#comment-24517))
 
 > Steve Hannah says:
 >
@@ -145,7 +145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Fawaz Qamhawi** — March 26, 2022 at 8:39 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24518))
+### **Fawaz Qamhawi** — March 26, 2022 at 8:39 pm ([permalink](/blog/codename-one-simulator-facelift/#comment-24518))
 
 > Fawaz Qamhawi says:
 >
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — March 27, 2022 at 12:37 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24519))
+### **Steve Hannah** — March 27, 2022 at 12:37 pm ([permalink](/blog/codename-one-simulator-facelift/#comment-24519))
 
 > Steve Hannah says:
 >
@@ -172,7 +172,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — March 28, 2022 at 1:44 pm ([permalink](https://www.codenameone.com/blog/codename-one-simulator-facelift.html#comment-24523))
+### **Steve Hannah** — March 28, 2022 at 1:44 pm ([permalink](/blog/codename-one-simulator-facelift/#comment-24523))
 
 > Steve Hannah says:
 >

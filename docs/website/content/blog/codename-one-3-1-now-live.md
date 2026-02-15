@@ -55,7 +55,7 @@ You can also read the far more detailed list of release notes [here](/codename-o
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — July 27, 2015 at 4:22 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-1-now-live.html#comment-21485))
+### **Chidiebere Okwudire** — July 27, 2015 at 4:22 pm ([permalink](/blog/codename-one-3-1-now-live/#comment-21485))
 
 > Chidiebere Okwudire says:
 >
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 27, 2015 at 4:30 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-1-now-live.html#comment-22412))
+### **Shai Almog** — July 27, 2015 at 4:30 pm ([permalink](/blog/codename-one-3-1-now-live/#comment-22412))
 
 > Shai Almog says:
 >

@@ -38,7 +38,7 @@ Codename One.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Sadart** — October 10, 2016 at 2:44 pm ([permalink](https://www.codenameone.com/blog/tip-disable-google-play-services.html#comment-22844))
+### **Sadart** — October 10, 2016 at 2:44 pm ([permalink](/blog/tip-disable-google-play-services/#comment-22844))
 
 > Sadart says:
 >

@@ -34,7 +34,7 @@ It’s an important feature as JDK 8 reaches end of life at the end of the year.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — August 16, 2018 at 8:13 am ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-24055))
+### **Francesco Galgani** — August 16, 2018 at 8:13 am ([permalink](/blog/uber-book-is-out-jdk-11/#comment-24055))
 
 > Francesco Galgani says:
 >
@@ -48,7 +48,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 16, 2018 at 12:14 pm ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-23995))
+### **Shai Almog** — August 16, 2018 at 12:14 pm ([permalink](/blog/uber-book-is-out-jdk-11/#comment-23995))
 
 > Shai Almog says:
 >
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gareth Murfin** — August 16, 2018 at 12:33 pm ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-23848))
+### **Gareth Murfin** — August 16, 2018 at 12:33 pm ([permalink](/blog/uber-book-is-out-jdk-11/#comment-23848))
 
 > Gareth Murfin says:
 >
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ronald Tshabalala** — August 16, 2018 at 4:18 pm ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-23661))
+### **Ronald Tshabalala** — August 16, 2018 at 4:18 pm ([permalink](/blog/uber-book-is-out-jdk-11/#comment-23661))
 
 > Ronald Tshabalala says:
 >
@@ -75,27 +75,27 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 17, 2018 at 3:37 am ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-23941))
+### **Shai Almog** — August 17, 2018 at 3:37 am ([permalink](/blog/uber-book-is-out-jdk-11/#comment-23941))
 
 > Shai Almog says:
 >
 > Yes!  
-> I will produce 8 apps for the course out of which I delivered 2 (in addition to the 2+ already there beforehand). The next app would be a whatsapp clone which will launch in 2018. It will be followed by a netflix clone. You can see how this was decided in the survey results [https://www.codenameone.com…](<https://www.codenameone.com/blog/survey-results-2018.html>)
+> I will produce 8 apps for the course out of which I delivered 2 (in addition to the 2+ already there beforehand). The next app would be a whatsapp clone which will launch in 2018. It will be followed by a netflix clone. You can see how this was decided in the survey results [https://www.codenameone.com…](</blog/survey-results-2018/>)
 >
 
 
 
-### **Francesco Galgani** — August 17, 2018 at 10:07 pm ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-24063))
+### **Francesco Galgani** — August 17, 2018 at 10:07 pm ([permalink](/blog/uber-book-is-out-jdk-11/#comment-24063))
 
 > Francesco Galgani says:
 >
 > Thank you. At the moment I’m migrating from Netbeans8.2+JDK8 to Netbeans9+OpenJDK10. I suggest you to update the info here (it’s written to use JDK8):  
-> [https://www.codenameone.com…](<https://www.codenameone.com/download.html>)
+> [https://www.codenameone.com…](</download/>)
 >
 
 
 
-### **Shai Almog** — August 18, 2018 at 8:09 am ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-23949))
+### **Shai Almog** — August 18, 2018 at 8:09 am ([permalink](/blog/uber-book-is-out-jdk-11/#comment-23949))
 
 > Shai Almog says:
 >
@@ -104,7 +104,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Tommy Mogaka** — August 21, 2018 at 10:11 am ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-23909))
+### **Tommy Mogaka** — August 21, 2018 at 10:11 am ([permalink](/blog/uber-book-is-out-jdk-11/#comment-23909))
 
 > Tommy Mogaka says:
 >
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 22, 2018 at 4:01 am ([permalink](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html#comment-23900))
+### **Shai Almog** — August 22, 2018 at 4:01 am ([permalink](/blog/uber-book-is-out-jdk-11/#comment-23900))
 
 > Shai Almog says:
 >

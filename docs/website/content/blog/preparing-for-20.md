@@ -60,7 +60,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — November 19, 2013 at 11:53 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21696))
+### **Anonymous** — November 19, 2013 at 11:53 am ([permalink](/blog/preparing-for-20/#comment-21696))
 
 > Anonymous says:
 >
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 19, 2013 at 3:54 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21921))
+### **Anonymous** — November 19, 2013 at 3:54 pm ([permalink](/blog/preparing-for-20/#comment-21921))
 
 > Anonymous says:
 >
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 19, 2013 at 8:03 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21812))
+### **Anonymous** — November 19, 2013 at 8:03 pm ([permalink](/blog/preparing-for-20/#comment-21812))
 
 > Anonymous says:
 >
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 20, 2013 at 8:19 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21819))
+### **Anonymous** — November 20, 2013 at 8:19 am ([permalink](/blog/preparing-for-20/#comment-21819))
 
 > Anonymous says:
 >
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 20, 2013 at 4:19 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21867))
+### **Anonymous** — November 20, 2013 at 4:19 pm ([permalink](/blog/preparing-for-20/#comment-21867))
 
 > Anonymous says:
 >
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 21, 2013 at 2:49 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21720))
+### **Anonymous** — November 21, 2013 at 2:49 am ([permalink](/blog/preparing-for-20/#comment-21720))
 
 > Anonymous says:
 >
@@ -120,7 +120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 21, 2013 at 4:19 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21708))
+### **Anonymous** — November 21, 2013 at 4:19 am ([permalink](/blog/preparing-for-20/#comment-21708))
 
 > Anonymous says:
 >
@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 21, 2013 at 5:39 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21958))
+### **Anonymous** — November 21, 2013 at 5:39 am ([permalink](/blog/preparing-for-20/#comment-21958))
 
 > Anonymous says:
 >
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 21, 2013 at 7:28 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21881))
+### **Anonymous** — November 21, 2013 at 7:28 am ([permalink](/blog/preparing-for-20/#comment-21881))
 
 > Anonymous says:
 >
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 23, 2013 at 1:40 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21619))
+### **Anonymous** — November 23, 2013 at 1:40 pm ([permalink](/blog/preparing-for-20/#comment-21619))
 
 > Anonymous says:
 >
@@ -174,7 +174,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 23, 2013 at 2:36 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-22024))
+### **Anonymous** — November 23, 2013 at 2:36 pm ([permalink](/blog/preparing-for-20/#comment-22024))
 
 > Anonymous says:
 >
@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 24, 2013 at 11:27 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21918))
+### **Anonymous** — November 24, 2013 at 11:27 am ([permalink](/blog/preparing-for-20/#comment-21918))
 
 > Anonymous says:
 >
@@ -194,7 +194,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 24, 2013 at 4:48 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21753))
+### **Anonymous** — November 24, 2013 at 4:48 pm ([permalink](/blog/preparing-for-20/#comment-21753))
 
 > Anonymous says:
 >
@@ -203,7 +203,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 24, 2013 at 4:53 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21981))
+### **Anonymous** — November 24, 2013 at 4:53 pm ([permalink](/blog/preparing-for-20/#comment-21981))
 
 > Anonymous says:
 >
@@ -214,7 +214,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 25, 2013 at 5:36 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21966))
+### **Anonymous** — November 25, 2013 at 5:36 am ([permalink](/blog/preparing-for-20/#comment-21966))
 
 > Anonymous says:
 >
@@ -223,7 +223,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 25, 2013 at 9:57 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-24160))
+### **Anonymous** — November 25, 2013 at 9:57 am ([permalink](/blog/preparing-for-20/#comment-24160))
 
 > Anonymous says:
 >
@@ -234,7 +234,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 10, 2013 at 10:10 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21990))
+### **Anonymous** — December 10, 2013 at 10:10 pm ([permalink](/blog/preparing-for-20/#comment-21990))
 
 > Anonymous says:
 >
@@ -243,7 +243,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 10, 2013 at 10:11 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21758))
+### **Anonymous** — December 10, 2013 at 10:11 pm ([permalink](/blog/preparing-for-20/#comment-21758))
 
 > Anonymous says:
 >
@@ -252,7 +252,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 11, 2013 at 9:34 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21897))
+### **Anonymous** — December 11, 2013 at 9:34 am ([permalink](/blog/preparing-for-20/#comment-21897))
 
 > Anonymous says:
 >
@@ -261,7 +261,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 6, 2014 at 7:00 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21790))
+### **Anonymous** — January 6, 2014 at 7:00 am ([permalink](/blog/preparing-for-20/#comment-21790))
 
 > Anonymous says:
 >
@@ -274,7 +274,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 6, 2014 at 8:00 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21721))
+### **Anonymous** — January 6, 2014 at 8:00 am ([permalink](/blog/preparing-for-20/#comment-21721))
 
 > Anonymous says:
 >
@@ -285,7 +285,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 6, 2014 at 8:04 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21709))
+### **Anonymous** — January 6, 2014 at 8:04 am ([permalink](/blog/preparing-for-20/#comment-21709))
 
 > Anonymous says:
 >
@@ -300,7 +300,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 20, 2014 at 11:21 am ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21717))
+### **Anonymous** — February 20, 2014 at 11:21 am ([permalink](/blog/preparing-for-20/#comment-21717))
 
 > Anonymous says:
 >
@@ -311,7 +311,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 20, 2014 at 2:40 pm ([permalink](https://www.codenameone.com/blog/preparing-for-20.html#comment-21829))
+### **Anonymous** — February 20, 2014 at 2:40 pm ([permalink](/blog/preparing-for-20/#comment-21829))
 
 > Anonymous says:
 >

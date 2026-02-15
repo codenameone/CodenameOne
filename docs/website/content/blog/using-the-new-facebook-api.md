@@ -86,7 +86,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — December 2, 2013 at 7:55 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-21641))
+### **Anonymous** — December 2, 2013 at 7:55 am ([permalink](/blog/using-the-new-facebook-api/#comment-21641))
 
 > Anonymous says:
 >
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 2, 2013 at 2:40 pm ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-22036))
+### **Anonymous** — December 2, 2013 at 2:40 pm ([permalink](/blog/using-the-new-facebook-api/#comment-22036))
 
 > Anonymous says:
 >
@@ -104,7 +104,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 4, 2013 at 6:02 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-22064))
+### **Anonymous** — December 4, 2013 at 6:02 am ([permalink](/blog/using-the-new-facebook-api/#comment-22064))
 
 > Anonymous says:
 >
@@ -129,7 +129,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 5, 2013 at 11:13 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-21911))
+### **Anonymous** — December 5, 2013 at 11:13 am ([permalink](/blog/using-the-new-facebook-api/#comment-21911))
 
 > Anonymous says:
 >
@@ -138,7 +138,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 20, 2014 at 5:37 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-21905))
+### **Anonymous** — January 20, 2014 at 5:37 am ([permalink](/blog/using-the-new-facebook-api/#comment-21905))
 
 > Anonymous says:
 >
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 20, 2014 at 3:25 pm ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-21982))
+### **Anonymous** — January 20, 2014 at 3:25 pm ([permalink](/blog/using-the-new-facebook-api/#comment-21982))
 
 > Anonymous says:
 >
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 3, 2015 at 10:55 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-22090))
+### **Anonymous** — February 3, 2015 at 10:55 am ([permalink](/blog/using-the-new-facebook-api/#comment-22090))
 
 > Anonymous says:
 >
@@ -175,7 +175,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 3, 2015 at 10:56 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-22017))
+### **Anonymous** — February 3, 2015 at 10:56 am ([permalink](/blog/using-the-new-facebook-api/#comment-22017))
 
 > Anonymous says:
 >
@@ -186,7 +186,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 3, 2015 at 1:42 pm ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-24165))
+### **Anonymous** — February 3, 2015 at 1:42 pm ([permalink](/blog/using-the-new-facebook-api/#comment-24165))
 
 > Anonymous says:
 >
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mr Emma** — September 26, 2015 at 5:08 pm ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-22179))
+### **Mr Emma** — September 26, 2015 at 5:08 pm ([permalink](/blog/using-the-new-facebook-api/#comment-22179))
 
 > Mr Emma says:
 >
@@ -213,7 +213,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 27, 2015 at 3:51 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-21603))
+### **Shai Almog** — September 27, 2015 at 3:51 am ([permalink](/blog/using-the-new-facebook-api/#comment-21603))
 
 > Shai Almog says:
 >
@@ -223,7 +223,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mr Emma** — September 27, 2015 at 7:24 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-22241))
+### **Mr Emma** — September 27, 2015 at 7:24 am ([permalink](/blog/using-the-new-facebook-api/#comment-22241))
 
 > Mr Emma says:
 >
@@ -232,7 +232,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 28, 2015 at 4:08 am ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-21652))
+### **Shai Almog** — September 28, 2015 at 4:08 am ([permalink](/blog/using-the-new-facebook-api/#comment-21652))
 
 > Shai Almog says:
 >
@@ -242,7 +242,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mr Emma** — September 28, 2015 at 11:28 pm ([permalink](https://www.codenameone.com/blog/using-the-new-facebook-api.html#comment-22253))
+### **Mr Emma** — September 28, 2015 at 11:28 pm ([permalink](/blog/using-the-new-facebook-api/#comment-22253))
 
 > Mr Emma says:
 >

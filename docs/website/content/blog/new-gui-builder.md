@@ -105,7 +105,7 @@ and let us know what you think.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jaanus Hansen** — September 21, 2015 at 3:00 pm ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22346))
+### **Jaanus Hansen** — September 21, 2015 at 3:00 pm ([permalink](/blog/new-gui-builder/#comment-22346))
 
 > Jaanus Hansen says:
 >
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bryan** — September 21, 2015 at 8:39 pm ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22331))
+### **bryan** — September 21, 2015 at 8:39 pm ([permalink](/blog/new-gui-builder/#comment-22331))
 
 > bryan says:
 >
@@ -123,7 +123,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 22, 2015 at 3:54 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-24199))
+### **Shai Almog** — September 22, 2015 at 3:54 am ([permalink](/blog/new-gui-builder/#comment-24199))
 
 > Shai Almog says:
 >
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bryan** — September 22, 2015 at 6:51 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-21547))
+### **bryan** — September 22, 2015 at 6:51 am ([permalink](/blog/new-gui-builder/#comment-21547))
 
 > bryan says:
 >
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 23, 2015 at 5:09 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22427))
+### **Shai Almog** — September 23, 2015 at 5:09 am ([permalink](/blog/new-gui-builder/#comment-22427))
 
 > Shai Almog says:
 >
@@ -162,7 +162,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bryan** — September 23, 2015 at 5:21 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22288))
+### **bryan** — September 23, 2015 at 5:21 am ([permalink](/blog/new-gui-builder/#comment-22288))
 
 > bryan says:
 >
@@ -171,7 +171,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 23, 2015 at 11:09 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22486))
+### **Shai Almog** — September 23, 2015 at 11:09 am ([permalink](/blog/new-gui-builder/#comment-22486))
 
 > Shai Almog says:
 >
@@ -181,7 +181,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — October 12, 2015 at 10:13 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22494))
+### **Chidiebere Okwudire** — October 12, 2015 at 10:13 am ([permalink](/blog/new-gui-builder/#comment-22494))
 
 > Chidiebere Okwudire says:
 >
@@ -198,7 +198,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 12, 2015 at 12:08 pm ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22436))
+### **Shai Almog** — October 12, 2015 at 12:08 pm ([permalink](/blog/new-gui-builder/#comment-22436))
 
 > Shai Almog says:
 >
@@ -215,7 +215,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — December 9, 2015 at 11:26 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-21489))
+### **Chidiebere Okwudire** — December 9, 2015 at 11:26 am ([permalink](/blog/new-gui-builder/#comment-21489))
 
 > Chidiebere Okwudire says:
 >
@@ -226,7 +226,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 9, 2015 at 12:01 pm ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22531))
+### **Shai Almog** — December 9, 2015 at 12:01 pm ([permalink](/blog/new-gui-builder/#comment-22531))
 
 > Shai Almog says:
 >
@@ -240,7 +240,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — December 9, 2015 at 8:49 pm ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22153))
+### **Chidiebere Okwudire** — December 9, 2015 at 8:49 pm ([permalink](/blog/new-gui-builder/#comment-22153))
 
 > Chidiebere Okwudire says:
 >
@@ -249,7 +249,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Akinniranye James** — September 10, 2016 at 5:52 pm ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-23040))
+### **Akinniranye James** — September 10, 2016 at 5:52 pm ([permalink](/blog/new-gui-builder/#comment-23040))
 
 > Akinniranye James says:
 >
@@ -258,7 +258,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 11, 2016 at 6:38 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22854))
+### **Shai Almog** — September 11, 2016 at 6:38 am ([permalink](/blog/new-gui-builder/#comment-22854))
 
 > Shai Almog says:
 >
@@ -268,7 +268,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Akinniranye James** — September 11, 2016 at 7:06 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-21656))
+### **Akinniranye James** — September 11, 2016 at 7:06 am ([permalink](/blog/new-gui-builder/#comment-21656))
 
 > Akinniranye James says:
 >
@@ -277,7 +277,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 12, 2016 at 4:16 am ([permalink](https://www.codenameone.com/blog/new-gui-builder.html#comment-22715))
+### **Shai Almog** — September 12, 2016 at 4:16 am ([permalink](/blog/new-gui-builder/#comment-22715))
 
 > Shai Almog says:
 >

@@ -110,7 +110,7 @@ Next time I’ll talk about doing the actual activation process and maybe discus
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Gareth Murfin** — October 5, 2018 at 8:23 pm ([permalink](https://www.codenameone.com/blog/tip-send-device-activation-sms-via-twilio.html#comment-24079))
+### **Gareth Murfin** — October 5, 2018 at 8:23 pm ([permalink](/blog/tip-send-device-activation-sms-via-twilio/#comment-24079))
 
 > Gareth Murfin says:
 >

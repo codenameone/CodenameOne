@@ -76,7 +76,7 @@ Hopefully, having this as a good resource will allow us to improve the tools to 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Señor Sentinel** — April 13, 2017 at 6:57 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-21575))
+### **Señor Sentinel** — April 13, 2017 at 6:57 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-21575))
 
 > Señor Sentinel says:
 >
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 14, 2017 at 4:29 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-21739))
+### **Shai Almog** — April 14, 2017 at 4:29 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-21739))
 
 > Shai Almog says:
 >
@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Señor Sentinel** — April 14, 2017 at 6:29 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23447))
+### **Señor Sentinel** — April 14, 2017 at 6:29 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23447))
 
 > Señor Sentinel says:
 >
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 15, 2017 at 4:29 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23473))
+### **Shai Almog** — April 15, 2017 at 4:29 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23473))
 
 > Shai Almog says:
 >
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Señor Sentinel** — April 15, 2017 at 7:27 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23171))
+### **Señor Sentinel** — April 15, 2017 at 7:27 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23171))
 
 > Señor Sentinel says:
 >
@@ -125,20 +125,20 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 16, 2017 at 4:43 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-21583))
+### **Shai Almog** — April 16, 2017 at 4:43 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-21583))
 
 > Shai Almog says:
 >
 > Do you have a guibuilder.input file? What’s inside it?
 >
-> I’ve explained the free support process here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/clarifying-our-support.html>)
+> I’ve explained the free support process here: [https://www.codenameone.com…](</blog/clarifying-our-support/>)
 >
 > I have no idea who you are but we got some contacts about app development over the past week which we answered. Either way our resources are pretty low at this time so if you need us to build your app for you we won’t be able to do anything before September.
 >
 
 
 
-### **Señor Sentinel** — April 16, 2017 at 7:12 pm ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23504))
+### **Señor Sentinel** — April 16, 2017 at 7:12 pm ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23504))
 
 > Señor Sentinel says:
 >
@@ -147,7 +147,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 17, 2017 at 5:38 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23291))
+### **Shai Almog** — April 17, 2017 at 5:38 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23291))
 
 > Shai Almog says:
 >
@@ -156,7 +156,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Señor Sentinel** — April 17, 2017 at 6:31 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23305))
+### **Señor Sentinel** — April 17, 2017 at 6:31 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23305))
 
 > Señor Sentinel says:
 >
@@ -169,7 +169,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 18, 2017 at 5:45 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23155))
+### **Shai Almog** — April 18, 2017 at 5:45 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23155))
 
 > Shai Almog says:
 >
@@ -179,7 +179,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Señor Sentinel** — April 18, 2017 at 6:32 am ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23049))
+### **Señor Sentinel** — April 18, 2017 at 6:32 am ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23049))
 
 > Señor Sentinel says:
 >
@@ -201,7 +201,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — April 18, 2017 at 5:46 pm ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-24145))
+### **shannah78** — April 18, 2017 at 5:46 pm ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-24145))
 
 > shannah78 says:
 >
@@ -210,7 +210,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Señor Sentinel** — April 18, 2017 at 6:02 pm ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-23391))
+### **Señor Sentinel** — April 18, 2017 at 6:02 pm ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-23391))
 
 > Señor Sentinel says:
 >
@@ -219,7 +219,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **kutoman** — November 18, 2018 at 12:02 pm ([permalink](https://www.codenameone.com/blog/tip-track-designer-guibuilder-issues.html#comment-24034))
+### **kutoman** — November 18, 2018 at 12:02 pm ([permalink](/blog/tip-track-designer-guibuilder-issues/#comment-24034))
 
 > kutoman says:
 >

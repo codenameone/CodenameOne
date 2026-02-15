@@ -51,7 +51,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — September 2, 2013 at 11:15 am ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-21693))
+### **Anonymous** — September 2, 2013 at 11:15 am ([permalink](/blog/till-the-end-of-the-form/#comment-21693))
 
 > Anonymous says:
 >
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 4, 2014 at 11:20 am ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-21868))
+### **Anonymous** — January 4, 2014 at 11:20 am ([permalink](/blog/till-the-end-of-the-form/#comment-21868))
 
 > Anonymous says:
 >
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 4, 2014 at 5:00 pm ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-21747))
+### **Anonymous** — January 4, 2014 at 5:00 pm ([permalink](/blog/till-the-end-of-the-form/#comment-21747))
 
 > Anonymous says:
 >
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 28, 2014 at 9:16 am ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-22048))
+### **Anonymous** — January 28, 2014 at 9:16 am ([permalink](/blog/till-the-end-of-the-form/#comment-22048))
 
 > Anonymous says:
 >
@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 28, 2014 at 10:39 am ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-21975))
+### **Anonymous** — January 28, 2014 at 10:39 am ([permalink](/blog/till-the-end-of-the-form/#comment-21975))
 
 > Anonymous says:
 >
@@ -120,7 +120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 28, 2014 at 5:02 pm ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-21860))
+### **Anonymous** — January 28, 2014 at 5:02 pm ([permalink](/blog/till-the-end-of-the-form/#comment-21860))
 
 > Anonymous says:
 >
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 29, 2014 at 4:25 am ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-21898))
+### **Anonymous** — January 29, 2014 at 4:25 am ([permalink](/blog/till-the-end-of-the-form/#comment-21898))
 
 > Anonymous says:
 >
@@ -144,7 +144,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — August 22, 2014 at 3:11 am ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-22211))
+### **Anonymous** — August 22, 2014 at 3:11 am ([permalink](/blog/till-the-end-of-the-form/#comment-22211))
 
 > Anonymous says:
 >
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — August 22, 2014 at 1:20 pm ([permalink](https://www.codenameone.com/blog/till-the-end-of-the-form.html#comment-21442))
+### **Anonymous** — August 22, 2014 at 1:20 pm ([permalink](/blog/till-the-end-of-the-form/#comment-21442))
 
 > Anonymous says:
 >

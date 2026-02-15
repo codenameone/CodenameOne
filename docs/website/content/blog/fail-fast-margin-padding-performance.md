@@ -112,7 +112,7 @@ been in the code for years.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Linsong Wang** — December 1, 2016 at 5:57 pm ([permalink](https://www.codenameone.com/blog/fail-fast-margin-padding-performance.html#comment-22836))
+### **Linsong Wang** — December 1, 2016 at 5:57 pm ([permalink](/blog/fail-fast-margin-padding-performance/#comment-22836))
 
 > Linsong Wang says:
 >
@@ -122,7 +122,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 2, 2016 at 5:30 am ([permalink](https://www.codenameone.com/blog/fail-fast-margin-padding-performance.html#comment-23007))
+### **Shai Almog** — December 2, 2016 at 5:30 am ([permalink](/blog/fail-fast-margin-padding-performance/#comment-23007))
 
 > Shai Almog says:
 >

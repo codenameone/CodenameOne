@@ -88,7 +88,7 @@ You can also read the far more detailed list of release notes [here](/codename-o
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — October 27, 2015 at 11:52 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22472))
+### **Diamond** — October 27, 2015 at 11:52 am ([permalink](/blog/codename-one-3-2-now-live/#comment-22472))
 
 > Diamond says:
 >
@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 28, 2015 at 3:35 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22195))
+### **Shai Almog** — October 28, 2015 at 3:35 am ([permalink](/blog/codename-one-3-2-now-live/#comment-22195))
 
 > Shai Almog says:
 >
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond** — October 28, 2015 at 4:17 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22487))
+### **Diamond** — October 28, 2015 at 4:17 am ([permalink](/blog/codename-one-3-2-now-live/#comment-22487))
 
 > Diamond says:
 >
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 28, 2015 at 9:47 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22180))
+### **Shai Almog** — October 28, 2015 at 9:47 am ([permalink](/blog/codename-one-3-2-now-live/#comment-22180))
 
 > Shai Almog says:
 >
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gerben** — October 28, 2015 at 9:49 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-21940))
+### **Gerben** — October 28, 2015 at 9:49 am ([permalink](/blog/codename-one-3-2-now-live/#comment-21940))
 
 > Gerben says:
 >
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 28, 2015 at 9:55 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22242))
+### **Shai Almog** — October 28, 2015 at 9:55 am ([permalink](/blog/codename-one-3-2-now-live/#comment-22242))
 
 > Shai Almog says:
 >
@@ -166,7 +166,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Tom Arn** — October 30, 2015 at 10:03 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22266))
+### **Tom Arn** — October 30, 2015 at 10:03 am ([permalink](/blog/codename-one-3-2-now-live/#comment-22266))
 
 > Tom Arn says:
 >
@@ -177,7 +177,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ahmed** — October 31, 2015 at 3:52 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22386))
+### **ahmed** — October 31, 2015 at 3:52 am ([permalink](/blog/codename-one-3-2-now-live/#comment-22386))
 
 > ahmed says:
 >
@@ -186,7 +186,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 31, 2015 at 4:16 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22396))
+### **Shai Almog** — October 31, 2015 at 4:16 am ([permalink](/blog/codename-one-3-2-now-live/#comment-22396))
 
 > Shai Almog says:
 >
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 31, 2015 at 4:17 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22403))
+### **Shai Almog** — October 31, 2015 at 4:17 am ([permalink](/blog/codename-one-3-2-now-live/#comment-22403))
 
 > Shai Almog says:
 >
@@ -205,7 +205,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Yaakov Gesher** — November 10, 2015 at 10:07 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22393))
+### **Yaakov Gesher** — November 10, 2015 at 10:07 pm ([permalink](/blog/codename-one-3-2-now-live/#comment-22393))
 
 > Yaakov Gesher says:
 >
@@ -214,7 +214,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 11, 2015 at 4:53 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22368))
+### **Shai Almog** — November 11, 2015 at 4:53 am ([permalink](/blog/codename-one-3-2-now-live/#comment-22368))
 
 > Shai Almog says:
 >
@@ -223,7 +223,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Yaakov Gesher** — November 11, 2015 at 7:51 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22455))
+### **Yaakov Gesher** — November 11, 2015 at 7:51 pm ([permalink](/blog/codename-one-3-2-now-live/#comment-22455))
 
 > Yaakov Gesher says:
 >
@@ -232,7 +232,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 12, 2015 at 3:09 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-21498))
+### **Shai Almog** — November 12, 2015 at 3:09 am ([permalink](/blog/codename-one-3-2-now-live/#comment-21498))
 
 > Shai Almog says:
 >
@@ -242,7 +242,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Yaakov Gesher** — November 14, 2015 at 9:16 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-21540))
+### **Yaakov Gesher** — November 14, 2015 at 9:16 pm ([permalink](/blog/codename-one-3-2-now-live/#comment-21540))
 
 > Yaakov Gesher says:
 >
@@ -251,7 +251,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 15, 2015 at 4:08 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-22548))
+### **Shai Almog** — November 15, 2015 at 4:08 am ([permalink](/blog/codename-one-3-2-now-live/#comment-22548))
 
 > Shai Almog says:
 >
@@ -261,7 +261,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Yaakov Gesher** — November 21, 2015 at 8:48 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-24200))
+### **Yaakov Gesher** — November 21, 2015 at 8:48 pm ([permalink](/blog/codename-one-3-2-now-live/#comment-24200))
 
 > Yaakov Gesher says:
 >
@@ -270,7 +270,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 22, 2015 at 4:37 am ([permalink](https://www.codenameone.com/blog/codename-one-3-2-now-live.html#comment-21548))
+### **Shai Almog** — November 22, 2015 at 4:37 am ([permalink](/blog/codename-one-3-2-now-live/#comment-21548))
 
 > Shai Almog says:
 >

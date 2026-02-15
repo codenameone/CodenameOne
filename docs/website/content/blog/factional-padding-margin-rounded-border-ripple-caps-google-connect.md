@@ -51,7 +51,7 @@ The reason we didn’t have that around sooner is that it requires a deep change
 
 We created `Border` in the LWUIT days and it grew very old. The goals it set out to accomplish were radically different from the ones we have today which is why we created `RoundBorder` when we needed something more expressive.
 
-`RoundBorder` works great for round and pill shapes but the classic square with rounded corners is still only available in the `Border` class. Normally, this would be enough but there is a lot of nuance we wanted to introduce to that API and a lot that we learned from the `RoundBorder`. So we created a new class [RoundRectBorder](https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundRectBorder.html) which allows you to create a round border that’s more refined. Here I adapted the original [RoundBorder](https://www.codenameone.com/javadoc/com/codename1/ui/plaf/RoundBorder.html) sample to work with `RoundRect`:
+`RoundBorder` works great for round and pill shapes but the classic square with rounded corners is still only available in the `Border` class. Normally, this would be enough but there is a lot of nuance we wanted to introduce to that API and a lot that we learned from the `RoundBorder`. So we created a new class [RoundRectBorder](/javadoc/com/codename1/ui/plaf/RoundRectBorder/) which allows you to create a round border that’s more refined. Here I adapted the original [RoundBorder](/javadoc/com/codename1/ui/plaf/RoundBorder/) sample to work with `RoundRect`:
     
     
     Form hi = new Form("RoundRect", new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER));
@@ -155,28 +155,28 @@ In order to reduce the impact of this behavior we didn’t apply it to every `Bu
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Gareth Murfin** — July 24, 2017 at 10:26 pm ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23500))
+### **Gareth Murfin** — July 24, 2017 at 10:26 pm ([permalink](/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect/#comment-23500))
 
 > Great update, it is a joy to see such leaps and bounds in functionality, congrats. Keep up the good work guys!..
 >
 
 
 
-### **Nick Koirala** — July 25, 2017 at 2:20 am ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23204))
+### **Nick Koirala** — July 25, 2017 at 2:20 am ([permalink](/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect/#comment-23204))
 
 > I like the ripple effect but it seems like its in slow motion compared to the material design ripple effect, how is the speed controlled?
 >
 
 
 
-### **Shai Almog** — July 25, 2017 at 4:34 pm ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23564))
+### **Shai Almog** — July 25, 2017 at 4:34 pm ([permalink](/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect/#comment-23564))
 
 > Right now it’s hardcoded. I looked at several implementations and each one looked very different so I eyeballed it. I’ll try to think of the right way to customize this, can you file an RFE?
 >
 
 
 
-### **Nick Koirala** — August 10, 2017 at 3:10 am ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23529))
+### **Nick Koirala** — August 10, 2017 at 3:10 am ([permalink](/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect/#comment-23529))
 
 > Nick Koirala says:
 >
@@ -191,7 +191,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 10, 2017 at 5:17 am ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23737))
+### **Shai Almog** — August 10, 2017 at 5:17 am ([permalink](/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect/#comment-23737))
 
 > Shai Almog says:
 >
@@ -220,7 +220,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Nick Koirala** — August 10, 2017 at 6:39 am ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-21524))
+### **Nick Koirala** — August 10, 2017 at 6:39 am ([permalink](/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect/#comment-21524))
 
 > Nick Koirala says:
 >
@@ -239,7 +239,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 11, 2017 at 7:21 am ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23626))
+### **Shai Almog** — August 11, 2017 at 7:21 am ([permalink](/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect/#comment-23626))
 
 > Shai Almog says:
 >
@@ -262,7 +262,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond** — August 22, 2017 at 9:13 am ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23677))
+### **Diamond** — August 22, 2017 at 9:13 am ([permalink](/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect/#comment-23677))
 
 > Diamond says:
 >
@@ -274,7 +274,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 22, 2017 at 1:20 pm ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-24210))
+### **Shai Almog** — August 22, 2017 at 1:20 pm ([permalink](/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect/#comment-24210))
 
 > Shai Almog says:
 >
@@ -283,7 +283,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond** — August 22, 2017 at 2:10 pm ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-21530))
+### **Diamond** — August 22, 2017 at 2:10 pm ([permalink](/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect/#comment-21530))
 
 > Diamond says:
 >
@@ -292,7 +292,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Thomas** — March 22, 2018 at 8:00 pm ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23829))
+### **Thomas** — March 22, 2018 at 8:00 pm ([permalink](/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect/#comment-23829))
 
 > Thomas says:
 >
@@ -301,7 +301,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 23, 2018 at 2:42 am ([permalink](https://www.codenameone.com/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect.html#comment-23757))
+### **Shai Almog** — March 23, 2018 at 2:42 am ([permalink](/blog/factional-padding-margin-rounded-border-ripple-caps-google-connect/#comment-23757))
 
 > Shai Almog says:
 >

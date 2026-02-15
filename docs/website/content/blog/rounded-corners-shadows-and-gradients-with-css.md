@@ -150,21 +150,21 @@ You can download the Codename One CSS library and read the installation instruct
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — October 19, 2015 at 3:54 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22454))
+### **Chidiebere Okwudire** — October 19, 2015 at 3:54 pm ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-22454))
 
 > Looks like really cool stuff; hope to try this out some time. Thanks!!!
 >
 
 
 
-### **Franck Marchand** — February 13, 2016 at 10:51 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22222))
+### **Franck Marchand** — February 13, 2016 at 10:51 pm ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-22222))
 
 > Hi, is it possible to do a cercle ? I try with border-radius:50% but I have a border around image, not a circle.
 >
 
 
 
-### **Shai Almog** — February 14, 2016 at 3:36 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22371))
+### **Shai Almog** — February 14, 2016 at 3:36 am ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-22371))
 
 > Hi,  
 > that won’t work. You round is inherently a special case since it can’t grow very well.
@@ -174,7 +174,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Franck Marchand** — February 14, 2016 at 10:21 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22425))
+### **Franck Marchand** — February 14, 2016 at 10:21 am ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-22425))
 
 > Have you an example ?
 >
@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Franck Marchand** — February 14, 2016 at 7:41 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22617))
+### **Franck Marchand** — February 14, 2016 at 7:41 pm ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-22617))
 
 > Ok, I find: [http://www.javacodegeeks.co…](<http://www.javacodegeeks.com/2015/08/building-a-chat-app-with-codename-one-part-4.html>)
 >
@@ -203,18 +203,18 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 15, 2016 at 3:28 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22481))
+### **Shai Almog** — February 15, 2016 at 3:28 am ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-22481))
 
 > Shai Almog says:
 >
-> I was thinking more about this: [https://www.codenameone.com…](<https://www.codenameone.com/manual/theme-basics.html#_the_background_behavior_image>)
+> I was thinking more about this: [https://www.codenameone.com…](</manual/theme-basics/#_the_background_behavior_image>)
 >
 > Notice that the article you linked appeared here first: [http://www.codenameone.com/…](<http://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-4.html>)
 >
 
 
 
-### **Mo** — June 2, 2016 at 4:09 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22840))
+### **Mo** — June 2, 2016 at 4:09 pm ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-22840))
 
 > Mo says:
 >
@@ -223,7 +223,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 3, 2016 at 4:05 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22730))
+### **Shai Almog** — June 3, 2016 at 4:05 am ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-22730))
 
 > Shai Almog says:
 >
@@ -232,7 +232,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Akinniranye James** — September 9, 2016 at 8:55 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22881))
+### **Akinniranye James** — September 9, 2016 at 8:55 pm ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-22881))
 
 > Akinniranye James says:
 >
@@ -241,7 +241,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Hristo Vrigazov** — September 11, 2016 at 11:32 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22752))
+### **Hristo Vrigazov** — September 11, 2016 at 11:32 am ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-22752))
 
 > Hristo Vrigazov says:
 >
@@ -258,7 +258,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — September 12, 2016 at 3:34 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-23033))
+### **shannah78** — September 12, 2016 at 3:34 pm ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-23033))
 
 > shannah78 says:
 >
@@ -267,7 +267,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Hristo Vrigazov** — October 23, 2016 at 6:25 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-23135))
+### **Hristo Vrigazov** — October 23, 2016 at 6:25 pm ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-23135))
 
 > Hristo Vrigazov says:
 >
@@ -276,7 +276,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 24, 2016 at 2:17 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22687))
+### **Shai Almog** — October 24, 2016 at 2:17 am ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-22687))
 
 > Shai Almog says:
 >
@@ -287,7 +287,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Hristo Vrigazov** — October 27, 2016 at 1:22 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-21448))
+### **Hristo Vrigazov** — October 27, 2016 at 1:22 pm ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-21448))
 
 > Hristo Vrigazov says:
 >
@@ -300,7 +300,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 28, 2016 at 3:44 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22904))
+### **Shai Almog** — October 28, 2016 at 3:44 am ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-22904))
 
 > Shai Almog says:
 >
@@ -309,7 +309,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Hristo Vrigazov** — November 2, 2016 at 10:15 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-23073))
+### **Hristo Vrigazov** — November 2, 2016 at 10:15 pm ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-23073))
 
 > Hristo Vrigazov says:
 >
@@ -318,7 +318,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — November 3, 2016 at 12:31 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22835))
+### **shannah78** — November 3, 2016 at 12:31 am ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-22835))
 
 > shannah78 says:
 >
@@ -327,7 +327,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Hristo Vrigazov** — November 3, 2016 at 5:31 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-23180))
+### **Hristo Vrigazov** — November 3, 2016 at 5:31 am ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-23180))
 
 > Hristo Vrigazov says:
 >
@@ -352,7 +352,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — November 3, 2016 at 5:41 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22864))
+### **shannah78** — November 3, 2016 at 5:41 pm ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-22864))
 
 > shannah78 says:
 >
@@ -361,7 +361,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Hristo Vrigazov** — November 3, 2016 at 7:49 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-22845))
+### **Hristo Vrigazov** — November 3, 2016 at 7:49 pm ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-22845))
 
 > Hristo Vrigazov says:
 >
@@ -372,7 +372,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — November 4, 2016 at 6:48 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-23184))
+### **shannah78** — November 4, 2016 at 6:48 pm ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-23184))
 
 > shannah78 says:
 >
@@ -381,7 +381,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Hristo Vrigazov** — November 9, 2016 at 5:30 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-23206))
+### **Hristo Vrigazov** — November 9, 2016 at 5:30 pm ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-23206))
 
 > Hristo Vrigazov says:
 >
@@ -390,7 +390,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Artur Hefczyc** — May 4, 2020 at 6:50 pm ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-21400))
+### **Artur Hefczyc** — May 4, 2020 at 6:50 pm ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-21400))
 
 > [Artur Hefczyc](https://avatars3.githubusercontent.com/u/1848738?v=4) says:
 >
@@ -430,7 +430,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 5, 2020 at 5:34 am ([permalink](https://www.codenameone.com/blog/rounded-corners-shadows-and-gradients-with-css.html#comment-21402))
+### **Shai Almog** — May 5, 2020 at 5:34 am ([permalink](/blog/rounded-corners-shadows-and-gradients-with-css/#comment-21402))
 
 > Shai Almog says:
 >

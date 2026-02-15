@@ -106,7 +106,7 @@ I’ll try to post a followup article about the improvements required to make th
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Bayu Sanjaya** — October 11, 2016 at 12:45 pm ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-22952))
+### **Bayu Sanjaya** — October 11, 2016 at 12:45 pm ([permalink](/blog/template-mobile-material-screens-ui-kit/#comment-22952))
 
 > Bayu Sanjaya says:
 >
@@ -115,7 +115,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — October 11, 2016 at 1:03 pm ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-23012))
+### **Chidiebere Okwudire** — October 11, 2016 at 1:03 pm ([permalink](/blog/template-mobile-material-screens-ui-kit/#comment-23012))
 
 > Chidiebere Okwudire says:
 >
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 11, 2016 at 1:32 pm ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-22716))
+### **Shai Almog** — October 11, 2016 at 1:32 pm ([permalink](/blog/template-mobile-material-screens-ui-kit/#comment-22716))
 
 > Shai Almog says:
 >
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **faugan** — October 12, 2016 at 3:02 pm ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-22831))
+### **faugan** — October 12, 2016 at 3:02 pm ([permalink](/blog/template-mobile-material-screens-ui-kit/#comment-22831))
 
 > faugan says:
 >
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 13, 2016 at 2:22 am ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-22805))
+### **Shai Almog** — October 13, 2016 at 2:22 am ([permalink](/blog/template-mobile-material-screens-ui-kit/#comment-22805))
 
 > Shai Almog says:
 >
@@ -162,7 +162,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **faugan** — October 13, 2016 at 9:30 am ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-22882))
+### **faugan** — October 13, 2016 at 9:30 am ([permalink](/blog/template-mobile-material-screens-ui-kit/#comment-22882))
 
 > faugan says:
 >
@@ -171,7 +171,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Adebisi Oladipupo** — February 20, 2017 at 10:03 pm ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-21564))
+### **Adebisi Oladipupo** — February 20, 2017 at 10:03 pm ([permalink](/blog/template-mobile-material-screens-ui-kit/#comment-21564))
 
 > Adebisi Oladipupo says:
 >
@@ -180,16 +180,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 21, 2017 at 7:06 am ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-23148))
+### **Shai Almog** — February 21, 2017 at 7:06 am ([permalink](/blog/template-mobile-material-screens-ui-kit/#comment-23148))
 
 > Shai Almog says:
 >
-> Make sure your plugin is up to date. You don’t need to download it as the material demo (MSUIKit) is available in the new project wizard there. You can also follow this guide on setting up a project from git: [https://www.codenameone.com…](<https://www.codenameone.com/blog/tip-setup-codename-one-demo-from-git.html>)
+> Make sure your plugin is up to date. You don’t need to download it as the material demo (MSUIKit) is available in the new project wizard there. You can also follow this guide on setting up a project from git: [https://www.codenameone.com…](</blog/tip-setup-codename-one-demo-from-git/>)
 >
 
 
 
-### **Adebisi Oladipupo** — February 21, 2017 at 1:57 pm ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-23245))
+### **Adebisi Oladipupo** — February 21, 2017 at 1:57 pm ([permalink](/blog/template-mobile-material-screens-ui-kit/#comment-23245))
 
 > Adebisi Oladipupo says:
 >
@@ -198,7 +198,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 22, 2017 at 7:13 am ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-23387))
+### **Shai Almog** — February 22, 2017 at 7:13 am ([permalink](/blog/template-mobile-material-screens-ui-kit/#comment-23387))
 
 > Shai Almog says:
 >
@@ -207,7 +207,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Adebisi Oladipupo** — February 22, 2017 at 8:42 pm ([permalink](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html#comment-24127))
+### **Adebisi Oladipupo** — February 22, 2017 at 8:42 pm ([permalink](/blog/template-mobile-material-screens-ui-kit/#comment-24127))
 
 > Adebisi Oladipupo says:
 >

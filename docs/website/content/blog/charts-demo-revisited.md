@@ -13,7 +13,7 @@ author: Shai Almog
 
 The charts demo is one of the most elaborate/messy demos we have as it was derived/ported from an  
 [aChartEngine](http://www.achartengine.org/) demo. Since the  
-[Codename One charts](https://www.codenameone.com/javadoc/com/codename1/charts/package-summary.html)  
+[Codename One charts](/javadoc/com/codename1/charts/package-summary/)  
 are themselves a derivative of aChartEngine this makes a lot of sense but the demo is a bit big and hard to  
 follow.
 

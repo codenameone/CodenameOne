@@ -57,7 +57,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — July 4, 2013 at 2:48 am ([permalink](https://www.codenameone.com/blog/the-move-to-java-5-and-new-cloud-e-mail-support.html#comment-21616))
+### **Anonymous** — July 4, 2013 at 2:48 am ([permalink](/blog/the-move-to-java-5-and-new-cloud-e-mail-support/#comment-21616))
 
 > Anonymous says:
 >
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 6, 2013 at 8:52 am ([permalink](https://www.codenameone.com/blog/the-move-to-java-5-and-new-cloud-e-mail-support.html#comment-21928))
+### **Anonymous** — July 6, 2013 at 8:52 am ([permalink](/blog/the-move-to-java-5-and-new-cloud-e-mail-support/#comment-21928))
 
 > Anonymous says:
 >
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 6, 2013 at 9:04 am ([permalink](https://www.codenameone.com/blog/the-move-to-java-5-and-new-cloud-e-mail-support.html#comment-21690))
+### **Anonymous** — July 6, 2013 at 9:04 am ([permalink](/blog/the-move-to-java-5-and-new-cloud-e-mail-support/#comment-21690))
 
 > Anonymous says:
 >

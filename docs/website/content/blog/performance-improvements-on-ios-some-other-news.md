@@ -40,7 +40,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 19, 2013 at 8:08 pm ([permalink](https://www.codenameone.com/blog/performance-improvements-on-ios-some-other-news.html#comment-21931))
+### **Anonymous** — March 19, 2013 at 8:08 pm ([permalink](/blog/performance-improvements-on-ios-some-other-news/#comment-21931))
 
 > Anonymous says:
 >

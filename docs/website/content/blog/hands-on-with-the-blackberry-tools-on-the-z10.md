@@ -125,7 +125,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — June 25, 2013 at 4:57 pm ([permalink](https://www.codenameone.com/blog/hands-on-with-the-blackberry-tools-on-the-z10.html#comment-21879))
+### **Anonymous** — June 25, 2013 at 4:57 pm ([permalink](/blog/hands-on-with-the-blackberry-tools-on-the-z10/#comment-21879))
 
 > Anonymous says:
 >
@@ -134,7 +134,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 2, 2013 at 7:32 am ([permalink](https://www.codenameone.com/blog/hands-on-with-the-blackberry-tools-on-the-z10.html#comment-21870))
+### **Anonymous** — July 2, 2013 at 7:32 am ([permalink](/blog/hands-on-with-the-blackberry-tools-on-the-z10/#comment-21870))
 
 > Anonymous says:
 >
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 4, 2013 at 5:19 pm ([permalink](https://www.codenameone.com/blog/hands-on-with-the-blackberry-tools-on-the-z10.html#comment-21756))
+### **Anonymous** — July 4, 2013 at 5:19 pm ([permalink](/blog/hands-on-with-the-blackberry-tools-on-the-z10/#comment-21756))
 
 > Anonymous says:
 >
@@ -154,7 +154,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 31, 2014 at 3:47 am ([permalink](https://www.codenameone.com/blog/hands-on-with-the-blackberry-tools-on-the-z10.html#comment-21672))
+### **Anonymous** — January 31, 2014 at 3:47 am ([permalink](/blog/hands-on-with-the-blackberry-tools-on-the-z10/#comment-21672))
 
 > Anonymous says:
 >
@@ -163,7 +163,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 31, 2014 at 4:39 am ([permalink](https://www.codenameone.com/blog/hands-on-with-the-blackberry-tools-on-the-z10.html#comment-21954))
+### **Anonymous** — January 31, 2014 at 4:39 am ([permalink](/blog/hands-on-with-the-blackberry-tools-on-the-z10/#comment-21954))
 
 > Anonymous says:
 >
@@ -172,7 +172,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 31, 2014 at 5:40 am ([permalink](https://www.codenameone.com/blog/hands-on-with-the-blackberry-tools-on-the-z10.html#comment-22002))
+### **Anonymous** — January 31, 2014 at 5:40 am ([permalink](/blog/hands-on-with-the-blackberry-tools-on-the-z10/#comment-22002))
 
 > Anonymous says:
 >
@@ -181,7 +181,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — May 1, 2014 at 4:24 am ([permalink](https://www.codenameone.com/blog/hands-on-with-the-blackberry-tools-on-the-z10.html#comment-22086))
+### **Anonymous** — May 1, 2014 at 4:24 am ([permalink](/blog/hands-on-with-the-blackberry-tools-on-the-z10/#comment-22086))
 
 > Anonymous says:
 >

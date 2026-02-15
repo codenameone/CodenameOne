@@ -94,7 +94,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 17, 2014 at 3:22 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22095))
+### **Anonymous** — March 17, 2014 at 3:22 pm ([permalink](/blog/mapping-natively/#comment-22095))
 
 > Anonymous says:
 >
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 17, 2014 at 6:51 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21791))
+### **Anonymous** — March 17, 2014 at 6:51 pm ([permalink](/blog/mapping-natively/#comment-21791))
 
 > Anonymous says:
 >
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 17, 2014 at 8:50 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21723))
+### **Anonymous** — March 17, 2014 at 8:50 pm ([permalink](/blog/mapping-natively/#comment-21723))
 
 > Anonymous says:
 >
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 18, 2014 at 2:59 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21710))
+### **Anonymous** — March 18, 2014 at 2:59 am ([permalink](/blog/mapping-natively/#comment-21710))
 
 > Anonymous says:
 >
@@ -132,7 +132,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 18, 2014 at 3:00 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21724))
+### **Anonymous** — March 18, 2014 at 3:00 am ([permalink](/blog/mapping-natively/#comment-21724))
 
 > Anonymous says:
 >
@@ -141,7 +141,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 20, 2014 at 7:19 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22076))
+### **Anonymous** — March 20, 2014 at 7:19 am ([permalink](/blog/mapping-natively/#comment-22076))
 
 > Anonymous says:
 >
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 20, 2014 at 4:36 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21960))
+### **Anonymous** — March 20, 2014 at 4:36 pm ([permalink](/blog/mapping-natively/#comment-21960))
 
 > Anonymous says:
 >
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 21, 2014 at 1:36 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21883))
+### **Anonymous** — March 21, 2014 at 1:36 pm ([permalink](/blog/mapping-natively/#comment-21883))
 
 > Anonymous says:
 >
@@ -170,7 +170,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 21, 2014 at 1:37 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22057))
+### **Anonymous** — March 21, 2014 at 1:37 pm ([permalink](/blog/mapping-natively/#comment-22057))
 
 > Anonymous says:
 >
@@ -179,7 +179,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 21, 2014 at 2:24 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21875))
+### **Anonymous** — March 21, 2014 at 2:24 pm ([permalink](/blog/mapping-natively/#comment-21875))
 
 > Anonymous says:
 >
@@ -188,7 +188,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 23, 2014 at 7:10 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21932))
+### **Anonymous** — March 23, 2014 at 7:10 am ([permalink](/blog/mapping-natively/#comment-21932))
 
 > Anonymous says:
 >
@@ -197,7 +197,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 23, 2014 at 8:15 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21440))
+### **Anonymous** — March 23, 2014 at 8:15 am ([permalink](/blog/mapping-natively/#comment-21440))
 
 > Anonymous says:
 >
@@ -206,7 +206,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 5, 2014 at 3:22 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21935))
+### **Anonymous** — September 5, 2014 at 3:22 am ([permalink](/blog/mapping-natively/#comment-21935))
 
 > Anonymous says:
 >
@@ -221,7 +221,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 5, 2014 at 12:42 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22132))
+### **Anonymous** — September 5, 2014 at 12:42 pm ([permalink](/blog/mapping-natively/#comment-22132))
 
 > Anonymous says:
 >
@@ -232,7 +232,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 10, 2014 at 3:41 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22292))
+### **Anonymous** — November 10, 2014 at 3:41 am ([permalink](/blog/mapping-natively/#comment-22292))
 
 > Anonymous says:
 >
@@ -243,7 +243,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 26, 2014 at 8:13 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22123))
+### **Anonymous** — November 26, 2014 at 8:13 am ([permalink](/blog/mapping-natively/#comment-22123))
 
 > Anonymous says:
 >
@@ -254,7 +254,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Bobo Collen** — April 8, 2015 at 2:49 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22063))
+### **Bobo Collen** — April 8, 2015 at 2:49 pm ([permalink](/blog/mapping-natively/#comment-22063))
 
 > Bobo Collen says:
 >
@@ -263,7 +263,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 9, 2015 at 5:29 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22109))
+### **Shai Almog** — April 9, 2015 at 5:29 am ([permalink](/blog/mapping-natively/#comment-22109))
 
 > Shai Almog says:
 >
@@ -272,7 +272,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Bobo Collen** — April 13, 2015 at 3:27 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21612))
+### **Bobo Collen** — April 13, 2015 at 3:27 pm ([permalink](/blog/mapping-natively/#comment-21612))
 
 > Bobo Collen says:
 >
@@ -281,7 +281,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 14, 2015 at 5:20 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-24167))
+### **Shai Almog** — April 14, 2015 at 5:20 am ([permalink](/blog/mapping-natively/#comment-24167))
 
 > Shai Almog says:
 >
@@ -290,7 +290,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Marco Grabmüller** — September 13, 2016 at 1:50 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22964))
+### **Marco Grabmüller** — September 13, 2016 at 1:50 pm ([permalink](/blog/mapping-natively/#comment-22964))
 
 > Marco Grabmüller says:
 >
@@ -319,7 +319,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 14, 2016 at 4:33 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23061))
+### **Shai Almog** — September 14, 2016 at 4:33 am ([permalink](/blog/mapping-natively/#comment-23061))
 
 > Shai Almog says:
 >
@@ -330,7 +330,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Marco Grabmüller** — September 14, 2016 at 8:06 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23081))
+### **Marco Grabmüller** — September 14, 2016 at 8:06 am ([permalink](/blog/mapping-natively/#comment-23081))
 
 > Marco Grabmüller says:
 >
@@ -347,7 +347,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **essay writer** — September 19, 2016 at 7:26 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21459))
+### **essay writer** — September 19, 2016 at 7:26 pm ([permalink](/blog/mapping-natively/#comment-21459))
 
 > essay writer says:
 >
@@ -356,7 +356,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Yngve Moe** — September 23, 2016 at 11:09 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23083))
+### **Yngve Moe** — September 23, 2016 at 11:09 pm ([permalink](/blog/mapping-natively/#comment-23083))
 
 > Yngve Moe says:
 >
@@ -365,7 +365,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **youssef abdeen** — December 1, 2016 at 5:25 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-21449))
+### **youssef abdeen** — December 1, 2016 at 5:25 pm ([permalink](/blog/mapping-natively/#comment-21449))
 
 > youssef abdeen says:
 >
@@ -374,7 +374,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 2, 2016 at 5:31 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22754))
+### **Shai Almog** — December 2, 2016 at 5:31 am ([permalink](/blog/mapping-natively/#comment-22754))
 
 > Shai Almog says:
 >
@@ -383,7 +383,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **youssef abdeen** — December 2, 2016 at 11:54 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23248))
+### **youssef abdeen** — December 2, 2016 at 11:54 pm ([permalink](/blog/mapping-natively/#comment-23248))
 
 > youssef abdeen says:
 >
@@ -393,7 +393,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **youssef abdeen** — December 3, 2016 at 12:30 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23103))
+### **youssef abdeen** — December 3, 2016 at 12:30 am ([permalink](/blog/mapping-natively/#comment-23103))
 
 > youssef abdeen says:
 >
@@ -403,7 +403,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 3, 2016 at 9:15 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23117))
+### **Shai Almog** — December 3, 2016 at 9:15 am ([permalink](/blog/mapping-natively/#comment-23117))
 
 > Shai Almog says:
 >
@@ -412,7 +412,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Marco Grabmüller** — December 5, 2016 at 7:31 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23126))
+### **Marco Grabmüller** — December 5, 2016 at 7:31 am ([permalink](/blog/mapping-natively/#comment-23126))
 
 > Marco Grabmüller says:
 >
@@ -434,7 +434,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 6, 2016 at 5:27 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23255))
+### **Shai Almog** — December 6, 2016 at 5:27 am ([permalink](/blog/mapping-natively/#comment-23255))
 
 > Shai Almog says:
 >
@@ -445,7 +445,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Marco Grabmüller** — December 6, 2016 at 8:19 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23264))
+### **Marco Grabmüller** — December 6, 2016 at 8:19 am ([permalink](/blog/mapping-natively/#comment-23264))
 
 > Marco Grabmüller says:
 >
@@ -470,7 +470,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 7, 2016 at 6:39 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23086))
+### **Shai Almog** — December 7, 2016 at 6:39 am ([permalink](/blog/mapping-natively/#comment-23086))
 
 > Shai Almog says:
 >
@@ -483,7 +483,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **youssef abdeen** — December 8, 2016 at 8:39 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22956))
+### **youssef abdeen** — December 8, 2016 at 8:39 pm ([permalink](/blog/mapping-natively/#comment-22956))
 
 > youssef abdeen says:
 >
@@ -493,7 +493,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 9, 2016 at 7:37 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23015))
+### **Shai Almog** — December 9, 2016 at 7:37 am ([permalink](/blog/mapping-natively/#comment-23015))
 
 > Shai Almog says:
 >
@@ -502,7 +502,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Stephen Michael** — January 18, 2017 at 6:13 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23069))
+### **Stephen Michael** — January 18, 2017 at 6:13 pm ([permalink](/blog/mapping-natively/#comment-23069))
 
 > Stephen Michael says:
 >
@@ -511,7 +511,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 19, 2017 at 6:18 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23088))
+### **Shai Almog** — January 19, 2017 at 6:18 am ([permalink](/blog/mapping-natively/#comment-23088))
 
 > Shai Almog says:
 >
@@ -521,7 +521,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Terry Wilkinson** — February 2, 2017 at 8:21 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23302))
+### **Terry Wilkinson** — February 2, 2017 at 8:21 pm ([permalink](/blog/mapping-natively/#comment-23302))
 
 > Terry Wilkinson says:
 >
@@ -543,7 +543,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 3, 2017 at 7:42 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23076))
+### **Shai Almog** — February 3, 2017 at 7:42 am ([permalink](/blog/mapping-natively/#comment-23076))
 
 > Shai Almog says:
 >
@@ -553,7 +553,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Terry Wilkinson** — February 3, 2017 at 5:01 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-24245))
+### **Terry Wilkinson** — February 3, 2017 at 5:01 pm ([permalink](/blog/mapping-natively/#comment-24245))
 
 > Terry Wilkinson says:
 >
@@ -564,7 +564,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 4, 2017 at 8:18 am ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-23209))
+### **Shai Almog** — February 4, 2017 at 8:18 am ([permalink](/blog/mapping-natively/#comment-23209))
 
 > Shai Almog says:
 >
@@ -573,7 +573,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Terry Wilkinson** — February 4, 2017 at 1:42 pm ([permalink](https://www.codenameone.com/blog/mapping-natively.html#comment-22822))
+### **Terry Wilkinson** — February 4, 2017 at 1:42 pm ([permalink](/blog/mapping-natively/#comment-22822))
 
 > Terry Wilkinson says:
 >

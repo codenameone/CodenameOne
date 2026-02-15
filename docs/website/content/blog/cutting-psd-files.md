@@ -89,7 +89,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — September 30, 2013 at 3:28 am ([permalink](https://www.codenameone.com/blog/cutting-psd-files.html#comment-21890))
+### **Anonymous** — September 30, 2013 at 3:28 am ([permalink](/blog/cutting-psd-files/#comment-21890))
 
 > Anonymous says:
 >

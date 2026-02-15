@@ -41,7 +41,7 @@ This isn’t quite a Codename One feature but it’s a huge change to the way we
 
 Those were the highlights but there were also a few important smaller features. There are too many to list but here are some that you might find interesting:
 
-→ [Sign in with Apple Support](https://www.codenameone.com/blog/sign-in-with-apple-support.html) – this also includes some improvements to the OAuth support
+→ [Sign in with Apple Support](/blog/sign-in-with-apple-support/) – this also includes some improvements to the OAuth support
 
 → New [KitchenSink](https://play.google.com/store/apps/details?id=com.codename1.demos.kitchen) Demo
 
@@ -53,7 +53,7 @@ Those were the highlights but there were also a few important smaller features. 
 
 → [Dark Mode API](/blog/dark-mode.html)
 
-→ [Sheet Component](https://www.codenameone.com/blog/sheet-positions.html)
+→ [Sheet Component](/blog/sheet-positions/)
 
 → [SpanMultiButton Component](https://github.com/codenameone/CodenameOne/commit/b5863f65be564756680a97b1aa90df68a9edfc10)
 
@@ -71,7 +71,7 @@ Those were the highlights but there were also a few important smaller features. 
 
 → [Radar Chart](https://github.com/codenameone/CodenameOne/commit/675a0ca5018705d5080f1ce393f107a4deedb305)
 
-→ [Async Media](https://www.codenameone.com/blog/media-async-play-and-pause-support.html)
+→ [Async Media](/blog/media-async-play-and-pause-support/)
 
 ### Moving Forward
 
@@ -94,13 +94,13 @@ Finally, we intend to make it easier to build Codename One from sources and work
 If you think we are doing a good job and appreciate our help, please help us by:  
   
 
-– [Spreading the word](https://www.codenameone.com/blog/how-you-can-help-spread-codenameone.html)
+– [Spreading the word](/blog/how-you-can-help-spread-codenameone/)
 
-– [Edit our docs](https://www.codenameone.com/blog/tip-edit-docs-fun-profit.html)
+– [Edit our docs](/blog/tip-edit-docs-fun-profit/)
 
-– [Edit our sources and submit bug fixes](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html)
+– [Edit our sources and submit bug fixes](/blog/how-to-use-the-codename-one-sources/)
 
-[– Signup/Upgrade](https://www.codenameone.com/pricing.html) your account
+[– Signup/Upgrade](/pricing/) your account
 
 If your company can afford it, please take the time and upgrade to enterprise, this will allow us to work on the things that are important for your company!
 
@@ -112,7 +112,7 @@ Thanks for reading this far and if you have any thoughts/suggestions of any kind
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Javier Anton** — February 6, 2021 at 11:15 pm ([permalink](https://www.codenameone.com/blog/introducing-codename-one-7-0-aka-video.html#comment-24400))
+### **Javier Anton** — February 6, 2021 at 11:15 pm ([permalink](/blog/introducing-codename-one-7-0-aka-video/#comment-24400))
 
 > Javier Anton says:
 >
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **IMIENS CORP** — February 9, 2021 at 8:26 am ([permalink](https://www.codenameone.com/blog/introducing-codename-one-7-0-aka-video.html#comment-24407))
+### **IMIENS CORP** — February 9, 2021 at 8:26 am ([permalink](/blog/introducing-codename-one-7-0-aka-video/#comment-24407))
 
 > IMIENS CORP says:
 >
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **IMIENS CORP** — February 9, 2021 at 8:33 am ([permalink](https://www.codenameone.com/blog/introducing-codename-one-7-0-aka-video.html#comment-24408))
+### **IMIENS CORP** — February 9, 2021 at 8:33 am ([permalink](/blog/introducing-codename-one-7-0-aka-video/#comment-24408))
 
 > IMIENS CORP says:
 >
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 10, 2021 at 2:06 am ([permalink](https://www.codenameone.com/blog/introducing-codename-one-7-0-aka-video.html#comment-24409))
+### **Shai Almog** — February 10, 2021 at 2:06 am ([permalink](/blog/introducing-codename-one-7-0-aka-video/#comment-24409))
 
 > Shai Almog says:
 >

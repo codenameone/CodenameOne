@@ -36,7 +36,7 @@ this time around.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Alexandre Richonnier** — March 28, 2015 at 1:24 pm ([permalink](https://www.codenameone.com/blog/github-migration-plan.html#comment-22248))
+### **Alexandre Richonnier** — March 28, 2015 at 1:24 pm ([permalink](/blog/github-migration-plan/#comment-22248))
 
 > Alexandre Richonnier says:
 >
@@ -47,7 +47,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 28, 2015 at 3:01 pm ([permalink](https://www.codenameone.com/blog/github-migration-plan.html#comment-22261))
+### **Shai Almog** — March 28, 2015 at 3:01 pm ([permalink](/blog/github-migration-plan/#comment-22261))
 
 > Shai Almog says:
 >
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **cvconover** — August 11, 2015 at 12:58 pm ([permalink](https://www.codenameone.com/blog/github-migration-plan.html#comment-22435))
+### **cvconover** — August 11, 2015 at 12:58 pm ([permalink](/blog/github-migration-plan/#comment-22435))
 
 > cvconover says:
 >
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 11, 2015 at 2:02 pm ([permalink](https://www.codenameone.com/blog/github-migration-plan.html#comment-21545))
+### **Shai Almog** — August 11, 2015 at 2:02 pm ([permalink](/blog/github-migration-plan/#comment-21545))
 
 > Shai Almog says:
 >

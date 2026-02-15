@@ -73,7 +73,7 @@ We’re not done yet. You’ll see more improvements trickling in over the next 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Antonio Rios** — April 9, 2022 at 7:32 pm ([permalink](https://www.codenameone.com/blog/new-property-sheet-and-javadocs.html#comment-24532))
+### **Antonio Rios** — April 9, 2022 at 7:32 pm ([permalink](/blog/new-property-sheet-and-javadocs/#comment-24532))
 
 > Antonio Rios says:
 >

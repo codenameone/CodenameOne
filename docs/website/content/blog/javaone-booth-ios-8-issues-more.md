@@ -63,7 +63,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 16, 2014 at 12:01 am ([permalink](https://www.codenameone.com/blog/javaone-booth-ios-8-issues-more.html#comment-22155))
+### **Anonymous** — October 16, 2014 at 12:01 am ([permalink](/blog/javaone-booth-ios-8-issues-more/#comment-22155))
 
 > Anonymous says:
 >
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 16, 2014 at 9:21 am ([permalink](https://www.codenameone.com/blog/javaone-booth-ios-8-issues-more.html#comment-21447))
+### **Anonymous** — October 16, 2014 at 9:21 am ([permalink](/blog/javaone-booth-ios-8-issues-more/#comment-21447))
 
 > Anonymous says:
 >
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 16, 2014 at 2:10 pm ([permalink](https://www.codenameone.com/blog/javaone-booth-ios-8-issues-more.html#comment-22271))
+### **Anonymous** — October 16, 2014 at 2:10 pm ([permalink](/blog/javaone-booth-ios-8-issues-more/#comment-22271))
 
 > Anonymous says:
 >
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 17, 2014 at 3:06 pm ([permalink](https://www.codenameone.com/blog/javaone-booth-ios-8-issues-more.html#comment-22088))
+### **Anonymous** — October 17, 2014 at 3:06 pm ([permalink](/blog/javaone-booth-ios-8-issues-more/#comment-22088))
 
 > Anonymous says:
 >
@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 17, 2014 at 10:28 pm ([permalink](https://www.codenameone.com/blog/javaone-booth-ios-8-issues-more.html#comment-22015))
+### **Anonymous** — October 17, 2014 at 10:28 pm ([permalink](/blog/javaone-booth-ios-8-issues-more/#comment-22015))
 
 > Anonymous says:
 >

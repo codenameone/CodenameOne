@@ -65,7 +65,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — December 9, 2013 at 11:42 am ([permalink](https://www.codenameone.com/blog/new-how-do-i-idea-launch-expanded-developer-guide.html#comment-22047))
+### **Anonymous** — December 9, 2013 at 11:42 am ([permalink](/blog/new-how-do-i-idea-launch-expanded-developer-guide/#comment-22047))
 
 > Anonymous says:
 >
@@ -76,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 10, 2013 at 5:15 am ([permalink](https://www.codenameone.com/blog/new-how-do-i-idea-launch-expanded-developer-guide.html#comment-21974))
+### **Anonymous** — December 10, 2013 at 5:15 am ([permalink](/blog/new-how-do-i-idea-launch-expanded-developer-guide/#comment-21974))
 
 > Anonymous says:
 >
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 12, 2013 at 4:37 am ([permalink](https://www.codenameone.com/blog/new-how-do-i-idea-launch-expanded-developer-guide.html#comment-21669))
+### **Anonymous** — December 12, 2013 at 4:37 am ([permalink](/blog/new-how-do-i-idea-launch-expanded-developer-guide/#comment-21669))
 
 > Anonymous says:
 >
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 12, 2013 at 4:55 am ([permalink](https://www.codenameone.com/blog/new-how-do-i-idea-launch-expanded-developer-guide.html#comment-21945))
+### **Anonymous** — December 12, 2013 at 4:55 am ([permalink](/blog/new-how-do-i-idea-launch-expanded-developer-guide/#comment-21945))
 
 > Anonymous says:
 >
@@ -107,7 +107,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 12, 2013 at 6:22 am ([permalink](https://www.codenameone.com/blog/new-how-do-i-idea-launch-expanded-developer-guide.html#comment-21670))
+### **Anonymous** — December 12, 2013 at 6:22 am ([permalink](/blog/new-how-do-i-idea-launch-expanded-developer-guide/#comment-21670))
 
 > Anonymous says:
 >
@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 12, 2013 at 5:38 pm ([permalink](https://www.codenameone.com/blog/new-how-do-i-idea-launch-expanded-developer-guide.html#comment-21742))
+### **Anonymous** — December 12, 2013 at 5:38 pm ([permalink](/blog/new-how-do-i-idea-launch-expanded-developer-guide/#comment-21742))
 
 > Anonymous says:
 >

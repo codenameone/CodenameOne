@@ -45,7 +45,7 @@ __ |  This pretty much shows off the benefit of having a native framework vs. th
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Ross Taylor** — June 16, 2016 at 7:44 pm ([permalink](https://www.codenameone.com/blog/dr-sbaitso-revisited.html#comment-21630))
+### **Ross Taylor** — June 16, 2016 at 7:44 pm ([permalink](/blog/dr-sbaitso-revisited/#comment-21630))
 
 > Ross Taylor says:
 >
@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 17, 2016 at 3:44 am ([permalink](https://www.codenameone.com/blog/dr-sbaitso-revisited.html#comment-22697))
+### **Shai Almog** — June 17, 2016 at 3:44 am ([permalink](/blog/dr-sbaitso-revisited/#comment-22697))
 
 > Shai Almog says:
 >
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ssybesma** — December 30, 2016 at 3:43 am ([permalink](https://www.codenameone.com/blog/dr-sbaitso-revisited.html#comment-23137))
+### **ssybesma** — December 30, 2016 at 3:43 am ([permalink](/blog/dr-sbaitso-revisited/#comment-23137))
 
 > ssybesma says:
 >
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 30, 2016 at 5:20 am ([permalink](https://www.codenameone.com/blog/dr-sbaitso-revisited.html#comment-23256))
+### **Shai Almog** — December 30, 2016 at 5:20 am ([permalink](/blog/dr-sbaitso-revisited/#comment-23256))
 
 > Shai Almog says:
 >
@@ -88,7 +88,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ssybesma** — December 30, 2016 at 6:03 am ([permalink](https://www.codenameone.com/blog/dr-sbaitso-revisited.html#comment-23301))
+### **ssybesma** — December 30, 2016 at 6:03 am ([permalink](/blog/dr-sbaitso-revisited/#comment-23301))
 
 > ssybesma says:
 >
@@ -97,7 +97,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 31, 2016 at 12:16 pm ([permalink](https://www.codenameone.com/blog/dr-sbaitso-revisited.html#comment-23075))
+### **Shai Almog** — December 31, 2016 at 12:16 pm ([permalink](/blog/dr-sbaitso-revisited/#comment-23075))
 
 > Shai Almog says:
 >

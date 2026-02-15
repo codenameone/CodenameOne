@@ -83,7 +83,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 27, 2013 at 7:36 am ([permalink](https://www.codenameone.com/blog/why-oracle-wont-issue-java-for-ios-anytime-soon.html#comment-21773))
+### **Anonymous** — January 27, 2013 at 7:36 am ([permalink](/blog/why-oracle-wont-issue-java-for-ios-anytime-soon/#comment-21773))
 
 > Anonymous says:
 >
@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 11, 2013 at 8:17 pm ([permalink](https://www.codenameone.com/blog/why-oracle-wont-issue-java-for-ios-anytime-soon.html#comment-24250))
+### **Anonymous** — February 11, 2013 at 8:17 pm ([permalink](/blog/why-oracle-wont-issue-java-for-ios-anytime-soon/#comment-24250))
 
 > Anonymous says:
 >
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 12, 2013 at 2:04 am ([permalink](https://www.codenameone.com/blog/why-oracle-wont-issue-java-for-ios-anytime-soon.html#comment-21806))
+### **Anonymous** — February 12, 2013 at 2:04 am ([permalink](/blog/why-oracle-wont-issue-java-for-ios-anytime-soon/#comment-21806))
 
 > Anonymous says:
 >
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — May 14, 2014 at 3:50 am ([permalink](https://www.codenameone.com/blog/why-oracle-wont-issue-java-for-ios-anytime-soon.html#comment-21797))
+### **Anonymous** — May 14, 2014 at 3:50 am ([permalink](/blog/why-oracle-wont-issue-java-for-ios-anytime-soon/#comment-21797))
 
 > Anonymous says:
 >

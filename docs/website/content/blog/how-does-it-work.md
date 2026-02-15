@@ -108,14 +108,14 @@ Thanks again for all the great feedback, comments & votes. They are all highly a
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — June 22, 2017 at 12:22 pm ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-21426))
+### **Francesco Galgani** — June 22, 2017 at 12:22 pm ([permalink](/blog/how-does-it-work/#comment-21426))
 
 > Thank you!
 >
 
 
 
-### **Jérémy MARQUER** — June 22, 2017 at 1:32 pm ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-23386))
+### **Jérémy MARQUER** — June 22, 2017 at 1:32 pm ([permalink](/blog/how-does-it-work/#comment-23386))
 
 > Jérémy MARQUER says:
 >
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Dalvik** — June 22, 2017 at 2:26 pm ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-23476))
+### **Dalvik** — June 22, 2017 at 2:26 pm ([permalink](/blog/how-does-it-work/#comment-23476))
 
 > Dalvik says:
 >
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 22, 2017 at 2:52 pm ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-23507))
+### **Shai Almog** — June 22, 2017 at 2:52 pm ([permalink](/blog/how-does-it-work/#comment-23507))
 
 > Shai Almog says:
 >
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Manuel Tijerino** — June 22, 2017 at 9:32 pm ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-24217))
+### **Manuel Tijerino** — June 22, 2017 at 9:32 pm ([permalink](/blog/how-does-it-work/#comment-24217))
 
 > Manuel Tijerino says:
 >
@@ -170,7 +170,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 23, 2017 at 4:36 am ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-23323))
+### **Shai Almog** — June 23, 2017 at 4:36 am ([permalink](/blog/how-does-it-work/#comment-23323))
 
 > Shai Almog says:
 >
@@ -181,7 +181,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **james agada** — June 23, 2017 at 12:16 pm ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-22074))
+### **james agada** — June 23, 2017 at 12:16 pm ([permalink](/blog/how-does-it-work/#comment-22074))
 
 > james agada says:
 >
@@ -190,7 +190,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lukman Javalove Idealist Jaji** — June 23, 2017 at 11:16 pm ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-23412))
+### **Lukman Javalove Idealist Jaji** — June 23, 2017 at 11:16 pm ([permalink](/blog/how-does-it-work/#comment-23412))
 
 > Lukman Javalove Idealist Jaji says:
 >
@@ -199,7 +199,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 24, 2017 at 5:12 am ([permalink](https://www.codenameone.com/blog/how-does-it-work.html#comment-23452))
+### **Shai Almog** — June 24, 2017 at 5:12 am ([permalink](/blog/how-does-it-work/#comment-23452))
 
 > Shai Almog says:
 >

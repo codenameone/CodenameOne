@@ -128,7 +128,7 @@ Javascript (Android) |  Yes |  Yes |  Yes |  No
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Gareth Murfin** — July 10, 2019 at 3:34 pm ([permalink](https://www.codenameone.com/blog/video-capture-constraints.html#comment-24059))
+### **Gareth Murfin** — July 10, 2019 at 3:34 pm ([permalink](/blog/video-capture-constraints/#comment-24059))
 
 > Gareth Murfin says:
 >

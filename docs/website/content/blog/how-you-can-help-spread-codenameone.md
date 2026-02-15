@@ -50,7 +50,7 @@ Let us know if you have ideas how to improve the site and engage with us. Try to
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Hristo Vrigazov** — December 2, 2016 at 6:21 pm ([permalink](https://www.codenameone.com/blog/how-you-can-help-spread-codenameone.html#comment-24229))
+### **Hristo Vrigazov** — December 2, 2016 at 6:21 pm ([permalink](/blog/how-you-can-help-spread-codenameone/#comment-24229))
 
 > Hristo Vrigazov says:
 >
@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jaco Dt** — February 2, 2017 at 6:07 am ([permalink](https://www.codenameone.com/blog/how-you-can-help-spread-codenameone.html#comment-23138))
+### **Jaco Dt** — February 2, 2017 at 6:07 am ([permalink](/blog/how-you-can-help-spread-codenameone/#comment-23138))
 
 > Jaco Dt says:
 >
@@ -68,7 +68,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — August 28, 2017 at 2:44 am ([permalink](https://www.codenameone.com/blog/how-you-can-help-spread-codenameone.html#comment-23471))
+### **Francesco Galgani** — August 28, 2017 at 2:44 am ([permalink](/blog/how-you-can-help-spread-codenameone/#comment-23471))
 
 > Francesco Galgani says:
 >

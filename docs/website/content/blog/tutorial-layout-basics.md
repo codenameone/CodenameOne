@@ -15,7 +15,7 @@ Layouts are one of the hardest subjects to grasp in Codename One, there is a lot
 
 Ideally, I’ll follow up with a more “pragmatic” video of layouts that will build on top of this video to explain how common layouts are achieved.
 
-To learn more about layouts you can check out the [layout gallery](https://www.codenameone.com/javadoc/com/codename1/ui/layouts/package-summary.html) in the JavaDocs and dig into an individual layout. Because this is very heavily documented I didn’t add additional writeup besides the video.
+To learn more about layouts you can check out the [layout gallery](/javadoc/com/codename1/ui/layouts/package-summary/) in the JavaDocs and dig into an individual layout. Because this is very heavily documented I didn’t add additional writeup besides the video.
 
 ---
 

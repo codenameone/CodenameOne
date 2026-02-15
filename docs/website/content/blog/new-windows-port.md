@@ -101,14 +101,14 @@ we’ll send them out to pasture.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Fabrício Cabeça** — April 4, 2016 at 6:40 pm ([permalink](https://www.codenameone.com/blog/new-windows-port.html#comment-22432))
+### **Fabrício Cabeça** — April 4, 2016 at 6:40 pm ([permalink](/blog/new-windows-port/#comment-22432))
 
 > Fabrício Cabeça says:
 >
 > This is great news indeed ! About supporting Windows 8.1 onwards we already accomplished this in our port, I will try to provide this support in your port. Many devices are still 8.1 and there are devices that are not going to receive the Windows 10 update.
 
 
-### **Chidiebere Okwudire** — April 5, 2016 at 7:33 am ([permalink](https://www.codenameone.com/blog/new-windows-port.html#comment-22720))
+### **Chidiebere Okwudire** — April 5, 2016 at 7:33 am ([permalink](/blog/new-windows-port/#comment-22720))
 
 > Chidiebere Okwudire says:
 >

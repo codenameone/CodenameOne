@@ -29,7 +29,7 @@ This is something we hope to remedy now that with the results of our recent effo
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **beck** — February 17, 2017 at 6:26 pm ([permalink](https://www.codenameone.com/blog/questions-of-the-week-43.html#comment-23278))
+### **beck** — February 17, 2017 at 6:26 pm ([permalink](/blog/questions-of-the-week-43/#comment-23278))
 
 > beck says:
 >

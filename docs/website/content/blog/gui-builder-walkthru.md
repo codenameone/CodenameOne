@@ -113,7 +113,7 @@ The Java code to match that is:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Clement Levallois** — October 15, 2015 at 6:07 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-21486))
+### **Clement Levallois** — October 15, 2015 at 6:07 am ([permalink](/blog/gui-builder-walkthru/#comment-21486))
 
 > Clement Levallois says:
 >
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 15, 2015 at 6:39 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22502))
+### **Shai Almog** — October 15, 2015 at 6:39 am ([permalink](/blog/gui-builder-walkthru/#comment-22502))
 
 > Shai Almog says:
 >
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **mtran** — October 16, 2015 at 2:49 pm ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-21479))
+### **mtran** — October 16, 2015 at 2:49 pm ([permalink](/blog/gui-builder-walkthru/#comment-21479))
 
 > mtran says:
 >
@@ -145,7 +145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 17, 2015 at 4:31 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22142))
+### **Shai Almog** — October 17, 2015 at 4:31 am ([permalink](/blog/gui-builder-walkthru/#comment-22142))
 
 > Shai Almog says:
 >
@@ -154,7 +154,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jeremy** — October 18, 2015 at 2:38 pm ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-24193))
+### **Jeremy** — October 18, 2015 at 2:38 pm ([permalink](/blog/gui-builder-walkthru/#comment-24193))
 
 > Jeremy says:
 >
@@ -163,7 +163,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 19, 2015 at 2:17 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22341))
+### **Shai Almog** — October 19, 2015 at 2:17 am ([permalink](/blog/gui-builder-walkthru/#comment-22341))
 
 > Shai Almog says:
 >
@@ -174,7 +174,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — October 29, 2015 at 3:48 pm ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22511))
+### **Chidiebere Okwudire** — October 29, 2015 at 3:48 pm ([permalink](/blog/gui-builder-walkthru/#comment-22511))
 
 > Chidiebere Okwudire says:
 >
@@ -185,7 +185,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 30, 2015 at 5:04 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22254))
+### **Shai Almog** — October 30, 2015 at 5:04 am ([permalink](/blog/gui-builder-walkthru/#comment-22254))
 
 > Shai Almog says:
 >
@@ -198,7 +198,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bledi** — October 31, 2015 at 4:52 pm ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22495))
+### **bledi** — October 31, 2015 at 4:52 pm ([permalink](/blog/gui-builder-walkthru/#comment-22495))
 
 > bledi says:
 >
@@ -208,7 +208,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 1, 2015 at 4:27 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22437))
+### **Shai Almog** — November 1, 2015 at 4:27 am ([permalink](/blog/gui-builder-walkthru/#comment-22437))
 
 > Shai Almog says:
 >
@@ -218,7 +218,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bledi** — November 1, 2015 at 11:01 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-21487))
+### **bledi** — November 1, 2015 at 11:01 am ([permalink](/blog/gui-builder-walkthru/#comment-21487))
 
 > bledi says:
 >
@@ -227,7 +227,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Dan** — November 5, 2015 at 3:16 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22267))
+### **Dan** — November 5, 2015 at 3:16 am ([permalink](/blog/gui-builder-walkthru/#comment-22267))
 
 > Dan says:
 >
@@ -236,7 +236,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 6, 2015 at 4:26 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22438))
+### **Shai Almog** — November 6, 2015 at 4:26 am ([permalink](/blog/gui-builder-walkthru/#comment-22438))
 
 > Shai Almog says:
 >
@@ -246,7 +246,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Yaakov Gesher** — November 8, 2015 at 7:28 am ([permalink](https://www.codenameone.com/blog/gui-builder-walkthru.html#comment-22530))
+### **Yaakov Gesher** — November 8, 2015 at 7:28 am ([permalink](/blog/gui-builder-walkthru/#comment-22530))
 
 > Yaakov Gesher says:
 >

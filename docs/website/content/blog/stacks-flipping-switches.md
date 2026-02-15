@@ -60,7 +60,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — August 28, 2014 at 8:46 am ([permalink](https://www.codenameone.com/blog/stacks-flipping-switches.html#comment-22187))
+### **Anonymous** — August 28, 2014 at 8:46 am ([permalink](/blog/stacks-flipping-switches/#comment-22187))
 
 > Anonymous says:
 >
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — August 28, 2014 at 4:13 pm ([permalink](https://www.codenameone.com/blog/stacks-flipping-switches.html#comment-22223))
+### **Anonymous** — August 28, 2014 at 4:13 pm ([permalink](/blog/stacks-flipping-switches/#comment-22223))
 
 > Anonymous says:
 >

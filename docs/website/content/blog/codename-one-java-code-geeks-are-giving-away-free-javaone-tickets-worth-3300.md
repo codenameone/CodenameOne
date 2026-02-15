@@ -82,7 +82,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — July 9, 2014 at 7:17 am ([permalink](https://www.codenameone.com/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html#comment-21437))
+### **Anonymous** — July 9, 2014 at 7:17 am ([permalink](/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300/#comment-21437))
 
 > Anonymous says:
 >
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 9, 2014 at 11:37 am ([permalink](https://www.codenameone.com/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html#comment-21732))
+### **Anonymous** — July 9, 2014 at 11:37 am ([permalink](/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300/#comment-21732))
 
 > Anonymous says:
 >
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 9, 2014 at 7:22 pm ([permalink](https://www.codenameone.com/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html#comment-22078))
+### **Anonymous** — July 9, 2014 at 7:22 pm ([permalink](/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300/#comment-22078))
 
 > Anonymous says:
 >
@@ -115,7 +115,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 10, 2014 at 1:41 am ([permalink](https://www.codenameone.com/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html#comment-22186))
+### **Anonymous** — July 10, 2014 at 1:41 am ([permalink](/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300/#comment-22186))
 
 > Anonymous says:
 >
@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 10, 2014 at 2:36 pm ([permalink](https://www.codenameone.com/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html#comment-21934))
+### **Anonymous** — July 10, 2014 at 2:36 pm ([permalink](/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300/#comment-21934))
 
 > Anonymous says:
 >
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 11, 2014 at 1:35 am ([permalink](https://www.codenameone.com/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html#comment-21985))
+### **Anonymous** — July 11, 2014 at 1:35 am ([permalink](/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300/#comment-21985))
 
 > Anonymous says:
 >
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 11, 2014 at 9:21 pm ([permalink](https://www.codenameone.com/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300.html#comment-21970))
+### **Anonymous** — July 11, 2014 at 9:21 pm ([permalink](/blog/codename-one-java-code-geeks-are-giving-away-free-javaone-tickets-worth-3300/#comment-21970))
 
 > Anonymous says:
 >

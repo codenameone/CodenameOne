@@ -37,7 +37,7 @@ Thanks!
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Michael Lindvall** — July 25, 2017 at 2:20 pm ([permalink](https://www.codenameone.com/blog/course-updates.html#comment-23470))
+### **Michael Lindvall** — July 25, 2017 at 2:20 pm ([permalink](/blog/course-updates/#comment-23470))
 
 > Michael Lindvall says:
 >
@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 9, 2017 at 8:04 am ([permalink](https://www.codenameone.com/blog/course-updates.html#comment-23720))
+### **Shai Almog** — August 9, 2017 at 8:04 am ([permalink](/blog/course-updates/#comment-23720))
 
 > Shai Almog says:
 >

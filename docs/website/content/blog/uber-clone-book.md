@@ -27,7 +27,7 @@ While the writing itself is quite easy the production aspect is a pain in the ne
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — June 16, 2018 at 6:10 am ([permalink](https://www.codenameone.com/blog/uber-clone-book.html#comment-23864))
+### **Francesco Galgani** — June 16, 2018 at 6:10 am ([permalink](/blog/uber-clone-book/#comment-23864))
 
 > Francesco Galgani says:
 >

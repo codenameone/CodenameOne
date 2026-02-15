@@ -108,7 +108,7 @@ Your browser does not support the video tag.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — February 8, 2020 at 7:21 am ([permalink](https://www.codenameone.com/blog/data-loading-placeholders.html#comment-21378))
+### **Francesco Galgani** — February 8, 2020 at 7:21 am ([permalink](/blog/data-loading-placeholders/#comment-21378))
 
 > [Francesco Galgani](https://lh6.googleusercontent.com/-4K0ax_DVJf4/AAAAAAAAAAI/AAAAAAAAAAA/AMZuuckEd1kcni0y8k6NMzNtxwOCEPatQQ/photo.jpg) says:
 >
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — February 10, 2020 at 12:49 pm ([permalink](https://www.codenameone.com/blog/data-loading-placeholders.html#comment-21382))
+### **Steve Hannah** — February 10, 2020 at 12:49 pm ([permalink](/blog/data-loading-placeholders/#comment-21382))
 
 > [Steve Hannah](https://lh3.googleusercontent.com/a-/AAuE7mBmUCgKSZtJ2cqeHgj6bdPY2AAQ10roHlMpgRWc) says:
 >

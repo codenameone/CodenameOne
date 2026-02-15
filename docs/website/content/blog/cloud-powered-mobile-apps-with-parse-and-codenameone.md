@@ -11,7 +11,7 @@ author: Steve Hannah
 
 ![Header Image](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/parse.com-post-header.jpg)
 
-A couple of weeks ago I created a [simple social network app](https://github.com/shannah/social-network) as part of the [Codename One webinar](https://www.codenameone.com/blog/java-mobile-dev-webinar-recap.html). This app provided functionality similar to the Facebook app.
+A couple of weeks ago I created a [simple social network app](https://github.com/shannah/social-network) as part of the [Codename One webinar](/blog/java-mobile-dev-webinar-recap/). This app provided functionality similar to the Facebook app.
 
   1. Send and Accept friend requests
 
@@ -686,7 +686,7 @@ I have posted an Android build of this app so you can install it directly on you
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — September 9, 2015 at 10:28 am ([permalink](https://www.codenameone.com/blog/cloud-powered-mobile-apps-with-parse-and-codenameone.html#comment-22453))
+### **Chidiebere Okwudire** — September 9, 2015 at 10:28 am ([permalink](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/#comment-22453))
 
 > Interesting tutorial…
 >
@@ -697,7 +697,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — September 9, 2015 at 3:57 pm ([permalink](https://www.codenameone.com/blog/cloud-powered-mobile-apps-with-parse-and-codenameone.html#comment-21560))
+### **shannah78** — September 9, 2015 at 3:57 pm ([permalink](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/#comment-21560))
 
 > “Security is inconvenient”, said Ashley Madison. The difficulty in securing an application increases exponentially with the number of access points. If you allow CRUD directly client side — or even just “R” — then you effectively have hundreds or thousands of access points (or millions depending on how you count). If your app has only a handful of “functions” though, you can limit the access point to just that handful and you can easily secure each point manually.
 >
@@ -710,7 +710,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 9, 2015 at 4:24 pm ([permalink](https://www.codenameone.com/blog/cloud-powered-mobile-apps-with-parse-and-codenameone.html#comment-22462))
+### **Shai Almog** — September 9, 2015 at 4:24 pm ([permalink](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/#comment-22462))
 
 > While I generally agree with all your points I wrote the app for my spouses yoga studio using this CRUD API on top of Parse.  
 > I can live with one lock (the parse keys) and since this isn’t an app for global distribution the chances of these getting hacked are pretty low. The fact that this isn’t a database of interest for hackers also makes it a safe choice.
@@ -724,7 +724,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — September 9, 2015 at 4:54 pm ([permalink](https://www.codenameone.com/blog/cloud-powered-mobile-apps-with-parse-and-codenameone.html#comment-22471))
+### **shannah78** — September 9, 2015 at 4:54 pm ([permalink](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/#comment-22471))
 
 > Definitely agree that level of interest to hackers should be taken into consideration. The question I usually ask myself is “how bad would it be if this database were leaked to the world”. If the answer is anything worse than “it would be perfectly fine”, then designing for security should be top priority. That said, it *is* possible to write a secure app using the client-side CRUD API. It is just much harder. It requires a comprehensive understanding of Parse’s system – and also a lot more thought at each step of database design.
 >
@@ -733,7 +733,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — September 10, 2015 at 9:09 am ([permalink](https://www.codenameone.com/blog/cloud-powered-mobile-apps-with-parse-and-codenameone.html#comment-22413))
+### **Chidiebere Okwudire** — September 10, 2015 at 9:09 am ([permalink](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/#comment-22413))
 
 > Thanks guys for sharing your thoughts. Security remains a difficult but very important subject and should be treated as such.
 >
@@ -742,14 +742,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — September 11, 2015 at 5:09 am ([permalink](https://www.codenameone.com/blog/cloud-powered-mobile-apps-with-parse-and-codenameone.html#comment-22298))
+### **shannah78** — September 11, 2015 at 5:09 am ([permalink](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/#comment-22298))
 
 > You’re right that is missing from the post, and class level acls are still necessary to lock down the database when cloud code is used.
 >
 
 
 
-### **SophiaVermon** — September 14, 2015 at 8:02 am ([permalink](https://www.codenameone.com/blog/cloud-powered-mobile-apps-with-parse-and-codenameone.html#comment-22151))
+### **SophiaVermon** — September 14, 2015 at 8:02 am ([permalink](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/#comment-22151))
 
 > Thanks for this detailed article with complete code and pictures, I will try to run it in my application.
 >

@@ -35,7 +35,7 @@ You can track these milestones and the related tasks in our github project [here
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — November 7, 2017 at 11:21 am ([permalink](https://www.codenameone.com/blog/codefreeze-for-3-8.html#comment-23841))
+### **Francesco Galgani** — November 7, 2017 at 11:21 am ([permalink](/blog/codefreeze-for-3-8/#comment-23841))
 
 > Francesco Galgani says:
 >
@@ -45,7 +45,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 8, 2017 at 6:47 am ([permalink](https://www.codenameone.com/blog/codefreeze-for-3-8.html#comment-21528))
+### **Shai Almog** — November 8, 2017 at 6:47 am ([permalink](/blog/codefreeze-for-3-8/#comment-21528))
 
 > Shai Almog says:
 >
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ayad_alssady** — February 20, 2018 at 4:34 pm ([permalink](https://www.codenameone.com/blog/codefreeze-for-3-8.html#comment-23640))
+### **ayad_alssady** — February 20, 2018 at 4:34 pm ([permalink](/blog/codefreeze-for-3-8/#comment-23640))
 
 > ayad_alssady says:
 >
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 21, 2018 at 5:27 am ([permalink](https://www.codenameone.com/blog/codefreeze-for-3-8.html#comment-23803))
+### **Shai Almog** — February 21, 2018 at 5:27 am ([permalink](/blog/codefreeze-for-3-8/#comment-23803))
 
 > Shai Almog says:
 >
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ayad_alssady** — February 21, 2018 at 7:35 am ([permalink](https://www.codenameone.com/blog/codefreeze-for-3-8.html#comment-23843))
+### **ayad_alssady** — February 21, 2018 at 7:35 am ([permalink](/blog/codefreeze-for-3-8/#comment-23843))
 
 > ayad_alssady says:
 >
@@ -85,11 +85,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 22, 2018 at 8:43 am ([permalink](https://www.codenameone.com/blog/codefreeze-for-3-8.html#comment-23861))
+### **Shai Almog** — February 22, 2018 at 8:43 am ([permalink](/blog/codefreeze-for-3-8/#comment-23861))
 
 > Shai Almog says:
 >
-> I understood that. I don’t understand what’s the problem with our sample code: [https://www.codenameone.com…](<https://www.codenameone.com/manual/graphics.html>)
+> I understood that. I don’t understand what’s the problem with our sample code: [https://www.codenameone.com…](</manual/graphics/>)
 >
 
 

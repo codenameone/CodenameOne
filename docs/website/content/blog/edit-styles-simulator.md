@@ -50,7 +50,7 @@ There might also be issues with layered themes, e.g. if you have 2 themes layere
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jérémy MARQUER** — April 12, 2017 at 2:02 pm ([permalink](https://www.codenameone.com/blog/edit-styles-simulator.html#comment-23122))
+### **Jérémy MARQUER** — April 12, 2017 at 2:02 pm ([permalink](/blog/edit-styles-simulator/#comment-23122))
 
 > Jérémy MARQUER says:
 >
@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Avelblood** — April 15, 2017 at 12:13 pm ([permalink](https://www.codenameone.com/blog/edit-styles-simulator.html#comment-21576))
+### **Avelblood** — April 15, 2017 at 12:13 pm ([permalink](/blog/edit-styles-simulator/#comment-21576))
 
 > Avelblood says:
 >

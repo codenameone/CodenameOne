@@ -38,7 +38,7 @@ We just released new updates to all the plugins for the 3.6 release. We are now 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **dingfelder** — January 12, 2018 at 8:37 am ([permalink](https://www.codenameone.com/blog/first-class-eclipse-support.html#comment-23679))
+### **dingfelder** — January 12, 2018 at 8:37 am ([permalink](/blog/first-class-eclipse-support/#comment-23679))
 
 > dingfelder says:
 >

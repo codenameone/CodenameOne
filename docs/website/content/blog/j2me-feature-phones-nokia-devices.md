@@ -78,7 +78,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — April 24, 2013 at 5:09 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21864))
+### **Anonymous** — April 24, 2013 at 5:09 am ([permalink](/blog/j2me-feature-phones-nokia-devices/#comment-21864))
 
 > Anonymous says:
 >
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 24, 2013 at 6:51 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21743))
+### **Anonymous** — April 24, 2013 at 6:51 am ([permalink](/blog/j2me-feature-phones-nokia-devices/#comment-21743))
 
 > Anonymous says:
 >
@@ -102,7 +102,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 24, 2013 at 7:31 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21786))
+### **Anonymous** — April 24, 2013 at 7:31 am ([permalink](/blog/j2me-feature-phones-nokia-devices/#comment-21786))
 
 > Anonymous says:
 >
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 24, 2013 at 7:39 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21781))
+### **Anonymous** — April 24, 2013 at 7:39 am ([permalink](/blog/j2me-feature-phones-nokia-devices/#comment-21781))
 
 > Anonymous says:
 >
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 24, 2013 at 7:39 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21855))
+### **Anonymous** — April 24, 2013 at 7:39 am ([permalink](/blog/j2me-feature-phones-nokia-devices/#comment-21855))
 
 > Anonymous says:
 >
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 24, 2013 at 9:37 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21906))
+### **Anonymous** — April 24, 2013 at 9:37 am ([permalink](/blog/j2me-feature-phones-nokia-devices/#comment-21906))
 
 > Anonymous says:
 >
@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 24, 2013 at 10:24 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21901))
+### **Anonymous** — April 24, 2013 at 10:24 am ([permalink](/blog/j2me-feature-phones-nokia-devices/#comment-21901))
 
 > Anonymous says:
 >
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 24, 2013 at 12:34 pm ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21754))
+### **Anonymous** — April 24, 2013 at 12:34 pm ([permalink](/blog/j2me-feature-phones-nokia-devices/#comment-21754))
 
 > Anonymous says:
 >
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — May 1, 2013 at 6:54 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21893))
+### **Anonymous** — May 1, 2013 at 6:54 am ([permalink](/blog/j2me-feature-phones-nokia-devices/#comment-21893))
 
 > Anonymous says:
 >
@@ -181,7 +181,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — May 16, 2013 at 9:22 pm ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21941))
+### **Anonymous** — May 16, 2013 at 9:22 pm ([permalink](/blog/j2me-feature-phones-nokia-devices/#comment-21941))
 
 > Anonymous says:
 >
@@ -190,7 +190,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — May 17, 2013 at 1:45 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21748))
+### **Anonymous** — May 17, 2013 at 1:45 am ([permalink](/blog/j2me-feature-phones-nokia-devices/#comment-21748))
 
 > Anonymous says:
 >
@@ -199,7 +199,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 26, 2013 at 6:58 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-24159))
+### **Anonymous** — September 26, 2013 at 6:58 am ([permalink](/blog/j2me-feature-phones-nokia-devices/#comment-24159))
 
 > Anonymous says:
 >
@@ -208,7 +208,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 9, 2013 at 11:32 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21989))
+### **Anonymous** — October 9, 2013 at 11:32 am ([permalink](/blog/j2me-feature-phones-nokia-devices/#comment-21989))
 
 > Anonymous says:
 >
@@ -221,7 +221,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 9, 2013 at 3:09 pm ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21762))
+### **Anonymous** — October 9, 2013 at 3:09 pm ([permalink](/blog/j2me-feature-phones-nokia-devices/#comment-21762))
 
 > Anonymous says:
 >
@@ -232,7 +232,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — May 29, 2014 at 6:41 am ([permalink](https://www.codenameone.com/blog/j2me-feature-phones-nokia-devices.html#comment-21782))
+### **Anonymous** — May 29, 2014 at 6:41 am ([permalink](/blog/j2me-feature-phones-nokia-devices/#comment-21782))
 
 > Anonymous says:
 >

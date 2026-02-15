@@ -59,7 +59,7 @@ more challenging and interesting demos that might be harder to adapt to newer co
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Ross Taylor** — May 17, 2016 at 4:35 pm ([permalink](https://www.codenameone.com/blog/chrome-demo.html#comment-22782))
+### **Ross Taylor** — May 17, 2016 at 4:35 pm ([permalink](/blog/chrome-demo/#comment-22782))
 
 > Ross Taylor says:
 >
@@ -68,7 +68,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 18, 2016 at 3:54 am ([permalink](https://www.codenameone.com/blog/chrome-demo.html#comment-22702))
+### **Shai Almog** — May 18, 2016 at 3:54 am ([permalink](/blog/chrome-demo/#comment-22702))
 
 > Shai Almog says:
 >
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 18, 2016 at 5:09 am ([permalink](https://www.codenameone.com/blog/chrome-demo.html#comment-22669))
+### **Shai Almog** — May 18, 2016 at 5:09 am ([permalink](/blog/chrome-demo/#comment-22669))
 
 > Shai Almog says:
 >

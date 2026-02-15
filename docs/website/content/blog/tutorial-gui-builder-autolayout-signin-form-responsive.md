@@ -144,35 +144,35 @@ Figure 4. Landscape mode after overriding `layoutContainer`. Logo is now hidden,
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Tommy Mogaka** — July 26, 2017 at 11:38 am ([permalink](https://www.codenameone.com/blog/tutorial-gui-builder-autolayout-signin-form-responsive.html#comment-23663))
+### **Tommy Mogaka** — July 26, 2017 at 11:38 am ([permalink](/blog/tutorial-gui-builder-autolayout-signin-form-responsive/#comment-23663))
 
 > Awsome!
 >
 
 
 
-### **Lukman Javalove Idealist Jaji** — July 27, 2017 at 11:25 pm ([permalink](https://www.codenameone.com/blog/tutorial-gui-builder-autolayout-signin-form-responsive.html#comment-21523))
+### **Lukman Javalove Idealist Jaji** — July 27, 2017 at 11:25 pm ([permalink](/blog/tutorial-gui-builder-autolayout-signin-form-responsive/#comment-21523))
 
 > and some of us are still attached to the OGUIB…. 🙁
 >
 
 
 
-### **Francesco Galgani** — July 30, 2017 at 7:53 am ([permalink](https://www.codenameone.com/blog/tutorial-gui-builder-autolayout-signin-form-responsive.html#comment-23727))
+### **Francesco Galgani** — July 30, 2017 at 7:53 am ([permalink](/blog/tutorial-gui-builder-autolayout-signin-form-responsive/#comment-23727))
 
 > Very useful tutorial, thank you.
 >
 
 
 
-### **Bogdan Istrate** — August 13, 2017 at 10:22 pm ([permalink](https://www.codenameone.com/blog/tutorial-gui-builder-autolayout-signin-form-responsive.html#comment-23205))
+### **Bogdan Istrate** — August 13, 2017 at 10:22 pm ([permalink](/blog/tutorial-gui-builder-autolayout-signin-form-responsive/#comment-23205))
 
 > Very good tutorial!
 >
 
 
 
-### **Json** — September 2, 2017 at 6:07 am ([permalink](https://www.codenameone.com/blog/tutorial-gui-builder-autolayout-signin-form-responsive.html#comment-23665))
+### **Json** — September 2, 2017 at 6:07 am ([permalink](/blog/tutorial-gui-builder-autolayout-signin-form-responsive/#comment-23665))
 
 > hi!
 >
@@ -206,7 +206,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 3, 2017 at 4:13 am ([permalink](https://www.codenameone.com/blog/tutorial-gui-builder-autolayout-signin-form-responsive.html#comment-23530))
+### **Shai Almog** — September 3, 2017 at 4:13 am ([permalink](/blog/tutorial-gui-builder-autolayout-signin-form-responsive/#comment-23530))
 
 > Make sure your plugin is at the latest version and open the project properties then press “OK” it should update the internal jar that should fix this.
 >

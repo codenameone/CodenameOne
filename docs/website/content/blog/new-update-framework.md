@@ -92,7 +92,7 @@ We won’t need to deal with as many IDE specific behaviors and we will be able 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — February 18, 2018 at 11:46 am ([permalink](https://www.codenameone.com/blog/new-update-framework.html#comment-23667))
+### **Francesco Galgani** — February 18, 2018 at 11:46 am ([permalink](/blog/new-update-framework/#comment-23667))
 
 > Francesco Galgani says:
 >
@@ -104,7 +104,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 19, 2018 at 5:57 am ([permalink](https://www.codenameone.com/blog/new-update-framework.html#comment-23788))
+### **Shai Almog** — February 19, 2018 at 5:57 am ([permalink](/blog/new-update-framework/#comment-23788))
 
 > Shai Almog says:
 >

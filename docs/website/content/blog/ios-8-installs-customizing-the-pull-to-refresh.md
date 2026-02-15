@@ -74,7 +74,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 7, 2014 at 7:02 pm ([permalink](https://www.codenameone.com/blog/ios-8-installs-customizing-the-pull-to-refresh.html#comment-22041))
+### **Anonymous** — October 7, 2014 at 7:02 pm ([permalink](/blog/ios-8-installs-customizing-the-pull-to-refresh/#comment-22041))
 
 > Anonymous says:
 >
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 7, 2014 at 11:24 pm ([permalink](https://www.codenameone.com/blog/ios-8-installs-customizing-the-pull-to-refresh.html#comment-22069))
+### **Anonymous** — October 7, 2014 at 11:24 pm ([permalink](/blog/ios-8-installs-customizing-the-pull-to-refresh/#comment-22069))
 
 > Anonymous says:
 >

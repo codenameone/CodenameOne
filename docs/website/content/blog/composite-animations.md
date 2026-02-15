@@ -19,7 +19,7 @@ When I want to do multiple animations in a sequence I can chain them using the `
 
 This seems like it should be enough but it sometimes isn’t, e.g. if I have two or more containers and I want them to animate layout together, or if I want an animation to both animate the position and style of a component!
 
-To solve this we introduced the [ComponentAnimation](https://www.codenameone.com/javadoc/com/codename1/ui/animations/ComponentAnimation.html) class way back in 3.4. We now have new API’s that return `ComponentAnimation` instances that we can subsequently chain together e.g. this code is from the upcoming kitchen sink demo:
+To solve this we introduced the [ComponentAnimation](/javadoc/com/codename1/ui/animations/ComponentAnimation/) class way back in 3.4. We now have new API’s that return `ComponentAnimation` instances that we can subsequently chain together e.g. this code is from the upcoming kitchen sink demo:
     
     
     ComponentAnimation cn2 = createStyleAnimation(newUIID, 1000);
@@ -40,7 +40,7 @@ We’ve added five methods that create this type to container:
 __ |  `createStyleAnimation` has been around since 3.4 so it isn’t listed, but we fixed a some bugs there…​   
 ---|---  
   
-You will notice that there are no `AndWait` version since you add these animations to the animation queue thru the [AnimationManager](https://www.codenameone.com/javadoc/com/codename1/ui/AnimationManager.html) API which has both `addAnimation` & `addAnimationAndBlock` allowing both use cases.
+You will notice that there are no `AndWait` version since you add these animations to the animation queue thru the [AnimationManager](/javadoc/com/codename1/ui/AnimationManager/) API which has both `addAnimation` & `addAnimationAndBlock` allowing both use cases.
 
 The code above uses the `compoundAnimation` static method to merge together animations (you can merge any number of animations not just two). You can also use the `sequentialAnimation` method to merge an animation sequence which might be more convenient than `AndWait` or `AndBlock`.
 

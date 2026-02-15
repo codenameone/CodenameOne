@@ -64,7 +64,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — June 8, 2013 at 11:17 am ([permalink](https://www.codenameone.com/blog/when-a-dialog-isnt-a-dialog.html#comment-21705))
+### **Anonymous** — June 8, 2013 at 11:17 am ([permalink](/blog/when-a-dialog-isnt-a-dialog/#comment-21705))
 
 > Anonymous says:
 >

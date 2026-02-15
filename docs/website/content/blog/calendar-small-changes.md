@@ -63,7 +63,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — February 26, 2014 at 2:49 pm ([permalink](https://www.codenameone.com/blog/calendar-small-changes.html#comment-21704))
+### **Anonymous** — February 26, 2014 at 2:49 pm ([permalink](/blog/calendar-small-changes/#comment-21704))
 
 > Anonymous says:
 >
@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 26, 2014 at 3:54 pm ([permalink](https://www.codenameone.com/blog/calendar-small-changes.html#comment-21923))
+### **Anonymous** — February 26, 2014 at 3:54 pm ([permalink](/blog/calendar-small-changes/#comment-21923))
 
 > Anonymous says:
 >

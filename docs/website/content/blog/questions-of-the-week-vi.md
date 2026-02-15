@@ -101,7 +101,7 @@ with the same facebook app.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Andreas Grätz** — May 23, 2016 at 7:14 am ([permalink](https://www.codenameone.com/blog/questions-of-the-week-vi.html#comment-22468))
+### **Andreas Grätz** — May 23, 2016 at 7:14 am ([permalink](/blog/questions-of-the-week-vi/#comment-22468))
 
 > Andreas Grätz says:
 >
@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 24, 2016 at 4:08 am ([permalink](https://www.codenameone.com/blog/questions-of-the-week-vi.html#comment-22578))
+### **Shai Almog** — May 24, 2016 at 4:08 am ([permalink](/blog/questions-of-the-week-vi/#comment-22578))
 
 > Shai Almog says:
 >
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Andreas Grätz** — May 25, 2016 at 11:11 pm ([permalink](https://www.codenameone.com/blog/questions-of-the-week-vi.html#comment-22876))
+### **Andreas Grätz** — May 25, 2016 at 11:11 pm ([permalink](/blog/questions-of-the-week-vi/#comment-22876))
 
 > Andreas Grätz says:
 >
@@ -138,7 +138,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 26, 2016 at 3:57 am ([permalink](https://www.codenameone.com/blog/questions-of-the-week-vi.html#comment-21412))
+### **Shai Almog** — May 26, 2016 at 3:57 am ([permalink](/blog/questions-of-the-week-vi/#comment-21412))
 
 > Shai Almog says:
 >

@@ -13,7 +13,7 @@ author: Shai Almog
 
 A couple of years ago I wrote an app for my spouses yoga studio for managing her student list. I intended to open source it but the code is a bit messy and I can’t seem to find the time/energy to clean it up. I used the excellent [parse4cn1](https://github.com/sidiabale/parse4cn1) library from [Chidiebere Okwudire](https://www.smash-ict.com/) during the height of Parse.
 
-As Parse ended I started thinking about contingency plans but after a few emails with Chidi and his [posts](https://www.codenameone.com/blog/how-i-chose-my-replacement-for-parse-com.html) detailing the various [options](https://www.codenameone.com/blog/how-i-chose-my-replacement-for-parse-com-part-2.html) I thought it might be possible to take the “lazy approach”.
+As Parse ended I started thinking about contingency plans but after a few emails with Chidi and his [posts](/blog/how-i-chose-my-replacement-for-parse-com/) detailing the various [options](/blog/how-i-chose-my-replacement-for-parse-com-part-2/) I thought it might be possible to take the “lazy approach”.
 
 Since the app is mostly for personal use I wasn’t faced with the prospect of replacing a “live” server which would have probably made the migration difficult. Since the app doesn’t use any “difficult” feature like push or complex server code this would be a trivial migration. Still I braced myself for hiccups…​
 
@@ -44,7 +44,7 @@ I wonder if parse hosting will become a commodity in the future and I’d really
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Ricardo Vicari** — March 11, 2017 at 12:51 am ([permalink](https://www.codenameone.com/blog/migrating-from-parse-back4app.html#comment-23398))
+### **Ricardo Vicari** — March 11, 2017 at 12:51 am ([permalink](/blog/migrating-from-parse-back4app/#comment-23398))
 
 > Ricardo Vicari says:
 >
@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ricardo Vicari** — March 11, 2017 at 12:53 am ([permalink](https://www.codenameone.com/blog/migrating-from-parse-back4app.html#comment-23462))
+### **Ricardo Vicari** — March 11, 2017 at 12:53 am ([permalink](/blog/migrating-from-parse-back4app/#comment-23462))
 
 > Ricardo Vicari says:
 >
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 11, 2017 at 6:19 am ([permalink](https://www.codenameone.com/blog/migrating-from-parse-back4app.html#comment-23329))
+### **Shai Almog** — March 11, 2017 at 6:19 am ([permalink](/blog/migrating-from-parse-back4app/#comment-23329))
 
 > Shai Almog says:
 >

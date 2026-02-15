@@ -112,7 +112,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — June 3, 2013 at 4:19 am ([permalink](https://www.codenameone.com/blog/maker-on-device-drag-drop-gui-builder-external-3rd-party-plugins.html#comment-21697))
+### **Anonymous** — June 3, 2013 at 4:19 am ([permalink](/blog/maker-on-device-drag-drop-gui-builder-external-3rd-party-plugins/#comment-21697))
 
 > Anonymous says:
 >
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 3, 2013 at 1:26 pm ([permalink](https://www.codenameone.com/blog/maker-on-device-drag-drop-gui-builder-external-3rd-party-plugins.html#comment-21734))
+### **Anonymous** — June 3, 2013 at 1:26 pm ([permalink](/blog/maker-on-device-drag-drop-gui-builder-external-3rd-party-plugins/#comment-21734))
 
 > Anonymous says:
 >

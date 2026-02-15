@@ -58,7 +58,7 @@ Another common mistake is to change the form from a network thread.
 
 ### Swipe the screens for next pages
 
-[Tabs](https://www.codenameone.com/javadoc/com/codename1/ui/Tabs.html) was designed with exactly that  
+[Tabs](/javadoc/com/codename1/ui/Tabs/) was designed with exactly that  
 use case in mind…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37814686/swipe-the-screens-for-next-pages)
@@ -111,7 +111,7 @@ which is currently non-existent. This might change overnight though.
 ### React on Tree expansion or collapse
 
 `Tree` is **very** customizeable, I would also recommend checking out the new  
-[Accordion](https://www.codenameone.com/javadoc/com/codename1/components/Accordion.html) component  
+[Accordion](/javadoc/com/codename1/components/Accordion/) component  
 which we will cover more in depth in a post sometime next week…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37798624/codenameone-react-on-tree-expansion-or-collapse)

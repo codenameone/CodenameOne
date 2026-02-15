@@ -72,7 +72,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — July 23, 2014 at 8:21 am ([permalink](https://www.codenameone.com/blog/walk-thru-tutorial.html#comment-22068))
+### **Anonymous** — July 23, 2014 at 8:21 am ([permalink](/blog/walk-thru-tutorial/#comment-22068))
 
 > Anonymous says:
 >
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 23, 2014 at 12:25 pm ([permalink](https://www.codenameone.com/blog/walk-thru-tutorial.html#comment-22165))
+### **Anonymous** — July 23, 2014 at 12:25 pm ([permalink](/blog/walk-thru-tutorial/#comment-22165))
 
 > Anonymous says:
 >
@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 23, 2014 at 6:14 pm ([permalink](https://www.codenameone.com/blog/walk-thru-tutorial.html#comment-22051))
+### **Anonymous** — July 23, 2014 at 6:14 pm ([permalink](/blog/walk-thru-tutorial/#comment-22051))
 
 > Anonymous says:
 >
@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 24, 2014 at 3:29 am ([permalink](https://www.codenameone.com/blog/walk-thru-tutorial.html#comment-21899))
+### **Anonymous** — July 24, 2014 at 3:29 am ([permalink](/blog/walk-thru-tutorial/#comment-21899))
 
 > Anonymous says:
 >
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 24, 2014 at 3:53 am ([permalink](https://www.codenameone.com/blog/walk-thru-tutorial.html#comment-21994))
+### **Anonymous** — July 24, 2014 at 3:53 am ([permalink](/blog/walk-thru-tutorial/#comment-21994))
 
 > Anonymous says:
 >
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 24, 2014 at 2:12 pm ([permalink](https://www.codenameone.com/blog/walk-thru-tutorial.html#comment-22115))
+### **Anonymous** — July 24, 2014 at 2:12 pm ([permalink](/blog/walk-thru-tutorial/#comment-22115))
 
 > Anonymous says:
 >

@@ -48,35 +48,35 @@ and the fact that the install process is simpler (just type codename) is a **hug
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Mohasin** — June 14, 2016 at 2:51 pm ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-22778))
+### **Mohasin** — June 14, 2016 at 2:51 pm ([permalink](/blog/netbeans-plugin-update-center/#comment-22778))
 
 > I have followed the procedure and i am not getting CodenameOne listen in available plugins. I tested the connections and tried again. It didnt work for me
 >
 
 
 
-### **Shai Almog** — June 15, 2016 at 4:00 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-22884))
+### **Shai Almog** — June 15, 2016 at 4:00 am ([permalink](/blog/netbeans-plugin-update-center/#comment-22884))
 
 > I’m not sure what is the issue but you can download the nbm directly from [https://www.codenameone.com…](<https://www.codenameone.com/files/netbeans/com-codename1.nbm>)
 >
 
 
 
-### **linnet maruve** — June 18, 2018 at 2:10 pm ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23839))
+### **linnet maruve** — June 18, 2018 at 2:10 pm ([permalink](/blog/netbeans-plugin-update-center/#comment-23839))
 
 > how can l update my netbeans plugin. when ever l run my project it writes it seems like you are using an old version l have tried the procedure but l can not find a way to update it
 >
 
 
 
-### **Shai Almog** — June 19, 2018 at 5:11 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23975))
+### **Shai Almog** — June 19, 2018 at 5:11 am ([permalink](/blog/netbeans-plugin-update-center/#comment-23975))
 
 > The latest version of the plugin is 4.0. Codename One Settings includes its own update system under Basic -> Update Client Libs.
 >
 
 
 
-### **linnet maruve** — June 19, 2018 at 6:39 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23954))
+### **linnet maruve** — June 19, 2018 at 6:39 am ([permalink](/blog/netbeans-plugin-update-center/#comment-23954))
 
 > linnet maruve says:
 >
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **linnet maruve** — June 19, 2018 at 9:58 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23872))
+### **linnet maruve** — June 19, 2018 at 9:58 am ([permalink](/blog/netbeans-plugin-update-center/#comment-23872))
 
 > linnet maruve says:
 >
@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 20, 2018 at 4:15 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-21645))
+### **Shai Almog** — June 20, 2018 at 4:15 am ([permalink](/blog/netbeans-plugin-update-center/#comment-21645))
 
 > Shai Almog says:
 >
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **linnet maruve** — June 20, 2018 at 6:48 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23393))
+### **linnet maruve** — June 20, 2018 at 6:48 am ([permalink](/blog/netbeans-plugin-update-center/#comment-23393))
 
 > linnet maruve says:
 >
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 21, 2018 at 6:07 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23932))
+### **Shai Almog** — June 21, 2018 at 6:07 am ([permalink](/blog/netbeans-plugin-update-center/#comment-23932))
 
 > Shai Almog says:
 >
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **linnet maruve** — June 21, 2018 at 2:14 pm ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23939))
+### **linnet maruve** — June 21, 2018 at 2:14 pm ([permalink](/blog/netbeans-plugin-update-center/#comment-23939))
 
 > linnet maruve says:
 >
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **linnet maruve** — June 21, 2018 at 2:15 pm ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23916))
+### **linnet maruve** — June 21, 2018 at 2:15 pm ([permalink](/blog/netbeans-plugin-update-center/#comment-23916))
 
 > linnet maruve says:
 >
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 22, 2018 at 7:30 pm ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23684))
+### **Shai Almog** — June 22, 2018 at 7:30 pm ([permalink](/blog/netbeans-plugin-update-center/#comment-23684))
 
 > Shai Almog says:
 >
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **linnet maruve** — June 25, 2018 at 1:42 pm ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-24004))
+### **linnet maruve** — June 25, 2018 at 1:42 pm ([permalink](/blog/netbeans-plugin-update-center/#comment-24004))
 
 > linnet maruve says:
 >
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **linnet maruve** — June 25, 2018 at 1:44 pm ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-21536))
+### **linnet maruve** — June 25, 2018 at 1:44 pm ([permalink](/blog/netbeans-plugin-update-center/#comment-21536))
 
 > linnet maruve says:
 >
@@ -170,7 +170,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 26, 2018 at 9:02 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23907))
+### **Shai Almog** — June 26, 2018 at 9:02 am ([permalink](/blog/netbeans-plugin-update-center/#comment-23907))
 
 > Shai Almog says:
 >
@@ -179,7 +179,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **linnet maruve** — June 26, 2018 at 9:07 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23898))
+### **linnet maruve** — June 26, 2018 at 9:07 am ([permalink](/blog/netbeans-plugin-update-center/#comment-23898))
 
 > linnet maruve says:
 >
@@ -188,7 +188,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **linnet maruve** — June 26, 2018 at 9:11 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23970))
+### **linnet maruve** — June 26, 2018 at 9:11 am ([permalink](/blog/netbeans-plugin-update-center/#comment-23970))
 
 > linnet maruve says:
 >
@@ -197,7 +197,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **linnet maruve** — June 26, 2018 at 9:35 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23881))
+### **linnet maruve** — June 26, 2018 at 9:35 am ([permalink](/blog/netbeans-plugin-update-center/#comment-23881))
 
 > linnet maruve says:
 >
@@ -206,7 +206,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 27, 2018 at 5:41 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23615))
+### **Shai Almog** — June 27, 2018 at 5:41 am ([permalink](/blog/netbeans-plugin-update-center/#comment-23615))
 
 > Shai Almog says:
 >
@@ -215,7 +215,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **linnet maruve** — June 27, 2018 at 10:15 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23633))
+### **linnet maruve** — June 27, 2018 at 10:15 am ([permalink](/blog/netbeans-plugin-update-center/#comment-23633))
 
 > linnet maruve says:
 >
@@ -224,7 +224,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 28, 2018 at 6:09 am ([permalink](https://www.codenameone.com/blog/netbeans-plugin-update-center.html#comment-23660))
+### **Shai Almog** — June 28, 2018 at 6:09 am ([permalink](/blog/netbeans-plugin-update-center/#comment-23660))
 
 > Shai Almog says:
 >

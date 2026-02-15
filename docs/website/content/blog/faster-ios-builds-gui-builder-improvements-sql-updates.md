@@ -61,7 +61,7 @@ term.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Nick Koirala** — October 27, 2016 at 3:40 am ([permalink](https://www.codenameone.com/blog/faster-ios-builds-gui-builder-improvements-sql-updates.html#comment-22745))
+### **Nick Koirala** — October 27, 2016 at 3:40 am ([permalink](/blog/faster-ios-builds-gui-builder-improvements-sql-updates/#comment-22745))
 
 > Nick Koirala says:
 >
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 28, 2016 at 3:43 am ([permalink](https://www.codenameone.com/blog/faster-ios-builds-gui-builder-improvements-sql-updates.html#comment-23143))
+### **Shai Almog** — October 28, 2016 at 3:43 am ([permalink](/blog/faster-ios-builds-gui-builder-improvements-sql-updates/#comment-23143))
 
 > Shai Almog says:
 >
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Nick Koirala** — October 28, 2016 at 3:43 am ([permalink](https://www.codenameone.com/blog/faster-ios-builds-gui-builder-improvements-sql-updates.html#comment-23094))
+### **Nick Koirala** — October 28, 2016 at 3:43 am ([permalink](/blog/faster-ios-builds-gui-builder-improvements-sql-updates/#comment-23094))
 
 > Nick Koirala says:
 >
@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Akinniranye James** — November 1, 2016 at 3:51 pm ([permalink](https://www.codenameone.com/blog/faster-ios-builds-gui-builder-improvements-sql-updates.html#comment-23035))
+### **Akinniranye James** — November 1, 2016 at 3:51 pm ([permalink](/blog/faster-ios-builds-gui-builder-improvements-sql-updates/#comment-23035))
 
 > Akinniranye James says:
 >

@@ -43,7 +43,7 @@ Next week I will post a module covering performance tuning, tips and pitfalls. I
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Tommy Mogaka** — February 23, 2018 at 5:31 am ([permalink](https://www.codenameone.com/blog/use-open-source-build-offline.html#comment-23887))
+### **Tommy Mogaka** — February 23, 2018 at 5:31 am ([permalink](/blog/use-open-source-build-offline/#comment-23887))
 
 > Tommy Mogaka says:
 >
@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 24, 2018 at 4:54 am ([permalink](https://www.codenameone.com/blog/use-open-source-build-offline.html#comment-23608))
+### **Shai Almog** — February 24, 2018 at 4:54 am ([permalink](/blog/use-open-source-build-offline/#comment-23608))
 
 > Shai Almog says:
 >
@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **CosmicDan** — August 5, 2018 at 12:50 am ([permalink](https://www.codenameone.com/blog/use-open-source-build-offline.html#comment-23752))
+### **CosmicDan** — August 5, 2018 at 12:50 am ([permalink](/blog/use-open-source-build-offline/#comment-23752))
 
 > CosmicDan says:
 >
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 5, 2018 at 4:54 am ([permalink](https://www.codenameone.com/blog/use-open-source-build-offline.html#comment-24042))
+### **Shai Almog** — August 5, 2018 at 4:54 am ([permalink](/blog/use-open-source-build-offline/#comment-24042))
 
 > Shai Almog says:
 >
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **CosmicDan** — August 5, 2018 at 5:04 am ([permalink](https://www.codenameone.com/blog/use-open-source-build-offline.html#comment-21578))
+### **CosmicDan** — August 5, 2018 at 5:04 am ([permalink](/blog/use-open-source-build-offline/#comment-21578))
 
 > CosmicDan says:
 >
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 6, 2018 at 4:20 am ([permalink](https://www.codenameone.com/blog/use-open-source-build-offline.html#comment-24011))
+### **Shai Almog** — August 6, 2018 at 4:20 am ([permalink](/blog/use-open-source-build-offline/#comment-24011))
 
 > Shai Almog says:
 >

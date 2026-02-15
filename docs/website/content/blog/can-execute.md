@@ -71,7 +71,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — September 18, 2014 at 5:18 am ([permalink](https://www.codenameone.com/blog/can-execute.html#comment-21978))
+### **Anonymous** — September 18, 2014 at 5:18 am ([permalink](/blog/can-execute/#comment-21978))
 
 > Anonymous says:
 >
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 18, 2014 at 3:27 pm ([permalink](https://www.codenameone.com/blog/can-execute.html#comment-22030))
+### **Anonymous** — September 18, 2014 at 3:27 pm ([permalink](/blog/can-execute/#comment-22030))
 
 > Anonymous says:
 >

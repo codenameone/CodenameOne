@@ -15,7 +15,7 @@ We recently added support to detect whether a device is running in dark/light mo
 
 ### Detecting Dark Mode
 
-Dark mode can be detected using APIs in the [CN](https://www.codenameone.com/javadoc/com/codename1/ui/CN.html) and [Display](https://www.codenameone.com/javadoc/com/codename1/ui/Display.html) classes. Specifically `isDarkMode()` and `setDarkMode(Boolean)`.
+Dark mode can be detected using APIs in the [CN](/javadoc/com/codename1/ui/CN/) and [Display](/javadoc/com/codename1/ui/Display/) classes. Specifically `isDarkMode()` and `setDarkMode(Boolean)`.
 
 Notice that `isDarkMode()` returns `Boolean` and not `boolean`. This means that `null` is a valid value for this method. The case of `null` indicates that dark mode detection isn’t available or isn’t working on this platform.
 
@@ -69,7 +69,7 @@ We hope to add additional dark/light templates and also port the native themes t
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Mohammed Hussein** — August 28, 2022 at 8:55 pm ([permalink](https://www.codenameone.com/blog/dark-mode.html#comment-24542))
+### **Mohammed Hussein** — August 28, 2022 at 8:55 pm ([permalink](/blog/dark-mode/#comment-24542))
 
 > Mohammed Hussein says:
 >
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mohammed Hussein** — September 1, 2022 at 8:46 am ([permalink](https://www.codenameone.com/blog/dark-mode.html#comment-24544))
+### **Mohammed Hussein** — September 1, 2022 at 8:46 am ([permalink](/blog/dark-mode/#comment-24544))
 
 > Mohammed Hussein says:
 >

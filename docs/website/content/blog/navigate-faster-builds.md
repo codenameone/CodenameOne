@@ -48,7 +48,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — June 20, 2014 at 4:17 am ([permalink](https://www.codenameone.com/blog/navigate-faster-builds.html#comment-21948))
+### **Anonymous** — June 20, 2014 at 4:17 am ([permalink](/blog/navigate-faster-builds/#comment-21948))
 
 > Anonymous says:
 >
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 20, 2014 at 1:31 pm ([permalink](https://www.codenameone.com/blog/navigate-faster-builds.html#comment-22004))
+### **Anonymous** — June 20, 2014 at 1:31 pm ([permalink](/blog/navigate-faster-builds/#comment-22004))
 
 > Anonymous says:
 >
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 21, 2014 at 8:58 am ([permalink](https://www.codenameone.com/blog/navigate-faster-builds.html#comment-21821))
+### **Anonymous** — June 21, 2014 at 8:58 am ([permalink](/blog/navigate-faster-builds/#comment-21821))
 
 > Anonymous says:
 >

@@ -39,7 +39,7 @@ With these in place you can convert a lot of typical SVG’s and use them in you
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Durank** — September 16, 2020 at 2:48 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder-revisited.html#comment-24339))
+### **Durank** — September 16, 2020 at 2:48 pm ([permalink](/blog/flamingo-svg-transcoder-revisited/#comment-24339))
 
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
@@ -48,7 +48,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 17, 2020 at 4:10 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder-revisited.html#comment-24337))
+### **Shai Almog** — September 17, 2020 at 4:10 am ([permalink](/blog/flamingo-svg-transcoder-revisited/#comment-24337))
 
 > Shai Almog says:
 >
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Durank** — October 20, 2020 at 3:06 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder-revisited.html#comment-24357))
+### **Durank** — October 20, 2020 at 3:06 pm ([permalink](/blog/flamingo-svg-transcoder-revisited/#comment-24357))
 
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 21, 2020 at 2:09 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder-revisited.html#comment-24358))
+### **Shai Almog** — October 21, 2020 at 2:09 am ([permalink](/blog/flamingo-svg-transcoder-revisited/#comment-24358))
 
 > Shai Almog says:
 >
@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Durank** — October 21, 2020 at 3:23 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder-revisited.html#comment-24359))
+### **Durank** — October 21, 2020 at 3:23 pm ([permalink](/blog/flamingo-svg-transcoder-revisited/#comment-24359))
 
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 22, 2020 at 10:47 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder-revisited.html#comment-24361))
+### **Shai Almog** — October 22, 2020 at 10:47 am ([permalink](/blog/flamingo-svg-transcoder-revisited/#comment-24361))
 
 > Shai Almog says:
 >

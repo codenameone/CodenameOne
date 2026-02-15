@@ -140,7 +140,7 @@ You can use font-scaling constants to scale all of the fonts in your stylesheet 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **ThomasH99** — March 16, 2021 at 8:07 am ([permalink](https://www.codenameone.com/blog/customizing-themes-of-codename-one-apps.html#comment-24414))
+### **ThomasH99** — March 16, 2021 at 8:07 am ([permalink](/blog/customizing-themes-of-codename-one-apps/#comment-24414))
 
 > ThomasH99 says:
 >
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — March 24, 2021 at 9:06 am ([permalink](https://www.codenameone.com/blog/customizing-themes-of-codename-one-apps.html#comment-24417))
+### **Javier Anton** — March 24, 2021 at 9:06 am ([permalink](/blog/customizing-themes-of-codename-one-apps/#comment-24417))
 
 > Javier Anton says:
 >
@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ThomasH99** — March 28, 2021 at 9:33 am ([permalink](https://www.codenameone.com/blog/customizing-themes-of-codename-one-apps.html#comment-24418))
+### **ThomasH99** — March 28, 2021 at 9:33 am ([permalink](/blog/customizing-themes-of-codename-one-apps/#comment-24418))
 
 > ThomasH99 says:
 >

@@ -78,7 +78,7 @@ This is a bit of a big change, ideally this side menu should be the default but 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Carlos** — May 17, 2017 at 1:28 pm ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23485))
+### **Carlos** — May 17, 2017 at 1:28 pm ([permalink](/blog/sidemenu-on-top/#comment-23485))
 
 > Carlos says:
 >
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 18, 2017 at 5:20 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23543))
+### **Shai Almog** — May 18, 2017 at 5:20 am ([permalink](/blog/sidemenu-on-top/#comment-23543))
 
 > Shai Almog says:
 >
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Klug Gauvain** — May 18, 2017 at 2:37 pm ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23492))
+### **Klug Gauvain** — May 18, 2017 at 2:37 pm ([permalink](/blog/sidemenu-on-top/#comment-23492))
 
 > Klug Gauvain says:
 >
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 19, 2017 at 4:55 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23282))
+### **Shai Almog** — May 19, 2017 at 4:55 am ([permalink](/blog/sidemenu-on-top/#comment-23282))
 
 > Shai Almog says:
 >
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Klug Gauvain** — May 19, 2017 at 7:19 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23373))
+### **Klug Gauvain** — May 19, 2017 at 7:19 am ([permalink](/blog/sidemenu-on-top/#comment-23373))
 
 > Klug Gauvain says:
 >
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **beck** — June 24, 2017 at 3:54 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23524))
+### **beck** — June 24, 2017 at 3:54 am ([permalink](/blog/sidemenu-on-top/#comment-23524))
 
 > beck says:
 >
@@ -145,7 +145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 24, 2017 at 4:39 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-24148))
+### **Shai Almog** — June 24, 2017 at 4:39 am ([permalink](/blog/sidemenu-on-top/#comment-24148))
 
 > Shai Almog says:
 >
@@ -154,7 +154,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gareth Murfin** — January 9, 2018 at 7:26 pm ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23730))
+### **Gareth Murfin** — January 9, 2018 at 7:26 pm ([permalink](/blog/sidemenu-on-top/#comment-23730))
 
 > Gareth Murfin says:
 >
@@ -163,7 +163,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 10, 2018 at 5:26 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23842))
+### **Shai Almog** — January 10, 2018 at 5:26 am ([permalink](/blog/sidemenu-on-top/#comment-23842))
 
 > Shai Almog says:
 >
@@ -172,7 +172,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gareth Murfin** — January 10, 2018 at 8:00 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23852))
+### **Gareth Murfin** — January 10, 2018 at 8:00 am ([permalink](/blog/sidemenu-on-top/#comment-23852))
 
 > Gareth Murfin says:
 >
@@ -181,7 +181,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 12, 2018 at 7:06 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23607))
+### **Shai Almog** — January 12, 2018 at 7:06 am ([permalink](/blog/sidemenu-on-top/#comment-23607))
 
 > Shai Almog says:
 >
@@ -190,7 +190,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Yaakov Gesher** — January 21, 2018 at 8:53 pm ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23764))
+### **Yaakov Gesher** — January 21, 2018 at 8:53 pm ([permalink](/blog/sidemenu-on-top/#comment-23764))
 
 > Yaakov Gesher says:
 >
@@ -199,7 +199,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 22, 2018 at 4:23 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23673))
+### **Shai Almog** — January 22, 2018 at 4:23 am ([permalink](/blog/sidemenu-on-top/#comment-23673))
 
 > Shai Almog says:
 >
@@ -209,7 +209,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Yaakov Gesher** — January 22, 2018 at 10:35 pm ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23929))
+### **Yaakov Gesher** — January 22, 2018 at 10:35 pm ([permalink](/blog/sidemenu-on-top/#comment-23929))
 
 > Yaakov Gesher says:
 >
@@ -218,7 +218,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 23, 2018 at 6:42 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23936))
+### **Shai Almog** — January 23, 2018 at 6:42 am ([permalink](/blog/sidemenu-on-top/#comment-23936))
 
 > Shai Almog says:
 >
@@ -229,7 +229,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — March 15, 2018 at 5:09 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-23682))
+### **Francesco Galgani** — March 15, 2018 at 5:09 am ([permalink](/blog/sidemenu-on-top/#comment-23682))
 
 > Francesco Galgani says:
 >
@@ -238,7 +238,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 16, 2018 at 5:11 am ([permalink](https://www.codenameone.com/blog/sidemenu-on-top.html#comment-21635))
+### **Shai Almog** — March 16, 2018 at 5:11 am ([permalink](/blog/sidemenu-on-top/#comment-21635))
 
 > Shai Almog says:
 >

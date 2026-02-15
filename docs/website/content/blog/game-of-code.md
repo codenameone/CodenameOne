@@ -45,7 +45,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — August 19, 2014 at 5:19 pm ([permalink](https://www.codenameone.com/blog/game-of-code.html#comment-22098))
+### **Anonymous** — August 19, 2014 at 5:19 pm ([permalink](/blog/game-of-code/#comment-22098))
 
 > Anonymous says:
 >
@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — August 20, 2014 at 2:34 am ([permalink](https://www.codenameone.com/blog/game-of-code.html#comment-21593))
+### **Anonymous** — August 20, 2014 at 2:34 am ([permalink](/blog/game-of-code/#comment-21593))
 
 > Anonymous says:
 >

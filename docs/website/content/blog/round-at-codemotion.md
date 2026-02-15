@@ -58,7 +58,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — December 2, 2014 at 7:38 am ([permalink](https://www.codenameone.com/blog/round-at-codemotion.html#comment-22146))
+### **Anonymous** — December 2, 2014 at 7:38 am ([permalink](/blog/round-at-codemotion/#comment-22146))
 
 > Anonymous says:
 >
@@ -67,7 +67,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 2, 2014 at 3:10 pm ([permalink](https://www.codenameone.com/blog/round-at-codemotion.html#comment-21476))
+### **Anonymous** — December 2, 2014 at 3:10 pm ([permalink](/blog/round-at-codemotion/#comment-21476))
 
 > Anonymous says:
 >
@@ -76,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 3, 2014 at 4:58 am ([permalink](https://www.codenameone.com/blog/round-at-codemotion.html#comment-22318))
+### **Anonymous** — December 3, 2014 at 4:58 am ([permalink](/blog/round-at-codemotion/#comment-22318))
 
 > Anonymous says:
 >
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 4, 2014 at 6:07 am ([permalink](https://www.codenameone.com/blog/round-at-codemotion.html#comment-21596))
+### **Anonymous** — December 4, 2014 at 6:07 am ([permalink](/blog/round-at-codemotion/#comment-21596))
 
 > Anonymous says:
 >
@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 4, 2014 at 1:13 pm ([permalink](https://www.codenameone.com/blog/round-at-codemotion.html#comment-22326))
+### **Anonymous** — December 4, 2014 at 1:13 pm ([permalink](/blog/round-at-codemotion/#comment-22326))
 
 > Anonymous says:
 >
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 5, 2014 at 3:24 am ([permalink](https://www.codenameone.com/blog/round-at-codemotion.html#comment-21996))
+### **Anonymous** — December 5, 2014 at 3:24 am ([permalink](/blog/round-at-codemotion/#comment-21996))
 
 > Anonymous says:
 >

@@ -76,7 +76,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — August 19, 2013 at 11:51 pm ([permalink](https://www.codenameone.com/blog/its-in-the-bag.html#comment-21776))
+### **Anonymous** — August 19, 2013 at 11:51 pm ([permalink](/blog/its-in-the-bag/#comment-21776))
 
 > Anonymous says:
 >
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 5, 2013 at 3:35 pm ([permalink](https://www.codenameone.com/blog/its-in-the-bag.html#comment-21803))
+### **Anonymous** — September 5, 2013 at 3:35 pm ([permalink](/blog/its-in-the-bag/#comment-21803))
 
 > Anonymous says:
 >

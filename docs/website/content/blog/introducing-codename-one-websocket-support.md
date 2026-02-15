@@ -129,18 +129,18 @@ Check out the [cn1-websockets project](https://github.com/shannah/cn1-websockets
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — December 19, 2017 at 12:33 pm ([permalink](https://www.codenameone.com/blog/introducing-codename-one-websocket-support.html#comment-23794))
+### **Francesco Galgani** — December 19, 2017 at 12:33 pm ([permalink](/blog/introducing-codename-one-websocket-support/#comment-23794))
 
 > Francesco Galgani says:
 >
 > I’m starting to search information on Codename One WebSockets because this discussion:  
 > [https://stackoverflow.com/q…](<https://stackoverflow.com/questions/47876835/codename-one-how-to-correctly-add-the-pubnub-library-and-use-it/47880481#47880481>)  
-> I didn’t find information on WebSockets in the developer guide, but I found this page. Please note that the following page gives a 404 error: [https://www.codenameone.com…](<https://www.codenameone.com/blog/tags/websockets.html>)
+> I didn’t find information on WebSockets in the developer guide, but I found this page. Please note that the following page gives a 404 error: [https://www.codenameone.com…](</blog/tags/websockets/>)
 >
 
 
 
-### **Shai Almog** — December 20, 2017 at 6:33 am ([permalink](https://www.codenameone.com/blog/introducing-codename-one-websocket-support.html#comment-23647))
+### **Shai Almog** — December 20, 2017 at 6:33 am ([permalink](/blog/introducing-codename-one-websocket-support/#comment-23647))
 
 > Shai Almog says:
 >

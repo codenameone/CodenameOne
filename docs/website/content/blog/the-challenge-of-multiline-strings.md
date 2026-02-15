@@ -87,7 +87,7 @@ of the complexities involved.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jacques Koorts** — April 28, 2016 at 3:25 pm ([permalink](https://www.codenameone.com/blog/the-challenge-of-multiline-strings.html#comment-22839))
+### **Jacques Koorts** — April 28, 2016 at 3:25 pm ([permalink](/blog/the-challenge-of-multiline-strings/#comment-22839))
 
 > Jacques Koorts says:
 >
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > You look at the problem from a ui designer point of view
 
 
-### **Shai Almog** — April 29, 2016 at 4:06 am ([permalink](https://www.codenameone.com/blog/the-challenge-of-multiline-strings.html#comment-22576))
+### **Shai Almog** — April 29, 2016 at 4:06 am ([permalink](/blog/the-challenge-of-multiline-strings/#comment-22576))
 
 > Shai Almog says:
 >

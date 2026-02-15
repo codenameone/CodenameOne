@@ -65,7 +65,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — November 6, 2013 at 5:27 pm ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21844))
+### **Anonymous** — November 6, 2013 at 5:27 pm ([permalink](/blog/surprises-and-changes/#comment-21844))
 
 > Anonymous says:
 >
@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 12, 2013 at 1:09 pm ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21765))
+### **Anonymous** — November 12, 2013 at 1:09 pm ([permalink](/blog/surprises-and-changes/#comment-21765))
 
 > Anonymous says:
 >
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 12, 2013 at 3:47 pm ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21834))
+### **Anonymous** — November 12, 2013 at 3:47 pm ([permalink](/blog/surprises-and-changes/#comment-21834))
 
 > Anonymous says:
 >
@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 20, 2013 at 5:51 am ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21777))
+### **Anonymous** — November 20, 2013 at 5:51 am ([permalink](/blog/surprises-and-changes/#comment-21777))
 
 > Anonymous says:
 >
@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 20, 2013 at 1:00 pm ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21794))
+### **Anonymous** — November 20, 2013 at 1:00 pm ([permalink](/blog/surprises-and-changes/#comment-21794))
 
 > Anonymous says:
 >
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 21, 2013 at 5:12 am ([permalink](https://www.codenameone.com/blog/surprises-and-changes.html#comment-21750))
+### **Anonymous** — November 21, 2013 at 5:12 am ([permalink](/blog/surprises-and-changes/#comment-21750))
 
 > Anonymous says:
 >

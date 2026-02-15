@@ -36,7 +36,7 @@ E.g. the URL matching the version above would look like that:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **adalbert** — February 10, 2018 at 10:41 am ([permalink](https://www.codenameone.com/blog/logged-versions.html#comment-23630))
+### **adalbert** — February 10, 2018 at 10:41 am ([permalink](/blog/logged-versions/#comment-23630))
 
 > adalbert says:
 >
@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 11, 2018 at 7:26 am ([permalink](https://www.codenameone.com/blog/logged-versions.html#comment-23811))
+### **Shai Almog** — February 11, 2018 at 7:26 am ([permalink](/blog/logged-versions/#comment-23811))
 
 > Shai Almog says:
 >

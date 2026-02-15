@@ -130,7 +130,7 @@ Some performance tips are generic and you can check them out in [our developer g
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jérémy MARQUER** — August 26, 2016 at 7:19 am ([permalink](https://www.codenameone.com/blog/performance-true-story.html#comment-24205))
+### **Jérémy MARQUER** — August 26, 2016 at 7:19 am ([permalink](/blog/performance-true-story/#comment-24205))
 
 > Jérémy MARQUER says:
 >
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 27, 2016 at 5:10 am ([permalink](https://www.codenameone.com/blog/performance-true-story.html#comment-22914))
+### **Shai Almog** — August 27, 2016 at 5:10 am ([permalink](/blog/performance-true-story/#comment-22914))
 
 > Shai Almog says:
 >
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Carlos** — March 10, 2017 at 6:21 pm ([permalink](https://www.codenameone.com/blog/performance-true-story.html#comment-23321))
+### **Carlos** — March 10, 2017 at 6:21 pm ([permalink](/blog/performance-true-story/#comment-23321))
 
 > Carlos says:
 >
@@ -160,7 +160,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 11, 2017 at 6:14 am ([permalink](https://www.codenameone.com/blog/performance-true-story.html#comment-23079))
+### **Shai Almog** — March 11, 2017 at 6:14 am ([permalink](/blog/performance-true-story/#comment-23079))
 
 > Shai Almog says:
 >

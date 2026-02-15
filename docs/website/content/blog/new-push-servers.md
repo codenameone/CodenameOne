@@ -135,7 +135,7 @@ builtin features for cross section/analytics.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jaanus Hansen** — September 2, 2015 at 9:01 pm ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-24181))
+### **Jaanus Hansen** — September 2, 2015 at 9:01 pm ([permalink](/blog/new-push-servers/#comment-24181))
 
 > Jaanus Hansen says:
 >
@@ -144,7 +144,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 3, 2015 at 3:39 am ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22420))
+### **Shai Almog** — September 3, 2015 at 3:39 am ([permalink](/blog/new-push-servers/#comment-22420))
 
 > Shai Almog says:
 >
@@ -154,7 +154,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Carlos** — September 10, 2015 at 5:56 pm ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22162))
+### **Carlos** — September 10, 2015 at 5:56 pm ([permalink](/blog/new-push-servers/#comment-22162))
 
 > Carlos says:
 >
@@ -168,7 +168,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 11, 2015 at 3:58 am ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22357))
+### **Shai Almog** — September 11, 2015 at 3:58 am ([permalink](/blog/new-push-servers/#comment-22357))
 
 > Shai Almog says:
 >
@@ -177,7 +177,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Wim Bervoets** — September 15, 2015 at 7:51 am ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-21546))
+### **Wim Bervoets** — September 15, 2015 at 7:51 am ([permalink](/blog/new-push-servers/#comment-21546))
 
 > Wim Bervoets says:
 >
@@ -188,7 +188,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 15, 2015 at 1:38 pm ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22316))
+### **Shai Almog** — September 15, 2015 at 1:38 pm ([permalink](/blog/new-push-servers/#comment-22316))
 
 > Shai Almog says:
 >
@@ -204,7 +204,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gerben Kegel** — February 16, 2016 at 11:51 am ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22582))
+### **Gerben Kegel** — February 16, 2016 at 11:51 am ([permalink](/blog/new-push-servers/#comment-22582))
 
 > Gerben Kegel says:
 >
@@ -213,7 +213,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 17, 2016 at 3:33 am ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22349))
+### **Shai Almog** — February 17, 2016 at 3:33 am ([permalink](/blog/new-push-servers/#comment-22349))
 
 > Shai Almog says:
 >
@@ -222,7 +222,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gerben Kegel** — February 17, 2016 at 9:17 am ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22334))
+### **Gerben Kegel** — February 17, 2016 at 9:17 am ([permalink](/blog/new-push-servers/#comment-22334))
 
 > Gerben Kegel says:
 >
@@ -239,7 +239,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 18, 2016 at 3:27 am ([permalink](https://www.codenameone.com/blog/new-push-servers.html#comment-22245))
+### **Shai Almog** — February 18, 2016 at 3:27 am ([permalink](/blog/new-push-servers/#comment-22245))
 
 > Shai Almog says:
 >

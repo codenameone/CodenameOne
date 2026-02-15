@@ -114,7 +114,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 13, 2015 at 7:17 am ([permalink](https://www.codenameone.com/blog/windows-phone-improvements-build-screenshots.html#comment-22201))
+### **Anonymous** — March 13, 2015 at 7:17 am ([permalink](/blog/windows-phone-improvements-build-screenshots/#comment-22201))
 
 > Anonymous says:
 >
@@ -123,7 +123,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 13, 2015 at 7:17 am ([permalink](https://www.codenameone.com/blog/windows-phone-improvements-build-screenshots.html#comment-22273))
+### **Anonymous** — March 13, 2015 at 7:17 am ([permalink](/blog/windows-phone-improvements-build-screenshots/#comment-22273))
 
 > Anonymous says:
 >

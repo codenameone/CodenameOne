@@ -81,7 +81,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Gert** — July 13, 2017 at 2:14 am ([permalink](https://www.codenameone.com/blog/native-interface.html#comment-23710))
+### **Gert** — July 13, 2017 at 2:14 am ([permalink](/blog/native-interface/#comment-23710))
 
 > Gert says:
 >
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 13, 2017 at 4:26 am ([permalink](https://www.codenameone.com/blog/native-interface.html#comment-23669))
+### **Shai Almog** — July 13, 2017 at 4:26 am ([permalink](/blog/native-interface/#comment-23669))
 
 > Shai Almog says:
 >
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gert** — July 13, 2017 at 4:39 am ([permalink](https://www.codenameone.com/blog/native-interface.html#comment-23582))
+### **Gert** — July 13, 2017 at 4:39 am ([permalink](/blog/native-interface/#comment-23582))
 
 > Gert says:
 >
@@ -115,7 +115,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 14, 2017 at 6:34 am ([permalink](https://www.codenameone.com/blog/native-interface.html#comment-23461))
+### **Shai Almog** — July 14, 2017 at 6:34 am ([permalink](/blog/native-interface/#comment-23461))
 
 > Shai Almog says:
 >

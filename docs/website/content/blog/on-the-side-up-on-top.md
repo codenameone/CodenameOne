@@ -102,28 +102,28 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — September 19, 2013 at 8:55 pm ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-21872))
+### **Anonymous** — September 19, 2013 at 8:55 pm ([permalink](/blog/on-the-side-up-on-top/#comment-21872))
 
 > Anonymous says:
 >
 > Oh these new additions to side menu are great, thanks.
 
 
-### **Anonymous** — September 20, 2013 at 12:46 am ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-21618))
+### **Anonymous** — September 20, 2013 at 12:46 am ([permalink](/blog/on-the-side-up-on-top/#comment-21618))
 
 > Anonymous says:
 >
 > Great work on this guys.
 
 
-### **Anonymous** — February 21, 2015 at 4:16 am ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-22207))
+### **Anonymous** — February 21, 2015 at 4:16 am ([permalink](/blog/on-the-side-up-on-top/#comment-22207))
 
 > Anonymous says:
 >
 > wow great tutorial, much helpfull
 
 
-### **Anonymous** — March 6, 2015 at 10:18 am ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-22303))
+### **Anonymous** — March 6, 2015 at 10:18 am ([permalink](/blog/on-the-side-up-on-top/#comment-22303))
 
 > Anonymous says:
 >
@@ -134,7 +134,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Dante
 
 
-### **Anonymous** — March 6, 2015 at 2:41 pm ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-21541))
+### **Anonymous** — March 6, 2015 at 2:41 pm ([permalink](/blog/on-the-side-up-on-top/#comment-21541))
 
 > Anonymous says:
 >
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > To show your icon just use a layer in the layered layout and when its tapped just invoke open sidemenu.
 
 
-### **Mahmoud** — March 14, 2016 at 11:39 am ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-21494))
+### **Mahmoud** — March 14, 2016 at 11:39 am ([permalink](/blog/on-the-side-up-on-top/#comment-21494))
 
 > Mahmoud says:
 >
@@ -152,21 +152,21 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > but my SideMenuBarImage in my theme is white color
 
 
-### **Shai Almog** — March 15, 2016 at 3:20 am ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-22501))
+### **Shai Almog** — March 15, 2016 at 3:20 am ([permalink](/blog/on-the-side-up-on-top/#comment-22501))
 
 > Shai Almog says:
 >
 > You need to use the theme constant rightSideMenuImage as you can have two different side menu bars and each can have its own image. You are seeing the default image whose color you can control by styling the foreground property.
 
 
-### **Mahmoud** — March 15, 2016 at 12:13 pm ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-21555))
+### **Mahmoud** — March 15, 2016 at 12:13 pm ([permalink](/blog/on-the-side-up-on-top/#comment-21555))
 
 > Mahmoud says:
 >
 > thanks Shai
 
 
-### **Mahmoud** — March 26, 2016 at 8:45 pm ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-22639))
+### **Mahmoud** — March 26, 2016 at 8:45 pm ([permalink](/blog/on-the-side-up-on-top/#comment-22639))
 
 > Mahmoud says:
 >
@@ -176,14 +176,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > thanks
 
 
-### **Shai Almog** — March 27, 2016 at 4:27 am ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-22510))
+### **Shai Almog** — March 27, 2016 at 4:27 am ([permalink](/blog/on-the-side-up-on-top/#comment-22510))
 
 > Shai Almog says:
 >
 > That is the shadow for the sidemenu set the theme constant sideMenuShadowBool=false
 
 
-### **Mahmoud** — March 27, 2016 at 5:46 am ([permalink](https://www.codenameone.com/blog/on-the-side-up-on-top.html#comment-21433))
+### **Mahmoud** — March 27, 2016 at 5:46 am ([permalink](/blog/on-the-side-up-on-top/#comment-21433))
 
 > Mahmoud says:
 >

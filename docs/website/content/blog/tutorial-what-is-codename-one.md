@@ -121,7 +121,7 @@ Thanks for baring with me. I hope this was helpful and informative.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **marksluser** — January 1, 2021 at 11:24 pm ([permalink](https://www.codenameone.com/blog/tutorial-what-is-codename-one.html#comment-24370))
+### **marksluser** — January 1, 2021 at 11:24 pm ([permalink](/blog/tutorial-what-is-codename-one/#comment-24370))
 
 > marksluser says:
 >
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 2, 2021 at 5:54 am ([permalink](https://www.codenameone.com/blog/tutorial-what-is-codename-one.html#comment-24371))
+### **Shai Almog** — January 2, 2021 at 5:54 am ([permalink](/blog/tutorial-what-is-codename-one/#comment-24371))
 
 > Shai Almog says:
 >

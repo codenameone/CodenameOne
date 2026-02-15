@@ -48,7 +48,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — August 27, 2014 at 12:54 pm ([permalink](https://www.codenameone.com/blog/perspective-transform.html#comment-21594))
+### **Anonymous** — August 27, 2014 at 12:54 pm ([permalink](/blog/perspective-transform/#comment-21594))
 
 > Anonymous says:
 >
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — August 27, 2014 at 2:16 pm ([permalink](https://www.codenameone.com/blog/perspective-transform.html#comment-22079))
+### **Anonymous** — August 27, 2014 at 2:16 pm ([permalink](/blog/perspective-transform/#comment-22079))
 
 > Anonymous says:
 >
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 18, 2015 at 6:43 pm ([permalink](https://www.codenameone.com/blog/perspective-transform.html#comment-21428))
+### **Anonymous** — February 18, 2015 at 6:43 pm ([permalink](/blog/perspective-transform/#comment-21428))
 
 > Anonymous says:
 >
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 19, 2015 at 3:53 am ([permalink](https://www.codenameone.com/blog/perspective-transform.html#comment-22310))
+### **Anonymous** — February 19, 2015 at 3:53 am ([permalink](/blog/perspective-transform/#comment-22310))
 
 > Anonymous says:
 >

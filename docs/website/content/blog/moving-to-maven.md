@@ -155,7 +155,7 @@ Watch the video demo of [Codename One initializr](https://dev.to/shannah/online-
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Javier Anton** — March 29, 2021 at 11:53 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24419))
+### **Javier Anton** — March 29, 2021 at 11:53 pm ([permalink](/blog/moving-to-maven/#comment-24419))
 
 > Javier Anton says:
 >
@@ -166,7 +166,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — March 29, 2021 at 11:59 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24420))
+### **Steve Hannah** — March 29, 2021 at 11:59 pm ([permalink](/blog/moving-to-maven/#comment-24420))
 
 > Steve Hannah says:
 >
@@ -175,7 +175,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — March 30, 2021 at 7:42 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24421))
+### **Javier Anton** — March 30, 2021 at 7:42 am ([permalink](/blog/moving-to-maven/#comment-24421))
 
 > Javier Anton says:
 >
@@ -184,7 +184,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — March 30, 2021 at 12:29 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24426))
+### **Steve Hannah** — March 30, 2021 at 12:29 pm ([permalink](/blog/moving-to-maven/#comment-24426))
 
 > Steve Hannah says:
 >
@@ -193,7 +193,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — March 30, 2021 at 9:48 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24422))
+### **Javier Anton** — March 30, 2021 at 9:48 am ([permalink](/blog/moving-to-maven/#comment-24422))
 
 > Javier Anton says:
 >
@@ -210,7 +210,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — March 30, 2021 at 9:49 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24423))
+### **Javier Anton** — March 30, 2021 at 9:49 am ([permalink](/blog/moving-to-maven/#comment-24423))
 
 > Javier Anton says:
 >
@@ -219,7 +219,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — March 30, 2021 at 9:53 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24424))
+### **Javier Anton** — March 30, 2021 at 9:53 am ([permalink](/blog/moving-to-maven/#comment-24424))
 
 > Javier Anton says:
 >
@@ -228,7 +228,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — April 1, 2021 at 12:23 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24436))
+### **Steve Hannah** — April 1, 2021 at 12:23 pm ([permalink](/blog/moving-to-maven/#comment-24436))
 
 > Steve Hannah says:
 >
@@ -238,7 +238,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — March 30, 2021 at 12:28 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24425))
+### **Steve Hannah** — March 30, 2021 at 12:28 pm ([permalink](/blog/moving-to-maven/#comment-24425))
 
 > Steve Hannah says:
 >
@@ -247,7 +247,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — March 30, 2021 at 7:44 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24427))
+### **Javier Anton** — March 30, 2021 at 7:44 pm ([permalink](/blog/moving-to-maven/#comment-24427))
 
 > Javier Anton says:
 >
@@ -256,7 +256,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — March 30, 2021 at 7:59 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24428))
+### **Steve Hannah** — March 30, 2021 at 7:59 pm ([permalink](/blog/moving-to-maven/#comment-24428))
 
 > Steve Hannah says:
 >
@@ -273,7 +273,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — March 30, 2021 at 11:51 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24429))
+### **Javier Anton** — March 30, 2021 at 11:51 pm ([permalink](/blog/moving-to-maven/#comment-24429))
 
 > Javier Anton says:
 >
@@ -291,7 +291,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > These errors happen both in PowerShell and in NetBeans
 
 
-### **Steve Hannah** — March 31, 2021 at 12:14 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24430))
+### **Steve Hannah** — March 31, 2021 at 12:14 am ([permalink](/blog/moving-to-maven/#comment-24430))
 
 > Steve Hannah says:
 >
@@ -299,7 +299,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 2. If it is 7.0.17, then please describe the exact command you are running, and what output you are getting.
 
 
-### **Javier Anton** — March 31, 2021 at 8:05 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24431))
+### **Javier Anton** — March 31, 2021 at 8:05 am ([permalink](/blog/moving-to-maven/#comment-24431))
 
 > Javier Anton says:
 >
@@ -318,7 +318,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I just tried “Clean and Rebuild” and now my project doesn’t detect Android native code anymore. I think I’ll have to re-run the migration later today and see if something changes
 
 
-### **Javier Anton** — March 31, 2021 at 7:25 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24432))
+### **Javier Anton** — March 31, 2021 at 7:25 pm ([permalink](/blog/moving-to-maven/#comment-24432))
 
 > Javier Anton says:
 >
@@ -340,7 +340,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Feel free to send me an email or anything, I can jump on a call too if required. Unless you can think of anything I will stop trying to fix this for now as I feel I have hit a dead end
 
 
-### **Steve Hannah** — March 31, 2021 at 9:25 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24433))
+### **Steve Hannah** — March 31, 2021 at 9:25 pm ([permalink](/blog/moving-to-maven/#comment-24433))
 
 > Steve Hannah says:
 >
@@ -349,7 +349,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — April 1, 2021 at 8:51 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24434))
+### **Javier Anton** — April 1, 2021 at 8:51 am ([permalink](/blog/moving-to-maven/#comment-24434))
 
 > Javier Anton says:
 >
@@ -357,7 +357,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Android builds still try to find the android SDK for native sources and fail
 
 
-### **Steve Hannah** — April 1, 2021 at 12:21 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24435))
+### **Steve Hannah** — April 1, 2021 at 12:21 pm ([permalink](/blog/moving-to-maven/#comment-24435))
 
 > Steve Hannah says:
 >
@@ -367,7 +367,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — April 1, 2021 at 2:45 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24437))
+### **Javier Anton** — April 1, 2021 at 2:45 pm ([permalink](/blog/moving-to-maven/#comment-24437))
 
 > Javier Anton says:
 >
@@ -376,7 +376,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Eric Gbofu** — April 1, 2021 at 4:15 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24438))
+### **Eric Gbofu** — April 1, 2021 at 4:15 pm ([permalink](/blog/moving-to-maven/#comment-24438))
 
 > Eric Gbofu says:
 >
@@ -395,7 +395,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — April 1, 2021 at 4:50 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24439))
+### **Steve Hannah** — April 1, 2021 at 4:50 pm ([permalink](/blog/moving-to-maven/#comment-24439))
 
 > Steve Hannah says:
 >
@@ -404,7 +404,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Eric Gbofu** — April 1, 2021 at 5:06 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24440))
+### **Eric Gbofu** — April 1, 2021 at 5:06 pm ([permalink](/blog/moving-to-maven/#comment-24440))
 
 > Eric Gbofu says:
 >
@@ -417,7 +417,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — April 1, 2021 at 5:41 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24441))
+### **Steve Hannah** — April 1, 2021 at 5:41 pm ([permalink](/blog/moving-to-maven/#comment-24441))
 
 > Steve Hannah says:
 >
@@ -426,14 +426,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Eric Gbofu** — April 1, 2021 at 9:43 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24442))
+### **Eric Gbofu** — April 1, 2021 at 9:43 pm ([permalink](/blog/moving-to-maven/#comment-24442))
 
 > Eric Gbofu says:
 >
 > Ok! Thanks for the clarification
 
 
-### **Eric Gbofu** — April 1, 2021 at 11:29 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24443))
+### **Eric Gbofu** — April 1, 2021 at 11:29 pm ([permalink](/blog/moving-to-maven/#comment-24443))
 
 > Eric Gbofu says:
 >
@@ -442,7 +442,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Eric Gbofu** — April 1, 2021 at 11:30 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24444))
+### **Eric Gbofu** — April 1, 2021 at 11:30 pm ([permalink](/blog/moving-to-maven/#comment-24444))
 
 > Eric Gbofu says:
 >
@@ -451,7 +451,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Raazia Tariq** — February 22, 2024 at 9:42 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24596))
+### **Raazia Tariq** — February 22, 2024 at 9:42 pm ([permalink](/blog/moving-to-maven/#comment-24596))
 
 > Raazia Tariq says:
 >
@@ -462,7 +462,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 23, 2024 at 3:02 am ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24597))
+### **Shai Almog** — February 23, 2024 at 3:02 am ([permalink](/blog/moving-to-maven/#comment-24597))
 
 > Shai Almog says:
 >
@@ -471,7 +471,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Raazia Tariq** — February 23, 2024 at 4:16 pm ([permalink](https://www.codenameone.com/blog/moving-to-maven.html#comment-24598))
+### **Raazia Tariq** — February 23, 2024 at 4:16 pm ([permalink](/blog/moving-to-maven/#comment-24598))
 
 > Raazia Tariq says:
 >

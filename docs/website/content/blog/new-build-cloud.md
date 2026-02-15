@@ -47,7 +47,7 @@ Once the book is done I’ll publish the first two chapters and the appendices h
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — July 4, 2018 at 12:39 am ([permalink](https://www.codenameone.com/blog/new-build-cloud.html#comment-24010))
+### **Francesco Galgani** — July 4, 2018 at 12:39 am ([permalink](/blog/new-build-cloud/#comment-24010))
 
 > Francesco Galgani says:
 >
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 4, 2018 at 4:24 am ([permalink](https://www.codenameone.com/blog/new-build-cloud.html#comment-24016))
+### **Shai Almog** — July 4, 2018 at 4:24 am ([permalink](/blog/new-build-cloud/#comment-24016))
 
 > Shai Almog says:
 >
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — July 4, 2018 at 10:35 am ([permalink](https://www.codenameone.com/blog/new-build-cloud.html#comment-24022))
+### **Francesco Galgani** — July 4, 2018 at 10:35 am ([permalink](/blog/new-build-cloud/#comment-24022))
 
 > Francesco Galgani says:
 >
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 5, 2018 at 4:01 am ([permalink](https://www.codenameone.com/blog/new-build-cloud.html#comment-23557))
+### **Shai Almog** — July 5, 2018 at 4:01 am ([permalink](/blog/new-build-cloud/#comment-23557))
 
 > Shai Almog says:
 >

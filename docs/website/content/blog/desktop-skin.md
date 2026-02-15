@@ -37,7 +37,7 @@ If you are looking to build desktop and web apps using Codename One let us know 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Carlos** — July 4, 2017 at 6:53 pm ([permalink](https://www.codenameone.com/blog/desktop-skin.html#comment-23359))
+### **Carlos** — July 4, 2017 at 6:53 pm ([permalink](/blog/desktop-skin/#comment-23359))
 
 > Good move.
 >
@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 5, 2017 at 4:10 am ([permalink](https://www.codenameone.com/blog/desktop-skin.html#comment-23652))
+### **Shai Almog** — July 5, 2017 at 4:10 am ([permalink](/blog/desktop-skin/#comment-23652))
 
 > Thanks.  
 > Not at this time, we have the desktop.width and desktop.height build hints but not programmatically.
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gareth Murfin** — February 14, 2018 at 9:03 am ([permalink](https://www.codenameone.com/blog/desktop-skin.html#comment-23723))
+### **Gareth Murfin** — February 14, 2018 at 9:03 am ([permalink](/blog/desktop-skin/#comment-23723))
 
 > Gareth Murfin says:
 >

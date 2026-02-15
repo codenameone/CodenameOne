@@ -258,7 +258,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — February 5, 2015 at 2:46 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-21800))
+### **Anonymous** — February 5, 2015 at 2:46 am ([permalink](/blog/codename-one-charts/#comment-21800))
 
 > Anonymous says:
 >
@@ -267,7 +267,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 6, 2015 at 2:07 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-22101))
+### **Anonymous** — February 6, 2015 at 2:07 am ([permalink](/blog/codename-one-charts/#comment-22101))
 
 > Anonymous says:
 >
@@ -282,7 +282,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 6, 2015 at 6:02 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-22336))
+### **Anonymous** — February 6, 2015 at 6:02 pm ([permalink](/blog/codename-one-charts/#comment-22336))
 
 > Anonymous says:
 >
@@ -291,7 +291,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 6, 2015 at 6:13 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-22206))
+### **Anonymous** — February 6, 2015 at 6:13 pm ([permalink](/blog/codename-one-charts/#comment-22206))
 
 > Anonymous says:
 >
@@ -300,7 +300,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **manezi** — May 18, 2015 at 9:56 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-22319))
+### **manezi** — May 18, 2015 at 9:56 am ([permalink](/blog/codename-one-charts/#comment-22319))
 
 > manezi says:
 >
@@ -309,7 +309,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 18, 2015 at 3:28 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-22392))
+### **Shai Almog** — May 18, 2015 at 3:28 pm ([permalink](/blog/codename-one-charts/#comment-22392))
 
 > Shai Almog says:
 >
@@ -320,7 +320,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Sana Maghraoui** — December 24, 2016 at 9:32 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23294))
+### **Sana Maghraoui** — December 24, 2016 at 9:32 am ([permalink](/blog/codename-one-charts/#comment-23294))
 
 > Sana Maghraoui says:
 >
@@ -329,7 +329,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 25, 2016 at 8:14 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23067))
+### **Shai Almog** — December 25, 2016 at 8:14 am ([permalink](/blog/codename-one-charts/#comment-23067))
 
 > Shai Almog says:
 >
@@ -339,7 +339,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Sana Maghraoui** — December 25, 2016 at 5:15 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-24118))
+### **Sana Maghraoui** — December 25, 2016 at 5:15 pm ([permalink](/blog/codename-one-charts/#comment-24118))
 
 > Sana Maghraoui says:
 >
@@ -350,7 +350,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 26, 2016 at 5:06 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-22838))
+### **Shai Almog** — December 26, 2016 at 5:06 am ([permalink](/blog/codename-one-charts/#comment-22838))
 
 > Shai Almog says:
 >
@@ -359,7 +359,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Sana Maghraoui** — December 26, 2016 at 8:37 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23096))
+### **Sana Maghraoui** — December 26, 2016 at 8:37 am ([permalink](/blog/codename-one-charts/#comment-23096))
 
 > Sana Maghraoui says:
 >
@@ -369,7 +369,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Sana Maghraoui** — December 26, 2016 at 1:57 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23231))
+### **Sana Maghraoui** — December 26, 2016 at 1:57 pm ([permalink](/blog/codename-one-charts/#comment-23231))
 
 > Sana Maghraoui says:
 >
@@ -378,7 +378,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 27, 2016 at 6:24 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23208))
+### **Shai Almog** — December 27, 2016 at 6:24 am ([permalink](/blog/codename-one-charts/#comment-23208))
 
 > Shai Almog says:
 >
@@ -387,7 +387,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Sana Maghraoui** — December 27, 2016 at 9:53 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-24122))
+### **Sana Maghraoui** — December 27, 2016 at 9:53 am ([permalink](/blog/codename-one-charts/#comment-24122))
 
 > Sana Maghraoui says:
 >
@@ -396,7 +396,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Sana Maghraoui** — December 27, 2016 at 10:02 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23062))
+### **Sana Maghraoui** — December 27, 2016 at 10:02 am ([permalink](/blog/codename-one-charts/#comment-23062))
 
 > Sana Maghraoui says:
 >
@@ -405,7 +405,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 28, 2016 at 1:23 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23175))
+### **Shai Almog** — December 28, 2016 at 1:23 pm ([permalink](/blog/codename-one-charts/#comment-23175))
 
 > Shai Almog says:
 >
@@ -414,7 +414,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Sana Maghraoui** — December 28, 2016 at 10:04 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23037))
+### **Sana Maghraoui** — December 28, 2016 at 10:04 pm ([permalink](/blog/codename-one-charts/#comment-23037))
 
 > Sana Maghraoui says:
 >
@@ -423,7 +423,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 29, 2016 at 5:51 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-22688))
+### **Shai Almog** — December 29, 2016 at 5:51 am ([permalink](/blog/codename-one-charts/#comment-22688))
 
 > Shai Almog says:
 >
@@ -432,18 +432,18 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jared Ruplinger** — October 9, 2017 at 3:05 pm ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23646))
+### **Jared Ruplinger** — October 9, 2017 at 3:05 pm ([permalink](/blog/codename-one-charts/#comment-23646))
 
 > Jared Ruplinger says:
 >
-> For those who are having trouble following the examples in the demo linked from this post, you might want to check out the “newer” demo from the post at [https://www.codenameone.com…](<https://www.codenameone.com/blog/charts-demo-revisited.html>)
+> For those who are having trouble following the examples in the demo linked from this post, you might want to check out the “newer” demo from the post at [https://www.codenameone.com…](</blog/charts-demo-revisited/>)
 >
 > It is a smidge simpler. That aside, however, there are a lot of moving pieces to the charts functionality and it would sure be nice to have some more thorough documentation.
 >
 
 
 
-### **Shai Almog** — October 10, 2017 at 4:40 am ([permalink](https://www.codenameone.com/blog/codename-one-charts.html#comment-23638))
+### **Shai Almog** — October 10, 2017 at 4:40 am ([permalink](/blog/codename-one-charts/#comment-23638))
 
 > Shai Almog says:
 >

@@ -13,7 +13,7 @@ author: Steve Hannah
 
 The next plugin update will add support for native interfaces in UWP. This opens the door for you to really dig into the native features of Windows if you wish to do so. Crucially, this will also allow us to push forward with windows support on some of the cn1libs that require native functionality. As a proof of concept, I have updated the CN1WebSockets library to support windows. It now works on all major platforms: iOS, Android, Javascript, UWP (Windows 10), Simulator, and Desktop builds. If you require sockets in your app, I highly recommend web sockets, as it is the most portable option currently available.
 
-For more information about the CN1 Websockets lib, check out my [previous blog post on the subject](https://www.codenameone.com/blog/introducing-codename-one-websocket-support.html).
+For more information about the CN1 Websockets lib, check out my [previous blog post on the subject](/blog/introducing-codename-one-websocket-support/).
 
 ### Inside the Source of a UWP Native Interface
 
@@ -143,14 +143,14 @@ When developing native interfaces, the process I usually follow is:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Hristo Vrigazov** — November 16, 2016 at 6:28 pm ([permalink](https://www.codenameone.com/blog/uwp-native-interfaces-mix-c-java.html#comment-22940))
+### **Hristo Vrigazov** — November 16, 2016 at 6:28 pm ([permalink](/blog/uwp-native-interfaces-mix-c-java/#comment-22940))
 
 > Great!
 >
 
 
 
-### **Chibuike Mba** — November 17, 2016 at 10:48 am ([permalink](https://www.codenameone.com/blog/uwp-native-interfaces-mix-c-java.html#comment-23044))
+### **Chibuike Mba** — November 17, 2016 at 10:48 am ([permalink](/blog/uwp-native-interfaces-mix-c-java/#comment-23044))
 
 > WOW! Steve this is good.
 >

@@ -142,14 +142,14 @@ You can also check out the Javadocs for the the library [here](https://rawgit.co
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **ftp27** — March 25, 2015 at 10:27 am ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-24242))
+### **ftp27** — March 25, 2015 at 10:27 am ([permalink](/blog/geo-visualization-library/#comment-24242))
 
 > Yesterday I’m solved a similar task 🙂
 >
 
 
 
-### **Chidiebere Okwudire** — March 18, 2017 at 11:57 pm ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23408))
+### **Chidiebere Okwudire** — March 18, 2017 at 11:57 pm ([permalink](/blog/geo-visualization-library/#comment-23408))
 
 > Chidiebere Okwudire says:
 >
@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — March 19, 2017 at 12:05 am ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23420))
+### **Chidiebere Okwudire** — March 19, 2017 at 12:05 am ([permalink](/blog/geo-visualization-library/#comment-23420))
 
 > Chidiebere Okwudire says:
 >
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 19, 2017 at 5:12 am ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23426))
+### **Shai Almog** — March 19, 2017 at 5:12 am ([permalink](/blog/geo-visualization-library/#comment-23426))
 
 > Shai Almog says:
 >
@@ -177,7 +177,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — March 25, 2017 at 10:30 pm ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23247))
+### **Chidiebere Okwudire** — March 25, 2017 at 10:30 pm ([permalink](/blog/geo-visualization-library/#comment-23247))
 
 > Chidiebere Okwudire says:
 >
@@ -186,7 +186,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — March 31, 2017 at 1:26 pm ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23481))
+### **shannah78** — March 31, 2017 at 1:26 pm ([permalink](/blog/geo-visualization-library/#comment-23481))
 
 > shannah78 says:
 >
@@ -197,7 +197,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — April 2, 2017 at 3:28 pm ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23490))
+### **Chidiebere Okwudire** — April 2, 2017 at 3:28 pm ([permalink](/blog/geo-visualization-library/#comment-23490))
 
 > Chidiebere Okwudire says:
 >
@@ -208,7 +208,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 2, 2017 at 5:03 pm ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23363))
+### **Shai Almog** — April 2, 2017 at 5:03 pm ([permalink](/blog/geo-visualization-library/#comment-23363))
 
 > Shai Almog says:
 >
@@ -219,7 +219,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — April 5, 2017 at 3:05 am ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23371))
+### **Chidiebere Okwudire** — April 5, 2017 at 3:05 am ([permalink](/blog/geo-visualization-library/#comment-23371))
 
 > Chidiebere Okwudire says:
 >
@@ -228,7 +228,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 5, 2017 at 4:32 am ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23315))
+### **Shai Almog** — April 5, 2017 at 4:32 am ([permalink](/blog/geo-visualization-library/#comment-23315))
 
 > Shai Almog says:
 >
@@ -237,7 +237,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — April 5, 2017 at 5:41 am ([permalink](https://www.codenameone.com/blog/geo-visualization-library.html#comment-23381))
+### **Chidiebere Okwudire** — April 5, 2017 at 5:41 am ([permalink](/blog/geo-visualization-library/#comment-23381))
 
 > Chidiebere Okwudire says:
 >

@@ -18,7 +18,7 @@ be used from the set of multi images or how many pixels will be used for 1 milli
 
 To make this process slightly easier we created a new demo that is remarkably simple but we are hoping it  
 would also be remarkably helpful. It just prints on the screen the settings and values of all the important  
-details mostly from the [Display class](https://www.codenameone.com/javadoc/com/codename1/ui/Display.html).
+details mostly from the [Display class](/javadoc/com/codename1/ui/Display/).
 
 This demo also allows you to send the details to your email directly so you can send it to a user who is experiencing  
 issues and understand some things about their device. This will also make it simpler for you to communicate issues  
@@ -248,7 +248,7 @@ The Java code to produce this is pretty trivial albeit a bit verbose:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — July 5, 2016 at 11:02 pm ([permalink](https://www.codenameone.com/blog/device-tester.html#comment-22885))
+### **bryan** — July 5, 2016 at 11:02 pm ([permalink](/blog/device-tester/#comment-22885))
 
 > bryan says:
 >
@@ -257,7 +257,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bryan** — July 5, 2016 at 11:54 pm ([permalink](https://www.codenameone.com/blog/device-tester.html#comment-21515))
+### **bryan** — July 5, 2016 at 11:54 pm ([permalink](/blog/device-tester/#comment-21515))
 
 > bryan says:
 >
@@ -266,7 +266,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Imriel** — July 12, 2016 at 5:59 am ([permalink](https://www.codenameone.com/blog/device-tester.html#comment-22625))
+### **Imriel** — July 12, 2016 at 5:59 am ([permalink](/blog/device-tester/#comment-22625))
 
 > Imriel says:
 >
@@ -275,7 +275,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 13, 2016 at 3:54 am ([permalink](https://www.codenameone.com/blog/device-tester.html#comment-22634))
+### **Shai Almog** — July 13, 2016 at 3:54 am ([permalink](/blog/device-tester/#comment-22634))
 
 > Shai Almog says:
 >

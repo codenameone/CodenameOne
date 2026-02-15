@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/tip-include-source-android-studio-3/tip.jpg)
 
-I covered the [include source feature](https://www.codenameone.com/how-do-i---use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc.html) extensively. For the most part it’s the simplest way to debug an application directly on the device. When I made that video the current version of Android Studio and Gradle were much older. We still use API version 23 on the build servers to keep everything compatible but you might want to use a newer version of the IDE.
+I covered the [include source feature](/how-do-i---use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc/) extensively. For the most part it’s the simplest way to debug an application directly on the device. When I made that video the current version of Android Studio and Gradle were much older. We still use API version 23 on the build servers to keep everything compatible but you might want to use a newer version of the IDE.
 
 In that case you can use the newer version 3.0+ of Android Studio but you will need to make a few updates to the process.
 

@@ -52,7 +52,7 @@ We think features such as JDK 9/10/11 support is crucial with the new JDK releas
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — June 28, 2018 at 6:51 am ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-24140))
+### **Diamond** — June 28, 2018 at 6:51 am ([permalink](/blog/moving-away-from-intercom/#comment-24140))
 
 > Diamond says:
 >
@@ -61,7 +61,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 29, 2018 at 6:20 am ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-23808))
+### **Shai Almog** — June 29, 2018 at 6:20 am ([permalink](/blog/moving-away-from-intercom/#comment-23808))
 
 > Shai Almog says:
 >
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — July 23, 2018 at 5:19 pm ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-23891))
+### **Francesco Galgani** — July 23, 2018 at 5:19 pm ([permalink](/blog/moving-away-from-intercom/#comment-23891))
 
 > Francesco Galgani says:
 >
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 24, 2018 at 4:11 am ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-23840))
+### **Shai Almog** — July 24, 2018 at 4:11 am ([permalink](/blog/moving-away-from-intercom/#comment-23840))
 
 > Shai Almog says:
 >
@@ -98,7 +98,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Caterina Bassano** — July 24, 2018 at 11:12 am ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-23976))
+### **Caterina Bassano** — July 24, 2018 at 11:12 am ([permalink](/blog/moving-away-from-intercom/#comment-23976))
 
 > Caterina Bassano says:
 >
@@ -107,7 +107,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 25, 2018 at 4:27 am ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-23982))
+### **Shai Almog** — July 25, 2018 at 4:27 am ([permalink](/blog/moving-away-from-intercom/#comment-23982))
 
 > Shai Almog says:
 >
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 25, 2018 at 5:47 am ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-23955))
+### **Shai Almog** — July 25, 2018 at 5:47 am ([permalink](/blog/moving-away-from-intercom/#comment-23955))
 
 > Shai Almog says:
 >
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — August 22, 2018 at 4:05 pm ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-23882))
+### **Francesco Galgani** — August 22, 2018 at 4:05 pm ([permalink](/blog/moving-away-from-intercom/#comment-23882))
 
 > Francesco Galgani says:
 >
@@ -160,7 +160,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 22, 2018 at 4:21 pm ([permalink](https://www.codenameone.com/blog/moving-away-from-intercom.html#comment-24068))
+### **Shai Almog** — August 22, 2018 at 4:21 pm ([permalink](/blog/moving-away-from-intercom/#comment-24068))
 
 > Shai Almog says:
 >

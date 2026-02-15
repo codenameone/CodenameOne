@@ -35,9 +35,9 @@ I barely wrote 100 lines of code (not the best ones). Even worst than that, I fe
 
 ### What Really Helped?
 
-I found the [Codename One developer guide](https://www.codenameone.com/developer-guide.html) to be the best learning resource. It’s great for learning your way around the tool and understanding its components. 
+I found the [Codename One developer guide](/developer-guide/) to be the best learning resource. It’s great for learning your way around the tool and understanding its components. 
 
-In the [How Do I](https://www.codenameone.com/how-do-i.html) section I found some very helpful video tutorials that also helped a lot with learning common use cases, like the [Layout basics](https://www.codenameone.com/how_di_i/how-do-i-positioning-components-using-layout-managers.html) video, and the [How to convert a PSD Design into a Native Mobile App](https://www.codenameone.com/video/how-to-convert-a-psd-design-into-a-native-mobile-app.html). 
+In the [How Do I](/how-do-i/) section I found some very helpful video tutorials that also helped a lot with learning common use cases, like the [Layout basics](/how_di_i/how-do-i-positioning-components-using-layout-managers/) video, and the [How to convert a PSD Design into a Native Mobile App](/video/how-to-convert-a-psd-design-into-a-native-mobile-app/). 
 
 At that point, I was comfortable enough with a good foundation level knowledge and my work seemed much smoother and stress-free. 
 
@@ -71,7 +71,7 @@ But more importantly, users can see and learn about the application structure an
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **[email protected]** — December 26, 2020 at 2:56 pm ([permalink](https://www.codenameone.com/blog/a-junior-software-developers-journey-at-codename-one.html#comment-24368))
+### **[email protected]** — December 26, 2020 at 2:56 pm ([permalink](/blog/a-junior-software-developers-journey-at-codename-one/#comment-24368))
 
 > [[email protected]](/cdn-cgi/l/email-protection) says:
 >

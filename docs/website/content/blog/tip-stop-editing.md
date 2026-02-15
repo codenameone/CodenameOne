@@ -38,7 +38,7 @@ The solution is to use the new `stopEditing(Runnable)` API. On most OS’s the r
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **3lix** — February 7, 2018 at 2:41 am ([permalink](https://www.codenameone.com/blog/tip-stop-editing.html#comment-21634))
+### **3lix** — February 7, 2018 at 2:41 am ([permalink](/blog/tip-stop-editing/#comment-21634))
 
 > 3lix says:
 >
@@ -47,7 +47,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 7, 2018 at 5:04 am ([permalink](https://www.codenameone.com/blog/tip-stop-editing.html#comment-21534))
+### **Shai Almog** — February 7, 2018 at 5:04 am ([permalink](/blog/tip-stop-editing/#comment-21534))
 
 > Shai Almog says:
 >

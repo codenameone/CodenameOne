@@ -13,10 +13,10 @@ author: Shai Almog
 
 A very common UI pattern is the 5 star ranking system. Up until recently we always had the same answer  
 when developers asked us how to implement it: “Use toggle buttons  
-([CheckBox](https://www.codenameone.com/javadoc/com/codename1/ui/CheckBox.html#createToggle-com.codename1.ui.Image-))”.
+([CheckBox](/javadoc/com/codename1/ui/CheckBox/#createToggle-com.codename1.ui.Image-))”.
 
 This is still not a bad answer but we think there is a “better” simpler way to do this thru the  
-[Slider](https://www.codenameone.com/javadoc/com/codename1/ui/Slider.html) which was  
+[Slider](/javadoc/com/codename1/ui/Slider/) which was  
 effectively designed with this usage in mind.
 
 The best way to do that is to just create two images with all 5 stars full and with all 5 stars empty and assign  
@@ -83,7 +83,7 @@ to pre-lambda code for practically everything as `Command` is a class and not a 
 bothered me enough to do something about it so now we have `ActionListener` versions of many `Command` API’s.
 
 These all redirect to the  
-[Command.create(String,Image,ActionListener)](https://www.codenameone.com/javadoc/com/codename1/ui/Command.html#create-java.lang.String-com.codename1.ui.Image-com.codename1.ui.events.ActionListener-)  
+[Command.create(String,Image,ActionListener)](/javadoc/com/codename1/ui/Command/#create-java.lang.String-com.codename1.ui.Image-com.codename1.ui.events.ActionListener-)  
 method which effectively creates a `Command` with the given details for the given action listener. So instead  
 of writing code like this:
     
@@ -122,7 +122,7 @@ which might be useful if you want to do something with the command later on (e.g
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — February 24, 2016 at 2:49 pm ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-22227))
+### **Diamond** — February 24, 2016 at 2:49 pm ([permalink](/blog/its-full-of-stars-terse-commands/#comment-22227))
 
 > Diamond says:
 >
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 24, 2016 at 2:52 pm ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-22727))
+### **Shai Almog** — February 24, 2016 at 2:52 pm ([permalink](/blog/its-full-of-stars-terse-commands/#comment-22727))
 
 > Shai Almog says:
 >
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond** — February 24, 2016 at 5:50 pm ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-22465))
+### **Diamond** — February 24, 2016 at 5:50 pm ([permalink](/blog/its-full-of-stars-terse-commands/#comment-22465))
 
 > Diamond says:
 >
@@ -154,7 +154,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 24, 2016 at 6:39 pm ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-22673))
+### **Shai Almog** — February 24, 2016 at 6:39 pm ([permalink](/blog/its-full-of-stars-terse-commands/#comment-22673))
 
 > Shai Almog says:
 >
@@ -163,7 +163,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 25, 2016 at 7:25 pm ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-22408))
+### **Shai Almog** — February 25, 2016 at 7:25 pm ([permalink](/blog/its-full-of-stars-terse-commands/#comment-22408))
 
 > Shai Almog says:
 >
@@ -172,7 +172,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond** — February 25, 2016 at 7:26 pm ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-22500))
+### **Diamond** — February 25, 2016 at 7:26 pm ([permalink](/blog/its-full-of-stars-terse-commands/#comment-22500))
 
 > Diamond says:
 >
@@ -181,7 +181,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 20, 2016 at 4:43 am ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-22867))
+### **Shai Almog** — December 20, 2016 at 4:43 am ([permalink](/blog/its-full-of-stars-terse-commands/#comment-22867))
 
 > Shai Almog says:
 >
@@ -192,7 +192,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **safa** — April 29, 2017 at 10:53 pm ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-23331))
+### **safa** — April 29, 2017 at 10:53 pm ([permalink](/blog/its-full-of-stars-terse-commands/#comment-23331))
 
 > safa says:
 >
@@ -201,7 +201,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 30, 2017 at 4:14 am ([permalink](https://www.codenameone.com/blog/its-full-of-stars-terse-commands.html#comment-23482))
+### **Shai Almog** — April 30, 2017 at 4:14 am ([permalink](/blog/its-full-of-stars-terse-commands/#comment-23482))
 
 > Shai Almog says:
 >

@@ -109,7 +109,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 22, 2015 at 5:07 am ([permalink](https://www.codenameone.com/blog/location-ios-beta-testing-better-input.html#comment-22335))
+### **Anonymous** — January 22, 2015 at 5:07 am ([permalink](/blog/location-ios-beta-testing-better-input/#comment-22335))
 
 > Anonymous says:
 >
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 22, 2015 at 6:20 am ([permalink](https://www.codenameone.com/blog/location-ios-beta-testing-better-input.html#comment-22184))
+### **Anonymous** — January 22, 2015 at 6:20 am ([permalink](/blog/location-ios-beta-testing-better-input/#comment-22184))
 
 > Anonymous says:
 >

@@ -33,7 +33,7 @@ Let us know what you think in the comments.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **kutoman** — June 13, 2017 at 2:20 pm ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-24134))
+### **kutoman** — June 13, 2017 at 2:20 pm ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-24134))
 
 > kutoman says:
 >
@@ -42,7 +42,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chad Elofson** — June 13, 2017 at 6:17 pm ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-24133))
+### **Chad Elofson** — June 13, 2017 at 6:17 pm ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-24133))
 
 > Chad Elofson says:
 >
@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Don't Bother** — June 13, 2017 at 7:31 pm ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-23457))
+### **Don't Bother** — June 13, 2017 at 7:31 pm ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-23457))
 
 > Don't Bother says:
 >
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 13, 2017 at 7:50 pm ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-22593))
+### **Shai Almog** — June 13, 2017 at 7:50 pm ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-22593))
 
 > Shai Almog says:
 >
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 13, 2017 at 7:59 pm ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-23591))
+### **Shai Almog** — June 13, 2017 at 7:59 pm ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-23591))
 
 > Shai Almog says:
 >
@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Nick Apperley** — June 14, 2017 at 1:20 am ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-23560))
+### **Nick Apperley** — June 14, 2017 at 1:20 am ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-23560))
 
 > Nick Apperley says:
 >
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 14, 2017 at 4:06 am ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-21468))
+### **Shai Almog** — June 14, 2017 at 4:06 am ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-21468))
 
 > Shai Almog says:
 >
@@ -102,7 +102,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Don't Bother** — June 15, 2017 at 4:23 am ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-23450))
+### **Don't Bother** — June 15, 2017 at 4:23 am ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-23450))
 
 > Don't Bother says:
 >
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 16, 2017 at 6:58 am ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-23569))
+### **Shai Almog** — June 16, 2017 at 6:58 am ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-23569))
 
 > Shai Almog says:
 >
@@ -141,7 +141,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Don't Bother** — June 16, 2017 at 2:19 pm ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-21586))
+### **Don't Bother** — June 16, 2017 at 2:19 pm ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-21586))
 
 > Don't Bother says:
 >
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 17, 2017 at 7:03 am ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-23598))
+### **Shai Almog** — June 17, 2017 at 7:03 am ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-23598))
 
 > Shai Almog says:
 >
@@ -163,7 +163,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Tom Tantisalidchai** — June 17, 2017 at 7:30 am ([permalink](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html#comment-23355))
+### **Tom Tantisalidchai** — June 17, 2017 at 7:30 am ([permalink](/blog/kotlin-wora-ios-iphone-windows-android/#comment-23355))
 
 > Tom Tantisalidchai says:
 >

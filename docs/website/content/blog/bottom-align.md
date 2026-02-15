@@ -92,35 +92,35 @@ I like this approach as it reduces clutter for the UI and leaves more space avai
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — November 29, 2018 at 7:08 am ([permalink](https://www.codenameone.com/blog/bottom-align.html#comment-24075))
+### **Francesco Galgani** — November 29, 2018 at 7:08 am ([permalink](/blog/bottom-align/#comment-24075))
 
 > Why did you use f.addComponent(0, mb);?
 >
 
 
 
-### **Shai Almog** — November 29, 2018 at 7:35 am ([permalink](https://www.codenameone.com/blog/bottom-align.html#comment-24045))
+### **Shai Almog** — November 29, 2018 at 7:35 am ([permalink](/blog/bottom-align/#comment-24045))
 
 > This adds the component to the first index in the component list. When I call add(Component) or addComponent(Component) it adds the component at the last offset which in this case will replace the existing “last component”. Here I added it to the top so a new entry will always appear first.
 >
 
 
 
-### **Francesco Galgani** — November 29, 2018 at 7:46 am ([permalink](https://www.codenameone.com/blog/bottom-align.html#comment-24088))
+### **Francesco Galgani** — November 29, 2018 at 7:46 am ([permalink](/blog/bottom-align/#comment-24088))
 
 > So in your example all the MultiButtons are disposed in inverted order of insertion, right? And if we want that every new MultiButton is added as penultimate?
 >
 
 
 
-### **Shai Almog** — November 29, 2018 at 8:24 am ([permalink](https://www.codenameone.com/blog/bottom-align.html#comment-23823))
+### **Shai Almog** — November 29, 2018 at 8:24 am ([permalink](/blog/bottom-align/#comment-23823))
 
 > No buttons are disposed but the new button is added to the top of the list instead of the bottom. That way the last button is always the add button.
 >
 
 
 
-### **Francesco Galgani** — November 29, 2018 at 11:21 am ([permalink](https://www.codenameone.com/blog/bottom-align.html#comment-23894))
+### **Francesco Galgani** — November 29, 2018 at 11:21 am ([permalink](/blog/bottom-align/#comment-23894))
 
 > Francesco Galgani says:
 >
@@ -129,7 +129,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 29, 2018 at 11:45 am ([permalink](https://www.codenameone.com/blog/bottom-align.html#comment-24080))
+### **Shai Almog** — November 29, 2018 at 11:45 am ([permalink](/blog/bottom-align/#comment-24080))
 
 > Shai Almog says:
 >

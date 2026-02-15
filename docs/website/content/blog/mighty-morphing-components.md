@@ -61,7 +61,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 27, 2014 at 4:31 pm ([permalink](https://www.codenameone.com/blog/mighty-morphing-components.html#comment-22116))
+### **Anonymous** — October 27, 2014 at 4:31 pm ([permalink](/blog/mighty-morphing-components/#comment-22116))
 
 > Anonymous says:
 >
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 1, 2014 at 1:27 pm ([permalink](https://www.codenameone.com/blog/mighty-morphing-components.html#comment-21849))
+### **Anonymous** — November 1, 2014 at 1:27 pm ([permalink](/blog/mighty-morphing-components/#comment-21849))
 
 > Anonymous says:
 >
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 27, 2014 at 10:54 pm ([permalink](https://www.codenameone.com/blog/mighty-morphing-components.html#comment-22156))
+### **Anonymous** — November 27, 2014 at 10:54 pm ([permalink](/blog/mighty-morphing-components/#comment-22156))
 
 > Anonymous says:
 >

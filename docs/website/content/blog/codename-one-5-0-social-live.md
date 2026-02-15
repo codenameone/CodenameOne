@@ -34,7 +34,7 @@ However if you are new to Codename One here’s a short primer. Codename One is 
 
   * Supports **seamless Continuous Integration** out of the box
 
-To learn more about Codename One check out the [about page](https://www.codenameone.com/about.html) you can [download it for free right now](https://www.codenameone.com/download.html).
+To learn more about Codename One check out the [about page](/about/) you can [download it for free right now](/download/).
 
 Version 5.0 is nicknamed Social because of the Facebook Clone application that was developed with it for [the online course](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java) in the Codename One Academy.
 
@@ -46,45 +46,45 @@ Figure 1. Facebook Native App vs. our Clone
 
 The top 5 features of this release are covered in this short video, check out further details below…​
 
-  * **Live CSS Update** — CSS is now deeply and seamlessly integrated into Codename One. When you change the content of a CSS file and save the Codename One simulator [automatically updates on the fly](https://www.codenameone.com/blog/live-css-update.html)
+  * **Live CSS Update** — CSS is now deeply and seamlessly integrated into Codename One. When you change the content of a CSS file and save the Codename One simulator [automatically updates on the fly](/blog/live-css-update/)
 
-  * **Rich Push Notifications** — Push notification was overhauled, we moved the last of the functionality from GCM to FCM. We now support [rich push notifications](https://www.codenameone.com/blog/tich-push-notification-improved-validation.html) that can include images and complex functionality
+  * **Rich Push Notifications** — Push notification was overhauled, we moved the last of the functionality from GCM to FCM. We now support [rich push notifications](/blog/tich-push-notification-improved-validation/) that can include images and complex functionality
 
-  * **Launch Screen Storyboards** — Historically iOS used screenshots of apps to fake fast application launches. Codename One automated that process in the past, it’s now discoraged by newer iOS features such as side-by-side multi-tasking. As such we now use [storyboard launch files](https://www.codenameone.com/blog/version-4-1-launch-screen-storyboards.html). This allows side-by-side multi-tasking and as a bonus speeds up compilation while reducing the app size further
+  * **Launch Screen Storyboards** — Historically iOS used screenshots of apps to fake fast application launches. Codename One automated that process in the past, it’s now discoraged by newer iOS features such as side-by-side multi-tasking. As such we now use [storyboard launch files](/blog/version-4-1-launch-screen-storyboards/). This allows side-by-side multi-tasking and as a bonus speeds up compilation while reducing the app size further
 
-  * **New JDK/OpenJDK** Support — [We now support JDK’s 8 to 11](https://www.codenameone.com/blog/uber-book-is-out-jdk-11.html) this includes OpenJDK
+  * **New JDK/OpenJDK** Support — [We now support JDK’s 8 to 11](/blog/uber-book-is-out-jdk-11/) this includes OpenJDK
 
-  * **New Cloud Servers** — We [migrated the last remaining Codename One servers off of Google App Engine](https://www.codenameone.com/blog/new-build-cloud.html). This allowed us to introduce great new features such as [the ability to increase your free build quota](https://www.codenameone.com/blog/increase-your-build-quotas.html)
+  * **New Cloud Servers** — We [migrated the last remaining Codename One servers off of Google App Engine](/blog/new-build-cloud/). This allowed us to introduce great new features such as [the ability to increase your free build quota](/blog/increase-your-build-quotas/)
 
-  * **Removed Old IDE Preferences UI** — The old right click IDE preferences UI was causing a lot of confusion due to lack of maintenance. It’s [now gone](https://www.codenameone.com/blog/removing-old-preferences.html) and replaced completely by Codename One Settings
+  * **Removed Old IDE Preferences UI** — The old right click IDE preferences UI was causing a lot of confusion due to lack of maintenance. It’s [now gone](/blog/removing-old-preferences/) and replaced completely by Codename One Settings
 
-  * **Android API Level 27** — We moved to [Android’s API Level 27](https://www.codenameone.com/blog/moving-to-27-facebook-clone-done.html) by default. Since Google requires API level 26 or higher at this time. We’ll probably update API levels faster due to this policy
+  * **Android API Level 27** — We moved to [Android’s API Level 27](/blog/moving-to-27-facebook-clone-done/) by default. Since Google requires API level 26 or higher at this time. We’ll probably update API levels faster due to this policy
 
-  * **Lightweight Picker** — The `Picker` component was rewritten as a [lightweight component](https://www.codenameone.com/blog/lightweight-picker-device-detection.html) instead of a native one. This allows far more customization and cross platform consistency for one of our most problematic widgets
+  * **Lightweight Picker** — The `Picker` component was rewritten as a [lightweight component](/blog/lightweight-picker-device-detection/) instead of a native one. This allows far more customization and cross platform consistency for one of our most problematic widgets
 
-  * **Low Level Camera API** — [Camera Kit](https://www.codenameone.com/blog/camerakit-low-level-camera-api.html) allows developers to access the native camera view to grab photos/videos and overlay graphics on top of the camera
+  * **Low Level Camera API** — [Camera Kit](/blog/camerakit-low-level-camera-api/) allows developers to access the native camera view to grab photos/videos and overlay graphics on top of the camera
 
-  * **Pluggable Spatial SQLite** — [Spatial support for SQLite](https://www.codenameone.com/blog/spatial-pluggable-sqlite.html) lets developers write complex location based applications. This functionality lets developers replace the existing native SQLite implementation with an arbitrary implementation which is very useful for enterprise grade features such as deep encryption, replication etc.
+  * **Pluggable Spatial SQLite** — [Spatial support for SQLite](/blog/spatial-pluggable-sqlite/) lets developers write complex location based applications. This functionality lets developers replace the existing native SQLite implementation with an arbitrary implementation which is very useful for enterprise grade features such as deep encryption, replication etc.
 
-  * **Improved Map Layout** — The map API now includes a [native high performance component layout](https://www.codenameone.com/blog/map-component-positioning-revisited.html) built in
+  * **Improved Map Layout** — The map API now includes a [native high performance component layout](/blog/map-component-positioning-revisited/) built in
 
-  * **Landscape UIID’s** — Components can [adapt their UIID to landscape](https://www.codenameone.com/blog/ios-back-command-behavior.html), this enables features such as smaller title font/padding in landscape mode
+  * **Landscape UIID’s** — Components can [adapt their UIID to landscape](/blog/ios-back-command-behavior/), this enables features such as smaller title font/padding in landscape mode
 
   * **Multiple Smaller Improvements** :
 
-    * [DateUtil API](https://www.codenameone.com/blog/date-util.html) for timezone related date functions
+    * [DateUtil API](/blog/date-util/) for timezone related date functions
 
-    * Sidemenu [right side option](https://www.codenameone.com/blog/right-sidemenu-tab-order.html) and new tab ordering API
+    * Sidemenu [right side option](/blog/right-sidemenu-tab-order/) and new tab ordering API
 
-    * Ability to map a list of [property business objects to a table](https://www.codenameone.com/blog/table-property-mapping.html)
+    * Ability to map a list of [property business objects to a table](/blog/table-property-mapping/)
 
-    * [Sendgrid cn1lib](https://www.codenameone.com/blog/sendgrid-cn1lib.html)
+    * [Sendgrid cn1lib](/blog/sendgrid-cn1lib/)
 
-    * [Rest API overhaul](https://www.codenameone.com/blog/rest-api-error-handling.html) for error handling, properties etc.
+    * [Rest API overhaul](/blog/rest-api-error-handling/) for error handling, properties etc.
 
-    * [On-device webserver](https://www.codenameone.com/blog/on-device-web-server.html)
+    * [On-device webserver](/blog/on-device-web-server/)
 
-    * [Auto-reconnect](https://www.codenameone.com/blog/tip-auto-reconnect-web-socket.html) for websockets
+    * [Auto-reconnect](/blog/tip-auto-reconnect-web-socket/) for websockets
 
 There are many other features both big and small. Check out our [blog](https://www.codenameone.com/blog/) and the github [project history](https://github.com/codenameone/CodenameOne/commits/master).
 
@@ -94,17 +94,17 @@ We took a lot of time for 5.0 and I’d like to take a similar duration for 6.0.
 
 We will have a whatsapp clone tutorial in the [Codename One Academy](https://codenameone.teachable.com/). Hence the moniker of the next release.
 
-Check out our [survey results](https://www.codenameone.com/blog/survey-results-2018.html) to see the future apps we’ll release into the academy. Even if you never plan to signup to the academy this should be interesting as it gives you a good notion of what can be built with Codename One.
+Check out our [survey results](/blog/survey-results-2018/) to see the future apps we’ll release into the academy. Even if you never plan to signup to the academy this should be interesting as it gives you a good notion of what can be built with Codename One.
 
 ### We Need your Help
 
 If you think we are doing a good job and appreciate our help please help us by:
 
-  * [Spreading the word](https://www.codenameone.com/blog/how-you-can-help-spread-codenameone.html)
+  * [Spreading the word](/blog/how-you-can-help-spread-codenameone/)
 
-  * [Edit our docs](https://www.codenameone.com/blog/tip-edit-docs-fun-profit.html)
+  * [Edit our docs](/blog/tip-edit-docs-fun-profit/)
 
-  * [Edit our sources and submit bug fixes](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html)
+  * [Edit our sources and submit bug fixes](/blog/how-to-use-the-codename-one-sources/)
 
   * Or just sign up for enterprise accounts which literally keep the lights on here…​ If your company can afford it please take the time and upgrade to enterprise, this will allow us to work on the things that are important for your company!
 
@@ -116,14 +116,14 @@ Thanks for reading this far and if you have any thoughts/suggestions of any kind
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **davidwaf** — September 19, 2018 at 9:10 pm ([permalink](https://www.codenameone.com/blog/codename-one-5-0-social-live.html#comment-23928))
+### **davidwaf** — September 19, 2018 at 9:10 pm ([permalink](/blog/codename-one-5-0-social-live/#comment-23928))
 
 > Awesome work!! ..as always. Push notifications: there was a mention they will be eventually available even for basic accounts?
 >
 
 
 
-### **Shai Almog** — September 20, 2018 at 6:50 am ([permalink](https://www.codenameone.com/blog/codename-one-5-0-social-live.html#comment-24029))
+### **Shai Almog** — September 20, 2018 at 6:50 am ([permalink](/blog/codename-one-5-0-social-live/#comment-24029))
 
 > Shai Almog says:
 >
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lukman Javalove Idealist Jaji** — September 20, 2018 at 1:04 pm ([permalink](https://www.codenameone.com/blog/codename-one-5-0-social-live.html#comment-22646))
+### **Lukman Javalove Idealist Jaji** — September 20, 2018 at 1:04 pm ([permalink](/blog/codename-one-5-0-social-live/#comment-22646))
 
 > Lukman Javalove Idealist Jaji says:
 >
@@ -145,7 +145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 25, 2018 at 8:20 am ([permalink](https://www.codenameone.com/blog/codename-one-5-0-social-live.html#comment-24013))
+### **Shai Almog** — September 25, 2018 at 8:20 am ([permalink](/blog/codename-one-5-0-social-live/#comment-24013))
 
 > Shai Almog says:
 >

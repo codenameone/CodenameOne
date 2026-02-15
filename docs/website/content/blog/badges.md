@@ -69,7 +69,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — September 4, 2014 at 7:13 am ([permalink](https://www.codenameone.com/blog/badges.html#comment-22029))
+### **Anonymous** — September 4, 2014 at 7:13 am ([permalink](/blog/badges/#comment-22029))
 
 > Anonymous says:
 >
@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Omar Suleiman** — January 14, 2018 at 12:42 pm ([permalink](https://www.codenameone.com/blog/badges.html#comment-24155))
+### **Omar Suleiman** — January 14, 2018 at 12:42 pm ([permalink](/blog/badges/#comment-24155))
 
 > Omar Suleiman says:
 >
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 15, 2018 at 6:45 am ([permalink](https://www.codenameone.com/blog/badges.html#comment-23742))
+### **Shai Almog** — January 15, 2018 at 6:45 am ([permalink](/blog/badges/#comment-23742))
 
 > Shai Almog says:
 >

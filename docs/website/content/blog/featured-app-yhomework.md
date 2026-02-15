@@ -59,7 +59,7 @@ is still king & the most important thing an app can deliver.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — May 19, 2016 at 3:48 pm ([permalink](https://www.codenameone.com/blog/featured-app-yhomework.html#comment-22602))
+### **Chidiebere Okwudire** — May 19, 2016 at 3:48 pm ([permalink](/blog/featured-app-yhomework/#comment-22602))
 
 > Chidiebere Okwudire says:
 >
@@ -68,14 +68,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > By the way, how do you make the app showcase images like the one at the top of this post? I’m looking for a tool to be able to do similar stuff.
 
 
-### **bryan** — May 19, 2016 at 11:46 pm ([permalink](https://www.codenameone.com/blog/featured-app-yhomework.html#comment-22553))
+### **bryan** — May 19, 2016 at 11:46 pm ([permalink](/blog/featured-app-yhomework/#comment-22553))
 
 > bryan says:
 >
 > That’s a very slick looking app. Any idea what sort of time it took to develop ?
 
 
-### **Shai Almog** — May 20, 2016 at 4:15 am ([permalink](https://www.codenameone.com/blog/featured-app-yhomework.html#comment-22910))
+### **Shai Almog** — May 20, 2016 at 4:15 am ([permalink](/blog/featured-app-yhomework/#comment-22910))
 
 > Shai Almog says:
 >
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Since this app is so old by now it was developed before there were “best practices” for Codename One and a lot of things could probably be accomplished in a more efficient way.
 
 
-### **Shai Almog** — May 20, 2016 at 4:16 am ([permalink](https://www.codenameone.com/blog/featured-app-yhomework.html#comment-22542))
+### **Shai Almog** — May 20, 2016 at 4:16 am ([permalink](/blog/featured-app-yhomework/#comment-22542))
 
 > Shai Almog says:
 >

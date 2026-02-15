@@ -44,7 +44,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Mahmoud** — June 25, 2016 at 11:52 pm ([permalink](https://www.codenameone.com/blog/push-notification-tutorial.html#comment-22870))
+### **Mahmoud** — June 25, 2016 at 11:52 pm ([permalink](/blog/push-notification-tutorial/#comment-22870))
 
 > Mahmoud says:
 >
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 26, 2016 at 4:47 am ([permalink](https://www.codenameone.com/blog/push-notification-tutorial.html#comment-22792))
+### **Shai Almog** — June 26, 2016 at 4:47 am ([permalink](/blog/push-notification-tutorial/#comment-22792))
 
 > Shai Almog says:
 >

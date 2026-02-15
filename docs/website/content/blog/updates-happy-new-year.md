@@ -29,7 +29,7 @@ I hope I’ll make the end of year deadline to publish the full module but with 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **davidwaf** — December 21, 2017 at 1:13 pm ([permalink](https://www.codenameone.com/blog/updates-happy-new-year.html#comment-23639))
+### **davidwaf** — December 21, 2017 at 1:13 pm ([permalink](/blog/updates-happy-new-year/#comment-23639))
 
 > awesome!
 >

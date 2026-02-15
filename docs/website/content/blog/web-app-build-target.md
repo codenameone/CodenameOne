@@ -62,7 +62,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 26, 2015 at 6:51 pm ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22108))
+### **Anonymous** — January 26, 2015 at 6:51 pm ([permalink](/blog/web-app-build-target/#comment-22108))
 
 > Anonymous says:
 >
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 26, 2015 at 10:11 pm ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22260))
+### **Anonymous** — January 26, 2015 at 10:11 pm ([permalink](/blog/web-app-build-target/#comment-22260))
 
 > Anonymous says:
 >
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 27, 2015 at 3:44 am ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22284))
+### **Anonymous** — January 27, 2015 at 3:44 am ([permalink](/blog/web-app-build-target/#comment-22284))
 
 > Anonymous says:
 >
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 27, 2015 at 3:46 am ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22033))
+### **Anonymous** — January 27, 2015 at 3:46 am ([permalink](/blog/web-app-build-target/#comment-22033))
 
 > Anonymous says:
 >
@@ -102,7 +102,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 28, 2015 at 6:22 am ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22147))
+### **Anonymous** — January 28, 2015 at 6:22 am ([permalink](/blog/web-app-build-target/#comment-22147))
 
 > Anonymous says:
 >
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 28, 2015 at 2:53 pm ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22177))
+### **Anonymous** — January 28, 2015 at 2:53 pm ([permalink](/blog/web-app-build-target/#comment-22177))
 
 > Anonymous says:
 >
@@ -122,7 +122,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 28, 2015 at 7:12 pm ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22302))
+### **Anonymous** — January 28, 2015 at 7:12 pm ([permalink](/blog/web-app-build-target/#comment-22302))
 
 > Anonymous says:
 >
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 28, 2015 at 7:22 pm ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-21477))
+### **Anonymous** — January 28, 2015 at 7:22 pm ([permalink](/blog/web-app-build-target/#comment-21477))
 
 > Anonymous says:
 >
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 29, 2015 at 4:04 am ([permalink](https://www.codenameone.com/blog/web-app-build-target.html#comment-22320))
+### **Anonymous** — January 29, 2015 at 4:04 am ([permalink](/blog/web-app-build-target/#comment-22320))
 
 > Anonymous says:
 >

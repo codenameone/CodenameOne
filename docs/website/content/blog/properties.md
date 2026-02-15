@@ -270,7 +270,7 @@ Do you have ideas on improving the syntax further?
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Stefan Eder** — November 23, 2016 at 9:50 am ([permalink](https://www.codenameone.com/blog/properties.html#comment-22967))
+### **Stefan Eder** — November 23, 2016 at 9:50 am ([permalink](/blog/properties/#comment-22967))
 
 > Stefan Eder says:
 >
@@ -279,7 +279,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 24, 2016 at 6:05 am ([permalink](https://www.codenameone.com/blog/properties.html#comment-22999))
+### **Shai Almog** — November 24, 2016 at 6:05 am ([permalink](/blog/properties/#comment-22999))
 
 > Shai Almog says:
 >
@@ -288,7 +288,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Orlando D'Free** — December 6, 2016 at 12:01 am ([permalink](https://www.codenameone.com/blog/properties.html#comment-23136))
+### **Orlando D'Free** — December 6, 2016 at 12:01 am ([permalink](/blog/properties/#comment-23136))
 
 > Orlando D'Free says:
 >
@@ -303,7 +303,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 6, 2016 at 6:11 am ([permalink](https://www.codenameone.com/blog/properties.html#comment-22746))
+### **Shai Almog** — December 6, 2016 at 6:11 am ([permalink](/blog/properties/#comment-22746))
 
 > Shai Almog says:
 >
@@ -314,7 +314,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mark Daniel Henning** — July 20, 2017 at 5:50 am ([permalink](https://www.codenameone.com/blog/properties.html#comment-23726))
+### **Mark Daniel Henning** — July 20, 2017 at 5:50 am ([permalink](/blog/properties/#comment-23726))
 
 > Mark Daniel Henning says:
 >
@@ -331,7 +331,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 21, 2017 at 1:32 pm ([permalink](https://www.codenameone.com/blog/properties.html#comment-23377))
+### **Shai Almog** — July 21, 2017 at 1:32 pm ([permalink](/blog/properties/#comment-23377))
 
 > Shai Almog says:
 >

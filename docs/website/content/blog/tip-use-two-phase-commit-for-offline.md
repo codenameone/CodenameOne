@@ -84,7 +84,7 @@ Some tools try to abstract these ideas. That sometimes creates a situation of au
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — July 30, 2018 at 10:32 pm ([permalink](https://www.codenameone.com/blog/tip-use-two-phase-commit-for-offline.html#comment-23873))
+### **Francesco Galgani** — July 30, 2018 at 10:32 pm ([permalink](/blog/tip-use-two-phase-commit-for-offline/#comment-23873))
 
 > Francesco Galgani says:
 >
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ZombieLover** — September 4, 2018 at 10:46 am ([permalink](https://www.codenameone.com/blog/tip-use-two-phase-commit-for-offline.html#comment-24078))
+### **ZombieLover** — September 4, 2018 at 10:46 am ([permalink](/blog/tip-use-two-phase-commit-for-offline/#comment-24078))
 
 > ZombieLover says:
 >

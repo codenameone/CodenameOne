@@ -51,7 +51,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — August 29, 2014 at 4:25 am ([permalink](https://www.codenameone.com/blog/showcase-your-codename-one-app-at-javaone.html#comment-22060))
+### **Anonymous** — August 29, 2014 at 4:25 am ([permalink](/blog/showcase-your-codename-one-app-at-javaone/#comment-22060))
 
 > Anonymous says:
 >
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 3, 2014 at 4:27 am ([permalink](https://www.codenameone.com/blog/showcase-your-codename-one-app-at-javaone.html#comment-22197))
+### **Anonymous** — September 3, 2014 at 4:27 am ([permalink](/blog/showcase-your-codename-one-app-at-javaone/#comment-22197))
 
 > Anonymous says:
 >
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 3, 2014 at 4:21 pm ([permalink](https://www.codenameone.com/blog/showcase-your-codename-one-app-at-javaone.html#comment-24184))
+### **Anonymous** — September 3, 2014 at 4:21 pm ([permalink](/blog/showcase-your-codename-one-app-at-javaone/#comment-24184))
 
 > Anonymous says:
 >

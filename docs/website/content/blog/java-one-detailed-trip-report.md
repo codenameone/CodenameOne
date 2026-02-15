@@ -443,7 +443,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — September 30, 2013 at 7:15 pm ([permalink](https://www.codenameone.com/blog/java-one-detailed-trip-report.html#comment-21640))
+### **Anonymous** — September 30, 2013 at 7:15 pm ([permalink](/blog/java-one-detailed-trip-report/#comment-21640))
 
 > Anonymous says:
 >
@@ -452,7 +452,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 1, 2013 at 3:53 am ([permalink](https://www.codenameone.com/blog/java-one-detailed-trip-report.html#comment-22035))
+### **Anonymous** — October 1, 2013 at 3:53 am ([permalink](/blog/java-one-detailed-trip-report/#comment-22035))
 
 > Anonymous says:
 >
@@ -465,7 +465,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 4, 2013 at 2:07 pm ([permalink](https://www.codenameone.com/blog/java-one-detailed-trip-report.html#comment-21858))
+### **Anonymous** — October 4, 2013 at 2:07 pm ([permalink](/blog/java-one-detailed-trip-report/#comment-21858))
 
 > Anonymous says:
 >
@@ -474,7 +474,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 4, 2013 at 4:20 pm ([permalink](https://www.codenameone.com/blog/java-one-detailed-trip-report.html#comment-21910))
+### **Anonymous** — October 4, 2013 at 4:20 pm ([permalink](/blog/java-one-detailed-trip-report/#comment-21910))
 
 > Anonymous says:
 >

@@ -88,7 +88,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — July 3, 2014 at 5:38 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-22163))
+### **Anonymous** — July 3, 2014 at 5:38 am ([permalink](/blog/same-size-back-swipe/#comment-22163))
 
 > Anonymous says:
 >
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks.
 
 
-### **Anonymous** — July 3, 2014 at 11:25 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-21730))
+### **Anonymous** — July 3, 2014 at 11:25 am ([permalink](/blog/same-size-back-swipe/#comment-21730))
 
 > Anonymous says:
 >
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 6, 2014 at 6:25 pm ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-21925))
+### **Anonymous** — July 6, 2014 at 6:25 pm ([permalink](/blog/same-size-back-swipe/#comment-21925))
 
 > Anonymous says:
 >
@@ -126,7 +126,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 
 
-### **Anonymous** — July 7, 2014 at 2:51 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-22087))
+### **Anonymous** — July 7, 2014 at 2:51 am ([permalink](/blog/same-size-back-swipe/#comment-22087))
 
 > Anonymous says:
 >
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 7, 2014 at 3:11 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-22014))
+### **Anonymous** — July 7, 2014 at 3:11 am ([permalink](/blog/same-size-back-swipe/#comment-22014))
 
 > Anonymous says:
 >
@@ -172,7 +172,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 7, 2014 at 11:20 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-21661))
+### **Anonymous** — July 7, 2014 at 11:20 am ([permalink](/blog/same-size-back-swipe/#comment-21661))
 
 > Anonymous says:
 >
@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 7, 2014 at 6:24 pm ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-22173))
+### **Anonymous** — July 7, 2014 at 6:24 pm ([permalink](/blog/same-size-back-swipe/#comment-22173))
 
 > Anonymous says:
 >
@@ -192,7 +192,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 7, 2014 at 6:25 pm ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-21441))
+### **Anonymous** — July 7, 2014 at 6:25 pm ([permalink](/blog/same-size-back-swipe/#comment-21441))
 
 > Anonymous says:
 >
@@ -203,7 +203,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 8, 2014 at 1:47 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-22097))
+### **Anonymous** — July 8, 2014 at 1:47 am ([permalink](/blog/same-size-back-swipe/#comment-22097))
 
 > Anonymous says:
 >
@@ -216,7 +216,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 8, 2014 at 2:50 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-21783))
+### **Anonymous** — July 8, 2014 at 2:50 am ([permalink](/blog/same-size-back-swipe/#comment-21783))
 
 > Anonymous says:
 >
@@ -232,7 +232,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 
 
-### **Anonymous** — July 8, 2014 at 11:53 am ([permalink](https://www.codenameone.com/blog/same-size-back-swipe.html#comment-21731))
+### **Anonymous** — July 8, 2014 at 11:53 am ([permalink](/blog/same-size-back-swipe/#comment-21731))
 
 > Anonymous says:
 >

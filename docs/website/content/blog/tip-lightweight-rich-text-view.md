@@ -131,7 +131,7 @@ I chose to use HTML because I already had a parser but the basic concept should 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — April 6, 2018 at 10:17 pm ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-23789))
+### **Francesco Galgani** — April 6, 2018 at 10:17 pm ([permalink](/blog/tip-lightweight-rich-text-view/#comment-23789))
 
 > Thank you Shai, your “proof of concept” (as you definited it) is exactly what I was looking for. In some simple circumstances, it can be a good replacement for SpanLabel and an easier and better solution than BrowserComponent (expecially if I need a text that should be automatically internationalized like in Label and SpanLabel). However, I found two issues in your code, that are easy to fix. The first one is that the font size is zero, so no text is shown. To solve, I changed the fonts definitions so:
 >
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 7, 2018 at 4:36 am ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-23796))
+### **Shai Almog** — April 7, 2018 at 4:36 am ([permalink](/blog/tip-lightweight-rich-text-view/#comment-23796))
 
 > Shai Almog says:
 >
@@ -160,7 +160,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gareth Murfin** — August 8, 2018 at 3:23 am ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-23650))
+### **Gareth Murfin** — August 8, 2018 at 3:23 am ([permalink](/blog/tip-lightweight-rich-text-view/#comment-23650))
 
 > Gareth Murfin says:
 >
@@ -169,7 +169,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Durank** — September 30, 2020 at 12:49 pm ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-24351))
+### **Durank** — September 30, 2020 at 12:49 pm ([permalink](/blog/tip-lightweight-rich-text-view/#comment-24351))
 
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
@@ -178,7 +178,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 1, 2020 at 6:40 am ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-24348))
+### **Shai Almog** — October 1, 2020 at 6:40 am ([permalink](/blog/tip-lightweight-rich-text-view/#comment-24348))
 
 > Shai Almog says:
 >
@@ -187,7 +187,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Julio Valeriron Ochoa** — September 22, 2021 at 3:03 pm ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-24490))
+### **Julio Valeriron Ochoa** — September 22, 2021 at 3:03 pm ([permalink](/blog/tip-lightweight-rich-text-view/#comment-24490))
 
 > Julio Valeriron Ochoa says:
 >
@@ -196,7 +196,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lianna Casper** — September 23, 2021 at 1:54 am ([permalink](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html#comment-24493))
+### **Lianna Casper** — September 23, 2021 at 1:54 am ([permalink](/blog/tip-lightweight-rich-text-view/#comment-24493))
 
 > Lianna Casper says:
 >

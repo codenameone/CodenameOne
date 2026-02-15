@@ -17,8 +17,8 @@ thumbnail: https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-21.j
 
 #### Basic introductory usage of Codename One
 
-For details please check out the [download section](https://www.codenameone.com/download.html). **Note:** The [plugins.netbeans.org](http://plugins.netbeans.org/) server has been down frequently in the past couple of months preventing automatic installation.  
-Please follow the instructions [here](https://www.codenameone.com/blog/netbeans-plugin-update-center.html) as a workaround if the instructions above don’t work.
+For details please check out the [download section](/download/). **Note:** The [plugins.netbeans.org](http://plugins.netbeans.org/) server has been down frequently in the past couple of months preventing automatic installation.  
+Please follow the instructions [here](/blog/netbeans-plugin-update-center/) as a workaround if the instructions above don’t work.
 
 ###### Transcript
 
@@ -50,7 +50,7 @@ Next we’ll open the designer by double clicking the theme file. The theme allo
 The designer tool is also used for countless other features, such as: resolution independent images, localization and more!
 
 The most important thing is running the resulting app on my devices, to do that we right click the project and select send Android build. You will notice there are many other build targets e.g. iOS. etc.).  
-Once a build is made navigate to the [build server at codenameone.com](https://www.codenameone.com/build-server.html) and select your build entry. You can then either email the link to yourself using the dedicated button or just scan the QR code in the page. This will allow you to download and install the app to your device.
+Once a build is made navigate to the [build server at codenameone.com](/build-server/) and select your build entry. You can then either email the link to yourself using the dedicated button or just scan the QR code in the page. This will allow you to download and install the app to your device.
 
 Here is actual device footage for the app we just built!
 

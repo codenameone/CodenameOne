@@ -38,7 +38,7 @@ Here are some of the best open-source cross platform app development frameworks 
 | Dart | Flutter |
 | Basic | B4A |
 
-****Related**** 📝 [How to Build iOS Apps with Java](https://www.codenameone.com/blog/how-to-build-ios-apps-with-java.html)
+****Related**** 📝 [How to Build iOS Apps with Java](/blog/how-to-build-ios-apps-with-java/)
 
 ### Is Cross Platform better than Native Development?
 
@@ -104,35 +104,35 @@ Choosing the right tool can be a daunting task. We have tried our best to be as 
 
 Java/Kotlin
 
-[Codename One](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2021.html#codenameone)
+[Codename One](/blog/top-10-best-cross-platform-app-development-frameworks-in-2021/#codenameone)
 
 JavaScript & HTML5
 
-[ReactNative](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2021.html#react)
+[ReactNative](/blog/top-10-best-cross-platform-app-development-frameworks-in-2021/#react)
 
-[Ionic](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2021.html#ionic)
+[Ionic](/blog/top-10-best-cross-platform-app-development-frameworks-in-2021/#ionic)
 
-[NativeScript](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2021.html#nativescript)
+[NativeScript](/blog/top-10-best-cross-platform-app-development-frameworks-in-2021/#nativescript)
 
-[Cordova](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2021.html#cordova)
+[Cordova](/blog/top-10-best-cross-platform-app-development-frameworks-in-2021/#cordova)
 
-[Appcelerator](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2021.html#appcelerator)
+[Appcelerator](/blog/top-10-best-cross-platform-app-development-frameworks-in-2021/#appcelerator)
 
 Dart
 
-[Flutter](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2021.html#flutter)
+[Flutter](/blog/top-10-best-cross-platform-app-development-frameworks-in-2021/#flutter)
 
 C#
 
-[Xamarin](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2021.html#xamarin)
+[Xamarin](/blog/top-10-best-cross-platform-app-development-frameworks-in-2021/#xamarin)
 
 C++
 
-[Qt](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2021.html#qt)
+[Qt](/blog/top-10-best-cross-platform-app-development-frameworks-in-2021/#qt)
 
 Ruby
 
-[RubyMotion](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2021.html#rubymotion)
+[RubyMotion](/blog/top-10-best-cross-platform-app-development-frameworks-in-2021/#rubymotion)
 
 Following parameters were considered while putting this list together:
 
@@ -209,7 +209,7 @@ Codename One is a revolutionary mobile development solution started by ex-Sun Mi
 
 Its core appeal is its unrestricted access to the native platform allowing developers to write native code directly from Java or Kotlin and access everything that the native mobile platform can provide.
 
-****Related:**** [Codename One comparison with other frameworks](https://www.codenameone.com/compare.html)
+****Related:**** [Codename One comparison with other frameworks](/compare/)
 
 > ****Programming Language:**** Java or Kotlin
 >
@@ -223,7 +223,7 @@ Its core appeal is its unrestricted access to the native platform allowing devel
 
 ![Codename One architecture](/blog/top-10-best-cross-platform-app-development-frameworks-in-2024/Group-1851.png)
 
-> Source: [Introduction to Codename One](https://www.codenameone.com/introduction.html)
+> Source: [Introduction to Codename One](/introduction/)
 
 | Codename One Pros | Codename One Cons |
 | --- | --- |
@@ -521,7 +521,7 @@ When choosing the best cross-platform app development framework, there’s NO on
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Francesco Galgani** — January 25, 2021 at 1:29 pm ([permalink](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2024.html#comment-24387))
+### **Francesco Galgani** — January 25, 2021 at 1:29 pm ([permalink](/blog/top-10-best-cross-platform-app-development-frameworks-in-2024/#comment-24387))
 
 > Francesco Galgani says:
 >
@@ -534,7 +534,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Vitali Kuptsov** — May 31, 2021 at 1:56 pm ([permalink](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2024.html#comment-24459))
+### **Vitali Kuptsov** — May 31, 2021 at 1:56 pm ([permalink](/blog/top-10-best-cross-platform-app-development-frameworks-in-2024/#comment-24459))
 
 > Vitali Kuptsov says:
 >
@@ -543,7 +543,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 31, 2021 at 2:25 pm ([permalink](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2024.html#comment-24460))
+### **Shai Almog** — May 31, 2021 at 2:25 pm ([permalink](/blog/top-10-best-cross-platform-app-development-frameworks-in-2024/#comment-24460))
 
 > Shai Almog says:
 >
@@ -552,7 +552,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Muminjon Abduraimov** — August 22, 2021 at 8:40 pm ([permalink](https://www.codenameone.com/blog/top-10-best-cross-platform-app-development-frameworks-in-2024.html#comment-24475))
+### **Muminjon Abduraimov** — August 22, 2021 at 8:40 pm ([permalink](/blog/top-10-best-cross-platform-app-development-frameworks-in-2024/#comment-24475))
 
 > Muminjon Abduraimov says:
 >

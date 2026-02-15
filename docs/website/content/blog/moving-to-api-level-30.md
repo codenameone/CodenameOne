@@ -27,7 +27,7 @@ You can set the build hint android.buildToolsVersion=29 as a temporary workaroun
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **plumberg** — July 13, 2021 at 8:18 pm ([permalink](https://www.codenameone.com/blog/moving-to-api-level-30.html#comment-24468))
+### **plumberg** — July 13, 2021 at 8:18 pm ([permalink](/blog/moving-to-api-level-30/#comment-24468))
 
 > plumberg says:
 >
@@ -36,7 +36,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 14, 2021 at 1:15 am ([permalink](https://www.codenameone.com/blog/moving-to-api-level-30.html#comment-24469))
+### **Shai Almog** — July 14, 2021 at 1:15 am ([permalink](/blog/moving-to-api-level-30/#comment-24469))
 
 > Shai Almog says:
 >

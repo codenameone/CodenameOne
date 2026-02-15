@@ -234,7 +234,7 @@ compared to Codename One and has some obvious potential issues.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — November 2, 2015 at 10:20 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22520))
+### **bryan** — November 2, 2015 at 10:20 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22520))
 
 > bryan says:
 >
@@ -245,7 +245,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 3, 2015 at 4:27 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22243))
+### **Shai Almog** — November 3, 2015 at 4:27 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22243))
 
 > Shai Almog says:
 >
@@ -258,7 +258,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **oojr** — November 7, 2015 at 10:15 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22504))
+### **oojr** — November 7, 2015 at 10:15 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22504))
 
 > oojr says:
 >
@@ -267,7 +267,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 8, 2015 at 4:23 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22279))
+### **Shai Almog** — November 8, 2015 at 4:23 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22279))
 
 > Shai Almog says:
 >
@@ -284,7 +284,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **oojr** — November 10, 2015 at 4:04 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22358))
+### **oojr** — November 10, 2015 at 4:04 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22358))
 
 > oojr says:
 >
@@ -295,7 +295,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 11, 2015 at 5:26 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22422))
+### **Shai Almog** — November 11, 2015 at 5:26 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22422))
 
 > Shai Almog says:
 >
@@ -312,7 +312,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jeff Carver** — January 16, 2016 at 8:06 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22533))
+### **Jeff Carver** — January 16, 2016 at 8:06 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22533))
 
 > Jeff Carver says:
 >
@@ -329,7 +329,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 17, 2016 at 4:39 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22677))
+### **Shai Almog** — January 17, 2016 at 4:39 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22677))
 
 > Shai Almog says:
 >
@@ -345,7 +345,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **void777** — January 25, 2016 at 11:19 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22524))
+### **void777** — January 25, 2016 at 11:19 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22524))
 
 > void777 says:
 >
@@ -354,7 +354,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 26, 2016 at 3:13 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22659))
+### **Shai Almog** — January 26, 2016 at 3:13 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22659))
 
 > Shai Almog says:
 >
@@ -363,7 +363,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **adamski** — January 30, 2016 at 9:30 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22441))
+### **adamski** — January 30, 2016 at 9:30 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22441))
 
 > adamski says:
 >
@@ -373,7 +373,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gabriel Matusevich** — March 11, 2016 at 6:43 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22609))
+### **Gabriel Matusevich** — March 11, 2016 at 6:43 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22609))
 
 > Gabriel Matusevich says:
 >
@@ -382,7 +382,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 12, 2016 at 3:28 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22755))
+### **Shai Almog** — March 12, 2016 at 3:28 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22755))
 
 > Shai Almog says:
 >
@@ -393,7 +393,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Simon** — March 12, 2016 at 5:02 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22619))
+### **Simon** — March 12, 2016 at 5:02 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22619))
 
 > Simon says:
 >
@@ -402,7 +402,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 12, 2016 at 5:12 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22629))
+### **Shai Almog** — March 12, 2016 at 5:12 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22629))
 
 > Shai Almog says:
 >
@@ -415,7 +415,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Simon** — March 12, 2016 at 5:18 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22483))
+### **Simon** — March 12, 2016 at 5:18 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22483))
 
 > Simon says:
 >
@@ -424,7 +424,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 12, 2016 at 5:41 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22584))
+### **Shai Almog** — March 12, 2016 at 5:41 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22584))
 
 > Shai Almog says:
 >
@@ -435,7 +435,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Simon** — March 12, 2016 at 5:49 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22765))
+### **Simon** — March 12, 2016 at 5:49 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22765))
 
 > Simon says:
 >
@@ -446,7 +446,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 12, 2016 at 7:34 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22773))
+### **Shai Almog** — March 12, 2016 at 7:34 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22773))
 
 > Shai Almog says:
 >
@@ -459,7 +459,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Alex** — March 28, 2016 at 2:36 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22446))
+### **Alex** — March 28, 2016 at 2:36 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22446))
 
 > Alex says:
 >
@@ -468,7 +468,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **adamski** — April 6, 2016 at 8:17 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22816))
+### **adamski** — April 6, 2016 at 8:17 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22816))
 
 > adamski says:
 >
@@ -481,7 +481,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 7, 2016 at 3:18 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22565))
+### **Shai Almog** — April 7, 2016 at 3:18 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22565))
 
 > Shai Almog says:
 >
@@ -492,7 +492,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Osei Fortune** — April 7, 2016 at 8:19 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22573))
+### **Osei Fortune** — April 7, 2016 at 8:19 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22573))
 
 > Osei Fortune says:
 >
@@ -501,7 +501,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Don't Bother** — April 20, 2016 at 11:22 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22693))
+### **Don't Bother** — April 20, 2016 at 11:22 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22693))
 
 > Don't Bother says:
 >
@@ -512,7 +512,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Don't Bother** — April 20, 2016 at 11:24 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22527))
+### **Don't Bother** — April 20, 2016 at 11:24 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22527))
 
 > Don't Bother says:
 >
@@ -521,7 +521,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chromonav Kulkarni** — April 26, 2016 at 7:21 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22768))
+### **Chromonav Kulkarni** — April 26, 2016 at 7:21 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22768))
 
 > Chromonav Kulkarni says:
 >
@@ -530,7 +530,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chromonav Kulkarni** — April 26, 2016 at 7:30 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22775))
+### **Chromonav Kulkarni** — April 26, 2016 at 7:30 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22775))
 
 > Chromonav Kulkarni says:
 >
@@ -542,7 +542,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chromonav Kulkarni** — April 26, 2016 at 7:46 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22596))
+### **Chromonav Kulkarni** — April 26, 2016 at 7:46 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22596))
 
 > Chromonav Kulkarni says:
 >
@@ -551,7 +551,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 26, 2016 at 8:06 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-21509))
+### **Shai Almog** — April 26, 2016 at 8:06 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-21509))
 
 > Shai Almog says:
 >
@@ -560,7 +560,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **oojr** — April 27, 2016 at 5:21 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-21557))
+### **oojr** — April 27, 2016 at 5:21 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-21557))
 
 > oojr says:
 >
@@ -569,7 +569,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chromonav Kulkarni** — April 27, 2016 at 2:21 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22825))
+### **Chromonav Kulkarni** — April 27, 2016 at 2:21 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22825))
 
 > Chromonav Kulkarni says:
 >
@@ -582,7 +582,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chromonav Kulkarni** — April 27, 2016 at 2:24 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22694))
+### **Chromonav Kulkarni** — April 27, 2016 at 2:24 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22694))
 
 > Chromonav Kulkarni says:
 >
@@ -591,7 +591,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 27, 2016 at 2:25 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22528))
+### **Shai Almog** — April 27, 2016 at 2:25 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22528))
 
 > Shai Almog says:
 >
@@ -605,7 +605,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ben** — May 9, 2016 at 9:31 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22776))
+### **Ben** — May 9, 2016 at 9:31 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22776))
 
 > Ben says:
 >
@@ -626,7 +626,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 10, 2016 at 4:08 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22883))
+### **Shai Almog** — May 10, 2016 at 4:08 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22883))
 
 > Shai Almog says:
 >
@@ -637,7 +637,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **khle** — June 25, 2016 at 12:14 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22633))
+### **khle** — June 25, 2016 at 12:14 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22633))
 
 > khle says:
 >
@@ -646,7 +646,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 26, 2016 at 4:50 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22877))
+### **Shai Almog** — June 26, 2016 at 4:50 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22877))
 
 > Shai Almog says:
 >
@@ -655,7 +655,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Nicolás Schürmann Lindemann** — July 5, 2016 at 12:25 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22772))
+### **Nicolás Schürmann Lindemann** — July 5, 2016 at 12:25 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22772))
 
 > Nicolás Schürmann Lindemann says:
 >
@@ -686,7 +686,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **WhoIsMeekMill?&kidcudi** — August 2, 2016 at 6:16 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22887))
+### **WhoIsMeekMill?&kidcudi** — August 2, 2016 at 6:16 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22887))
 
 > WhoIsMeekMill?&kidcudi says:
 >
@@ -695,7 +695,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bertbeck** — August 13, 2016 at 3:54 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22984))
+### **bertbeck** — August 13, 2016 at 3:54 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22984))
 
 > bertbeck says:
 >
@@ -704,7 +704,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 14, 2016 at 4:19 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22921))
+### **Shai Almog** — August 14, 2016 at 4:19 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22921))
 
 > Shai Almog says:
 >
@@ -714,7 +714,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **yedidyak** — August 21, 2016 at 8:47 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22802))
+### **yedidyak** — August 21, 2016 at 8:47 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22802))
 
 > yedidyak says:
 >
@@ -733,7 +733,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 22, 2016 at 3:25 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22879))
+### **Shai Almog** — August 22, 2016 at 3:25 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22879))
 
 > Shai Almog says:
 >
@@ -743,7 +743,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shailesh** — September 17, 2016 at 1:25 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22819))
+### **Shailesh** — September 17, 2016 at 1:25 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22819))
 
 > Shailesh says:
 >
@@ -752,7 +752,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 17, 2016 at 4:11 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-24222))
+### **Shai Almog** — September 17, 2016 at 4:11 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-24222))
 
 > Shai Almog says:
 >
@@ -767,7 +767,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **IsMyBlueYourBlue** — October 11, 2016 at 5:58 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22929))
+### **IsMyBlueYourBlue** — October 11, 2016 at 5:58 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22929))
 
 > IsMyBlueYourBlue says:
 >
@@ -776,7 +776,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Hristo Vrigazov** — October 23, 2016 at 2:28 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22981))
+### **Hristo Vrigazov** — October 23, 2016 at 2:28 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22981))
 
 > Hristo Vrigazov says:
 >
@@ -785,7 +785,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 1, 2016 at 1:11 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22924))
+### **Shai Almog** — November 1, 2016 at 1:11 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22924))
 
 > Shai Almog says:
 >
@@ -804,7 +804,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Justin L Mills** — November 9, 2016 at 4:42 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23181))
+### **Justin L Mills** — November 9, 2016 at 4:42 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23181))
 
 > Justin L Mills says:
 >
@@ -813,7 +813,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 10, 2016 at 5:03 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22865))
+### **Shai Almog** — November 10, 2016 at 5:03 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22865))
 
 > Shai Almog says:
 >
@@ -824,7 +824,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Justin L Mills** — November 10, 2016 at 11:33 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22846))
+### **Justin L Mills** — November 10, 2016 at 11:33 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22846))
 
 > Justin L Mills says:
 >
@@ -847,7 +847,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 11, 2016 at 7:22 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23185))
+### **Shai Almog** — November 11, 2016 at 7:22 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23185))
 
 > Shai Almog says:
 >
@@ -860,7 +860,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jason Nathan** — December 18, 2016 at 12:41 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22968))
+### **Jason Nathan** — December 18, 2016 at 12:41 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22968))
 
 > Jason Nathan says:
 >
@@ -869,7 +869,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 18, 2016 at 4:45 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-22837))
+### **Shai Almog** — December 18, 2016 at 4:45 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-22837))
 
 > Shai Almog says:
 >
@@ -878,7 +878,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ie5x** — January 11, 2017 at 10:29 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23241))
+### **ie5x** — January 11, 2017 at 10:29 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23241))
 
 > ie5x says:
 >
@@ -909,7 +909,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 12, 2017 at 5:08 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23162))
+### **Shai Almog** — January 12, 2017 at 5:08 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23162))
 
 > Shai Almog says:
 >
@@ -919,7 +919,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Nitin Bansal** — February 4, 2017 at 7:39 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-21647))
+### **Nitin Bansal** — February 4, 2017 at 7:39 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-21647))
 
 > Nitin Bansal says:
 >
@@ -928,7 +928,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 5, 2017 at 8:17 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23249))
+### **Shai Almog** — February 5, 2017 at 8:17 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23249))
 
 > Shai Almog says:
 >
@@ -939,7 +939,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Stan** — February 8, 2017 at 5:41 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23089))
+### **Stan** — February 8, 2017 at 5:41 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23089))
 
 > Stan says:
 >
@@ -948,7 +948,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Stan** — February 8, 2017 at 5:44 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23244))
+### **Stan** — February 8, 2017 at 5:44 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23244))
 
 > Stan says:
 >
@@ -957,7 +957,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **anonymyst** — February 17, 2017 at 11:51 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23310))
+### **anonymyst** — February 17, 2017 at 11:51 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23310))
 
 > anonymyst says:
 >
@@ -966,7 +966,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 18, 2017 at 5:59 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23378))
+### **Shai Almog** — February 18, 2017 at 5:59 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23378))
 
 > Shai Almog says:
 >
@@ -979,7 +979,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **carlos** — March 21, 2017 at 7:41 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23260))
+### **carlos** — March 21, 2017 at 7:41 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23260))
 
 > carlos says:
 >
@@ -996,7 +996,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **carlos** — March 21, 2017 at 7:48 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23100))
+### **carlos** — March 21, 2017 at 7:48 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23100))
 
 > carlos says:
 >
@@ -1005,7 +1005,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 22, 2017 at 4:57 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23338))
+### **Shai Almog** — March 22, 2017 at 4:57 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23338))
 
 > Shai Almog says:
 >
@@ -1023,7 +1023,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **carlos** — March 22, 2017 at 6:29 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-21569))
+### **carlos** — March 22, 2017 at 6:29 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-21569))
 
 > carlos says:
 >
@@ -1058,7 +1058,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 23, 2017 at 6:23 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23121))
+### **Shai Almog** — March 23, 2017 at 6:23 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23121))
 
 > Shai Almog says:
 >
@@ -1073,7 +1073,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Rick** — April 8, 2017 at 10:08 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23427))
+### **Rick** — April 8, 2017 at 10:08 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23427))
 
 > Rick says:
 >
@@ -1091,7 +1091,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 9, 2017 at 4:02 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23261))
+### **Shai Almog** — April 9, 2017 at 4:02 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23261))
 
 > Shai Almog says:
 >
@@ -1105,7 +1105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **lambdatoast** — May 18, 2017 at 10:42 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23365))
+### **lambdatoast** — May 18, 2017 at 10:42 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23365))
 
 > lambdatoast says:
 >
@@ -1120,7 +1120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 14, 2017 at 7:07 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23603))
+### **Shai Almog** — August 14, 2017 at 7:07 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23603))
 
 > Shai Almog says:
 >
@@ -1130,7 +1130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Albert Gao** — October 9, 2017 at 4:15 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23666))
+### **Albert Gao** — October 9, 2017 at 4:15 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23666))
 
 > Albert Gao says:
 >
@@ -1148,7 +1148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 9, 2017 at 7:59 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23787))
+### **Shai Almog** — October 9, 2017 at 7:59 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23787))
 
 > Shai Almog says:
 >
@@ -1157,12 +1157,12 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 1\. I’m not sure about the complexities of those. I think some of that should be portable.  
 > 2\. That’s doable. The main obstacle for doing this is people/resources.  
-> 3\. We have a properties binding framework, it’s oriented at Java but might work well for kotlin see: [https://www.codenameone.com…](<https://www.codenameone.com/how-do-i-use-properties-to-speed-development.html>)
+> 3\. We have a properties binding framework, it’s oriented at Java but might work well for kotlin see: [https://www.codenameone.com…](</how-do-i-use-properties-to-speed-development/>)
 >
 
 
 
-### **Albert Gao** — October 9, 2017 at 8:08 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23793))
+### **Albert Gao** — October 9, 2017 at 8:08 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23793))
 
 > Albert Gao says:
 >
@@ -1173,7 +1173,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **nathan32** — October 13, 2017 at 7:54 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23574))
+### **nathan32** — October 13, 2017 at 7:54 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23574))
 
 > nathan32 says:
 >
@@ -1185,7 +1185,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 13, 2017 at 8:20 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23801))
+### **Shai Almog** — October 13, 2017 at 8:20 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23801))
 
 > Shai Almog says:
 >
@@ -1196,14 +1196,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > – You can get a basic subscription for your office for less than a cost of a Mac if all you care about is the build server functionality. Having said that the pro subscription includes FAR more features than that and full support. That’s something you can’t buy fro any amount of money in react. You can’t pay Facebook (not a 3rd party) to give you professional support.  
 > With the enterprise subscription you buy a lot of things that go well beyond offline build, specifically you buy partial control over the direction of the project and a direct line to us. There are many other features besides offline build etc. Its meant for enterprises not startups so if price is an issue don’t buy it. The fact that there are paid options is an advantage for us, not a disadvantage.
 >
-> – We support Kotlin not just Java although Java is the main target. We could support any language supported by the JVM from Ruby to Jython to Scala etc. There is even a nifty guide Steve wrote explaining the steps he took in porting Kotlin (FYI he also added unofficial support for Mirah a few years back): [https://www.codenameone.com…](<https://www.codenameone.com/blog/how-to-port-jvm-languages-to-codename-one.html>)
+> – We support Kotlin not just Java although Java is the main target. We could support any language supported by the JVM from Ruby to Jython to Scala etc. There is even a nifty guide Steve wrote explaining the steps he took in porting Kotlin (FYI he also added unofficial support for Mirah a few years back): [https://www.codenameone.com…](</blog/how-to-port-jvm-languages-to-codename-one/>)
 >
 > – There used to be a 3rd party offline build project, we hired its maintainer (not to stop the project, he’s just a really great hacker). When that project ran very few people used it, it might still work but most people don’t really care about that stuff so the last paragraph should be reversed. “You would be surprised”.
 >
 
 
 
-### **nathan32** — October 13, 2017 at 8:52 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23762))
+### **nathan32** — October 13, 2017 at 8:52 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23762))
 
 > nathan32 says:
 >
@@ -1212,11 +1212,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 13, 2017 at 10:00 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23755))
+### **Shai Almog** — October 13, 2017 at 10:00 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23755))
 
 > Shai Almog says:
 >
-> Native builds in Codename One are between free (with quota limits) to 19USD per month with no limits. I have no idea why you decided the $399 enterprise version is needed when about 1% of our users actually pick that option. From that 1% very few use the offline builds which even our promotional material recommends against see: [https://www.codenameone.com…](<https://www.codenameone.com/how-do-i-use-offline-build.html>)
+> Native builds in Codename One are between free (with quota limits) to 19USD per month with no limits. I have no idea why you decided the $399 enterprise version is needed when about 1% of our users actually pick that option. From that 1% very few use the offline builds which even our promotional material recommends against see: [https://www.codenameone.com…](</how-do-i-use-offline-build/>)
 >
 > Again you totally ignore the fact that you can use our source code for free and that it delivers pretty much everything. You also ignored all the other points I made.
 >
@@ -1225,7 +1225,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 7, 2017 at 11:01 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23729))
+### **Shai Almog** — November 7, 2017 at 11:01 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23729))
 
 > Shai Almog says:
 >
@@ -1243,7 +1243,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Nick** — February 26, 2018 at 4:48 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23951))
+### **Nick** — February 26, 2018 at 4:48 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23951))
 
 > Nick says:
 >
@@ -1252,7 +1252,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 3, 2018 at 12:12 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23765))
+### **Shai Almog** — March 3, 2018 at 12:12 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23765))
 
 > Shai Almog says:
 >
@@ -1266,7 +1266,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **James Line** — June 14, 2018 at 1:38 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23856))
+### **James Line** — June 14, 2018 at 1:38 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23856))
 
 > James Line says:
 >
@@ -1275,7 +1275,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Iftee Khar Ul Islam** — June 20, 2019 at 2:27 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-24117))
+### **Iftee Khar Ul Islam** — June 20, 2019 at 2:27 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-24117))
 
 > Iftee Khar Ul Islam says:
 >
@@ -1284,7 +1284,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Iftee Khar Ul Islam** — June 20, 2019 at 2:31 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23967))
+### **Iftee Khar Ul Islam** — June 20, 2019 at 2:31 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23967))
 
 > Iftee Khar Ul Islam says:
 >
@@ -1293,7 +1293,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Michael** — September 16, 2019 at 11:18 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-23912))
+### **Michael** — September 16, 2019 at 11:18 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-23912))
 
 > Michael says:
 >
@@ -1302,7 +1302,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Merkle Groot** — February 7, 2020 at 11:51 pm ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-21377))
+### **Merkle Groot** — February 7, 2020 at 11:51 pm ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-21377))
 
 > [Merkle Groot](https://lh3.googleusercontent.com/-wgRg-3_Yiws/AAAAAAAAAAI/AAAAAAAAAAA/ACHi3rfK-pe_xm40uIAPWNZP0XwW8eHSwg/photo.jpg) says:
 >
@@ -1312,7 +1312,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 8, 2020 at 4:43 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-21380))
+### **Shai Almog** — February 8, 2020 at 4:43 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-21380))
 
 > Shai Almog says:
 >
@@ -1322,7 +1322,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Crab Synth** — May 22, 2020 at 1:56 am ([permalink](https://www.codenameone.com/blog/java-is-superior-to-react-native-in-practically-every-way.html#comment-21407))
+### **Crab Synth** — May 22, 2020 at 1:56 am ([permalink](/blog/java-is-superior-to-react-native-in-practically-every-way/#comment-21407))
 
 > [Crab Synth](https://lh3.googleusercontent.com/a-/AOh14GgDWPylqC3Tu2Tn2VKYsC4FGkgFlhb9leY7laYR) says:
 >

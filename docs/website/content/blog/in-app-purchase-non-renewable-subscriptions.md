@@ -11,10 +11,10 @@ author: Steve Hannah
 
 ![Header Image](/blog/in-app-purchase-non-renewable-subscriptions/in-app-purchase.jpg)
 
-__ |  This is the second post in a three-part series on In-App purchase. Please check out [Part I: Introduction to In-App Purchase](https://www.codenameone.com/blog/intro-to-in-app-purchase.html) and [Part 3: Auto-renewing Subscriptions in iOS and Android](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html).   
+__ |  This is the second post in a three-part series on In-App purchase. Please check out [Part I: Introduction to In-App Purchase](/blog/intro-to-in-app-purchase/) and [Part 3: Auto-renewing Subscriptions in iOS and Android](/blog/autorenewing-subscriptions-in-ios-and-android/).   
 ---|---  
   
-In [my last post](https://www.codenameone.com/blog/intro-to-in-app-purchase.html) we looked at one-off in-app purchases. In this post we’ll look at subscriptions. As we discussed before, there are two types of subscriptions:
+In [my last post](/blog/intro-to-in-app-purchase/) we looked at one-off in-app purchases. In this post we’ll look at subscriptions. As we discussed before, there are two types of subscriptions:
 
   1. Non-renewable
 
@@ -392,7 +392,7 @@ Codename One uses the `Receipt` class as the foundation for its subscriptions in
 
 ## Up Next: Auto-Renewable Subscriptions
 
-The [next post](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html) in this series covers [Auto-renewable subscriptions](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html).
+The [next post](/blog/autorenewing-subscriptions-in-ios-and-android/) in this series covers [Auto-renewable subscriptions](/blog/autorenewing-subscriptions-in-ios-and-android/).
 ---
 
 ## Archived Comments
@@ -400,7 +400,7 @@ The [next post](https://www.codenameone.com/blog/autorenewing-subscriptions-in-i
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Giri Sugu** — December 7, 2017 at 6:37 am ([permalink](https://www.codenameone.com/blog/in-app-purchase-non-renewable-subscriptions.html#comment-23763))
+### **Giri Sugu** — December 7, 2017 at 6:37 am ([permalink](/blog/in-app-purchase-non-renewable-subscriptions/#comment-23763))
 
 > Hi. In non-renewable subscriptions i have a couple of questions,  
 > 1\. if i have 200 products means, do i want to add that all 200 products in iTunes connect  
@@ -409,7 +409,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 8, 2017 at 6:51 am ([permalink](https://www.codenameone.com/blog/in-app-purchase-non-renewable-subscriptions.html#comment-23672))
+### **Shai Almog** — December 8, 2017 at 6:51 am ([permalink](/blog/in-app-purchase-non-renewable-subscriptions/#comment-23672))
 
 > Hi,  
 > 1\. Yes.  
@@ -418,14 +418,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Julien Sosin** — February 9, 2018 at 7:21 am ([permalink](https://www.codenameone.com/blog/in-app-purchase-non-renewable-subscriptions.html#comment-23896))
+### **Julien Sosin** — February 9, 2018 at 7:21 am ([permalink](/blog/in-app-purchase-non-renewable-subscriptions/#comment-23896))
 
 > Hello. An user cancel his purchase but Apple didn’t send the cancellation_date when I refresh the receipts and I can’t know that the user had cancel his purchase. What can I do ?
 >
 
 
 
-### **Shai Almog** — February 10, 2018 at 6:01 am ([permalink](https://www.codenameone.com/blog/in-app-purchase-non-renewable-subscriptions.html#comment-23878))
+### **Shai Almog** — February 10, 2018 at 6:01 am ([permalink](/blog/in-app-purchase-non-renewable-subscriptions/#comment-23878))
 
 > Hi,  
 > Not much. If Apple doesn’t send the cancellation it’s a problem. Generally with in-app-purchase you should only sell stuff you don’t mind losing occasionally on.
@@ -433,7 +433,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Julien Sosin** — February 10, 2018 at 8:57 am ([permalink](https://www.codenameone.com/blog/in-app-purchase-non-renewable-subscriptions.html#comment-23750))
+### **Julien Sosin** — February 10, 2018 at 8:57 am ([permalink](/blog/in-app-purchase-non-renewable-subscriptions/#comment-23750))
 
 > Hi Almog. I guess I should check manually :/
 >

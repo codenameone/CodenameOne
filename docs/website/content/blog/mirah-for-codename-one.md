@@ -59,7 +59,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — September 6, 2014 at 5:39 am ([permalink](https://www.codenameone.com/blog/mirah-for-codename-one.html#comment-21986))
+### **Anonymous** — September 6, 2014 at 5:39 am ([permalink](/blog/mirah-for-codename-one/#comment-21986))
 
 > Anonymous says:
 >
@@ -68,7 +68,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 6, 2014 at 1:44 pm ([permalink](https://www.codenameone.com/blog/mirah-for-codename-one.html#comment-21719))
+### **Anonymous** — September 6, 2014 at 1:44 pm ([permalink](/blog/mirah-for-codename-one/#comment-21719))
 
 > Anonymous says:
 >
@@ -77,7 +77,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 30, 2014 at 5:40 pm ([permalink](https://www.codenameone.com/blog/mirah-for-codename-one.html#comment-24240))
+### **Anonymous** — September 30, 2014 at 5:40 pm ([permalink](/blog/mirah-for-codename-one/#comment-24240))
 
 > Anonymous says:
 >

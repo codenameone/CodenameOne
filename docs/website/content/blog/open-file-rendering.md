@@ -14,7 +14,7 @@ author: Shai Almog
 As part of our continuing effort to squash bugs for the 3.4 release date we hit two major issues, the first of which is  
 a long time RFE to [fix PDF viewing on iOS & Android to work consistently](https://github.com/codenameone/CodenameOne/issues/1651).  
 This also applies to any file opening in iOS/Android which should now be trivial with the `Display.execute` method.  
-Just use that method on any file within your home directory in [FileSystemStorage](https://www.codenameone.com/javadoc/com/codename1/io/FileSystemStorage.html)  
+Just use that method on any file within your home directory in [FileSystemStorage](/javadoc/com/codename1/io/FileSystemStorage/)  
 and it should launch the native app to view that file.
 
 A common use case is to see a PDF file for help or guide e.g. like this:
@@ -53,8 +53,8 @@ you need to call `setCellRenderer(true)` on all of the children. We don’t do i
 odd bugs where adding a child before and another child after will result in weird rendering…​
 
 We intend to switch to the new Android pipeline a bit after the 3.4 release so be sure to update your renderer code  
-if you use such an approach or better yet, avoid `List` and switch to [InfiniteContainer](https://www.codenameone.com/javadoc/com/codename1/ui/InfiniteContainer.html)  
-or [InfiniteScrollAdapter](https://www.codenameone.com/javadoc/com/codename1/components/InfiniteScrollAdapter.html).
+if you use such an approach or better yet, avoid `List` and switch to [InfiniteContainer](/javadoc/com/codename1/ui/InfiniteContainer/)  
+or [InfiniteScrollAdapter](/javadoc/com/codename1/components/InfiniteScrollAdapter/).
 
 __ |  After publishing this Steve noted that I was quite unclear about a few of the things above so below  
 are a couple of clarifications:   
@@ -74,35 +74,35 @@ the issue.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Yaakov Gesher** — July 24, 2016 at 5:43 am ([permalink](https://www.codenameone.com/blog/open-file-rendering.html#comment-22894))
+### **Yaakov Gesher** — July 24, 2016 at 5:43 am ([permalink](/blog/open-file-rendering/#comment-22894))
 
 > Yaakov Gesher says:
 >
 > Hi Shai, I’ve been trying to use the execute() api and I’ve run into some unexpected behavior. It seems to try to open any local file as a pdf. It seemed from this post that it should work to open any file. If I try to open an mp3 file, for example, it should open with a media player app. But at least on Android (have yet to test on ios), even mp3 files get treated as pdfs (which obviously causes an error).
 
 
-### **Shai Almog** — July 25, 2016 at 4:38 am ([permalink](https://www.codenameone.com/blog/open-file-rendering.html#comment-22546))
+### **Shai Almog** — July 25, 2016 at 4:38 am ([permalink](/blog/open-file-rendering/#comment-22546))
 
 > Shai Almog says:
 >
 > Looking at the code I think it should work for MP3’s and I know people use it for video so it should be fine. Make sure the file extension is correct as this is important for this API.
 
 
-### **Chris** — June 7, 2017 at 6:30 pm ([permalink](https://www.codenameone.com/blog/open-file-rendering.html#comment-23273))
+### **Chris** — June 7, 2017 at 6:30 pm ([permalink](/blog/open-file-rendering/#comment-23273))
 
 > Chris says:
 >
 > Where is fs.getAppHomePath() in my project. How can I find the folder where should I place the PDF file to open from the App
 
 
-### **Shai Almog** — June 8, 2017 at 5:29 am ([permalink](https://www.codenameone.com/blog/open-file-rendering.html#comment-23486))
+### **Shai Almog** — June 8, 2017 at 5:29 am ([permalink](/blog/open-file-rendering/#comment-23486))
 
 > Shai Almog says:
 >
 > It’s not in your project. It’s a device specific path that varies from device to device. You can use Util.copy() to copy a resource file to that directory though.
 
 
-### **Chris** — June 8, 2017 at 6:27 pm ([permalink](https://www.codenameone.com/blog/open-file-rendering.html#comment-23493))
+### **Chris** — June 8, 2017 at 6:27 pm ([permalink](/blog/open-file-rendering/#comment-23493))
 
 > Chris says:
 >
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I have tried to save it to Storage as well – Util.copy(fs.openInputStream(fileName), Storage.getInstance().createOutputStream(fileName));
 
 
-### **Shai Almog** — June 9, 2017 at 4:38 am ([permalink](https://www.codenameone.com/blog/open-file-rendering.html#comment-23366))
+### **Shai Almog** — June 9, 2017 at 4:38 am ([permalink](/blog/open-file-rendering/#comment-23366))
 
 > Shai Almog says:
 >
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > But I suggest first checking if the file already exists or maybe even a version.
 
 
-### **Chris** — June 9, 2017 at 9:04 pm ([permalink](https://www.codenameone.com/blog/open-file-rendering.html#comment-23283))
+### **Chris** — June 9, 2017 at 9:04 pm ([permalink](/blog/open-file-rendering/#comment-23283))
 
 > Chris says:
 >

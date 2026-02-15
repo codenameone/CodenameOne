@@ -60,7 +60,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — April 28, 2014 at 3:46 pm ([permalink](https://www.codenameone.com/blog/screenshots-and-graphics-update.html#comment-21830))
+### **Anonymous** — April 28, 2014 at 3:46 pm ([permalink](/blog/screenshots-and-graphics-update/#comment-21830))
 
 > Anonymous says:
 >
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 30, 2014 at 2:45 pm ([permalink](https://www.codenameone.com/blog/screenshots-and-graphics-update.html#comment-21772))
+### **Anonymous** — April 30, 2014 at 2:45 pm ([permalink](/blog/screenshots-and-graphics-update/#comment-21772))
 
 > Anonymous says:
 >

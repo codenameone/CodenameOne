@@ -28,7 +28,7 @@ This will produce a 32bit build like before.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **James van Kessel** — February 13, 2017 at 11:48 am ([permalink](https://www.codenameone.com/blog/moving-to-64bit-by-default.html#comment-23336))
+### **James van Kessel** — February 13, 2017 at 11:48 am ([permalink](/blog/moving-to-64bit-by-default/#comment-23336))
 
 > James van Kessel says:
 >
@@ -39,7 +39,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 14, 2017 at 8:04 am ([permalink](https://www.codenameone.com/blog/moving-to-64bit-by-default.html#comment-23105))
+### **Shai Almog** — February 14, 2017 at 8:04 am ([permalink](/blog/moving-to-64bit-by-default/#comment-23105))
 
 > Shai Almog says:
 >
@@ -49,7 +49,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Keith Valdez Hasselstrom** — March 6, 2017 at 6:01 pm ([permalink](https://www.codenameone.com/blog/moving-to-64bit-by-default.html#comment-23419))
+### **Keith Valdez Hasselstrom** — March 6, 2017 at 6:01 pm ([permalink](/blog/moving-to-64bit-by-default/#comment-23419))
 
 > Keith Valdez Hasselstrom says:
 >
@@ -58,7 +58,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 7, 2017 at 6:33 am ([permalink](https://www.codenameone.com/blog/moving-to-64bit-by-default.html#comment-23343))
+### **Shai Almog** — March 7, 2017 at 6:33 am ([permalink](/blog/moving-to-64bit-by-default/#comment-23343))
 
 > Shai Almog says:
 >
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Keith Valdez Hasselstrom** — March 7, 2017 at 2:20 pm ([permalink](https://www.codenameone.com/blog/moving-to-64bit-by-default.html#comment-23240))
+### **Keith Valdez Hasselstrom** — March 7, 2017 at 2:20 pm ([permalink](/blog/moving-to-64bit-by-default/#comment-23240))
 
 > Keith Valdez Hasselstrom says:
 >

@@ -42,7 +42,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 30, 2014 at 3:16 pm ([permalink](https://www.codenameone.com/blog/keyboard-keys-android-pipeline.html#comment-22145))
+### **Anonymous** — October 30, 2014 at 3:16 pm ([permalink](/blog/keyboard-keys-android-pipeline/#comment-22145))
 
 > Anonymous says:
 >
@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 30, 2014 at 9:53 pm ([permalink](https://www.codenameone.com/blog/keyboard-keys-android-pipeline.html#comment-22006))
+### **Anonymous** — October 30, 2014 at 9:53 pm ([permalink](/blog/keyboard-keys-android-pipeline/#comment-22006))
 
 > Anonymous says:
 >

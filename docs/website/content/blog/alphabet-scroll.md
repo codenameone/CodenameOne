@@ -94,7 +94,7 @@ the relevant code below:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — July 19, 2016 at 7:39 am ([permalink](https://www.codenameone.com/blog/alphabet-scroll.html#comment-22861))
+### **Chidiebere Okwudire** — July 19, 2016 at 7:39 am ([permalink](/blog/alphabet-scroll/#comment-22861))
 
 > Chidiebere Okwudire says:
 >
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ross Taylor** — July 19, 2016 at 8:56 am ([permalink](https://www.codenameone.com/blog/alphabet-scroll.html#comment-22644))
+### **Ross Taylor** — July 19, 2016 at 8:56 am ([permalink](/blog/alphabet-scroll/#comment-22644))
 
 > Ross Taylor says:
 >
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — July 19, 2016 at 1:29 pm ([permalink](https://www.codenameone.com/blog/alphabet-scroll.html#comment-22818))
+### **Chidiebere Okwudire** — July 19, 2016 at 1:29 pm ([permalink](/blog/alphabet-scroll/#comment-22818))
 
 > Chidiebere Okwudire says:
 >
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 20, 2016 at 4:20 am ([permalink](https://www.codenameone.com/blog/alphabet-scroll.html#comment-22580))
+### **Shai Almog** — July 20, 2016 at 4:20 am ([permalink](/blog/alphabet-scroll/#comment-22580))
 
 > Shai Almog says:
 >
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 20, 2016 at 4:20 am ([permalink](https://www.codenameone.com/blog/alphabet-scroll.html#comment-22733))
+### **Shai Almog** — July 20, 2016 at 4:20 am ([permalink](/blog/alphabet-scroll/#comment-22733))
 
 > Shai Almog says:
 >
@@ -142,7 +142,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 20, 2016 at 4:23 am ([permalink](https://www.codenameone.com/blog/alphabet-scroll.html#comment-22977))
+### **Shai Almog** — July 20, 2016 at 4:23 am ([permalink](/blog/alphabet-scroll/#comment-22977))
 
 > Shai Almog says:
 >

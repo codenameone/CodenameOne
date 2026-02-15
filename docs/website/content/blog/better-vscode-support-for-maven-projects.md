@@ -79,7 +79,7 @@ Currently, debugging is still a bit of a challenge in VSCode. We are working on 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Bryan Buchanan** — June 7, 2022 at 11:22 am ([permalink](https://www.codenameone.com/blog/better-vscode-support-for-maven-projects.html#comment-24536))
+### **Bryan Buchanan** — June 7, 2022 at 11:22 am ([permalink](/blog/better-vscode-support-for-maven-projects/#comment-24536))
 
 > Bryan Buchanan says:
 >
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Bryan Buchanan** — June 9, 2022 at 12:50 am ([permalink](https://www.codenameone.com/blog/better-vscode-support-for-maven-projects.html#comment-24537))
+### **Bryan Buchanan** — June 9, 2022 at 12:50 am ([permalink](/blog/better-vscode-support-for-maven-projects/#comment-24537))
 
 > Bryan Buchanan says:
 >
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Bryan Buchanan** — June 10, 2022 at 7:53 am ([permalink](https://www.codenameone.com/blog/better-vscode-support-for-maven-projects.html#comment-24539))
+### **Bryan Buchanan** — June 10, 2022 at 7:53 am ([permalink](/blog/better-vscode-support-for-maven-projects/#comment-24539))
 
 > Bryan Buchanan says:
 >
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **N P** — August 22, 2023 at 8:23 pm ([permalink](https://www.codenameone.com/blog/better-vscode-support-for-maven-projects.html#comment-24568))
+### **N P** — August 22, 2023 at 8:23 pm ([permalink](/blog/better-vscode-support-for-maven-projects/#comment-24568))
 
 > N P says:
 >
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 23, 2023 at 2:00 am ([permalink](https://www.codenameone.com/blog/better-vscode-support-for-maven-projects.html#comment-24569))
+### **Shai Almog** — August 23, 2023 at 2:00 am ([permalink](/blog/better-vscode-support-for-maven-projects/#comment-24569))
 
 > Shai Almog says:
 >
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Raphael Lacuna** — September 23, 2023 at 12:02 am ([permalink](https://www.codenameone.com/blog/better-vscode-support-for-maven-projects.html#comment-24575))
+### **Raphael Lacuna** — September 23, 2023 at 12:02 am ([permalink](/blog/better-vscode-support-for-maven-projects/#comment-24575))
 
 > Raphael Lacuna says:
 >
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — September 23, 2023 at 12:50 pm ([permalink](https://www.codenameone.com/blog/better-vscode-support-for-maven-projects.html#comment-24576))
+### **Steve Hannah** — September 23, 2023 at 12:50 pm ([permalink](/blog/better-vscode-support-for-maven-projects/#comment-24576))
 
 > Steve Hannah says:
 >

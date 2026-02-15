@@ -127,7 +127,7 @@ Add the following maven dependency to your common/pom.xml file
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Wits ICT** — August 1, 2023 at 10:26 pm ([permalink](https://www.codenameone.com/blog/codename-one-shared-files-library.html#comment-24565))
+### **Wits ICT** — August 1, 2023 at 10:26 pm ([permalink](/blog/codename-one-shared-files-library/#comment-24565))
 
 > Wits ICT says:
 >
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mobi Tribe** — October 10, 2023 at 12:49 pm ([permalink](https://www.codenameone.com/blog/codename-one-shared-files-library.html#comment-24580))
+### **Mobi Tribe** — October 10, 2023 at 12:49 pm ([permalink](/blog/codename-one-shared-files-library/#comment-24580))
 
 > Mobi Tribe says:
 >

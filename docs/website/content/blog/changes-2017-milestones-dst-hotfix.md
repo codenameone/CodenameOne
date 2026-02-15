@@ -35,7 +35,7 @@ So please make sure to include that information in support queries (in general n
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chris** — March 22, 2017 at 5:50 pm ([permalink](https://www.codenameone.com/blog/changes-2017-milestones-dst-hotfix.html#comment-23212))
+### **Chris** — March 22, 2017 at 5:50 pm ([permalink](/blog/changes-2017-milestones-dst-hotfix/#comment-23212))
 
 > Chris says:
 >
@@ -44,7 +44,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 23, 2017 at 5:55 am ([permalink](https://www.codenameone.com/blog/changes-2017-milestones-dst-hotfix.html#comment-23221))
+### **Shai Almog** — March 23, 2017 at 5:55 am ([permalink](/blog/changes-2017-milestones-dst-hotfix/#comment-23221))
 
 > Shai Almog says:
 >

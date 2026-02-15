@@ -80,7 +80,7 @@ I don’t think it will do enough to combat fragmentation. Google will need to c
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — April 6, 2018 at 9:56 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23555))
+### **Francesco Galgani** — April 6, 2018 at 9:56 am ([permalink](/blog/android-build-target-27-migration/#comment-23555))
 
 > Francesco Galgani says:
 >
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 7, 2018 at 4:42 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23648))
+### **Shai Almog** — April 7, 2018 at 4:42 am ([permalink](/blog/android-build-target-27-migration/#comment-23648))
 
 > Shai Almog says:
 >
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — May 12, 2018 at 8:45 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23780))
+### **Denis** — May 12, 2018 at 8:45 am ([permalink](/blog/android-build-target-27-migration/#comment-23780))
 
 > Denis says:
 >
@@ -129,7 +129,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 13, 2018 at 4:25 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23692))
+### **Shai Almog** — May 13, 2018 at 4:25 am ([permalink](/blog/android-build-target-27-migration/#comment-23692))
 
 > Shai Almog says:
 >
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — May 13, 2018 at 6:38 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23725))
+### **Denis** — May 13, 2018 at 6:38 am ([permalink](/blog/android-build-target-27-migration/#comment-23725))
 
 > Denis says:
 >
@@ -150,7 +150,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 14, 2018 at 4:25 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-21475))
+### **Shai Almog** — May 14, 2018 at 4:25 am ([permalink](/blog/android-build-target-27-migration/#comment-21475))
 
 > Shai Almog says:
 >
@@ -160,7 +160,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — May 14, 2018 at 7:24 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23556))
+### **Denis** — May 14, 2018 at 7:24 am ([permalink](/blog/android-build-target-27-migration/#comment-23556))
 
 > Denis says:
 >
@@ -206,7 +206,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 15, 2018 at 4:08 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23790))
+### **Shai Almog** — May 15, 2018 at 4:08 am ([permalink](/blog/android-build-target-27-migration/#comment-23790))
 
 > Shai Almog says:
 >
@@ -218,7 +218,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — May 15, 2018 at 4:25 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23960))
+### **Denis** — May 15, 2018 at 4:25 am ([permalink](/blog/android-build-target-27-migration/#comment-23960))
 
 > Denis says:
 >
@@ -230,7 +230,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 15, 2018 at 4:48 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-21644))
+### **Shai Almog** — May 15, 2018 at 4:48 am ([permalink](/blog/android-build-target-27-migration/#comment-21644))
 
 > Shai Almog says:
 >
@@ -239,7 +239,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — May 15, 2018 at 6:44 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23699))
+### **Denis** — May 15, 2018 at 6:44 am ([permalink](/blog/android-build-target-27-migration/#comment-23699))
 
 > Denis says:
 >
@@ -251,7 +251,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — May 15, 2018 at 9:20 pm ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23716))
+### **Denis** — May 15, 2018 at 9:20 pm ([permalink](/blog/android-build-target-27-migration/#comment-23716))
 
 > Denis says:
 >
@@ -261,7 +261,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 16, 2018 at 5:56 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23767))
+### **Shai Almog** — May 16, 2018 at 5:56 am ([permalink](/blog/android-build-target-27-migration/#comment-23767))
 
 > Shai Almog says:
 >
@@ -273,7 +273,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — May 16, 2018 at 6:16 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23693))
+### **Denis** — May 16, 2018 at 6:16 am ([permalink](/blog/android-build-target-27-migration/#comment-23693))
 
 > Denis says:
 >
@@ -282,7 +282,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 17, 2018 at 11:05 am ([permalink](https://www.codenameone.com/blog/android-build-target-27-migration.html#comment-23931))
+### **Shai Almog** — May 17, 2018 at 11:05 am ([permalink](/blog/android-build-target-27-migration/#comment-23931))
 
 > Shai Almog says:
 >

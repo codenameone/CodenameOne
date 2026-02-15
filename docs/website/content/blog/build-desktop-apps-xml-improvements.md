@@ -55,7 +55,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 28, 2014 at 4:50 am ([permalink](https://www.codenameone.com/blog/build-desktop-apps-xml-improvements.html#comment-22065))
+### **Anonymous** — January 28, 2014 at 4:50 am ([permalink](/blog/build-desktop-apps-xml-improvements/#comment-22065))
 
 > Anonymous says:
 >
@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 28, 2014 at 5:00 pm ([permalink](https://www.codenameone.com/blog/build-desktop-apps-xml-improvements.html#comment-21991))
+### **Anonymous** — January 28, 2014 at 5:00 pm ([permalink](/blog/build-desktop-apps-xml-improvements/#comment-21991))
 
 > Anonymous says:
 >
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 30, 2014 at 1:08 pm ([permalink](https://www.codenameone.com/blog/build-desktop-apps-xml-improvements.html#comment-21671))
+### **Anonymous** — January 30, 2014 at 1:08 pm ([permalink](/blog/build-desktop-apps-xml-improvements/#comment-21671))
 
 > Anonymous says:
 >
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 30, 2014 at 2:33 pm ([permalink](https://www.codenameone.com/blog/build-desktop-apps-xml-improvements.html#comment-21946))
+### **Anonymous** — January 30, 2014 at 2:33 pm ([permalink](/blog/build-desktop-apps-xml-improvements/#comment-21946))
 
 > Anonymous says:
 >

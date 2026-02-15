@@ -298,7 +298,7 @@ It might be interesting to allow manipulation of some SVG object states as well�
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — November 20, 2017 at 4:56 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-21633))
+### **Francesco Galgani** — November 20, 2017 at 4:56 pm ([permalink](/blog/flamingo-svg-transcoder/#comment-21633))
 
 > I’m interested in converting an svg scalable logo to Codename One code, but… is the link you provided correct? There is no mention of Codename One:  
 > [https://github.com/ebourg/f…](<https://github.com/ebourg/flamingo-svg-transcoder>)
@@ -306,7 +306,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 21, 2017 at 12:33 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-21533))
+### **Shai Almog** — November 21, 2017 at 12:33 pm ([permalink](/blog/flamingo-svg-transcoder/#comment-21533))
 
 > Ugh, thanks! It’s [http://github.com/codenameo…](<http://github.com/codenameone/flamingo-svg-transcoder>)  
 > I’ll fix it in the post.
@@ -314,7 +314,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Angelo** — June 23, 2020 at 5:31 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24281))
+### **Angelo** — June 23, 2020 at 5:31 pm ([permalink](/blog/flamingo-svg-transcoder/#comment-24281))
 
 > Angelo says:
 >
@@ -323,7 +323,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 24, 2020 at 2:45 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-21424))
+### **Shai Almog** — June 24, 2020 at 2:45 am ([permalink](/blog/flamingo-svg-transcoder/#comment-21424))
 
 > Shai Almog says:
 >
@@ -332,7 +332,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Angelo** — June 24, 2020 at 7:11 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24280))
+### **Angelo** — June 24, 2020 at 7:11 am ([permalink](/blog/flamingo-svg-transcoder/#comment-24280))
 
 > Angelo says:
 >
@@ -347,7 +347,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Durank** — October 21, 2020 at 3:20 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24344))
+### **Durank** — October 21, 2020 at 3:20 pm ([permalink](/blog/flamingo-svg-transcoder/#comment-24344))
 
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
@@ -356,7 +356,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Durank** — October 21, 2020 at 4:33 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24360))
+### **Durank** — October 21, 2020 at 4:33 pm ([permalink](/blog/flamingo-svg-transcoder/#comment-24360))
 
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
@@ -365,7 +365,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 22, 2020 at 10:48 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24362))
+### **Shai Almog** — October 22, 2020 at 10:48 am ([permalink](/blog/flamingo-svg-transcoder/#comment-24362))
 
 > Shai Almog says:
 >
@@ -374,7 +374,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Duran k** — October 22, 2020 at 3:10 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24364))
+### **Duran k** — October 22, 2020 at 3:10 pm ([permalink](/blog/flamingo-svg-transcoder/#comment-24364))
 
 > [Duran k](https://lh3.googleusercontent.com/a-/AOh14GhIAakAlC4gLyRHwDzKuv6MUG2CDvLghf3zUAG8yA=s96-c) says:
 >
@@ -411,7 +411,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 23, 2020 at 6:53 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24356))
+### **Shai Almog** — October 23, 2020 at 6:53 am ([permalink](/blog/flamingo-svg-transcoder/#comment-24356))
 
 > Shai Almog says:
 >
@@ -423,7 +423,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Duran k** — October 23, 2020 at 6:30 pm ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24363))
+### **Duran k** — October 23, 2020 at 6:30 pm ([permalink](/blog/flamingo-svg-transcoder/#comment-24363))
 
 > [Duran k](https://lh3.googleusercontent.com/a-/AOh14GhIAakAlC4gLyRHwDzKuv6MUG2CDvLghf3zUAG8yA=s96-c) says:
 >
@@ -432,7 +432,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 24, 2020 at 5:38 am ([permalink](https://www.codenameone.com/blog/flamingo-svg-transcoder.html#comment-24365))
+### **Shai Almog** — October 24, 2020 at 5:38 am ([permalink](/blog/flamingo-svg-transcoder/#comment-24365))
 
 > Shai Almog says:
 >

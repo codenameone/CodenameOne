@@ -100,7 +100,7 @@ and just run them as usual!
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — November 23, 2015 at 9:51 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22428))
+### **Diamond** — November 23, 2015 at 9:51 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22428))
 
 > Diamond says:
 >
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chen Fishbein** — November 23, 2015 at 10:25 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22171))
+### **Chen Fishbein** — November 23, 2015 at 10:25 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22171))
 
 > Chen Fishbein says:
 >
@@ -126,7 +126,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bryan** — November 23, 2015 at 9:36 pm ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22521))
+### **bryan** — November 23, 2015 at 9:36 pm ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22521))
 
 > bryan says:
 >
@@ -135,7 +135,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 24, 2015 at 4:19 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22244))
+### **Shai Almog** — November 24, 2015 at 4:19 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22244))
 
 > Shai Almog says:
 >
@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — December 9, 2015 at 11:34 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22505))
+### **Chidiebere Okwudire** — December 9, 2015 at 11:34 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22505))
 
 > Chidiebere Okwudire says:
 >
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 9, 2015 at 12:04 pm ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22359))
+### **Shai Almog** — December 9, 2015 at 12:04 pm ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22359))
 
 > Shai Almog says:
 >
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — December 9, 2015 at 8:45 pm ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22452))
+### **Chidiebere Okwudire** — December 9, 2015 at 8:45 pm ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22452))
 
 > Chidiebere Okwudire says:
 >
@@ -176,7 +176,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 10, 2015 at 3:38 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22369))
+### **Shai Almog** — December 10, 2015 at 3:38 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22369))
 
 > Shai Almog says:
 >
@@ -186,7 +186,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chen Fishbein** — December 10, 2015 at 8:10 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22280))
+### **Chen Fishbein** — December 10, 2015 at 8:10 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22280))
 
 > Chen Fishbein says:
 >
@@ -196,7 +196,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — December 10, 2015 at 11:56 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22423))
+### **Chidiebere Okwudire** — December 10, 2015 at 11:56 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22423))
 
 > Chidiebere Okwudire says:
 >
@@ -205,7 +205,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — January 20, 2016 at 12:04 pm ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22672))
+### **Chidiebere Okwudire** — January 20, 2016 at 12:04 pm ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22672))
 
 > Chidiebere Okwudire says:
 >
@@ -218,7 +218,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 20, 2016 at 2:16 pm ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-22407))
+### **Shai Almog** — January 20, 2016 at 2:16 pm ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-22407))
 
 > Shai Almog says:
 >
@@ -229,14 +229,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > With a refined design as we see in most of our professional grade apps, you wouldn’t use any of our builtin icons and focus on your own so having icons for everything would be redundant.
 >
-> You can have platform specific icons like these guys offer thru the resource file override feature which was designed with this exact thing in mind: [https://www.codenameone.com…]([https://www.codenameone.com/how-do-i—create-different-uis-or-use-different-images-for-specific-platformsform-factors-using-the-override-option-in-the-gui-builder.html](https://www.codenameone.com/how-do-i---create-different-uis-or-use-different-images-for-specific-platformsform-factors-using-the-override-option-in-the-gui-builder.html))
+> You can have platform specific icons like these guys offer thru the resource file override feature which was designed with this exact thing in mind: [https://www.codenameone.com…]([/how-do-i—create-different-uis-or-use-different-images-for-specific-platformsform-factors-using-the-override-option-in-the-gui-builder.html](https://www.codenameone.com/how-do-i---create-different-uis-or-use-different-images-for-specific-platformsform-factors-using-the-override-option-in-the-gui-builder/))
 >
 > However, I think this is often overstated. I think 99% of users care don’t really care that much about these conventions. If your app looks good and respects the general platform paradigm (e.g. Menu button, back button behavior etc.) it should be good.
 >
 
 
 
-### **Chidiebere Okwudire** — January 25, 2016 at 9:16 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-24258))
+### **Chidiebere Okwudire** — January 25, 2016 at 9:16 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-24258))
 
 > Chidiebere Okwudire says:
 >
@@ -245,7 +245,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ayush jagga** — June 23, 2020 at 7:28 am ([permalink](https://www.codenameone.com/blog/material-icons-background-music-geofencing-gradle.html#comment-24278))
+### **ayush jagga** — June 23, 2020 at 7:28 am ([permalink](/blog/material-icons-background-music-geofencing-gradle/#comment-24278))
 
 > [ayush jagga](https://lh3.googleusercontent.com/a-/AOh14Gg4AfIvrf-y03PXgpEK7I199ci7_UNyHimjmlpE) says:
 >

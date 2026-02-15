@@ -62,7 +62,7 @@ to scan the state machine class intelligently.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jeff Brower** — October 18, 2015 at 1:22 pm ([permalink](https://www.codenameone.com/blog/shrinking-sizes-optimizing.html#comment-22421))
+### **Jeff Brower** — October 18, 2015 at 1:22 pm ([permalink](/blog/shrinking-sizes-optimizing/#comment-22421))
 
 > Jeff Brower says:
 >

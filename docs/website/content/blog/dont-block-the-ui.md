@@ -138,7 +138,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Javier Anton** — August 17, 2020 at 8:15 am ([permalink](https://www.codenameone.com/blog/dont-block-the-ui.html#comment-24329))
+### **Javier Anton** — August 17, 2020 at 8:15 am ([permalink](/blog/dont-block-the-ui/#comment-24329))
 
 > [Javier Anton](https://lh3.googleusercontent.com/a-/AAuE7mDRjHkEvAZNXquh9p7Oo00ey1yOwNzZ0SrFwD0IVA) says:
 >

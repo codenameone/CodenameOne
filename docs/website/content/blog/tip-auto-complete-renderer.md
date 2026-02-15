@@ -95,18 +95,18 @@ Figure 1. Auto complete with images
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **davidwaf** — January 15, 2018 at 2:45 pm ([permalink](https://www.codenameone.com/blog/tip-auto-complete-renderer.html#comment-24221))
+### **davidwaf** — January 15, 2018 at 2:45 pm ([permalink](/blog/tip-auto-complete-renderer/#comment-24221))
 
 > Months later, this came in handy. Would be great to know how to implement the list-less version.
 >
 
 
 
-### **Shai Almog** — January 16, 2018 at 6:47 am ([permalink](https://www.codenameone.com/blog/tip-auto-complete-renderer.html#comment-23697))
+### **Shai Almog** — January 16, 2018 at 6:47 am ([permalink](/blog/tip-auto-complete-renderer/#comment-23697))
 
 > Shai Almog says:
 >
-> We’ll need to write a new component to implement that but technically it should be pretty easy to do similarly to some of the options highlighted in [https://www.codenameone.com…](<https://www.codenameone.com/blog/tip-dont-use-combobox.html>)
+> We’ll need to write a new component to implement that but technically it should be pretty easy to do similarly to some of the options highlighted in [https://www.codenameone.com…](</blog/tip-dont-use-combobox/>)
 >
 
 

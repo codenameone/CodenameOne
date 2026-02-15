@@ -21,7 +21,7 @@ In this tutorial I try to separate the various ports & explain when each one of 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — November 5, 2017 at 10:50 am ([permalink](https://www.codenameone.com/blog/tutorial-desktop-javascript-ports.html#comment-23704))
+### **Francesco Galgani** — November 5, 2017 at 10:50 am ([permalink](/blog/tutorial-desktop-javascript-ports/#comment-23704))
 
 > Francesco Galgani says:
 >
@@ -32,7 +32,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 6, 2017 at 2:31 pm ([permalink](https://www.codenameone.com/blog/tutorial-desktop-javascript-ports.html#comment-23712))
+### **Shai Almog** — November 6, 2017 at 2:31 pm ([permalink](/blog/tutorial-desktop-javascript-ports/#comment-23712))
 
 > Shai Almog says:
 >
@@ -42,7 +42,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — November 7, 2017 at 8:03 pm ([permalink](https://www.codenameone.com/blog/tutorial-desktop-javascript-ports.html#comment-23851))
+### **Francesco Galgani** — November 7, 2017 at 8:03 pm ([permalink](/blog/tutorial-desktop-javascript-ports/#comment-23851))
 
 > Francesco Galgani says:
 >
@@ -57,11 +57,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 8, 2017 at 5:12 am ([permalink](https://www.codenameone.com/blog/tutorial-desktop-javascript-ports.html#comment-23859))
+### **Shai Almog** — November 8, 2017 at 5:12 am ([permalink](/blog/tutorial-desktop-javascript-ports/#comment-23859))
 
 > Shai Almog says:
 >
-> We support cursor behavior in the current version of Codename One (I think it was added for 3.7) but we don’t implicitly change the mouse cursor. This should work on JavaScript and in the simulator see [https://www.codenameone.com…](<https://www.codenameone.com/blog/splitpane-cursors-push-registration.html>)
+> We support cursor behavior in the current version of Codename One (I think it was added for 3.7) but we don’t implicitly change the mouse cursor. This should work on JavaScript and in the simulator see [https://www.codenameone.com…](</blog/splitpane-cursors-push-registration/>)
 >
 > I just tried the pocker demo and it worked for me, it took a few seconds to load so maybe some hiccup happened during download on your end?
 >
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — November 12, 2017 at 12:04 am ([permalink](https://www.codenameone.com/blog/tutorial-desktop-javascript-ports.html#comment-23678))
+### **Francesco Galgani** — November 12, 2017 at 12:04 am ([permalink](/blog/tutorial-desktop-javascript-ports/#comment-23678))
 
 > Francesco Galgani says:
 >
@@ -97,7 +97,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 12, 2017 at 5:17 am ([permalink](https://www.codenameone.com/blog/tutorial-desktop-javascript-ports.html#comment-23566))
+### **Shai Almog** — November 12, 2017 at 5:17 am ([permalink](/blog/tutorial-desktop-javascript-ports/#comment-23566))
 
 > Shai Almog says:
 >
@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — November 12, 2017 at 12:53 pm ([permalink](https://www.codenameone.com/blog/tutorial-desktop-javascript-ports.html#comment-21531))
+### **Francesco Galgani** — November 12, 2017 at 12:53 pm ([permalink](/blog/tutorial-desktop-javascript-ports/#comment-21531))
 
 > Francesco Galgani says:
 >

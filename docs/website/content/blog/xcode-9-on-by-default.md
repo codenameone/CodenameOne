@@ -48,7 +48,7 @@ We are considering delaying the release that is planned for March 6th by a week 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Stefan Eder** — February 20, 2018 at 2:04 pm ([permalink](https://www.codenameone.com/blog/xcode-9-on-by-default.html#comment-23528))
+### **Stefan Eder** — February 20, 2018 at 2:04 pm ([permalink](/blog/xcode-9-on-by-default/#comment-23528))
 
 > Stefan Eder says:
 >
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 21, 2018 at 5:25 am ([permalink](https://www.codenameone.com/blog/xcode-9-on-by-default.html#comment-23923))
+### **Shai Almog** — February 21, 2018 at 5:25 am ([permalink](/blog/xcode-9-on-by-default/#comment-23923))
 
 > Shai Almog says:
 >
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Stefan Eder** — February 21, 2018 at 6:20 am ([permalink](https://www.codenameone.com/blog/xcode-9-on-by-default.html#comment-23731))
+### **Stefan Eder** — February 21, 2018 at 6:20 am ([permalink](/blog/xcode-9-on-by-default/#comment-23731))
 
 > Stefan Eder says:
 >
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 22, 2018 at 8:41 am ([permalink](https://www.codenameone.com/blog/xcode-9-on-by-default.html#comment-23853))
+### **Shai Almog** — February 22, 2018 at 8:41 am ([permalink](/blog/xcode-9-on-by-default/#comment-23853))
 
 > Shai Almog says:
 >
@@ -88,7 +88,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Stefan Eder** — February 23, 2018 at 6:49 am ([permalink](https://www.codenameone.com/blog/xcode-9-on-by-default.html#comment-23836))
+### **Stefan Eder** — February 23, 2018 at 6:49 am ([permalink](/blog/xcode-9-on-by-default/#comment-23836))
 
 > Stefan Eder says:
 >
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 24, 2018 at 4:59 am ([permalink](https://www.codenameone.com/blog/xcode-9-on-by-default.html#comment-23690))
+### **Shai Almog** — February 24, 2018 at 4:59 am ([permalink](/blog/xcode-9-on-by-default/#comment-23690))
 
 > Shai Almog says:
 >

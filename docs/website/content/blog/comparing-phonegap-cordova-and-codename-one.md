@@ -196,7 +196,7 @@ If you think we misrepresented Codename One or PhoneGap/Cordova in any way let u
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — June 28, 2016 at 8:46 pm ([permalink](https://www.codenameone.com/blog/comparing-phonegap-cordova-and-codename-one.html#comment-21514))
+### **bryan** — June 28, 2016 at 8:46 pm ([permalink](/blog/comparing-phonegap-cordova-and-codename-one/#comment-21514))
 
 > bryan says:
 >
@@ -205,7 +205,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 29, 2016 at 4:19 am ([permalink](https://www.codenameone.com/blog/comparing-phonegap-cordova-and-codename-one.html#comment-22451))
+### **Shai Almog** — June 29, 2016 at 4:19 am ([permalink](/blog/comparing-phonegap-cordova-and-codename-one/#comment-22451))
 
 > Shai Almog says:
 >
@@ -214,7 +214,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bryan** — June 29, 2016 at 4:34 am ([permalink](https://www.codenameone.com/blog/comparing-phonegap-cordova-and-codename-one.html#comment-22920))
+### **bryan** — June 29, 2016 at 4:34 am ([permalink](/blog/comparing-phonegap-cordova-and-codename-one/#comment-22920))
 
 > bryan says:
 >
@@ -223,7 +223,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **José Ignacio Santa Cruz** — June 29, 2016 at 12:39 pm ([permalink](https://www.codenameone.com/blog/comparing-phonegap-cordova-and-codename-one.html#comment-22950))
+### **José Ignacio Santa Cruz** — June 29, 2016 at 12:39 pm ([permalink](/blog/comparing-phonegap-cordova-and-codename-one/#comment-22950))
 
 > José Ignacio Santa Cruz says:
 >
@@ -234,7 +234,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 29, 2016 at 1:20 pm ([permalink](https://www.codenameone.com/blog/comparing-phonegap-cordova-and-codename-one.html#comment-22927))
+### **Shai Almog** — June 29, 2016 at 1:20 pm ([permalink](/blog/comparing-phonegap-cordova-and-codename-one/#comment-22927))
 
 > Shai Almog says:
 >
@@ -247,7 +247,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **David Hinckley** — July 1, 2016 at 11:15 am ([permalink](https://www.codenameone.com/blog/comparing-phonegap-cordova-and-codename-one.html#comment-22784))
+### **David Hinckley** — July 1, 2016 at 11:15 am ([permalink](/blog/comparing-phonegap-cordova-and-codename-one/#comment-22784))
 
 > David Hinckley says:
 >
@@ -256,7 +256,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **amikeliunas** — July 6, 2016 at 4:58 am ([permalink](https://www.codenameone.com/blog/comparing-phonegap-cordova-and-codename-one.html#comment-22410))
+### **amikeliunas** — July 6, 2016 at 4:58 am ([permalink](/blog/comparing-phonegap-cordova-and-codename-one/#comment-22410))
 
 > amikeliunas says:
 >

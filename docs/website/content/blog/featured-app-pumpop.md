@@ -61,21 +61,21 @@ so if you are looking forward to the new Windows support you have Fabricio and P
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Ross Taylor** — May 12, 2016 at 2:56 pm ([permalink](https://www.codenameone.com/blog/featured-app-pumpop.html#comment-22891))
+### **Ross Taylor** — May 12, 2016 at 2:56 pm ([permalink](/blog/featured-app-pumpop/#comment-22891))
 
 > Interesting app. However I noticed an annoying bug though, for example when switching between other apps using the overview button (task switcher) while the chat form is showing, going back to this app again, the message input bar disappears only leaving the typed text visible (tested on android 4.3.1).
 >
 
 
 
-### **Fabrício Cabeça** — May 13, 2016 at 1:14 pm ([permalink](https://www.codenameone.com/blog/featured-app-pumpop.html#comment-22695))
+### **Fabrício Cabeça** — May 13, 2016 at 1:14 pm ([permalink](/blog/featured-app-pumpop/#comment-22695))
 
 > Thanks Ross for the feedback ! I didn’t find it that annoying but it was marked as a bug to be fixed in the next version.
 >
 
 
 
-### **Ross Taylor** — May 17, 2016 at 10:17 am ([permalink](https://www.codenameone.com/blog/featured-app-pumpop.html#comment-22574))
+### **Ross Taylor** — May 17, 2016 at 10:17 am ([permalink](/blog/featured-app-pumpop/#comment-22574))
 
 > Hi Fabricio, thats great! Also would it be possible to add in paragraph support for typing in the text conversations? That would be nice :). Another lookout point is whether if its possible to make the UI more native looking to the OS (eg material design for Android etc) by sticking to their guidelines, while still preserving the fun. I also noticed a slight flickering in the background when menu actions are accessed and the action list box sometimes get stuck at the bottom when the keyboard is minimized and the screen maximized. Good luck! Looking forward to the next update..Ross.
 >

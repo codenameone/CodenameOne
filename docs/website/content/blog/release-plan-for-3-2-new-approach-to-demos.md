@@ -52,7 +52,7 @@ it in the constructor but this seems tedious, with the global resources this sho
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Ross Taylor** — October 27, 2015 at 11:12 am ([permalink](https://www.codenameone.com/blog/release-plan-for-3-2-new-approach-to-demos.html#comment-22463))
+### **Ross Taylor** — October 27, 2015 at 11:12 am ([permalink](/blog/release-plan-for-3-2-new-approach-to-demos/#comment-22463))
 
 > Ross Taylor says:
 >
@@ -61,7 +61,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 28, 2015 at 3:29 am ([permalink](https://www.codenameone.com/blog/release-plan-for-3-2-new-approach-to-demos.html#comment-22414))
+### **Shai Almog** — October 28, 2015 at 3:29 am ([permalink](/blog/release-plan-for-3-2-new-approach-to-demos/#comment-22414))
 
 > Shai Almog says:
 >
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Joe** — November 2, 2015 at 1:06 pm ([permalink](https://www.codenameone.com/blog/release-plan-for-3-2-new-approach-to-demos.html#comment-22129))
+### **Joe** — November 2, 2015 at 1:06 pm ([permalink](/blog/release-plan-for-3-2-new-approach-to-demos/#comment-22129))
 
 > Joe says:
 >
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 3, 2015 at 4:29 am ([permalink](https://www.codenameone.com/blog/release-plan-for-3-2-new-approach-to-demos.html#comment-22512))
+### **Shai Almog** — November 3, 2015 at 4:29 am ([permalink](/blog/release-plan-for-3-2-new-approach-to-demos/#comment-22512))
 
 > Shai Almog says:
 >

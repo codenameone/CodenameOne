@@ -53,7 +53,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **juanpgarciac** — May 22, 2015 at 9:17 pm ([permalink](https://www.codenameone.com/blog/adding-google-play-ads.html#comment-22216))
+### **juanpgarciac** — May 22, 2015 at 9:17 pm ([permalink](/blog/adding-google-play-ads/#comment-22216))
 
 > juanpgarciac says:
 >
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 23, 2015 at 6:32 am ([permalink](https://www.codenameone.com/blog/adding-google-play-ads.html#comment-22112))
+### **Shai Almog** — May 23, 2015 at 6:32 am ([permalink](/blog/adding-google-play-ads/#comment-22112))
 
 > Shai Almog says:
 >
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **App Maker** — January 10, 2016 at 9:30 pm ([permalink](https://www.codenameone.com/blog/adding-google-play-ads.html#comment-22406))
+### **App Maker** — January 10, 2016 at 9:30 pm ([permalink](/blog/adding-google-play-ads/#comment-22406))
 
 > App Maker says:
 >
@@ -81,18 +81,18 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 11, 2016 at 3:22 am ([permalink](https://www.codenameone.com/blog/adding-google-play-ads.html#comment-22498))
+### **Shai Almog** — January 11, 2016 at 3:22 am ([permalink](/blog/adding-google-play-ads/#comment-22498))
 
 > Shai Almog says:
 >
-> We removed it as it was hard to maintain across IDE’s. We provided several newer monetization options including several ad based cn1libs [https://www.codenameone.com…](<https://www.codenameone.com/cn1libs.html>)
+> We removed it as it was hard to maintain across IDE’s. We provided several newer monetization options including several ad based cn1libs [https://www.codenameone.com…](</cn1libs/>)
 >
 > And this option which doesn’t require the monetization section, just a build hint.
 >
 
 
 
-### **Pugazhendi E** — March 26, 2016 at 7:36 am ([permalink](https://www.codenameone.com/blog/adding-google-play-ads.html#comment-22668))
+### **Pugazhendi E** — March 26, 2016 at 7:36 am ([permalink](/blog/adding-google-play-ads/#comment-22668))
 
 > Pugazhendi E says:
 >
@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 27, 2016 at 4:25 am ([permalink](https://www.codenameone.com/blog/adding-google-play-ads.html#comment-22459))
+### **Shai Almog** — March 27, 2016 at 4:25 am ([permalink](/blog/adding-google-play-ads/#comment-22459))
 
 > Shai Almog says:
 >
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jean Carlos Rojas Ramirez** — June 8, 2016 at 11:35 pm ([permalink](https://www.codenameone.com/blog/adding-google-play-ads.html#comment-22833))
+### **Jean Carlos Rojas Ramirez** — June 8, 2016 at 11:35 pm ([permalink](/blog/adding-google-play-ads/#comment-22833))
 
 > Jean Carlos Rojas Ramirez says:
 >
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 9, 2016 at 5:05 am ([permalink](https://www.codenameone.com/blog/adding-google-play-ads.html#comment-21629))
+### **Shai Almog** — June 9, 2016 at 5:05 am ([permalink](/blog/adding-google-play-ads/#comment-21629))
 
 > Shai Almog says:
 >
@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jean Carlos Rojas Ramirez** — June 9, 2016 at 5:24 am ([permalink](https://www.codenameone.com/blog/adding-google-play-ads.html#comment-22826))
+### **Jean Carlos Rojas Ramirez** — June 9, 2016 at 5:24 am ([permalink](/blog/adding-google-play-ads/#comment-22826))
 
 > Jean Carlos Rojas Ramirez says:
 >
@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 10, 2016 at 3:46 am ([permalink](https://www.codenameone.com/blog/adding-google-play-ads.html#comment-22612))
+### **Shai Almog** — June 10, 2016 at 3:46 am ([permalink](/blog/adding-google-play-ads/#comment-22612))
 
 > Shai Almog says:
 >
@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Pugazhendi E** — July 25, 2016 at 1:27 pm ([permalink](https://www.codenameone.com/blog/adding-google-play-ads.html#comment-22843))
+### **Pugazhendi E** — July 25, 2016 at 1:27 pm ([permalink](/blog/adding-google-play-ads/#comment-22843))
 
 > Pugazhendi E says:
 >
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 26, 2016 at 4:11 am ([permalink](https://www.codenameone.com/blog/adding-google-play-ads.html#comment-22928))
+### **Shai Almog** — July 26, 2016 at 4:11 am ([permalink](/blog/adding-google-play-ads/#comment-22928))
 
 > Shai Almog says:
 >

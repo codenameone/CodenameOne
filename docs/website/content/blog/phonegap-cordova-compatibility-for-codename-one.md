@@ -148,7 +148,7 @@ There is already support in Codename One for developing Cordova plugins and dist
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **sao** — November 12, 2015 at 10:33 am ([permalink](https://www.codenameone.com/blog/phonegap-cordova-compatibility-for-codename-one.html#comment-22464))
+### **sao** — November 12, 2015 at 10:33 am ([permalink](/blog/phonegap-cordova-compatibility-for-codename-one/#comment-22464))
 
 > sao says:
 >
@@ -157,14 +157,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Afam Okonkwo
 
 
-### **shannah78** — November 12, 2015 at 3:57 pm ([permalink](https://www.codenameone.com/blog/phonegap-cordova-compatibility-for-codename-one.html#comment-22473))
+### **shannah78** — November 12, 2015 at 3:57 pm ([permalink](/blog/phonegap-cordova-compatibility-for-codename-one/#comment-22473))
 
 > shannah78 says:
 >
 > Nice video and slides, Shai. One note: You should be able to use relative paths for the -Dsource parameter. You just can’t use the “~” tilde shorthand for home directory. Paths like “../myapp” or “myapp” should work though.
 
 
-### **Valeriy Skachko** — November 29, 2015 at 2:18 pm ([permalink](https://www.codenameone.com/blog/phonegap-cordova-compatibility-for-codename-one.html#comment-21552))
+### **Valeriy Skachko** — November 29, 2015 at 2:18 pm ([permalink](/blog/phonegap-cordova-compatibility-for-codename-one/#comment-21552))
 
 > Valeriy Skachko says:
 >
@@ -181,7 +181,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 6) Now i cant run on send build after Updating libraries
 
 
-### **Shai Almog** — November 29, 2015 at 2:47 pm ([permalink](https://www.codenameone.com/blog/phonegap-cordova-compatibility-for-codename-one.html#comment-22549))
+### **Shai Almog** — November 29, 2015 at 2:47 pm ([permalink](/blog/phonegap-cordova-compatibility-for-codename-one/#comment-22549))
 
 > Shai Almog says:
 >

@@ -41,7 +41,7 @@ a chat I’d be happy to meet.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **beck** — September 19, 2016 at 3:00 pm ([permalink](https://www.codenameone.com/blog/merged-peer-october-vacations-india-trip.html#comment-22686))
+### **beck** — September 19, 2016 at 3:00 pm ([permalink](/blog/merged-peer-october-vacations-india-trip/#comment-22686))
 
 > beck says:
 >
@@ -50,7 +50,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — September 19, 2016 at 3:01 pm ([permalink](https://www.codenameone.com/blog/merged-peer-october-vacations-india-trip.html#comment-22744))
+### **Chidiebere Okwudire** — September 19, 2016 at 3:01 pm ([permalink](/blog/merged-peer-october-vacations-india-trip/#comment-22744))
 
 > Chidiebere Okwudire says:
 >
@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 20, 2016 at 5:21 am ([permalink](https://www.codenameone.com/blog/merged-peer-october-vacations-india-trip.html#comment-22939))
+### **Shai Almog** — September 20, 2016 at 5:21 am ([permalink](/blog/merged-peer-october-vacations-india-trip/#comment-22939))
 
 > Shai Almog says:
 >
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 20, 2016 at 5:23 am ([permalink](https://www.codenameone.com/blog/merged-peer-october-vacations-india-trip.html#comment-23133))
+### **Shai Almog** — September 20, 2016 at 5:23 am ([permalink](/blog/merged-peer-october-vacations-india-trip/#comment-23133))
 
 > Shai Almog says:
 >
@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **beck** — September 29, 2016 at 4:24 am ([permalink](https://www.codenameone.com/blog/merged-peer-october-vacations-india-trip.html#comment-23023))
+### **beck** — September 29, 2016 at 4:24 am ([permalink](/blog/merged-peer-october-vacations-india-trip/#comment-23023))
 
 > beck says:
 >

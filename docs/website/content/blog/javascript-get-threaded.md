@@ -73,7 +73,7 @@ I have been developing in both Java and Javascript for years, so needing to use 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **BrendanEich** — August 24, 2015 at 4:20 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22161))
+### **BrendanEich** — August 24, 2015 at 4:20 pm ([permalink](/blog/javascript-get-threaded/#comment-22161))
 
 > BrendanEich says:
 >
@@ -86,7 +86,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — August 24, 2015 at 5:27 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22204))
+### **shannah78** — August 24, 2015 at 5:27 pm ([permalink](/blog/javascript-get-threaded/#comment-22204))
 
 > shannah78 says:
 >
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jason Mulligan** — August 25, 2015 at 10:31 am ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22276))
+### **Jason Mulligan** — August 25, 2015 at 10:31 am ([permalink](/blog/javascript-get-threaded/#comment-22276))
 
 > Jason Mulligan says:
 >
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — August 25, 2015 at 2:15 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22084))
+### **shannah78** — August 25, 2015 at 2:15 pm ([permalink](/blog/javascript-get-threaded/#comment-22084))
 
 > shannah78 says:
 >
@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jason Mulligan** — August 25, 2015 at 2:47 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-21478))
+### **Jason Mulligan** — August 25, 2015 at 2:47 pm ([permalink](/blog/javascript-get-threaded/#comment-21478))
 
 > Jason Mulligan says:
 >
@@ -150,7 +150,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — August 25, 2015 at 3:03 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22433))
+### **shannah78** — August 25, 2015 at 3:03 pm ([permalink](/blog/javascript-get-threaded/#comment-22433))
 
 > shannah78 says:
 >
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **BrendanEich** — September 2, 2015 at 3:34 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22366))
+### **BrendanEich** — September 2, 2015 at 3:34 pm ([permalink](/blog/javascript-get-threaded/#comment-22366))
 
 > BrendanEich says:
 >
@@ -172,7 +172,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Alexey Andreev** — September 4, 2015 at 4:14 am ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-24192))
+### **Alexey Andreev** — September 4, 2015 at 4:14 am ([permalink](/blog/javascript-get-threaded/#comment-24192))
 
 > Alexey Andreev says:
 >
@@ -199,7 +199,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Asmithdev** — September 14, 2015 at 7:30 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22376))
+### **Asmithdev** — September 14, 2015 at 7:30 pm ([permalink](/blog/javascript-get-threaded/#comment-22376))
 
 > Asmithdev says:
 >
@@ -208,7 +208,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Asmithdev** — September 14, 2015 at 7:38 pm ([permalink](https://www.codenameone.com/blog/javascript-get-threaded.html#comment-22306))
+### **Asmithdev** — September 14, 2015 at 7:38 pm ([permalink](/blog/javascript-get-threaded/#comment-22306))
 
 > Asmithdev says:
 >

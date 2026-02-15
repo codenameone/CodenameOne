@@ -149,7 +149,7 @@ __ |  We made the store screenshots using [theapplaunchpad.com](http://theapplau
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Lukman Javalove Idealist Jaji** — September 1, 2016 at 4:40 am ([permalink](https://www.codenameone.com/blog/kitchensink-ii.html#comment-23020))
+### **Lukman Javalove Idealist Jaji** — September 1, 2016 at 4:40 am ([permalink](/blog/kitchensink-ii/#comment-23020))
 
 > Hi Shai
 >
@@ -160,7 +160,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 1, 2016 at 6:25 am ([permalink](https://www.codenameone.com/blog/kitchensink-ii.html#comment-22872))
+### **Shai Almog** — September 1, 2016 at 6:25 am ([permalink](/blog/kitchensink-ii/#comment-22872))
 
 > Hi,  
 > thanks!

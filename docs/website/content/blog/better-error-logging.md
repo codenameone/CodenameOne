@@ -37,7 +37,7 @@ Notice that this API is potentially prohibitive in terms of performance. As such
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — April 17, 2019 at 3:10 pm ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-23990))
+### **Francesco Galgani** — April 17, 2019 at 3:10 pm ([permalink](/blog/better-error-logging/#comment-23990))
 
 > Francesco Galgani says:
 >
@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 18, 2019 at 2:43 am ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-24057))
+### **Shai Almog** — April 18, 2019 at 2:43 am ([permalink](/blog/better-error-logging/#comment-24057))
 
 > Shai Almog says:
 >
@@ -55,7 +55,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — April 23, 2019 at 1:58 pm ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-24108))
+### **Francesco Galgani** — April 23, 2019 at 1:58 pm ([permalink](/blog/better-error-logging/#comment-24108))
 
 > Francesco Galgani says:
 >
@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — April 23, 2019 at 2:21 pm ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-24096))
+### **Francesco Galgani** — April 23, 2019 at 2:21 pm ([permalink](/blog/better-error-logging/#comment-24096))
 
 > Francesco Galgani says:
 >
@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 23, 2019 at 4:55 pm ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-24115))
+### **Shai Almog** — April 23, 2019 at 4:55 pm ([permalink](/blog/better-error-logging/#comment-24115))
 
 > Shai Almog says:
 >
@@ -89,7 +89,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — April 23, 2019 at 5:57 pm ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-23921))
+### **Francesco Galgani** — April 23, 2019 at 5:57 pm ([permalink](/blog/better-error-logging/#comment-23921))
 
 > Francesco Galgani says:
 >
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 24, 2019 at 4:04 am ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-24040))
+### **Shai Almog** — April 24, 2019 at 4:04 am ([permalink](/blog/better-error-logging/#comment-24040))
 
 > Shai Almog says:
 >
@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — April 24, 2019 at 6:20 am ([permalink](https://www.codenameone.com/blog/better-error-logging.html#comment-24066))
+### **Francesco Galgani** — April 24, 2019 at 6:20 am ([permalink](/blog/better-error-logging/#comment-24066))
 
 > Francesco Galgani says:
 >

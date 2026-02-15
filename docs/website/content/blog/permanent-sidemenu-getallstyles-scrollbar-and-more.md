@@ -142,7 +142,7 @@ Update: Since writing this we’ve launched the [Codename One Academy](/blog/lau
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — September 10, 2015 at 9:22 am ([permalink](https://www.codenameone.com/blog/permanent-sidemenu-getallstyles-scrollbar-and-more.html#comment-21496))
+### **Chidiebere Okwudire** — September 10, 2015 at 9:22 am ([permalink](/blog/permanent-sidemenu-getallstyles-scrollbar-and-more/#comment-21496))
 
 > Chidiebere Okwudire says:
 >
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Parse offers some other ‘goodies’ that might be interesting to the CN1 community like analytics (though from the last I remember, Flurry had better options for analysis and segmentation). Then there’s also the now rather infamous/controversial push notification service 😉 I hope others will contribute to parse4cn1 to further extend the coverage.
 
 
-### **pollaris** — April 30, 2017 at 11:53 pm ([permalink](https://www.codenameone.com/blog/permanent-sidemenu-getallstyles-scrollbar-and-more.html#comment-23364))
+### **pollaris** — April 30, 2017 at 11:53 pm ([permalink](/blog/permanent-sidemenu-getallstyles-scrollbar-and-more/#comment-23364))
 
 > pollaris says:
 >
@@ -160,14 +160,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > -Russ
 
 
-### **Blessing Mahlalela** — October 22, 2017 at 4:16 pm ([permalink](https://www.codenameone.com/blog/permanent-sidemenu-getallstyles-scrollbar-and-more.html#comment-23688))
+### **Blessing Mahlalela** — October 22, 2017 at 4:16 pm ([permalink](/blog/permanent-sidemenu-getallstyles-scrollbar-and-more/#comment-23688))
 
 > Blessing Mahlalela says:
 >
 > Hi, how can I disable tensile drag on side menu. I tried to inspect the components but I can’t seem to find a container that is within Toolbar… disabling tensile drag on form worked On form only and not the Side menu. Note the app is hand coded
 
 
-### **Shai Almog** — October 22, 2017 at 4:38 pm ([permalink](https://www.codenameone.com/blog/permanent-sidemenu-getallstyles-scrollbar-and-more.html#comment-21473))
+### **Shai Almog** — October 22, 2017 at 4:38 pm ([permalink](/blog/permanent-sidemenu-getallstyles-scrollbar-and-more/#comment-21473))
 
 > Shai Almog says:
 >

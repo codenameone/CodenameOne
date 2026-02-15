@@ -13,8 +13,8 @@ author: Shai Almog
 
 Sticky headers was one of the first big requests we said no to. Back in the day a lot of people asked for  
 it but we always shot it down because it was too hard to implement on top of our Swing inspired lists.  
-This predated our Container improvement, [InfiniteContainer](https://www.codenameone.com/javadoc/com/codename1/ui/InfiniteContainer.html)  
-and [InfiniteScrollAdapter](https://www.codenameone.com/javadoc/com/codename1/components/InfiniteScrollAdapter.html).
+This predated our Container improvement, [InfiniteContainer](/javadoc/com/codename1/ui/InfiniteContainer/)  
+and [InfiniteScrollAdapter](/javadoc/com/codename1/components/InfiniteScrollAdapter/).
 
 While our preference for lists has waned we never got around to show how easy it is to do sticky headers with `Container`  
 until last week when [Chen](https://twitter.com/CFishbein/) released the  
@@ -38,7 +38,7 @@ you could also use the layered pane or a `LayeredLayout` to achieve similar effe
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chibuike Mba** — May 26, 2016 at 7:15 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22859))
+### **Chibuike Mba** — May 26, 2016 at 7:15 am ([permalink](/blog/sticky-headers/#comment-22859))
 
 > Chibuike Mba says:
 >
@@ -47,7 +47,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 27, 2016 at 5:09 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22450))
+### **Shai Almog** — May 27, 2016 at 5:09 am ([permalink](/blog/sticky-headers/#comment-22450))
 
 > Shai Almog says:
 >
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chibuike Mba** — May 27, 2016 at 6:43 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22919))
+### **Chibuike Mba** — May 27, 2016 at 6:43 am ([permalink](/blog/sticky-headers/#comment-22919))
 
 > Chibuike Mba says:
 >
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 29, 2016 at 2:55 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22783))
+### **Shai Almog** — May 29, 2016 at 2:55 am ([permalink](/blog/sticky-headers/#comment-22783))
 
 > Shai Almog says:
 >
@@ -76,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Nigel Chomba** — May 30, 2016 at 9:48 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22703))
+### **Nigel Chomba** — May 30, 2016 at 9:48 am ([permalink](/blog/sticky-headers/#comment-22703))
 
 > Nigel Chomba says:
 >
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chen Fishbein** — May 30, 2016 at 11:57 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22674))
+### **Chen Fishbein** — May 30, 2016 at 11:57 am ([permalink](/blog/sticky-headers/#comment-22674))
 
 > Chen Fishbein says:
 >
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chibuike Mba** — July 21, 2016 at 3:05 pm ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22983))
+### **Chibuike Mba** — July 21, 2016 at 3:05 pm ([permalink](/blog/sticky-headers/#comment-22983))
 
 > Chibuike Mba says:
 >
@@ -117,7 +117,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 22, 2016 at 4:45 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22951))
+### **Shai Almog** — July 22, 2016 at 4:45 am ([permalink](/blog/sticky-headers/#comment-22951))
 
 > Shai Almog says:
 >
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chibuike Mba** — July 22, 2016 at 1:09 pm ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22905))
+### **Chibuike Mba** — July 22, 2016 at 1:09 pm ([permalink](/blog/sticky-headers/#comment-22905))
 
 > Chibuike Mba says:
 >
@@ -156,7 +156,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 23, 2016 at 4:50 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22886))
+### **Shai Almog** — July 23, 2016 at 4:50 am ([permalink](/blog/sticky-headers/#comment-22886))
 
 > Shai Almog says:
 >
@@ -165,7 +165,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chibuike Mba** — July 23, 2016 at 11:57 pm ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-21517))
+### **Chibuike Mba** — July 23, 2016 at 11:57 pm ([permalink](/blog/sticky-headers/#comment-21517))
 
 > Chibuike Mba says:
 >
@@ -307,7 +307,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 24, 2016 at 3:45 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22550))
+### **Shai Almog** — July 24, 2016 at 3:45 am ([permalink](/blog/sticky-headers/#comment-22550))
 
 > Shai Almog says:
 >
@@ -316,7 +316,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chibuike Mba** — July 24, 2016 at 2:27 pm ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-21632))
+### **Chibuike Mba** — July 24, 2016 at 2:27 pm ([permalink](/blog/sticky-headers/#comment-21632))
 
 > Chibuike Mba says:
 >
@@ -345,7 +345,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 25, 2016 at 4:36 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22829))
+### **Shai Almog** — July 25, 2016 at 4:36 am ([permalink](/blog/sticky-headers/#comment-22829))
 
 > Shai Almog says:
 >
@@ -354,7 +354,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — September 18, 2016 at 9:57 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-22980))
+### **Ch Hjelm** — September 18, 2016 at 9:57 am ([permalink](/blog/sticky-headers/#comment-22980))
 
 > Ch Hjelm says:
 >
@@ -372,7 +372,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 19, 2016 at 3:54 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-23134))
+### **Shai Almog** — September 19, 2016 at 3:54 am ([permalink](/blog/sticky-headers/#comment-23134))
 
 > Shai Almog says:
 >
@@ -387,7 +387,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — September 20, 2016 at 8:43 pm ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-23093))
+### **Ch Hjelm** — September 20, 2016 at 8:43 pm ([permalink](/blog/sticky-headers/#comment-23093))
 
 > Ch Hjelm says:
 >
@@ -398,7 +398,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 21, 2016 at 4:23 am ([permalink](https://www.codenameone.com/blog/sticky-headers.html#comment-23149))
+### **Shai Almog** — September 21, 2016 at 4:23 am ([permalink](/blog/sticky-headers/#comment-23149))
 
 > Shai Almog says:
 >

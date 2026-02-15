@@ -46,7 +46,7 @@ I’m pretty excited about that…​
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — July 24, 2020 at 10:06 am ([permalink](https://www.codenameone.com/blog/new-settings-ui.html#comment-24301))
+### **Francesco Galgani** — July 24, 2020 at 10:06 am ([permalink](/blog/new-settings-ui/#comment-24301))
 
 > Now I notice the “File” menu from which you can change the size of the text, menu we talked about on Github.
 >
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 26, 2020 at 2:09 am ([permalink](https://www.codenameone.com/blog/new-settings-ui.html#comment-24300))
+### **Shai Almog** — July 26, 2020 at 2:09 am ([permalink](/blog/new-settings-ui/#comment-24300))
 
 > We’ll try to increase contrast here to make it more readable.
 >

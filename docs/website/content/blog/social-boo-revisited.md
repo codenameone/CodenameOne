@@ -60,7 +60,7 @@ plugin updates.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **salah Alhaddabi** — December 22, 2016 at 4:43 pm ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-22957))
+### **salah Alhaddabi** — December 22, 2016 at 4:43 pm ([permalink](/blog/social-boo-revisited/#comment-22957))
 
 > salah Alhaddabi says:
 >
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 23, 2016 at 6:36 am ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-23016))
+### **Shai Almog** — December 23, 2016 at 6:36 am ([permalink](/blog/social-boo-revisited/#comment-23016))
 
 > Shai Almog says:
 >
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — December 24, 2016 at 7:13 am ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-23187))
+### **salah Alhaddabi** — December 24, 2016 at 7:13 am ([permalink](/blog/social-boo-revisited/#comment-23187))
 
 > salah Alhaddabi says:
 >
@@ -97,7 +97,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 24, 2016 at 9:12 am ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-23285))
+### **Shai Almog** — December 24, 2016 at 9:12 am ([permalink](/blog/social-boo-revisited/#comment-23285))
 
 > Shai Almog says:
 >
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — December 24, 2016 at 5:53 pm ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-23001))
+### **salah Alhaddabi** — December 24, 2016 at 5:53 pm ([permalink](/blog/social-boo-revisited/#comment-23001))
 
 > salah Alhaddabi says:
 >
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 25, 2016 at 8:23 am ([permalink](https://www.codenameone.com/blog/social-boo-revisited.html#comment-23233))
+### **Shai Almog** — December 25, 2016 at 8:23 am ([permalink](/blog/social-boo-revisited/#comment-23233))
 
 > Shai Almog says:
 >

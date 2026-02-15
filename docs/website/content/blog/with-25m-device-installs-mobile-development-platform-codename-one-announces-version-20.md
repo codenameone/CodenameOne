@@ -53,7 +53,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 13, 2015 at 7:09 am ([permalink](https://www.codenameone.com/blog/with-25m-device-installs-mobile-development-platform-codename-one-announces-version-20.html#comment-22126))
+### **Anonymous** — March 13, 2015 at 7:09 am ([permalink](/blog/with-25m-device-installs-mobile-development-platform-codename-one-announces-version-20/#comment-22126))
 
 > Anonymous says:
 >

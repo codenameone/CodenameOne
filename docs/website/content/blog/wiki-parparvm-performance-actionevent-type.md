@@ -108,7 +108,7 @@ level which should produce the desired result.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — January 14, 2016 at 8:20 am ([permalink](https://www.codenameone.com/blog/wiki-parparvm-performance-actionevent-type.html#comment-22507))
+### **Chidiebere Okwudire** — January 14, 2016 at 8:20 am ([permalink](/blog/wiki-parparvm-performance-actionevent-type/#comment-22507))
 
 > Chidiebere Okwudire says:
 >
@@ -123,7 +123,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 14, 2016 at 8:35 am ([permalink](https://www.codenameone.com/blog/wiki-parparvm-performance-actionevent-type.html#comment-22399))
+### **Shai Almog** — January 14, 2016 at 8:35 am ([permalink](/blog/wiki-parparvm-performance-actionevent-type/#comment-22399))
 
 > Shai Almog says:
 >
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — January 20, 2016 at 11:57 am ([permalink](https://www.codenameone.com/blog/wiki-parparvm-performance-actionevent-type.html#comment-22390))
+### **Chidiebere Okwudire** — January 20, 2016 at 11:57 am ([permalink](/blog/wiki-parparvm-performance-actionevent-type/#comment-22390))
 
 > Chidiebere Okwudire says:
 >

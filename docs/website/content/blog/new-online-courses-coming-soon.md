@@ -29,7 +29,7 @@ There are some things I was hoping for such as on-device-debugging which we just
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Michael Lindvall** — June 7, 2017 at 1:34 pm ([permalink](https://www.codenameone.com/blog/new-online-courses-coming-soon.html#comment-23466))
+### **Michael Lindvall** — June 7, 2017 at 1:34 pm ([permalink](/blog/new-online-courses-coming-soon/#comment-23466))
 
 > Michael Lindvall says:
 >
@@ -38,7 +38,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 7, 2017 at 2:06 pm ([permalink](https://www.codenameone.com/blog/new-online-courses-coming-soon.html#comment-23534))
+### **Shai Almog** — June 7, 2017 at 2:06 pm ([permalink](/blog/new-online-courses-coming-soon/#comment-23534))
 
 > Shai Almog says:
 >
@@ -47,7 +47,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Michael Lindvall** — June 7, 2017 at 2:12 pm ([permalink](https://www.codenameone.com/blog/new-online-courses-coming-soon.html#comment-23334))
+### **Michael Lindvall** — June 7, 2017 at 2:12 pm ([permalink](/blog/new-online-courses-coming-soon/#comment-23334))
 
 > Michael Lindvall says:
 >
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — June 12, 2017 at 5:34 am ([permalink](https://www.codenameone.com/blog/new-online-courses-coming-soon.html#comment-24132))
+### **salah Alhaddabi** — June 12, 2017 at 5:34 am ([permalink](/blog/new-online-courses-coming-soon/#comment-24132))
 
 > salah Alhaddabi says:
 >
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — June 14, 2017 at 5:25 pm ([permalink](https://www.codenameone.com/blog/new-online-courses-coming-soon.html#comment-23440))
+### **Francesco Galgani** — June 14, 2017 at 5:25 pm ([permalink](/blog/new-online-courses-coming-soon/#comment-23440))
 
 > Francesco Galgani says:
 >
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 15, 2017 at 5:15 am ([permalink](https://www.codenameone.com/blog/new-online-courses-coming-soon.html#comment-24147))
+### **Shai Almog** — June 15, 2017 at 5:15 am ([permalink](/blog/new-online-courses-coming-soon/#comment-24147))
 
 > Shai Almog says:
 >
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — June 15, 2017 at 12:01 pm ([permalink](https://www.codenameone.com/blog/new-online-courses-coming-soon.html#comment-23477))
+### **Francesco Galgani** — June 15, 2017 at 12:01 pm ([permalink](/blog/new-online-courses-coming-soon/#comment-23477))
 
 > Francesco Galgani says:
 >
@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 16, 2017 at 7:01 am ([permalink](https://www.codenameone.com/blog/new-online-courses-coming-soon.html#comment-23577))
+### **Shai Almog** — June 16, 2017 at 7:01 am ([permalink](/blog/new-online-courses-coming-soon/#comment-23577))
 
 > Shai Almog says:
 >

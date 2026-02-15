@@ -48,7 +48,7 @@ Blogging will still be slow through January as I try to catch up to all the task
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jérémy MARQUER** — January 5, 2018 at 9:37 am ([permalink](https://www.codenameone.com/blog/uber-clone-trickling-down.html#comment-23922))
+### **Jérémy MARQUER** — January 5, 2018 at 9:37 am ([permalink](/blog/uber-clone-trickling-down/#comment-23922))
 
 > Sure it didn’t take you 5000 hours for building this uber clone. BUT, you didn’t reinvent the wheel …  
 > As they said in article, 5000 hours is estimated for the following services :  
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 5, 2018 at 9:55 am ([permalink](https://www.codenameone.com/blog/uber-clone-trickling-down.html#comment-23802))
+### **Shai Almog** — January 5, 2018 at 9:55 am ([permalink](/blog/uber-clone-trickling-down/#comment-23802))
 
 > Shai Almog says:
 >
@@ -76,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lukman Javalove Idealist Jaji** — January 12, 2018 at 6:35 pm ([permalink](https://www.codenameone.com/blog/uber-clone-trickling-down.html#comment-23575))
+### **Lukman Javalove Idealist Jaji** — January 12, 2018 at 6:35 pm ([permalink](/blog/uber-clone-trickling-down/#comment-23575))
 
 > Lukman Javalove Idealist Jaji says:
 >
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 13, 2018 at 5:54 am ([permalink](https://www.codenameone.com/blog/uber-clone-trickling-down.html#comment-23772))
+### **Shai Almog** — January 13, 2018 at 5:54 am ([permalink](/blog/uber-clone-trickling-down/#comment-23772))
 
 > Shai Almog says:
 >
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lukman Javalove Idealist Jaji** — January 13, 2018 at 10:43 am ([permalink](https://www.codenameone.com/blog/uber-clone-trickling-down.html#comment-23904))
+### **Lukman Javalove Idealist Jaji** — January 13, 2018 at 10:43 am ([permalink](/blog/uber-clone-trickling-down/#comment-23904))
 
 > Lukman Javalove Idealist Jaji says:
 >

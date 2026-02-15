@@ -14,7 +14,7 @@ author: Shai Almog
 Are you interested in selling your custom made themes, templates & libraries for Codename One?
 
 [Eric Dodji Gbofu](http://twitter.com/doderic/) founder of [Codename One Fr](http://www.codenameonefr.com/) and author of the French language  
-[Codename One book](https://www.codenameone.com/blog/book-continued-migration.html) is launching  
+[Codename One book](/blog/book-continued-migration/) is launching  
 a [Codename One store](http://www.codenameone-store.com/).
 
 This is meant as a Codename One equivalent to sites such as theme forest that provide ready made templates  

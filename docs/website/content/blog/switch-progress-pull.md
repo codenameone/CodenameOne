@@ -27,7 +27,7 @@ Fixing the old class would have been hard. It was designed to support two very d
 
 Figure 1. The New Switch Class in Action
 
-The new class is trivial and works as a drop-in replacement for `OnOffSwitch`. The great thing about it is the newfound ability to customize everything through the theme/css. You can learn more about that in the [class JavaDoc](https://www.codenameone.com/javadoc/com/codename1/components/Switch.html).
+The new class is trivial and works as a drop-in replacement for `OnOffSwitch`. The great thing about it is the newfound ability to customize everything through the theme/css. You can learn more about that in the [class JavaDoc](/javadoc/com/codename1/components/Switch/).
 
 ### InfiniteProgress
 

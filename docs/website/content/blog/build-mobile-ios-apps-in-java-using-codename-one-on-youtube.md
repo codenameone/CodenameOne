@@ -62,7 +62,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 9, 2014 at 7:24 am ([permalink](https://www.codenameone.com/blog/build-mobile-ios-apps-in-java-using-codename-one-on-youtube.html#comment-22174))
+### **Anonymous** — October 9, 2014 at 7:24 am ([permalink](/blog/build-mobile-ios-apps-in-java-using-codename-one-on-youtube/#comment-22174))
 
 > Anonymous says:
 >
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 9, 2014 at 1:21 pm ([permalink](https://www.codenameone.com/blog/build-mobile-ios-apps-in-java-using-codename-one-on-youtube.html#comment-21604))
+### **Anonymous** — October 9, 2014 at 1:21 pm ([permalink](/blog/build-mobile-ios-apps-in-java-using-codename-one-on-youtube/#comment-21604))
 
 > Anonymous says:
 >
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ankit Mathur** — April 7, 2015 at 9:30 am ([permalink](https://www.codenameone.com/blog/build-mobile-ios-apps-in-java-using-codename-one-on-youtube.html#comment-22071))
+### **Ankit Mathur** — April 7, 2015 at 9:30 am ([permalink](/blog/build-mobile-ios-apps-in-java-using-codename-one-on-youtube/#comment-22071))
 
 > Ankit Mathur says:
 >
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 7, 2015 at 7:21 pm ([permalink](https://www.codenameone.com/blog/build-mobile-ios-apps-in-java-using-codename-one-on-youtube.html#comment-22228))
+### **Shai Almog** — April 7, 2015 at 7:21 pm ([permalink](/blog/build-mobile-ios-apps-in-java-using-codename-one-on-youtube/#comment-22228))
 
 > Shai Almog says:
 >

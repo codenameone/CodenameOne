@@ -42,7 +42,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — May 29, 2014 at 1:26 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21780))
+### **Anonymous** — May 29, 2014 at 1:26 am ([permalink](/blog/vm-updates-webservices/#comment-21780))
 
 > Anonymous says:
 >
@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — May 29, 2014 at 2:51 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-22096))
+### **Anonymous** — May 29, 2014 at 2:51 am ([permalink](/blog/vm-updates-webservices/#comment-22096))
 
 > Anonymous says:
 >
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 4, 2014 at 5:29 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21726))
+### **Anonymous** — June 4, 2014 at 5:29 am ([permalink](/blog/vm-updates-webservices/#comment-21726))
 
 > Anonymous says:
 >
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 4, 2014 at 2:27 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21711))
+### **Anonymous** — June 4, 2014 at 2:27 pm ([permalink](/blog/vm-updates-webservices/#comment-21711))
 
 > Anonymous says:
 >
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 4, 2014 at 7:21 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21727))
+### **Anonymous** — June 4, 2014 at 7:21 pm ([permalink](/blog/vm-updates-webservices/#comment-21727))
 
 > Anonymous says:
 >
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 5, 2014 at 12:25 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-22077))
+### **Anonymous** — June 5, 2014 at 12:25 am ([permalink](/blog/vm-updates-webservices/#comment-22077))
 
 > Anonymous says:
 >
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 5, 2014 at 1:22 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21961))
+### **Anonymous** — June 5, 2014 at 1:22 am ([permalink](/blog/vm-updates-webservices/#comment-21961))
 
 > Anonymous says:
 >
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 5, 2014 at 2:10 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21884))
+### **Anonymous** — June 5, 2014 at 2:10 am ([permalink](/blog/vm-updates-webservices/#comment-21884))
 
 > Anonymous says:
 >
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 5, 2014 at 3:36 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-22058))
+### **Anonymous** — June 5, 2014 at 3:36 am ([permalink](/blog/vm-updates-webservices/#comment-22058))
 
 > Anonymous says:
 >
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 5, 2014 at 7:15 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21876))
+### **Anonymous** — June 5, 2014 at 7:15 am ([permalink](/blog/vm-updates-webservices/#comment-21876))
 
 > Anonymous says:
 >
@@ -170,7 +170,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 6, 2014 at 4:29 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21622))
+### **Anonymous** — June 6, 2014 at 4:29 am ([permalink](/blog/vm-updates-webservices/#comment-21622))
 
 > Anonymous says:
 >
@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 6, 2014 at 4:32 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-22027))
+### **Anonymous** — June 6, 2014 at 4:32 am ([permalink](/blog/vm-updates-webservices/#comment-22027))
 
 > Anonymous says:
 >
@@ -198,7 +198,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 6, 2014 at 1:46 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21933))
+### **Anonymous** — June 6, 2014 at 1:46 pm ([permalink](/blog/vm-updates-webservices/#comment-21933))
 
 > Anonymous says:
 >
@@ -215,7 +215,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 6, 2014 at 3:38 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-22130))
+### **Anonymous** — June 6, 2014 at 3:38 pm ([permalink](/blog/vm-updates-webservices/#comment-22130))
 
 > Anonymous says:
 >
@@ -228,7 +228,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 17, 2014 at 11:32 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21914))
+### **Anonymous** — June 17, 2014 at 11:32 am ([permalink](/blog/vm-updates-webservices/#comment-21914))
 
 > Anonymous says:
 >
@@ -247,7 +247,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 17, 2014 at 4:52 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21993))
+### **Anonymous** — June 17, 2014 at 4:52 pm ([permalink](/blog/vm-updates-webservices/#comment-21993))
 
 > Anonymous says:
 >
@@ -256,7 +256,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 17, 2014 at 5:26 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21820))
+### **Anonymous** — June 17, 2014 at 5:26 pm ([permalink](/blog/vm-updates-webservices/#comment-21820))
 
 > Anonymous says:
 >
@@ -267,7 +267,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 20, 2014 at 5:49 am ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21676))
+### **Anonymous** — June 20, 2014 at 5:49 am ([permalink](/blog/vm-updates-webservices/#comment-21676))
 
 > Anonymous says:
 >
@@ -288,7 +288,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 20, 2014 at 1:52 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21443))
+### **Anonymous** — June 20, 2014 at 1:52 pm ([permalink](/blog/vm-updates-webservices/#comment-21443))
 
 > Anonymous says:
 >
@@ -299,7 +299,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 21, 2014 at 4:21 pm ([permalink](https://www.codenameone.com/blog/vm-updates-webservices.html#comment-21885))
+### **Anonymous** — June 21, 2014 at 4:21 pm ([permalink](/blog/vm-updates-webservices/#comment-21885))
 
 > Anonymous says:
 >

@@ -183,28 +183,28 @@ You can check out the final source code of this tutorial [here](https://github.c
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Nigel Chomba** — July 20, 2015 at 8:39 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-1.html#comment-24171))
+### **Nigel Chomba** — July 20, 2015 at 8:39 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-1/#comment-24171))
 
 > Lets move on Shai…..whats next?
 
 
-### **Shai Almog** — July 20, 2015 at 2:43 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-1.html#comment-21651))
+### **Shai Almog** — July 20, 2015 at 2:43 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-1/#comment-21651))
 
 > We will post it when its ready.
 
 
-### **Nigel Chomba** — July 22, 2015 at 5:22 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-1.html#comment-22252))
+### **Nigel Chomba** — July 22, 2015 at 5:22 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-1/#comment-22252))
 
 > Great sir
 
 
-### **Michael du Plessis** — April 10, 2017 at 1:36 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-1.html#comment-23332))
+### **Michael du Plessis** — April 10, 2017 at 1:36 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-1/#comment-23332))
 
 > I notice in the documentation that you recommend not using .getTitleArea().setUIID(“Container”); anymore because it allowed hacks.  
 > How can we remove the TitleArea now?
 
 
-### **Shai Almog** — April 11, 2017 at 4:36 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-1.html#comment-23354))
+### **Shai Almog** — April 11, 2017 at 4:36 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-1/#comment-23354))
 
 > getTitleArea() is deprecated because it was used as getTitleArea().removeAll(); getTitleArea().addComponent(myCmp);
 >
@@ -213,36 +213,36 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > You can avoid this though by adding a UIID TitleArea and overriding the styling to make it transparent, without a border, padding or margin.
 
 
-### **Michael du Plessis** — April 18, 2017 at 8:34 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-1.html#comment-23438))
+### **Michael du Plessis** — April 18, 2017 at 8:34 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-1/#comment-23438))
 
 > Ah I understand! Thank you for the explanation. I will also play around with the customisation of TitleArea within the Theme Editor.
 
 
-### **Francesco Galgani** — November 28, 2017 at 8:58 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-1.html#comment-23834))
+### **Francesco Galgani** — November 28, 2017 at 8:58 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-1/#comment-23834))
 
 > About “FontImage.create(” ue96c “, iconFontStyle)”, what is the meaning of ” ue96c “? How is chosen or generated this string? Thank you.
 
 
-### **Shai Almog** — November 29, 2017 at 6:50 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-1.html#comment-23771))
+### **Shai Almog** — November 29, 2017 at 6:50 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-1/#comment-23771))
 
-> This tutorial was written before we had material design icons integrated into Codename One so I used the fontello fonts which include various icons. When you download a font from fontello you get an HTML with all the codes in the font. I explained this here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/using-icon-fonts-such-as-fontello.html>)
+> This tutorial was written before we had material design icons integrated into Codename One so I used the fontello fonts which include various icons. When you download a font from fontello you get an HTML with all the codes in the font. I explained this here: [https://www.codenameone.com…](</blog/using-icon-fonts-such-as-fontello/>)
 
 
-### **Francesco Galgani** — December 1, 2017 at 6:21 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-1.html#comment-23903))
+### **Francesco Galgani** — December 1, 2017 at 6:21 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-1/#comment-23903))
 
 > Francesco Galgani says:
 >
 > I’ve just seen that interesting tutorial, useful if I need custom icons not included in the material icons set. Thank you
 
 
-### **Ahnaf Tahmeed** — May 3, 2020 at 11:20 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-1.html#comment-21399))
+### **Ahnaf Tahmeed** — May 3, 2020 at 11:20 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-1/#comment-21399))
 
 > [Ahnaf Tahmeed](https://lh3.googleusercontent.com/a-/AOh14GhIoPjnxowmY7XUvnUL5kz7LSzCdIa-9HB-kCXxPg) says:
 >
 > Do I need to be a JAVA expert to go through this course …??
 
 
-### **Shai Almog** — May 4, 2020 at 6:03 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-1.html#comment-21398))
+### **Shai Almog** — May 4, 2020 at 6:03 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-1/#comment-21398))
 
 > Shai Almog says:
 >

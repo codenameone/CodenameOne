@@ -45,7 +45,7 @@ of features/functionality you would expect in such an API.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Ulises Escobar** — July 19, 2016 at 5:13 pm ([permalink](https://www.codenameone.com/blog/scrollbars-tooltips.html#comment-22710))
+### **Ulises Escobar** — July 19, 2016 at 5:13 pm ([permalink](/blog/scrollbars-tooltips/#comment-22710))
 
 > Ulises Escobar says:
 >
@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 20, 2016 at 4:27 am ([permalink](https://www.codenameone.com/blog/scrollbars-tooltips.html#comment-22741))
+### **Shai Almog** — July 20, 2016 at 4:27 am ([permalink](/blog/scrollbars-tooltips/#comment-22741))
 
 > Shai Almog says:
 >
@@ -63,7 +63,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **beck** — July 20, 2016 at 6:47 am ([permalink](https://www.codenameone.com/blog/scrollbars-tooltips.html#comment-22653))
+### **beck** — July 20, 2016 at 6:47 am ([permalink](/blog/scrollbars-tooltips/#comment-22653))
 
 > beck says:
 >
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 21, 2016 at 3:49 am ([permalink](https://www.codenameone.com/blog/scrollbars-tooltips.html#comment-21516))
+### **Shai Almog** — July 21, 2016 at 3:49 am ([permalink](/blog/scrollbars-tooltips/#comment-21516))
 
 > Shai Almog says:
 >

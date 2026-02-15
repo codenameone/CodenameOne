@@ -48,7 +48,7 @@ We plan to add something similar to iOS and the simulator as we move forward.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Fabrizio Grassi** — July 11, 2016 at 2:11 pm ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-21427))
+### **Fabrizio Grassi** — July 11, 2016 at 2:11 pm ([permalink](/blog/new-android-peer-mode/#comment-21427))
 
 > Fabrizio Grassi says:
 >
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond** — July 11, 2016 at 8:44 pm ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-22842))
+### **Diamond** — July 11, 2016 at 8:44 pm ([permalink](/blog/new-android-peer-mode/#comment-22842))
 
 > Diamond says:
 >
@@ -68,7 +68,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 12, 2016 at 3:19 am ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-24224))
+### **Shai Almog** — July 12, 2016 at 3:19 am ([permalink](/blog/new-android-peer-mode/#comment-24224))
 
 > Shai Almog says:
 >
@@ -77,7 +77,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 12, 2016 at 3:21 am ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-22759))
+### **Shai Almog** — July 12, 2016 at 3:21 am ([permalink](/blog/new-android-peer-mode/#comment-22759))
 
 > Shai Almog says:
 >
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jonathan** — August 3, 2016 at 6:14 am ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-22767))
+### **Jonathan** — August 3, 2016 at 6:14 am ([permalink](/blog/new-android-peer-mode/#comment-22767))
 
 > Jonathan says:
 >
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 4, 2016 at 4:25 am ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-24204))
+### **Shai Almog** — August 4, 2016 at 4:25 am ([permalink](/blog/new-android-peer-mode/#comment-24204))
 
 > Shai Almog says:
 >
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lukman Javalove Idealist Jaji** — August 16, 2016 at 7:09 am ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-24225))
+### **Lukman Javalove Idealist Jaji** — August 16, 2016 at 7:09 am ([permalink](/blog/new-android-peer-mode/#comment-24225))
 
 > Lukman Javalove Idealist Jaji says:
 >
@@ -117,7 +117,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond** — August 16, 2016 at 10:35 am ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-22760))
+### **Diamond** — August 16, 2016 at 10:35 am ([permalink](/blog/new-android-peer-mode/#comment-22760))
 
 > Diamond says:
 >
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lukman Javalove Idealist Jaji** — August 16, 2016 at 10:47 am ([permalink](https://www.codenameone.com/blog/new-android-peer-mode.html#comment-22529))
+### **Lukman Javalove Idealist Jaji** — August 16, 2016 at 10:47 am ([permalink](/blog/new-android-peer-mode/#comment-22529))
 
 > Lukman Javalove Idealist Jaji says:
 >

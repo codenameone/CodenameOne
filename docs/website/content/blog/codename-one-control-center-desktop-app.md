@@ -35,7 +35,7 @@ Happy coding! and a Happy New Year!
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — December 31, 2020 at 3:35 pm ([permalink](https://www.codenameone.com/blog/codename-one-control-center-desktop-app.html#comment-24369))
+### **Francesco Galgani** — December 31, 2020 at 3:35 pm ([permalink](/blog/codename-one-control-center-desktop-app/#comment-24369))
 
 > Francesco Galgani says:
 >
@@ -48,7 +48,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — January 10, 2021 at 9:42 pm ([permalink](https://www.codenameone.com/blog/codename-one-control-center-desktop-app.html#comment-24375))
+### **Javier Anton** — January 10, 2021 at 9:42 pm ([permalink](/blog/codename-one-control-center-desktop-app/#comment-24375))
 
 > Javier Anton says:
 >
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — January 11, 2021 at 6:32 pm ([permalink](https://www.codenameone.com/blog/codename-one-control-center-desktop-app.html#comment-24376))
+### **Javier Anton** — January 11, 2021 at 6:32 pm ([permalink](/blog/codename-one-control-center-desktop-app/#comment-24376))
 
 > Javier Anton says:
 >
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chen Fishbein** — January 12, 2021 at 8:51 am ([permalink](https://www.codenameone.com/blog/codename-one-control-center-desktop-app.html#comment-24377))
+### **Chen Fishbein** — January 12, 2021 at 8:51 am ([permalink](/blog/codename-one-control-center-desktop-app/#comment-24377))
 
 > Chen Fishbein says:
 >
@@ -76,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Colin Forster** — March 15, 2021 at 2:21 am ([permalink](https://www.codenameone.com/blog/codename-one-control-center-desktop-app.html#comment-24412))
+### **Colin Forster** — March 15, 2021 at 2:21 am ([permalink](/blog/codename-one-control-center-desktop-app/#comment-24412))
 
 > Colin Forster says:
 >
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 15, 2021 at 3:34 pm ([permalink](https://www.codenameone.com/blog/codename-one-control-center-desktop-app.html#comment-24413))
+### **Shai Almog** — March 15, 2021 at 3:34 pm ([permalink](/blog/codename-one-control-center-desktop-app/#comment-24413))
 
 > Shai Almog says:
 >
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Colin Forster** — March 17, 2021 at 6:48 am ([permalink](https://www.codenameone.com/blog/codename-one-control-center-desktop-app.html#comment-24415))
+### **Colin Forster** — March 17, 2021 at 6:48 am ([permalink](/blog/codename-one-control-center-desktop-app/#comment-24415))
 
 > Colin Forster says:
 >

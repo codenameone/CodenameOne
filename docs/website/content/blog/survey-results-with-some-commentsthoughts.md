@@ -118,7 +118,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 28, 2013 at 5:09 pm ([permalink](https://www.codenameone.com/blog/survey-results-with-some-commentsthoughts.html#comment-21815))
+### **Anonymous** — January 28, 2013 at 5:09 pm ([permalink](/blog/survey-results-with-some-commentsthoughts/#comment-21815))
 
 > Anonymous says:
 >
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 29, 2013 at 3:36 am ([permalink](https://www.codenameone.com/blog/survey-results-with-some-commentsthoughts.html#comment-21962))
+### **Anonymous** — January 29, 2013 at 3:36 am ([permalink](/blog/survey-results-with-some-commentsthoughts/#comment-21962))
 
 > Anonymous says:
 >

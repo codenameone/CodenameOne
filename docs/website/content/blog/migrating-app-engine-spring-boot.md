@@ -41,7 +41,7 @@ Over the past year updating the App Engine deployment became impossible as Googl
 
 ### How does it Work?
 
-We’ve worked a lot with Spring Boot while developing [the courses](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java) and [upcoming book](https://www.codenameone.com/blog/uber-clone-book.html). The speed of development and ease of use is at a different scale altogether.
+We’ve worked a lot with Spring Boot while developing [the courses](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java) and [upcoming book](/blog/uber-clone-book/). The speed of development and ease of use is at a different scale altogether.
 
 With that in mind we decided to do a live migration to a Spring Boot server that would work as a drop in replacement to app engine. To keep scalability in place we decided to use cloudflare (as we do on the main website). It makes scaling remarkably easy.
 
@@ -87,7 +87,7 @@ We decided to start a new leaf with a new domain for the emails. We didn’t mov
 
 ### How could this Impact You
 
-I already discussed some of these [here](https://www.codenameone.com/blog/new-build-cloud.html). But there is one additional entry in the pile: IPN.
+I already discussed some of these [here](/blog/new-build-cloud/). But there is one additional entry in the pile: IPN.
 
 We handle our subscriptions via PayPal. We’d love to add other options but there are logistical issues with global deployments for all of them. We don’t want any billing data on our servers as we don’t want to deal with that complexity.
 
@@ -113,7 +113,7 @@ I don’t want to announce dates as I’m still working on the book and we need 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Steve Nganga** — July 12, 2018 at 11:26 am ([permalink](https://www.codenameone.com/blog/migrating-app-engine-spring-boot.html#comment-23807))
+### **Steve Nganga** — July 12, 2018 at 11:26 am ([permalink](/blog/migrating-app-engine-spring-boot/#comment-23807))
 
 > Steve Nganga says:
 >
@@ -122,7 +122,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lukman Javalove Idealist Jaji** — July 12, 2018 at 1:18 pm ([permalink](https://www.codenameone.com/blog/migrating-app-engine-spring-boot.html#comment-23993))
+### **Lukman Javalove Idealist Jaji** — July 12, 2018 at 1:18 pm ([permalink](/blog/migrating-app-engine-spring-boot/#comment-23993))
 
 > Lukman Javalove Idealist Jaji says:
 >
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 13, 2018 at 5:00 am ([permalink](https://www.codenameone.com/blog/migrating-app-engine-spring-boot.html#comment-23857))
+### **Shai Almog** — July 13, 2018 at 5:00 am ([permalink](/blog/migrating-app-engine-spring-boot/#comment-23857))
 
 > Shai Almog says:
 >
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 13, 2018 at 5:04 am ([permalink](https://www.codenameone.com/blog/migrating-app-engine-spring-boot.html#comment-23865))
+### **Shai Almog** — July 13, 2018 at 5:04 am ([permalink](/blog/migrating-app-engine-spring-boot/#comment-23865))
 
 > Shai Almog says:
 >

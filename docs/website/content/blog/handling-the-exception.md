@@ -45,7 +45,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — April 5, 2016 at 9:51 pm ([permalink](https://www.codenameone.com/blog/handling-the-exception.html#comment-21483))
+### **Chidiebere Okwudire** — April 5, 2016 at 9:51 pm ([permalink](/blog/handling-the-exception/#comment-21483))
 
 > Chidiebere Okwudire says:
 >
@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 6, 2016 at 2:41 am ([permalink](https://www.codenameone.com/blog/handling-the-exception.html#comment-22447))
+### **Shai Almog** — April 6, 2016 at 2:41 am ([permalink](/blog/handling-the-exception/#comment-22447))
 
 > Shai Almog says:
 >

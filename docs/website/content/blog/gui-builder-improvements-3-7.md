@@ -263,14 +263,14 @@ This GUI builder release represents the first step in a new direction. We have o
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — June 28, 2017 at 9:53 pm ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23358))
+### **bryan** — June 28, 2017 at 9:53 pm ([permalink](/blog/gui-builder-improvements-3-7/#comment-23358))
 
 > I haven’t used this, so the answer might be obvious – when you use the new GUI builder, does this create a “GUI only” app ?
 >
 
 
 
-### **Shai Almog** — June 29, 2017 at 3:30 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23651))
+### **Shai Almog** — June 29, 2017 at 3:30 am ([permalink](/blog/gui-builder-improvements-3-7/#comment-23651))
 
 > The GUI project is an old concept that was retired.
 >
@@ -279,7 +279,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — June 29, 2017 at 9:09 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23594))
+### **salah Alhaddabi** — June 29, 2017 at 9:09 am ([permalink](/blog/gui-builder-improvements-3-7/#comment-23594))
 
 > Very nice.
 >
@@ -288,7 +288,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 29, 2017 at 12:59 pm ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23662))
+### **Shai Almog** — June 29, 2017 at 12:59 pm ([permalink](/blog/gui-builder-improvements-3-7/#comment-23662))
 
 > Their tool is more about natural language not layout. It works with templates not components so it doesn’t allow you to do anything you want for any resolution or form factor (e.g. tablets). We would like to have more ready made templates that would effectively reduce the amount of UI you need to create.
 >
@@ -297,7 +297,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **David G** — July 1, 2017 at 12:49 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23668))
+### **David G** — July 1, 2017 at 12:49 am ([permalink](/blog/gui-builder-improvements-3-7/#comment-23668))
 
 > Took the new GUI builder for a test run today and looks very promising, guys! Still some bugs to sort out (eg. the Tabs component was difficult to work with) but I’m sure you’re working on it. I can definitely see a business case for me signing up to CodeName one if the GUI builder reaches a point where I can quickly and reliably develop high quality front-ends for mobile devices.
 >
@@ -306,17 +306,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 1, 2017 at 4:03 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23581))
+### **Shai Almog** — July 1, 2017 at 4:03 am ([permalink](/blog/gui-builder-improvements-3-7/#comment-23581))
 
 > Thanks!
 >
-> The tabs should be improved/fixed by now, we specifically didn’t commit that to keep the release stable. As I mentioned here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/survey-results-kotlin-updates-news.html>)  
+> The tabs should be improved/fixed by now, we specifically didn’t commit that to keep the release stable. As I mentioned here: [https://www.codenameone.com…](</blog/survey-results-kotlin-updates-news/>)  
 > We’ll include that fix in the 3.7.2 update that will come our on Friday.
 >
 
 
 
-### **David G** — July 9, 2017 at 3:53 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23685))
+### **David G** — July 9, 2017 at 3:53 am ([permalink](/blog/gui-builder-improvements-3-7/#comment-23685))
 
 > Hi Shai,  
 > Thought I’d let you know I just downloaded the 3.7.2 pluggin for NetBeans and the GUI builder still doesn’t handle Tabs properly… there’s just nothing showing up in the navigation pane when components are added to a Tabs container. I was able to define tab text and icons but couldn’t go any further.
@@ -324,7 +324,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 9, 2017 at 5:08 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-21470))
+### **Shai Almog** — July 9, 2017 at 5:08 am ([permalink](/blog/gui-builder-improvements-3-7/#comment-21470))
 
 > Thanks. Can you please file an issue on that?  
 > It probably didn’t make it eventually, I recall seeing it on an internal list but it must have gotten buried.
@@ -332,14 +332,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Γιάννης Σαλταπίδας** — June 29, 2018 at 11:19 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23819))
+### **Γιάννης Σαλταπίδας** — June 29, 2018 at 11:19 am ([permalink](/blog/gui-builder-improvements-3-7/#comment-23819))
 
 > Hello. There should be a tool to convert the style of the old GUI builder with the new GUI. Error free and smooth.
 >
 
 
 
-### **Shai Almog** — June 30, 2018 at 4:57 am ([permalink](https://www.codenameone.com/blog/gui-builder-improvements-3-7.html#comment-23831))
+### **Shai Almog** — June 30, 2018 at 4:57 am ([permalink](/blog/gui-builder-improvements-3-7/#comment-23831))
 
 > Hi,  
 > tools become error free when people report errors in the issue tracker and we fix them: [http://github.com/codenameo…](<http://github.com/codenameone/CodenameOne/issues/>)

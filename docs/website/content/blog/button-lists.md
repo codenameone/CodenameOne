@@ -93,14 +93,14 @@ Figure 1. Demo of the button list classes
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — December 8, 2018 at 11:14 am ([permalink](https://www.codenameone.com/blog/button-lists.html#comment-24102))
+### **Francesco Galgani** — December 8, 2018 at 11:14 am ([permalink](/blog/button-lists/#comment-24102))
 
 > Great! However, in this example, there is an issue: the “Add Option” works fine with iOS skin, but it doesn’t work as expected on Android skin (because it’s necessary to change the layout to see the new added Button). I done tests with “[iPhoneX.skin](<http://iPhoneX.skin>)” and “[GooglePixel2.skin](<http://GooglePixel2.skin>)”
 >
 
 
 
-### **Francesco Galgani** — December 8, 2018 at 11:14 am ([permalink](https://www.codenameone.com/blog/button-lists.html#comment-23875))
+### **Francesco Galgani** — December 8, 2018 at 11:14 am ([permalink](/blog/button-lists/#comment-23875))
 
 > Francesco Galgani says:
 >
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — December 8, 2018 at 11:14 am ([permalink](https://www.codenameone.com/blog/button-lists.html#comment-21539))
+### **Francesco Galgani** — December 8, 2018 at 11:14 am ([permalink](/blog/button-lists/#comment-21539))
 
 > Francesco Galgani says:
 >
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 8, 2018 at 1:46 pm ([permalink](https://www.codenameone.com/blog/button-lists.html#comment-24105))
+### **Shai Almog** — December 8, 2018 at 1:46 pm ([permalink](/blog/button-lists/#comment-24105))
 
 > Shai Almog says:
 >

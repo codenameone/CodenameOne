@@ -74,14 +74,14 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Sebastian Sickelmann** — January 20, 2016 at 4:32 am ([permalink](https://www.codenameone.com/blog/the-toarraynew-array-antipattern.html#comment-22417))
+### **Sebastian Sickelmann** — January 20, 2016 at 4:32 am ([permalink](/blog/the-toarraynew-array-antipattern/#comment-22417))
 
 > Sebastian Sickelmann says:
 >
 > You should also read [http://shipilev.net/blog/20…](<http://shipilev.net/blog/2016/arrays-wisdom-ancients/>) and maybe relativize some statements about Java SE and it’s reflection and optimizing possibilities.
 
 
-### **Shai Almog** — January 20, 2016 at 4:37 am ([permalink](https://www.codenameone.com/blog/the-toarraynew-array-antipattern.html#comment-22665))
+### **Shai Almog** — January 20, 2016 at 4:37 am ([permalink](/blog/the-toarraynew-array-antipattern/#comment-22665))
 
 > Shai Almog says:
 >
@@ -92,14 +92,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Notice that newer versions of the JVM are talking about new language features such as the ability to use generics efficiently with primitives. This would also pose a problem with relying on behaviors like this…
 
 
-### **Sebastian Sickelmann** — January 20, 2016 at 3:29 pm ([permalink](https://www.codenameone.com/blog/the-toarraynew-array-antipattern.html#comment-22499))
+### **Sebastian Sickelmann** — January 20, 2016 at 3:29 pm ([permalink](/blog/the-toarraynew-array-antipattern/#comment-22499))
 
 > Sebastian Sickelmann says:
 >
 > Well just wanted to mention the fairly new article regarding the same programming pattern. And if I get Aleksey right it is actually the other way around. By passing an non empty array you make it harder for the JIT at least for the HotspotVM to deliver best performance. It is totally clear to me that in other VM Implementation or in AOT Optimization scenarios for mobiles it may be the other way around.
 
 
-### **Shai Almog** — January 21, 2016 at 3:43 am ([permalink](https://www.codenameone.com/blog/the-toarraynew-array-antipattern.html#comment-22592))
+### **Shai Almog** — January 21, 2016 at 3:43 am ([permalink](/blog/the-toarraynew-array-antipattern/#comment-22592))
 
 > Shai Almog says:
 >

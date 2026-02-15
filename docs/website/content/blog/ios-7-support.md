@@ -39,7 +39,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 2, 2014 at 7:42 pm ([permalink](https://www.codenameone.com/blog/ios-7-support.html#comment-21813))
+### **Anonymous** — January 2, 2014 at 7:42 pm ([permalink](/blog/ios-7-support/#comment-21813))
 
 > Anonymous says:
 >
@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 3, 2014 at 3:23 am ([permalink](https://www.codenameone.com/blog/ios-7-support.html#comment-21778))
+### **Anonymous** — January 3, 2014 at 3:23 am ([permalink](/blog/ios-7-support/#comment-21778))
 
 > Anonymous says:
 >
@@ -63,7 +63,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 3, 2014 at 4:02 am ([permalink](https://www.codenameone.com/blog/ios-7-support.html#comment-21809))
+### **Anonymous** — January 3, 2014 at 4:02 am ([permalink](/blog/ios-7-support/#comment-21809))
 
 > Anonymous says:
 >
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 4, 2014 at 6:09 am ([permalink](https://www.codenameone.com/blog/ios-7-support.html#comment-21795))
+### **Anonymous** — January 4, 2014 at 6:09 am ([permalink](/blog/ios-7-support/#comment-21795))
 
 > Anonymous says:
 >

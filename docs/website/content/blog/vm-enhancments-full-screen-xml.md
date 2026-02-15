@@ -19,13 +19,13 @@ We did two big things for ParparVM (our iOS VM) which allowed us to expose this 
 
 We can’t guarantee that these will work perfectly for all cases as there are some complexities. E.g. our process for supporting Java 8 might trigger true for `isAnonymousClass()` due to a lambda. But this is a start.
 
-Another important piece is `java.util.Objects`. Technically we implemented this class via [com.codename1.compat.java.util.Objects](https://www.codenameone.com/javadoc/com/codename1/compat/java/util/Objects.html) but if you use the [java.util.Objects](https://www.codenameone.com/javadoc/java/util/Objects.html) it will work just fine. The processor will translate the calls to the Codename One equivalents.
+Another important piece is `java.util.Objects`. Technically we implemented this class via [com.codename1.compat.java.util.Objects](/javadoc/com/codename1/compat/java/util/Objects/) but if you use the [java.util.Objects](/javadoc/java/util/Objects/) it will work just fine. The processor will translate the calls to the Codename One equivalents.
 
 `Objects` includes some common useful utility methods. Hopefully we’ll add a few more classes like that as needed.
 
 ### XML Properties
 
-We supported JSON in [properties](https://www.codenameone.com/blog/properties-are-amazing.html) from day one. XML is a bit harded but not by much. We added highly experimental support for XML into properties which can be useful when working with XML data from the server or storage.
+We supported JSON in [properties](/blog/properties-are-amazing/) from day one. XML is a bit harded but not by much. We added highly experimental support for XML into properties which can be useful when working with XML data from the server or storage.
 
 __ |  This feature is experimental and the API might change/break   
 ---|---  

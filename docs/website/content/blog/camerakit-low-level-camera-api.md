@@ -37,7 +37,7 @@ I would love to see ports of this to other Codename One platforms and the simula
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Amuche Chimezie** — March 29, 2018 at 3:45 pm ([permalink](https://www.codenameone.com/blog/camerakit-low-level-camera-api.html#comment-23779))
+### **Amuche Chimezie** — March 29, 2018 at 3:45 pm ([permalink](/blog/camerakit-low-level-camera-api/#comment-23779))
 
 > Amuche Chimezie says:
 >
@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **thunderkilll** — April 27, 2018 at 5:47 am ([permalink](https://www.codenameone.com/blog/camerakit-low-level-camera-api.html#comment-23805))
+### **thunderkilll** — April 27, 2018 at 5:47 am ([permalink](/blog/camerakit-low-level-camera-api/#comment-23805))
 
 > thunderkilll says:
 >
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 28, 2018 at 5:32 am ([permalink](https://www.codenameone.com/blog/camerakit-low-level-camera-api.html#comment-23734))
+### **Shai Almog** — April 28, 2018 at 5:32 am ([permalink](/blog/camerakit-low-level-camera-api/#comment-23734))
 
 > Shai Almog says:
 >

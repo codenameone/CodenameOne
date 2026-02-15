@@ -141,7 +141,7 @@ You can also read the far more detailed list of release notes [here](/codename-o
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — January 27, 2016 at 11:50 am ([permalink](https://www.codenameone.com/blog/codename-one-3-3-now-live.html#comment-21615))
+### **Chidiebere Okwudire** — January 27, 2016 at 11:50 am ([permalink](/blog/codename-one-3-3-now-live/#comment-21615))
 
 > Chidiebere Okwudire says:
 >
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 27, 2016 at 12:26 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-3-now-live.html#comment-22666))
+### **Shai Almog** — January 27, 2016 at 12:26 pm ([permalink](/blog/codename-one-3-3-now-live/#comment-22666))
 
 > Shai Almog says:
 >
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — January 27, 2016 at 12:36 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-3-now-live.html#comment-22699))
+### **Chidiebere Okwudire** — January 27, 2016 at 12:36 pm ([permalink](/blog/codename-one-3-3-now-live/#comment-22699))
 
 > Chidiebere Okwudire says:
 >
@@ -178,7 +178,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 27, 2016 at 12:48 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-3-now-live.html#comment-22637))
+### **Shai Almog** — January 27, 2016 at 12:48 pm ([permalink](/blog/codename-one-3-3-now-live/#comment-22637))
 
 > Shai Almog says:
 >

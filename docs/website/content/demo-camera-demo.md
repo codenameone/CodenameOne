@@ -26,7 +26,7 @@ Trivial usage of the camera to capture a photo
 
 ![](/demos/camera-demo-screenshot-1.png)
 
-Trivial demo showing off usage of the camera via the [Capture API](https://www.codenameone.com/manual/misc-features.html#_capture_photos_video_audio).
+Trivial demo showing off usage of the camera via the [Capture API](/manual/misc-features/#_capture_photos_video_audio).
 
 Notice that the JavaScript HTML5 demo is not what we have on the device where applications are translated to native code!  
 Since Apple doesn’t allow demos on itunes and doesn’t allow installing apps without itunes we can’t distribute the native app demos, you would need to build from source with an itunes demo account.

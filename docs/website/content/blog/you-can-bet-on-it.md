@@ -59,7 +59,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 13, 2015 at 7:05 am ([permalink](https://www.codenameone.com/blog/you-can-bet-on-it.html#comment-22313))
+### **Anonymous** — March 13, 2015 at 7:05 am ([permalink](/blog/you-can-bet-on-it/#comment-22313))
 
 > Anonymous says:
 >
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > </div>
 
 
-### **Anonymous** — March 13, 2015 at 7:05 am ([permalink](https://www.codenameone.com/blog/you-can-bet-on-it.html#comment-22321))
+### **Anonymous** — March 13, 2015 at 7:05 am ([permalink](/blog/you-can-bet-on-it/#comment-22321))
 
 > Anonymous says:
 >

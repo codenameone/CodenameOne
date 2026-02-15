@@ -72,7 +72,7 @@ Good promotional material is no substitute for good app design, but it’s a ste
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chris Moore** — May 30, 2019 at 7:49 am ([permalink](https://www.codenameone.com/blog/3-image-tools-for-app-marketing.html#comment-24041))
+### **Chris Moore** — May 30, 2019 at 7:49 am ([permalink](/blog/3-image-tools-for-app-marketing/#comment-24041))
 
 > Hey Shai!
 >

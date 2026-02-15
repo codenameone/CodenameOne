@@ -27,14 +27,14 @@ Notice that I didn’t even go for “pixel perfect” as that would mean the co
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Lukman Javalove Idealist Jaji** — November 21, 2017 at 1:01 pm ([permalink](https://www.codenameone.com/blog/uber.html#comment-23868))
+### **Lukman Javalove Idealist Jaji** — November 21, 2017 at 1:01 pm ([permalink](/blog/uber/#comment-23868))
 
 > Nice. There is some kind of dropShadow effect on the logo on the Uber icon which is not in the clone. Nice one though
 >
 
 
 
-### **Shai Almog** — November 21, 2017 at 1:07 pm ([permalink](https://www.codenameone.com/blog/uber.html#comment-23895))
+### **Shai Almog** — November 21, 2017 at 1:07 pm ([permalink](/blog/uber/#comment-23895))
 
 > Shai Almog says:
 >
@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **maxii123** — November 21, 2017 at 1:15 pm ([permalink](https://www.codenameone.com/blog/uber.html#comment-23540))
+### **maxii123** — November 21, 2017 at 1:15 pm ([permalink](/blog/uber/#comment-23540))
 
 > maxii123 says:
 >
@@ -55,7 +55,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 21, 2017 at 1:22 pm ([permalink](https://www.codenameone.com/blog/uber.html#comment-23877))
+### **Shai Almog** — November 21, 2017 at 1:22 pm ([permalink](/blog/uber/#comment-23877))
 
 > Shai Almog says:
 >
@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ross Taylor** — November 21, 2017 at 3:28 pm ([permalink](https://www.codenameone.com/blog/uber.html#comment-23749))
+### **Ross Taylor** — November 21, 2017 at 3:28 pm ([permalink](/blog/uber/#comment-23749))
 
 > Ross Taylor says:
 >
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Simphiwe Twala** — November 21, 2017 at 4:05 pm ([permalink](https://www.codenameone.com/blog/uber.html#comment-23629))
+### **Simphiwe Twala** — November 21, 2017 at 4:05 pm ([permalink](/blog/uber/#comment-23629))
 
 > Simphiwe Twala says:
 >
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Manuel Tijerino** — November 22, 2017 at 12:09 am ([permalink](https://www.codenameone.com/blog/uber.html#comment-23656))
+### **Manuel Tijerino** — November 22, 2017 at 12:09 am ([permalink](/blog/uber/#comment-23656))
 
 > Manuel Tijerino says:
 >
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **3lix** — April 8, 2018 at 2:00 am ([permalink](https://www.codenameone.com/blog/uber.html#comment-23641))
+### **3lix** — April 8, 2018 at 2:00 am ([permalink](/blog/uber/#comment-23641))
 
 > 3lix says:
 >
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 8, 2018 at 5:55 am ([permalink](https://www.codenameone.com/blog/uber.html#comment-23924))
+### **Shai Almog** — April 8, 2018 at 5:55 am ([permalink](/blog/uber/#comment-23924))
 
 > Shai Almog says:
 >
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Philip Welch** — June 13, 2018 at 12:01 am ([permalink](https://www.codenameone.com/blog/uber.html#comment-23992))
+### **Philip Welch** — June 13, 2018 at 12:01 am ([permalink](/blog/uber/#comment-23992))
 
 > Philip Welch says:
 >
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 13, 2018 at 6:23 am ([permalink](https://www.codenameone.com/blog/uber.html#comment-23846))
+### **Shai Almog** — June 13, 2018 at 6:23 am ([permalink](/blog/uber/#comment-23846))
 
 > Shai Almog says:
 >
@@ -132,7 +132,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francisco Claudio Araujo Palme** — August 5, 2018 at 6:00 pm ([permalink](https://www.codenameone.com/blog/uber.html#comment-23814))
+### **Francisco Claudio Araujo Palme** — August 5, 2018 at 6:00 pm ([permalink](/blog/uber/#comment-23814))
 
 > Francisco Claudio Araujo Palme says:
 >
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 6, 2018 at 4:18 am ([permalink](https://www.codenameone.com/blog/uber.html#comment-23782))
+### **Shai Almog** — August 6, 2018 at 4:18 am ([permalink](/blog/uber/#comment-23782))
 
 > Shai Almog says:
 >
@@ -153,7 +153,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gareth Murfin** — August 4, 2020 at 5:07 pm ([permalink](https://www.codenameone.com/blog/uber.html#comment-24308))
+### **Gareth Murfin** — August 4, 2020 at 5:07 pm ([permalink](/blog/uber/#comment-24308))
 
 > [Gareth Murfin](https://lh3.googleusercontent.com/a-/AOh14GiKSl5jm7N1Rsw8eobcYTOzEcg7dMk62FKKC_SboA) says:
 >
@@ -162,7 +162,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 5, 2020 at 2:35 am ([permalink](https://www.codenameone.com/blog/uber.html#comment-24306))
+### **Shai Almog** — August 5, 2020 at 2:35 am ([permalink](/blog/uber/#comment-24306))
 
 > Shai Almog says:
 >

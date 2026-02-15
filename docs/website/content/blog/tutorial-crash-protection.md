@@ -22,7 +22,7 @@ On a different subject I also neglected to mention the new security related modu
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — September 23, 2017 at 10:27 pm ([permalink](https://www.codenameone.com/blog/tutorial-crash-protection.html#comment-23777))
+### **Francesco Galgani** — September 23, 2017 at 10:27 pm ([permalink](/blog/tutorial-crash-protection/#comment-23777))
 
 > Francesco Galgani says:
 >
@@ -31,7 +31,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — October 18, 2017 at 10:21 am ([permalink](https://www.codenameone.com/blog/tutorial-crash-protection.html#comment-23810))
+### **Francesco Galgani** — October 18, 2017 at 10:21 am ([permalink](/blog/tutorial-crash-protection/#comment-23810))
 
 > Francesco Galgani says:
 >
@@ -41,7 +41,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 1\. Is there a code that automatically catches (and reports by e-mail) all exceptions in all threads, not only in the EDT?
 >
-> 2\. In the manual, section “Logging & Crash Protection”, at the page: [https://www.codenameone.com…](<https://www.codenameone.com/manual/files-storage-networking.html#_logging_crash_protection>) , there are the following two lines of code: I don’t understood if it makes sense use them in conjunction with Log.bindCrashProtection(true)
+> 2\. In the manual, section “Logging & Crash Protection”, at the page: [https://www.codenameone.com…](</manual/files-storage-networking/#_logging_crash_protection>) , there are the following two lines of code: I don’t understood if it makes sense use them in conjunction with Log.bindCrashProtection(true)
 >
 > Log.setReportingLevel(Log.REPORTING_DEBUG);  
 > DefaultCrashReporter.init(true, 2);
@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 19, 2017 at 5:50 am ([permalink](https://www.codenameone.com/blog/tutorial-crash-protection.html#comment-23826))
+### **Shai Almog** — October 19, 2017 at 5:50 am ([permalink](/blog/tutorial-crash-protection/#comment-23826))
 
 > Shai Almog says:
 >
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 19, 2017 at 5:54 am ([permalink](https://www.codenameone.com/blog/tutorial-crash-protection.html#comment-23833))
+### **Shai Almog** — October 19, 2017 at 5:54 am ([permalink](/blog/tutorial-crash-protection/#comment-23833))
 
 > Shai Almog says:
 >

@@ -128,7 +128,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 14, 2014 at 7:15 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-21869))
+### **Anonymous** — March 14, 2014 at 7:15 am ([permalink](/blog/image-from-url-made-easy/#comment-21869))
 
 > Anonymous says:
 >
@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 4, 2014 at 12:27 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-22066))
+### **Anonymous** — April 4, 2014 at 12:27 am ([permalink](/blog/image-from-url-made-easy/#comment-22066))
 
 > Anonymous says:
 >
@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 4, 2014 at 2:57 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-21913))
+### **Anonymous** — April 4, 2014 at 2:57 am ([permalink](/blog/image-from-url-made-easy/#comment-21913))
 
 > Anonymous says:
 >
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 4, 2014 at 9:12 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-22049))
+### **Anonymous** — April 4, 2014 at 9:12 am ([permalink](/blog/image-from-url-made-easy/#comment-22049))
 
 > Anonymous says:
 >
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 4, 2014 at 10:34 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-21976))
+### **Anonymous** — April 4, 2014 at 10:34 am ([permalink](/blog/image-from-url-made-easy/#comment-21976))
 
 > Anonymous says:
 >
@@ -175,7 +175,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 4, 2014 at 3:46 pm ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-21992))
+### **Anonymous** — April 4, 2014 at 3:46 pm ([permalink](/blog/image-from-url-made-easy/#comment-21992))
 
 > Anonymous says:
 >
@@ -184,7 +184,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 19, 2014 at 5:47 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-22114))
+### **Anonymous** — June 19, 2014 at 5:47 am ([permalink](/blog/image-from-url-made-easy/#comment-22114))
 
 > Anonymous says:
 >
@@ -203,7 +203,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 20, 2014 at 12:46 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-21675))
+### **Anonymous** — June 20, 2014 at 12:46 am ([permalink](/blog/image-from-url-made-easy/#comment-21675))
 
 > Anonymous says:
 >
@@ -216,7 +216,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 20, 2014 at 10:00 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-22143))
+### **Anonymous** — June 20, 2014 at 10:00 am ([permalink](/blog/image-from-url-made-easy/#comment-22143))
 
 > Anonymous says:
 >
@@ -237,7 +237,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 20, 2014 at 1:53 pm ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-24238))
+### **Anonymous** — June 20, 2014 at 1:53 pm ([permalink](/blog/image-from-url-made-easy/#comment-24238))
 
 > Anonymous says:
 >
@@ -246,7 +246,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 21, 2014 at 4:20 pm ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-21848))
+### **Anonymous** — June 21, 2014 at 4:20 pm ([permalink](/blog/image-from-url-made-easy/#comment-21848))
 
 > Anonymous says:
 >
@@ -265,7 +265,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 3, 2015 at 6:31 am ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-22148))
+### **Anonymous** — March 3, 2015 at 6:31 am ([permalink](/blog/image-from-url-made-easy/#comment-22148))
 
 > Anonymous says:
 >
@@ -274,7 +274,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 3, 2015 at 12:19 pm ([permalink](https://www.codenameone.com/blog/image-from-url-made-easy.html#comment-22178))
+### **Anonymous** — March 3, 2015 at 12:19 pm ([permalink](/blog/image-from-url-made-easy/#comment-22178))
 
 > Anonymous says:
 >

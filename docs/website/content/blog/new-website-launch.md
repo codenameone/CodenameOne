@@ -33,7 +33,7 @@ As part of this migration login on the website will no longer be available/requi
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — September 27, 2020 at 7:28 am ([permalink](https://www.codenameone.com/blog/new-website-launch.html#comment-24345))
+### **Francesco Galgani** — September 27, 2020 at 7:28 am ([permalink](/blog/new-website-launch/#comment-24345))
 
 > [Francesco Galgani](https://lh6.googleusercontent.com/-4K0ax_DVJf4/AAAAAAAAAAI/AAAAAAAAAAA/AMZuuckEd1kcni0y8k6NMzNtxwOCEPatQQ/photo.jpg) says:
 >
@@ -42,7 +42,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > If the new site will continue to have the blogging section (which I’ve grown fond of…), you could add an article indicating which are the new links. Thank you.
 
 
-### **Shai Almog** — September 27, 2020 at 7:41 am ([permalink](https://www.codenameone.com/blog/new-website-launch.html#comment-24346))
+### **Shai Almog** — September 27, 2020 at 7:41 am ([permalink](/blog/new-website-launch/#comment-24346))
 
 > Shai Almog says:
 >
@@ -50,21 +50,21 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Most links (including blogs) should remain the same.
 
 
-### **Francesco Galgani** — October 5, 2020 at 8:36 am ([permalink](https://www.codenameone.com/blog/new-website-launch.html#comment-24355))
+### **Francesco Galgani** — October 5, 2020 at 8:36 am ([permalink](/blog/new-website-launch/#comment-24355))
 
 > [Francesco Galgani](https://lh6.googleusercontent.com/-4K0ax_DVJf4/AAAAAAAAAAI/AAAAAAAAAAA/AMZuuckEd1kcni0y8k6NMzNtxwOCEPatQQ/photo.jpg) says:
 >
 > I guess something didn’t work: I keep seeing the site as before…
 
 
-### **Shai Almog** — October 5, 2020 at 8:39 am ([permalink](https://www.codenameone.com/blog/new-website-launch.html#comment-24353))
+### **Shai Almog** — October 5, 2020 at 8:39 am ([permalink](/blog/new-website-launch/#comment-24353))
 
 > Shai Almog says:
 >
 > Notice the update I posted last week to the article at the top… I doubt we’ll make it by this weekend either. This is proving much harder in the least expected quadrants.
 
 
-### **Francesco Galgani** — October 5, 2020 at 8:42 am ([permalink](https://www.codenameone.com/blog/new-website-launch.html#comment-24354))
+### **Francesco Galgani** — October 5, 2020 at 8:42 am ([permalink](/blog/new-website-launch/#comment-24354))
 
 > [Francesco Galgani](https://lh6.googleusercontent.com/-4K0ax_DVJf4/AAAAAAAAAAI/AAAAAAAAAAA/AMZuuckEd1kcni0y8k6NMzNtxwOCEPatQQ/photo.jpg) says:
 >

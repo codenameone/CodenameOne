@@ -49,14 +49,14 @@ One part of that is an introduction of a new security tag to the blog. We’ll a
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Miguel Munoz** — August 14, 2020 at 10:22 pm ([permalink](https://www.codenameone.com/blog/strong-android-certificates.html#comment-24321))
+### **Miguel Munoz** — August 14, 2020 at 10:22 pm ([permalink](/blog/strong-android-certificates/#comment-24321))
 
 > Where does it put the certificate? I’m moving my source to GitHub, and I naturally don’t want the certificates stored there, too. I found the iOS certificates in a folder called iosCerts, and excluded those from github, but I can’t find them for the android build. What files should I exclude?
 >
 
 
 
-### **Shai Almog** — August 15, 2020 at 5:17 am ([permalink](https://www.codenameone.com/blog/strong-android-certificates.html#comment-24325))
+### **Shai Almog** — August 15, 2020 at 5:17 am ([permalink](/blog/strong-android-certificates/#comment-24325))
 
 > Shai Almog says:
 >

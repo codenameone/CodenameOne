@@ -14,7 +14,7 @@ author: Shai Almog
 __ |  It’s LIVE! Check out the bootcamp signup [here](https://codenameone.teachable.com/p/full-stack-java-mobile-app-bootcamp/).   
 ---|---  
   
-Thanks for all the comments and interest on the [previous post](https://www.codenameone.com/blog/full-stack-java-bootcamp.html). In that post I discussed the importance of great app design and showed some of the cool newish demos I built to highlight the general direction. I also talked about the importance of personal mentorship especially with new/elaborate mobile technologies where **everything** is different.
+Thanks for all the comments and interest on the [previous post](/blog/full-stack-java-bootcamp/). In that post I discussed the importance of great app design and showed some of the cool newish demos I built to highlight the general direction. I also talked about the importance of personal mentorship especially with new/elaborate mobile technologies where **everything** is different.
 
 I also discussed the bootcamp with broad strokes, I won’t go into too many details about it today (I’ll write more later in the week). Just to clarify the general direction, the main focus will be on UI/UX. This means we will build a complete production grade application from the ground up with server connectivity and everything…​ I’m aiming this as an advanced bootcamp (deep into native interfaces etc.) but I have provisions for people who are new to Codename One.   
 One of the things that really excites me is getting to know you (our community) better on a more personal level. I find it very hard to keep up with all the thousands of people that I’ve communicated with in the past 5 years. Putting faces, voices and some context is something I’m eagerly looking forward to.
@@ -45,7 +45,7 @@ One of the main things I want to focus on is “real life” and the transformat
 
 ![Ram Nathaniel](/blog/spring-template-more-about-bootcamp/Ram.jpg)
 
-Ram picked up Codename One during the beta & built one of the [coolest apps](https://www.codenameone.com/featured-yhomework.html) ever back in 2012. It’s a bit dated by now with its design but it works well and had gained a loyal following because it’s an amazing app.
+Ram picked up Codename One during the beta & built one of the [coolest apps](/featured-yhomework/) ever back in 2012. It’s a bit dated by now with its design but it works well and had gained a loyal following because it’s an amazing app.
 
 Ram shipped his app on iOS & Android without a problem but it stagnated for a couple of years. Ram like a lot of us didn’t have the proper expertise in marketing and promotion to push the app to the prominent place it needs to be. A lot of apps die in this exact spot… Most of us think of a competitor as the worst thing that can happen to our app and a strong competitor is exactly what happened!
 
@@ -123,7 +123,7 @@ P.S. Thanks to all of you who shared my last post within your social circle, I r
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jérémy MARQUER** — March 6, 2017 at 4:39 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23313))
+### **Jérémy MARQUER** — March 6, 2017 at 4:39 pm ([permalink](/blog/spring-template-more-about-bootcamp/#comment-23313))
 
 > Very interesting program !  
 > As I did not take the time to reply by e-mail, I tell you here what I would like to see in the bootcamp : Unit and Integration Test ! 🙂  
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Dalvik** — March 6, 2017 at 5:06 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23379))
+### **Dalvik** — March 6, 2017 at 5:06 pm ([permalink](/blog/spring-template-more-about-bootcamp/#comment-23379))
 
 > Dalvik says:
 >
@@ -142,7 +142,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 6, 2017 at 5:09 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23191))
+### **Shai Almog** — March 6, 2017 at 5:09 pm ([permalink](/blog/spring-template-more-about-bootcamp/#comment-23191))
 
 > Shai Almog says:
 >
@@ -153,7 +153,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 6, 2017 at 5:11 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23289))
+### **Shai Almog** — March 6, 2017 at 5:11 pm ([permalink](/blog/spring-template-more-about-bootcamp/#comment-23289))
 
 > Shai Almog says:
 >
@@ -162,7 +162,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chad Elofson** — March 6, 2017 at 5:37 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23197))
+### **Chad Elofson** — March 6, 2017 at 5:37 pm ([permalink](/blog/spring-template-more-about-bootcamp/#comment-23197))
 
 > Chad Elofson says:
 >
@@ -171,7 +171,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Fabrício Cabeça** — March 6, 2017 at 5:45 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23407))
+### **Fabrício Cabeça** — March 6, 2017 at 5:45 pm ([permalink](/blog/spring-template-more-about-bootcamp/#comment-23407))
 
 > Fabrício Cabeça says:
 >
@@ -181,7 +181,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — March 6, 2017 at 6:11 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23425))
+### **salah Alhaddabi** — March 6, 2017 at 6:11 pm ([permalink](/blog/spring-template-more-about-bootcamp/#comment-23425))
 
 > salah Alhaddabi says:
 >
@@ -190,7 +190,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 6, 2017 at 6:53 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23258))
+### **Shai Almog** — March 6, 2017 at 6:53 pm ([permalink](/blog/spring-template-more-about-bootcamp/#comment-23258))
 
 > Shai Almog says:
 >
@@ -199,7 +199,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 6, 2017 at 6:54 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23099))
+### **Shai Almog** — March 6, 2017 at 6:54 pm ([permalink](/blog/spring-template-more-about-bootcamp/#comment-23099))
 
 > Shai Almog says:
 >
@@ -210,7 +210,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 6, 2017 at 7:00 pm ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23337))
+### **Shai Almog** — March 6, 2017 at 7:00 pm ([permalink](/blog/spring-template-more-about-bootcamp/#comment-23337))
 
 > Shai Almog says:
 >
@@ -223,7 +223,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — March 7, 2017 at 4:38 am ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-23211))
+### **salah Alhaddabi** — March 7, 2017 at 4:38 am ([permalink](/blog/spring-template-more-about-bootcamp/#comment-23211))
 
 > salah Alhaddabi says:
 >
@@ -232,7 +232,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 7, 2017 at 5:17 am ([permalink](https://www.codenameone.com/blog/spring-template-more-about-bootcamp.html#comment-24128))
+### **Shai Almog** — March 7, 2017 at 5:17 am ([permalink](/blog/spring-template-more-about-bootcamp/#comment-24128))
 
 > Shai Almog says:
 >

@@ -18,11 +18,11 @@ Thanks again to everyone who answered my questions. I got tons of valuable feedb
 
 One of the main things I got from pretty much everyone who wrote is the desire to improve your UI, this is a huge deal for us as I think we have an advantage here. E.g. a lot of developers who wrote to me (some of which worked with us for **years**) weren’t familiar with these demos I’ve published:
 
-  * [Material Screens](https://www.codenameone.com/blog/template-mobile-material-screens-ui-kit.html)
+  * [Material Screens](/blog/template-mobile-material-screens-ui-kit/)
 
-  * [Phoenix](https://www.codenameone.com/blog/template-phoenix-ui.html)
+  * [Phoenix](/blog/template-phoenix-ui/)
 
-  * [PSD to App](https://www.codenameone.com/blog/psd-to-app-revisited.html)
+  * [PSD to App](/blog/psd-to-app-revisited/)
 
   * [Clean Modern](http://www.codenameone.com/blog/template-clean-modern-ui-kit.html)
 
@@ -86,7 +86,7 @@ This was the first article in a 3 part series, check out part 2 [here](/blog/spr
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Dalvik** — March 1, 2017 at 1:04 pm ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23028))
+### **Dalvik** — March 1, 2017 at 1:04 pm ([permalink](/blog/full-stack-java-bootcamp/#comment-23028))
 
 > Interesting stuff, is this for all levels?  
 > Is there a place to register?  
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 1, 2017 at 3:34 pm ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23038))
+### **Shai Almog** — March 1, 2017 at 3:34 pm ([permalink](/blog/full-stack-java-bootcamp/#comment-23038))
 
 > Shai Almog says:
 >
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Dalvik** — March 2, 2017 at 8:45 am ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-21565))
+### **Dalvik** — March 2, 2017 at 8:45 am ([permalink](/blog/full-stack-java-bootcamp/#comment-21565))
 
 > Dalvik says:
 >
@@ -117,7 +117,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ignatus Ujomor** — March 2, 2017 at 9:05 am ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23320))
+### **Ignatus Ujomor** — March 2, 2017 at 9:05 am ([permalink](/blog/full-stack-java-bootcamp/#comment-23320))
 
 > Ignatus Ujomor says:
 >
@@ -126,7 +126,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chad Elofson** — March 2, 2017 at 9:21 am ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23397))
+### **Chad Elofson** — March 2, 2017 at 9:21 am ([permalink](/blog/full-stack-java-bootcamp/#comment-23397))
 
 > Chad Elofson says:
 >
@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 2, 2017 at 10:02 am ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23238))
+### **Shai Almog** — March 2, 2017 at 10:02 am ([permalink](/blog/full-stack-java-bootcamp/#comment-23238))
 
 > Shai Almog says:
 >
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 2, 2017 at 10:03 am ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23078))
+### **Shai Almog** — March 2, 2017 at 10:03 am ([permalink](/blog/full-stack-java-bootcamp/#comment-23078))
 
 > Shai Almog says:
 >
@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 2, 2017 at 10:04 am ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23328))
+### **Shai Almog** — March 2, 2017 at 10:04 am ([permalink](/blog/full-stack-java-bootcamp/#comment-23328))
 
 > Shai Almog says:
 >
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — March 2, 2017 at 3:04 pm ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23269))
+### **salah Alhaddabi** — March 2, 2017 at 3:04 pm ([permalink](/blog/full-stack-java-bootcamp/#comment-23269))
 
 > salah Alhaddabi says:
 >
@@ -176,7 +176,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 2, 2017 at 3:33 pm ([permalink](https://www.codenameone.com/blog/full-stack-java-bootcamp.html#comment-23183))
+### **Shai Almog** — March 2, 2017 at 3:33 pm ([permalink](/blog/full-stack-java-bootcamp/#comment-23183))
 
 > Shai Almog says:
 >

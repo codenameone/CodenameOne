@@ -48,7 +48,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — June 8, 2014 at 5:57 pm ([permalink](https://www.codenameone.com/blog/webservice-wizard.html#comment-21984))
+### **Anonymous** — June 8, 2014 at 5:57 pm ([permalink](/blog/webservice-wizard/#comment-21984))
 
 > Anonymous says:
 >
@@ -61,7 +61,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 9, 2014 at 2:17 am ([permalink](https://www.codenameone.com/blog/webservice-wizard.html#comment-21969))
+### **Anonymous** — June 9, 2014 at 2:17 am ([permalink](/blog/webservice-wizard/#comment-21969))
 
 > Anonymous says:
 >
@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 9, 2014 at 6:32 pm ([permalink](https://www.codenameone.com/blog/webservice-wizard.html#comment-21592))
+### **Anonymous** — June 9, 2014 at 6:32 pm ([permalink](/blog/webservice-wizard/#comment-21592))
 
 > Anonymous says:
 >
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 1, 2014 at 6:00 am ([permalink](https://www.codenameone.com/blog/webservice-wizard.html#comment-21446))
+### **Anonymous** — July 1, 2014 at 6:00 am ([permalink](/blog/webservice-wizard/#comment-21446))
 
 > Anonymous says:
 >

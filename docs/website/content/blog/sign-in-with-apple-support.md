@@ -118,7 +118,7 @@ Some screenshots from the demo:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Javier Anton** — April 1, 2020 at 12:30 pm ([permalink](https://www.codenameone.com/blog/sign-in-with-apple-support.html#comment-21373))
+### **Javier Anton** — April 1, 2020 at 12:30 pm ([permalink](/blog/sign-in-with-apple-support/#comment-21373))
 
 > This cn1 lib breaks the host app that imports it at compile time. The reason is that the native javase bit of the lib has incorrect package names and some imports aren’t available (in AppleSignInNativeImpl and WebViewBrowserWindow). The host app will compile when manually commenting these things out, but it might be worth updating the cn1lib so it doesn’t throw these errors as currently the native interface gets reset to faulty code each time the cn1lib is refreshed
 >
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — April 1, 2020 at 1:52 pm ([permalink](https://www.codenameone.com/blog/sign-in-with-apple-support.html#comment-21375))
+### **Steve Hannah** — April 1, 2020 at 1:52 pm ([permalink](/blog/sign-in-with-apple-support/#comment-21375))
 
 > [Steve Hannah](https://lh3.googleusercontent.com/a-/AAuE7mBmUCgKSZtJ2cqeHgj6bdPY2AAQ10roHlMpgRWc) says:
 >
@@ -142,7 +142,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — April 1, 2020 at 2:40 pm ([permalink](https://www.codenameone.com/blog/sign-in-with-apple-support.html#comment-21374))
+### **Javier Anton** — April 1, 2020 at 2:40 pm ([permalink](/blog/sign-in-with-apple-support/#comment-21374))
 
 > [Javier Anton](https://lh3.googleusercontent.com/a-/AAuE7mDRjHkEvAZNXquh9p7Oo00ey1yOwNzZ0SrFwD0IVA) says:
 >

@@ -87,16 +87,16 @@ I don’t think this is the time to share too much but Steve has been working on
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Nick Koirala** — May 24, 2017 at 10:13 pm ([permalink](https://www.codenameone.com/blog/splitpane-cursors-push-registration.html#comment-23317))
+### **Nick Koirala** — May 24, 2017 at 10:13 pm ([permalink](/blog/splitpane-cursors-push-registration/#comment-23317))
 
 > Nick Koirala says:
 >
-> I like the simplified push registration with a build hint as the old way wasn’t intuitive enough for me to implement without looking it up every time. Is there a way to set then sender id programatically? One of my projects uses the process described here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/deploy-same-mobile-app-template-multiple-times.html>) and currently the gcm sender id is also set in the overridden code.
+> I like the simplified push registration with a build hint as the old way wasn’t intuitive enough for me to implement without looking it up every time. Is there a way to set then sender id programatically? One of my projects uses the process described here: [https://www.codenameone.com…](</blog/deploy-same-mobile-app-template-multiple-times/>) and currently the gcm sender id is also set in the overridden code.
 >
 
 
 
-### **Shai Almog** — May 25, 2017 at 4:28 am ([permalink](https://www.codenameone.com/blog/splitpane-cursors-push-registration.html#comment-23384))
+### **Shai Almog** — May 25, 2017 at 4:28 am ([permalink](/blog/splitpane-cursors-push-registration/#comment-23384))
 
 > Shai Almog says:
 >
@@ -105,7 +105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Raffic** — July 26, 2017 at 1:38 pm ([permalink](https://www.codenameone.com/blog/splitpane-cursors-push-registration.html#comment-23527))
+### **Raffic** — July 26, 2017 at 1:38 pm ([permalink](/blog/splitpane-cursors-push-registration/#comment-23527))
 
 > Raffic says:
 >
@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 28, 2017 at 4:28 am ([permalink](https://www.codenameone.com/blog/splitpane-cursors-push-registration.html#comment-23744))
+### **Shai Almog** — July 28, 2017 at 4:28 am ([permalink](/blog/splitpane-cursors-push-registration/#comment-23744))
 
 > Shai Almog says:
 >

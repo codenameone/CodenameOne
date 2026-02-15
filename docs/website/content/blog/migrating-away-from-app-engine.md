@@ -44,7 +44,7 @@ We will also need you to update URL’s for services such as push notification e
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **James David Low** — May 26, 2015 at 7:39 am ([permalink](https://www.codenameone.com/blog/migrating-away-from-app-engine.html#comment-22160))
+### **James David Low** — May 26, 2015 at 7:39 am ([permalink](/blog/migrating-away-from-app-engine/#comment-22160))
 
 > James David Low says:
 >
@@ -55,7 +55,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 26, 2015 at 2:59 pm ([permalink](https://www.codenameone.com/blog/migrating-away-from-app-engine.html#comment-24198))
+### **Shai Almog** — May 26, 2015 at 2:59 pm ([permalink](/blog/migrating-away-from-app-engine/#comment-24198))
 
 > Shai Almog says:
 >
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Youssef** — May 31, 2015 at 6:51 pm ([permalink](https://www.codenameone.com/blog/migrating-away-from-app-engine.html#comment-21939))
+### **Youssef** — May 31, 2015 at 6:51 pm ([permalink](/blog/migrating-away-from-app-engine/#comment-21939))
 
 > Youssef says:
 >
@@ -76,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 1, 2015 at 9:30 am ([permalink](https://www.codenameone.com/blog/migrating-away-from-app-engine.html#comment-22093))
+### **Shai Almog** — June 1, 2015 at 9:30 am ([permalink](/blog/migrating-away-from-app-engine/#comment-22093))
 
 > Shai Almog says:
 >
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **chachan** — June 30, 2015 at 8:29 pm ([permalink](https://www.codenameone.com/blog/migrating-away-from-app-engine.html#comment-22344))
+### **chachan** — June 30, 2015 at 8:29 pm ([permalink](/blog/migrating-away-from-app-engine/#comment-22344))
 
 > chachan says:
 >

@@ -154,7 +154,7 @@ Feel free to create your own benchmarks comparing Codename One 3.6 with the late
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jérémy MARQUER** — February 14, 2017 at 1:21 pm ([permalink](https://www.codenameone.com/blog/parparvm-optimizations-compiling-java-for-ios.html#comment-23128))
+### **Jérémy MARQUER** — February 14, 2017 at 1:21 pm ([permalink](/blog/parparvm-optimizations-compiling-java-for-ios/#comment-23128))
 
 > Really nice !!  
 > I think it could also be noticeable on older devices …
@@ -162,14 +162,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bryan** — February 14, 2017 at 8:05 pm ([permalink](https://www.codenameone.com/blog/parparvm-optimizations-compiling-java-for-ios.html#comment-23055))
+### **bryan** — February 14, 2017 at 8:05 pm ([permalink](/blog/parparvm-optimizations-compiling-java-for-ios/#comment-23055))
 
 > Great work Steve. CN1 is getting better and better, congrats to all.
 >
 
 
 
-### **Gareth Murfin** — February 9, 2019 at 4:49 pm ([permalink](https://www.codenameone.com/blog/parparvm-optimizations-compiling-java-for-ios.html#comment-24037))
+### **Gareth Murfin** — February 9, 2019 at 4:49 pm ([permalink](/blog/parparvm-optimizations-compiling-java-for-ios/#comment-24037))
 
 > Great work Steve – certainly in the last year or so cn1 has felt way faster
 >

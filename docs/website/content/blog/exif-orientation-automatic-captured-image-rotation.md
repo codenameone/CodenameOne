@@ -107,7 +107,7 @@ A server-side error may also occur, but this cannot be resolved client-side. All
 
 #### The solution
 
-THe new API [Util.downloadUrlSafely](https://www.codenameone.com/javadoc/com/codename1/io/Util.html#downloadUrlSafely-java.lang.String-java.lang.String-com.codename1.util.OnComplete-com.codename1.util.OnComplete-) safely download the given URL to the `Storage` or to the `FileSystemStorage`.
+THe new API [Util.downloadUrlSafely](/javadoc/com/codename1/io/Util/#downloadUrlSafely-java.lang.String-java.lang.String-com.codename1.util.OnComplete-com.codename1.util.OnComplete-) safely download the given URL to the `Storage` or to the `FileSystemStorage`.
 
 This method is resistant to network errors and capable of resume the download as soon as network conditions allow and in a completely transparent way for the user.
 
@@ -249,28 +249,28 @@ Applications such as Dropbox, Google Drive, OwnCloud and similar use specific in
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Javier Anton** — July 3, 2020 at 10:45 pm ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24283))
+### **Javier Anton** — July 3, 2020 at 10:45 pm ([permalink](/blog/exif-orientation-automatic-captured-image-rotation/#comment-24283))
 
 > Really useful stuff. Just wondering, the safe download always requires the app to be in fg to finish, right? I mean, the download won’t finish if the app goes into bg and never comes back? And my second question is: does the download effectively pause when the app is in bg? Thx
 >
 
 
 
-### **Shai Almog** — July 4, 2020 at 4:50 am ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24284))
+### **Shai Almog** — July 4, 2020 at 4:50 am ([permalink](/blog/exif-orientation-automatic-captured-image-rotation/#comment-24284))
 
 > This uses background fetch to download in the background so download continues automatically when the device is backgrounded. Normally when a device is sent to background a download will stop in this case it’s supposed to continue.
 >
 
 
 
-### **Francesco Galgani** — July 5, 2020 at 5:46 am ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24285))
+### **Francesco Galgani** — July 5, 2020 at 5:46 am ([permalink](/blog/exif-orientation-automatic-captured-image-rotation/#comment-24285))
 
 > I’m afraid there’s been a misunderstanding. As I wrote: “This method is resistant to network errors and capable of resume the download as soon as network conditions allow and in a completely transparent way for the user. This is regardless of whether the download continues or not when the app goes in background: if the operating system stops the download when the app goes in background, it will automatically resume when the app goes back in foreground, otherwise it will continue in background. More specifically, usually (but not necessarily always) the download will continue in the background on Android, while it will “pause” on iOS. Without this method, when the app goes into the background the download can be “killed” without finish, with this method the download will be restored to where it came from when the app returns to foreground. In this sense, it is normal to expect the download to end when the app is returned to foreground, although in some cases (such as Android) it may continue and complete in the background. Backgroundfetch is therefore not used.
 >
 
 
 
-### **Shai Almog** — July 5, 2020 at 6:17 am ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24287))
+### **Shai Almog** — July 5, 2020 at 6:17 am ([permalink](/blog/exif-orientation-automatic-captured-image-rotation/#comment-24287))
 
 > Shai Almog says:
 >
@@ -284,7 +284,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — July 5, 2020 at 7:17 am ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24288))
+### **Francesco Galgani** — July 5, 2020 at 7:17 am ([permalink](/blog/exif-orientation-automatic-captured-image-rotation/#comment-24288))
 
 > [Francesco Galgani](https://lh6.googleusercontent.com/-4K0ax_DVJf4/AAAAAAAAAAI/AAAAAAAAAAA/AMZuuckEd1kcni0y8k6NMzNtxwOCEPatQQ/photo.jpg) says:
 >
@@ -297,7 +297,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 6, 2020 at 5:35 am ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24290))
+### **Shai Almog** — July 6, 2020 at 5:35 am ([permalink](/blog/exif-orientation-automatic-captured-image-rotation/#comment-24290))
 
 > Shai Almog says:
 >
@@ -306,7 +306,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — July 6, 2020 at 6:49 am ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24289))
+### **Javier Anton** — July 6, 2020 at 6:49 am ([permalink](/blog/exif-orientation-automatic-captured-image-rotation/#comment-24289))
 
 > [Javier Anton](https://lh3.googleusercontent.com/a-/AAuE7mDRjHkEvAZNXquh9p7Oo00ey1yOwNzZ0SrFwD0IVA) says:
 >
@@ -315,7 +315,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — August 13, 2020 at 3:21 pm ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24319))
+### **Javier Anton** — August 13, 2020 at 3:21 pm ([permalink](/blog/exif-orientation-automatic-captured-image-rotation/#comment-24319))
 
 > [Javier Anton](https://lh3.googleusercontent.com/a-/AAuE7mDRjHkEvAZNXquh9p7Oo00ey1yOwNzZ0SrFwD0IVA) says:
 >
@@ -326,7 +326,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — August 13, 2020 at 4:15 pm ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24320))
+### **Javier Anton** — August 13, 2020 at 4:15 pm ([permalink](/blog/exif-orientation-automatic-captured-image-rotation/#comment-24320))
 
 > [Javier Anton](https://lh3.googleusercontent.com/a-/AAuE7mDRjHkEvAZNXquh9p7Oo00ey1yOwNzZ0SrFwD0IVA) says:
 >
@@ -335,7 +335,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 14, 2020 at 4:33 am ([permalink](https://www.codenameone.com/blog/exif-orientation-automatic-captured-image-rotation.html#comment-24322))
+### **Shai Almog** — August 14, 2020 at 4:33 am ([permalink](/blog/exif-orientation-automatic-captured-image-rotation/#comment-24322))
 
 > Shai Almog says:
 >

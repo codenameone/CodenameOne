@@ -86,7 +86,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 8, 2014 at 1:15 pm ([permalink](https://www.codenameone.com/blog/sockets-multiline-trees.html#comment-21722))
+### **Anonymous** — January 8, 2014 at 1:15 pm ([permalink](/blog/sockets-multiline-trees/#comment-21722))
 
 > Anonymous says:
 >
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 8, 2014 at 1:47 pm ([permalink](https://www.codenameone.com/blog/sockets-multiline-trees.html#comment-22075))
+### **Anonymous** — January 8, 2014 at 1:47 pm ([permalink](/blog/sockets-multiline-trees/#comment-22075))
 
 > Anonymous says:
 >
@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 12, 2014 at 10:16 am ([permalink](https://www.codenameone.com/blog/sockets-multiline-trees.html#comment-21874))
+### **Anonymous** — January 12, 2014 at 10:16 am ([permalink](/blog/sockets-multiline-trees/#comment-21874))
 
 > Anonymous says:
 >
@@ -117,7 +117,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 12, 2014 at 3:58 pm ([permalink](https://www.codenameone.com/blog/sockets-multiline-trees.html#comment-21620))
+### **Anonymous** — January 12, 2014 at 3:58 pm ([permalink](/blog/sockets-multiline-trees/#comment-21620))
 
 > Anonymous says:
 >
@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 21, 2014 at 5:32 pm ([permalink](https://www.codenameone.com/blog/sockets-multiline-trees.html#comment-21621))
+### **Anonymous** — March 21, 2014 at 5:32 pm ([permalink](/blog/sockets-multiline-trees/#comment-21621))
 
 > Anonymous says:
 >
@@ -145,7 +145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 22, 2014 at 4:58 am ([permalink](https://www.codenameone.com/blog/sockets-multiline-trees.html#comment-22026))
+### **Anonymous** — March 22, 2014 at 4:58 am ([permalink](/blog/sockets-multiline-trees/#comment-22026))
 
 > Anonymous says:
 >
@@ -154,7 +154,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 24, 2014 at 3:11 pm ([permalink](https://www.codenameone.com/blog/sockets-multiline-trees.html#comment-21968))
+### **Anonymous** — March 24, 2014 at 3:11 pm ([permalink](/blog/sockets-multiline-trees/#comment-21968))
 
 > Anonymous says:
 >
@@ -163,7 +163,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 24, 2014 at 3:35 pm ([permalink](https://www.codenameone.com/blog/sockets-multiline-trees.html#comment-24162))
+### **Anonymous** — March 24, 2014 at 3:35 pm ([permalink](/blog/sockets-multiline-trees/#comment-24162))
 
 > Anonymous says:
 >
@@ -172,7 +172,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 27, 2014 at 6:42 pm ([permalink](https://www.codenameone.com/blog/sockets-multiline-trees.html#comment-21436))
+### **Anonymous** — April 27, 2014 at 6:42 pm ([permalink](/blog/sockets-multiline-trees/#comment-21436))
 
 > Anonymous says:
 >
@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 28, 2014 at 2:21 am ([permalink](https://www.codenameone.com/blog/sockets-multiline-trees.html#comment-21847))
+### **Anonymous** — April 28, 2014 at 2:21 am ([permalink](/blog/sockets-multiline-trees/#comment-21847))
 
 > Anonymous says:
 >
@@ -194,7 +194,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 7, 2014 at 8:23 am ([permalink](https://www.codenameone.com/blog/sockets-multiline-trees.html#comment-22080))
+### **Anonymous** — December 7, 2014 at 8:23 am ([permalink](/blog/sockets-multiline-trees/#comment-22080))
 
 > Anonymous says:
 >
@@ -205,7 +205,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 7, 2014 at 8:55 am ([permalink](https://www.codenameone.com/blog/sockets-multiline-trees.html#comment-21937))
+### **Anonymous** — December 7, 2014 at 8:55 am ([permalink](/blog/sockets-multiline-trees/#comment-21937))
 
 > Anonymous says:
 >
@@ -214,7 +214,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 7, 2014 at 2:54 pm ([permalink](https://www.codenameone.com/blog/sockets-multiline-trees.html#comment-22135))
+### **Anonymous** — December 7, 2014 at 2:54 pm ([permalink](/blog/sockets-multiline-trees/#comment-22135))
 
 > Anonymous says:
 >

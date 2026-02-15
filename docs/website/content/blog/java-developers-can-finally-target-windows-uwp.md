@@ -124,42 +124,42 @@ To toggle these modes we added two build hints:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — June 12, 2016 at 9:26 pm ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-22469))
+### **bryan** — June 12, 2016 at 9:26 pm ([permalink](/blog/java-developers-can-finally-target-windows-uwp/#comment-22469))
 
 > This sounds really good. I don’t have much to do with the Windows eco-system, so if I want to try this, I’m guessing any recent Windows mobile should run this, or is there some specific version (of the seemingly ever changing) Windows mobile platform I need to look for ?
 >
 
 
 
-### **Shai Almog** — June 13, 2016 at 3:53 am ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-22731))
+### **Shai Almog** — June 13, 2016 at 3:53 am ([permalink](/blog/java-developers-can-finally-target-windows-uwp/#comment-22731))
 
 > It requires a device that’s running windows 10 and some of the older devices won’t get that upgrade.
 >
 
 
 
-### **Chibuike Mba** — June 13, 2016 at 7:40 am ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-22587))
+### **Chibuike Mba** — June 13, 2016 at 7:40 am ([permalink](/blog/java-developers-can-finally-target-windows-uwp/#comment-22587))
 
 > WOW!!! CodenameOne rocks, one stone (code base) to kill(target) all the birds(platforms) in the air(out there). Am loving it. Will surely try it in the next version of our app [http://ozioma.net](<http://ozioma.net>). Great job guys. 🙂
 >
 
 
 
-### **Lukman Javalove Idealist Jaji** — June 13, 2016 at 1:20 pm ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-22771))
+### **Lukman Javalove Idealist Jaji** — June 13, 2016 at 1:20 pm ([permalink](/blog/java-developers-can-finally-target-windows-uwp/#comment-22771))
 
 > I am over the moon with this!!!!!!!!!
 >
 
 
 
-### **Ben A** — August 8, 2016 at 8:49 pm ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-22711))
+### **Ben A** — August 8, 2016 at 8:49 pm ([permalink](/blog/java-developers-can-finally-target-windows-uwp/#comment-22711))
 
 > Good news for Java devs
 >
 
 
 
-### **Teguh Kusuma** — September 5, 2016 at 4:24 pm ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-22707))
+### **Teguh Kusuma** — September 5, 2016 at 4:24 pm ([permalink](/blog/java-developers-can-finally-target-windows-uwp/#comment-22707))
 
 > Teguh Kusuma says:
 >
@@ -168,7 +168,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 6, 2016 at 3:54 am ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-22915))
+### **Shai Almog** — September 6, 2016 at 3:54 am ([permalink](/blog/java-developers-can-finally-target-windows-uwp/#comment-22915))
 
 > Shai Almog says:
 >
@@ -177,7 +177,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Cristian Romascu** — September 29, 2016 at 5:51 am ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-23034))
+### **Cristian Romascu** — September 29, 2016 at 5:51 am ([permalink](/blog/java-developers-can-finally-target-windows-uwp/#comment-23034))
 
 > Cristian Romascu says:
 >
@@ -186,7 +186,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 30, 2016 at 6:48 am ([permalink](https://www.codenameone.com/blog/java-developers-can-finally-target-windows-uwp.html#comment-23063))
+### **Shai Almog** — September 30, 2016 at 6:48 am ([permalink](/blog/java-developers-can-finally-target-windows-uwp/#comment-23063))
 
 > Shai Almog says:
 >

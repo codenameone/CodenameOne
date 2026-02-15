@@ -72,7 +72,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — June 25, 2014 at 1:50 am ([permalink](https://www.codenameone.com/blog/not-a-dialog-again.html#comment-21838))
+### **Anonymous** — June 25, 2014 at 1:50 am ([permalink](/blog/not-a-dialog-again/#comment-21838))
 
 > Anonymous says:
 >
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 25, 2014 at 1:19 pm ([permalink](https://www.codenameone.com/blog/not-a-dialog-again.html#comment-21684))
+### **Anonymous** — June 25, 2014 at 1:19 pm ([permalink](/blog/not-a-dialog-again/#comment-21684))
 
 > Anonymous says:
 >
@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 25, 2014 at 4:21 pm ([permalink](https://www.codenameone.com/blog/not-a-dialog-again.html#comment-21729))
+### **Anonymous** — June 25, 2014 at 4:21 pm ([permalink](/blog/not-a-dialog-again/#comment-21729))
 
 > Anonymous says:
 >
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 25, 2014 at 4:22 pm ([permalink](https://www.codenameone.com/blog/not-a-dialog-again.html#comment-22154))
+### **Anonymous** — June 25, 2014 at 4:22 pm ([permalink](/blog/not-a-dialog-again/#comment-22154))
 
 > Anonymous says:
 >
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 13, 2014 at 6:58 am ([permalink](https://www.codenameone.com/blog/not-a-dialog-again.html#comment-21798))
+### **Anonymous** — July 13, 2014 at 6:58 am ([permalink](/blog/not-a-dialog-again/#comment-21798))
 
 > Anonymous says:
 >
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 13, 2014 at 11:46 am ([permalink](https://www.codenameone.com/blog/not-a-dialog-again.html#comment-21877))
+### **Anonymous** — July 13, 2014 at 11:46 am ([permalink](/blog/not-a-dialog-again/#comment-21877))
 
 > Anonymous says:
 >
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 1, 2014 at 10:33 pm ([permalink](https://www.codenameone.com/blog/not-a-dialog-again.html#comment-22032))
+### **Anonymous** — December 1, 2014 at 10:33 pm ([permalink](/blog/not-a-dialog-again/#comment-22032))
 
 > Anonymous says:
 >

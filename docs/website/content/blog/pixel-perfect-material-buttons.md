@@ -144,14 +144,14 @@ The [issue tracker](http://github.com/codenameone/CodenameOne/issues/) is the be
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Ross Taylor** — July 12, 2017 at 5:30 pm ([permalink](https://www.codenameone.com/blog/pixel-perfect-material-buttons.html#comment-23694))
+### **Ross Taylor** — July 12, 2017 at 5:30 pm ([permalink](/blog/pixel-perfect-material-buttons/#comment-23694))
 
 > Are you saying the priorities are not clear where CN1 should focus on when it comes to aligning CN1 UI with the UI guidelines of the respective OS? Its going to be tough because ideally I was hoping to rely on CN1 to have most of the guideline knowledge build-in and occasionally look at guidelines to verify things like spacings and so on.
 >
 
 
 
-### **Shai Almog** — July 13, 2017 at 4:02 am ([permalink](https://www.codenameone.com/blog/pixel-perfect-material-buttons.html#comment-23519))
+### **Shai Almog** — July 13, 2017 at 4:02 am ([permalink](/blog/pixel-perfect-material-buttons/#comment-23519))
 
 > Native API’s don’t keep up with the guidelines at all times so that’s a bit more tricky.
 >
@@ -160,14 +160,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ross Taylor** — July 14, 2017 at 5:46 pm ([permalink](https://www.codenameone.com/blog/pixel-perfect-material-buttons.html#comment-23595))
+### **Ross Taylor** — July 14, 2017 at 5:46 pm ([permalink](/blog/pixel-perfect-material-buttons/#comment-23595))
 
 > So what you mean is one must be creating our own theme that conforms to design guidelines instead of relying on the default theme?
 >
 
 
 
-### **Shai Almog** — July 15, 2017 at 8:08 am ([permalink](https://www.codenameone.com/blog/pixel-perfect-material-buttons.html#comment-23719))
+### **Shai Almog** — July 15, 2017 at 8:08 am ([permalink](/blog/pixel-perfect-material-buttons/#comment-23719))
 
 > What I’m saying is that design guidelines wouldn’t exist if there was a technical possibility to make them seamless. We currently bring you to a point of portability but we can bring you closer in terms of look (which is what this article is about).
 >

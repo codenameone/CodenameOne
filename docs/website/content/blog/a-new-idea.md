@@ -103,7 +103,7 @@ by copying them to the new plugin. Be sure to let us know immediately if you run
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Therk** — April 13, 2016 at 11:42 pm ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22656))
+### **Therk** — April 13, 2016 at 11:42 pm ([permalink](/blog/a-new-idea/#comment-22656))
 
 > Thank you for improving the plugin. It is more intuitive even though it may not be consistent with other IntelliJ plugins. Unfortunately, I started to get a NullPointerException when setting up the Run configuration for a new sample application.  
 > I am not sure the best way to report such issues, but the stack trace is:
@@ -204,7 +204,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Therk** — April 14, 2016 at 12:21 am ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22484))
+### **Therk** — April 14, 2016 at 12:21 am ([permalink](/blog/a-new-idea/#comment-22484))
 
 > A few suggestion on improving the IDEA plugin:  
 > 1\. In the Codename One Preferences, tabbing between fields does not seem to work, requiring a mouse click into next fields. For example in the Login or iOS Certificate Wizard.  
@@ -218,7 +218,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 14, 2016 at 2:36 am ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22585))
+### **Shai Almog** — April 14, 2016 at 2:36 am ([permalink](/blog/a-new-idea/#comment-22585))
 
 > Thanks!  
 > Those are great issues/RFE’s.  
@@ -227,7 +227,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 14, 2016 at 8:08 am ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22766))
+### **Shai Almog** — April 14, 2016 at 8:08 am ([permalink](/blog/a-new-idea/#comment-22766))
 
 > Shai Almog says:
 >
@@ -240,7 +240,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 14, 2016 at 8:14 am ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22774))
+### **Shai Almog** — April 14, 2016 at 8:14 am ([permalink](/blog/a-new-idea/#comment-22774))
 
 > Shai Almog says:
 >
@@ -250,7 +250,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Eric Coolman** — April 28, 2016 at 9:50 pm ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22466))
+### **Eric Coolman** — April 28, 2016 at 9:50 pm ([permalink](/blog/a-new-idea/#comment-22466))
 
 > Eric Coolman says:
 >
@@ -259,7 +259,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **James van Kessel** — May 20, 2016 at 3:56 pm ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22606))
+### **James van Kessel** — May 20, 2016 at 3:56 pm ([permalink](/blog/a-new-idea/#comment-22606))
 
 > James van Kessel says:
 >
@@ -268,7 +268,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 21, 2016 at 3:51 am ([permalink](https://www.codenameone.com/blog/a-new-idea.html#comment-22611))
+### **Shai Almog** — May 21, 2016 at 3:51 am ([permalink](/blog/a-new-idea/#comment-22611))
 
 > Shai Almog says:
 >

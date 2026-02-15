@@ -76,7 +76,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — April 1, 2014 at 4:29 am ([permalink](https://www.codenameone.com/blog/new-android-pipeline-fixes.html#comment-24213))
+### **Anonymous** — April 1, 2014 at 4:29 am ([permalink](/blog/new-android-pipeline-fixes/#comment-24213))
 
 > Anonymous says:
 >
@@ -89,7 +89,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 1, 2014 at 4:33 am ([permalink](https://www.codenameone.com/blog/new-android-pipeline-fixes.html#comment-22038))
+### **Anonymous** — April 1, 2014 at 4:33 am ([permalink](/blog/new-android-pipeline-fixes/#comment-22038))
 
 > Anonymous says:
 >
@@ -98,7 +98,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 28, 2014 at 3:50 am ([permalink](https://www.codenameone.com/blog/new-android-pipeline-fixes.html#comment-22121))
+### **Anonymous** — April 28, 2014 at 3:50 am ([permalink](/blog/new-android-pipeline-fixes/#comment-22121))
 
 > Anonymous says:
 >
@@ -123,7 +123,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 28, 2014 at 12:26 pm ([permalink](https://www.codenameone.com/blog/new-android-pipeline-fixes.html#comment-21683))
+### **Anonymous** — April 28, 2014 at 12:26 pm ([permalink](/blog/new-android-pipeline-fixes/#comment-21683))
 
 > Anonymous says:
 >

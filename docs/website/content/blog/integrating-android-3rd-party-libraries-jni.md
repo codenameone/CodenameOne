@@ -46,7 +46,7 @@ the libs API’s under the android implementation only section.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — June 29, 2015 at 10:49 am ([permalink](https://www.codenameone.com/blog/integrating-android-3rd-party-libraries-jni.html#comment-21599))
+### **Chidiebere Okwudire** — June 29, 2015 at 10:49 am ([permalink](/blog/integrating-android-3rd-party-libraries-jni/#comment-21599))
 
 > Chidiebere Okwudire says:
 >
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **John Markh** — January 18, 2017 at 7:13 pm ([permalink](https://www.codenameone.com/blog/integrating-android-3rd-party-libraries-jni.html#comment-23235))
+### **John Markh** — January 18, 2017 at 7:13 pm ([permalink](/blog/integrating-android-3rd-party-libraries-jni/#comment-23235))
 
 > John Markh says:
 >
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 19, 2017 at 6:15 am ([permalink](https://www.codenameone.com/blog/integrating-android-3rd-party-libraries-jni.html#comment-24120))
+### **Shai Almog** — January 19, 2017 at 6:15 am ([permalink](/blog/integrating-android-3rd-party-libraries-jni/#comment-24120))
 
 > Shai Almog says:
 >
@@ -77,7 +77,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 19, 2017 at 6:17 am ([permalink](https://www.codenameone.com/blog/integrating-android-3rd-party-libraries-jni.html#comment-23146))
+### **Shai Almog** — January 19, 2017 at 6:17 am ([permalink](/blog/integrating-android-3rd-party-libraries-jni/#comment-23146))
 
 > Shai Almog says:
 >
@@ -89,7 +89,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Amina Benzerga** — July 13, 2017 at 3:31 pm ([permalink](https://www.codenameone.com/blog/integrating-android-3rd-party-libraries-jni.html#comment-23516))
+### **Amina Benzerga** — July 13, 2017 at 3:31 pm ([permalink](/blog/integrating-android-3rd-party-libraries-jni/#comment-23516))
 
 > Amina Benzerga says:
 >
@@ -98,7 +98,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 14, 2017 at 6:35 am ([permalink](https://www.codenameone.com/blog/integrating-android-3rd-party-libraries-jni.html#comment-21393))
+### **Shai Almog** — July 14, 2017 at 6:35 am ([permalink](/blog/integrating-android-3rd-party-libraries-jni/#comment-21393))
 
 > Shai Almog says:
 >

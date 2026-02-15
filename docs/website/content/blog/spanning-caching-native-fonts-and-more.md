@@ -98,7 +98,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — July 25, 2013 at 9:49 am ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-24233))
+### **Anonymous** — July 25, 2013 at 9:49 am ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-24233))
 
 > Anonymous says:
 >
@@ -107,7 +107,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 25, 2013 at 10:43 am ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-21699))
+### **Anonymous** — July 25, 2013 at 10:43 am ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-21699))
 
 > Anonymous says:
 >
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 25, 2013 at 2:36 pm ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-21843))
+### **Anonymous** — July 25, 2013 at 2:36 pm ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-21843))
 
 > Anonymous says:
 >
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 25, 2013 at 3:59 pm ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-21764))
+### **Anonymous** — July 25, 2013 at 3:59 pm ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-21764))
 
 > Anonymous says:
 >
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 10, 2014 at 6:28 pm ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-21685))
+### **Anonymous** — September 10, 2014 at 6:28 pm ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-21685))
 
 > Anonymous says:
 >
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 11, 2014 at 1:43 am ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-22188))
+### **Anonymous** — September 11, 2014 at 1:43 am ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-22188))
 
 > Anonymous says:
 >
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 6, 2014 at 6:46 am ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-22189))
+### **Anonymous** — November 6, 2014 at 6:46 am ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-22189))
 
 > Anonymous says:
 >
@@ -175,7 +175,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 6, 2014 at 3:27 pm ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-22225))
+### **Anonymous** — November 6, 2014 at 3:27 pm ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-22225))
 
 > Anonymous says:
 >
@@ -186,7 +186,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 7, 2014 at 3:47 am ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-22106))
+### **Anonymous** — November 7, 2014 at 3:47 am ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-22106))
 
 > Anonymous says:
 >
@@ -197,7 +197,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 8, 2014 at 12:15 pm ([permalink](https://www.codenameone.com/blog/spanning-caching-native-fonts-and-more.html#comment-22031))
+### **Anonymous** — November 8, 2014 at 12:15 pm ([permalink](/blog/spanning-caching-native-fonts-and-more/#comment-22031))
 
 > Anonymous says:
 >

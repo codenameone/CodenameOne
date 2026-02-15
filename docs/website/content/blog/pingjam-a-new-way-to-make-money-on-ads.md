@@ -83,7 +83,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — April 29, 2013 at 8:53 pm ([permalink](https://www.codenameone.com/blog/pingjam-a-new-way-to-make-money-on-ads.html#comment-21694))
+### **Anonymous** — April 29, 2013 at 8:53 pm ([permalink](/blog/pingjam-a-new-way-to-make-money-on-ads/#comment-21694))
 
 > Anonymous says:
 >
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 30, 2013 at 12:52 am ([permalink](https://www.codenameone.com/blog/pingjam-a-new-way-to-make-money-on-ads.html#comment-21759))
+### **Anonymous** — April 30, 2013 at 12:52 am ([permalink](/blog/pingjam-a-new-way-to-make-money-on-ads/#comment-21759))
 
 > Anonymous says:
 >

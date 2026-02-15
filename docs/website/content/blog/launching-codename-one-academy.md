@@ -64,7 +64,7 @@ Thanks again for all the feedback it’s very much appreciated and this just wou
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Dalvik** — June 26, 2017 at 12:09 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23432))
+### **Dalvik** — June 26, 2017 at 12:09 pm ([permalink](/blog/launching-codename-one-academy/#comment-23432))
 
 > Great!  
 > Just signed up to the full package 😉
@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — June 26, 2017 at 3:39 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-21863))
+### **Francesco Galgani** — June 26, 2017 at 3:39 pm ([permalink](/blog/launching-codename-one-academy/#comment-21863))
 
 > Francesco Galgani says:
 >
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 26, 2017 at 4:12 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23547))
+### **Shai Almog** — June 26, 2017 at 4:12 pm ([permalink](/blog/launching-codename-one-academy/#comment-23547))
 
 > Shai Almog says:
 >
@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 26, 2017 at 4:16 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23643))
+### **Shai Almog** — June 26, 2017 at 4:16 pm ([permalink](/blog/launching-codename-one-academy/#comment-23643))
 
 > Shai Almog says:
 >
@@ -104,7 +104,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — June 26, 2017 at 5:53 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23635))
+### **salah Alhaddabi** — June 26, 2017 at 5:53 pm ([permalink](/blog/launching-codename-one-academy/#comment-23635))
 
 > salah Alhaddabi says:
 >
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 26, 2017 at 7:09 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23480))
+### **Shai Almog** — June 26, 2017 at 7:09 pm ([permalink](/blog/launching-codename-one-academy/#comment-23480))
 
 > Shai Almog says:
 >
@@ -123,7 +123,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Michael Lindvall** — June 26, 2017 at 7:57 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23484))
+### **Michael Lindvall** — June 26, 2017 at 7:57 pm ([permalink](/blog/launching-codename-one-academy/#comment-23484))
 
 > Michael Lindvall says:
 >
@@ -132,7 +132,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bryan** — June 26, 2017 at 8:06 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23203))
+### **bryan** — June 26, 2017 at 8:06 pm ([permalink](/blog/launching-codename-one-academy/#comment-23203))
 
 > bryan says:
 >
@@ -141,7 +141,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Stephen Aitchison** — June 27, 2017 at 12:03 am ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23509))
+### **Stephen Aitchison** — June 27, 2017 at 12:03 am ([permalink](/blog/launching-codename-one-academy/#comment-23509))
 
 > Stephen Aitchison says:
 >
@@ -150,7 +150,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 27, 2017 at 3:38 am ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23405))
+### **Shai Almog** — June 27, 2017 at 3:38 am ([permalink](/blog/launching-codename-one-academy/#comment-23405))
 
 > Shai Almog says:
 >
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 27, 2017 at 3:41 am ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23417))
+### **Shai Almog** — June 27, 2017 at 3:41 am ([permalink](/blog/launching-codename-one-academy/#comment-23417))
 
 > Shai Almog says:
 >
@@ -170,7 +170,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Amuche Chimezie** — June 28, 2017 at 9:47 am ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23453))
+### **Amuche Chimezie** — June 28, 2017 at 9:47 am ([permalink](/blog/launching-codename-one-academy/#comment-23453))
 
 > Amuche Chimezie says:
 >
@@ -180,7 +180,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 29, 2017 at 3:32 am ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-22281))
+### **Shai Almog** — June 29, 2017 at 3:32 am ([permalink](/blog/launching-codename-one-academy/#comment-22281))
 
 > Shai Almog says:
 >
@@ -189,7 +189,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **João Bastos** — June 29, 2017 at 11:30 am ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23433))
+### **João Bastos** — June 29, 2017 at 11:30 am ([permalink](/blog/launching-codename-one-academy/#comment-23433))
 
 > João Bastos says:
 >
@@ -198,7 +198,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — June 29, 2017 at 1:43 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23489))
+### **Francesco Galgani** — June 29, 2017 at 1:43 pm ([permalink](/blog/launching-codename-one-academy/#comment-23489))
 
 > Francesco Galgani says:
 >
@@ -207,7 +207,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 29, 2017 at 1:52 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23548))
+### **Shai Almog** — June 29, 2017 at 1:52 pm ([permalink](/blog/launching-codename-one-academy/#comment-23548))
 
 > Shai Almog says:
 >
@@ -218,7 +218,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — June 29, 2017 at 1:55 pm ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23644))
+### **Francesco Galgani** — June 29, 2017 at 1:55 pm ([permalink](/blog/launching-codename-one-academy/#comment-23644))
 
 > Francesco Galgani says:
 >
@@ -227,7 +227,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Amuche Chimezie** — July 3, 2017 at 8:13 am ([permalink](https://www.codenameone.com/blog/launching-codename-one-academy.html#comment-23601))
+### **Amuche Chimezie** — July 3, 2017 at 8:13 am ([permalink](/blog/launching-codename-one-academy/#comment-23601))
 
 > Amuche Chimezie says:
 >

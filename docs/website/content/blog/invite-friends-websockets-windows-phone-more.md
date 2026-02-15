@@ -148,7 +148,7 @@ As a result we decided to add the class `CaseInsensitiveOrder` which is effectiv
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Fabrício Cabeça** — August 3, 2015 at 4:52 pm ([permalink](https://www.codenameone.com/blog/invite-friends-websockets-windows-phone-more.html#comment-22297))
+### **Fabrício Cabeça** — August 3, 2015 at 4:52 pm ([permalink](/blog/invite-friends-websockets-windows-phone-more/#comment-22297))
 
 > Fabrício Cabeça says:
 >
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ftp27** — August 4, 2015 at 11:25 am ([permalink](https://www.codenameone.com/blog/invite-friends-websockets-windows-phone-more.html#comment-22375))
+### **ftp27** — August 4, 2015 at 11:25 am ([permalink](/blog/invite-friends-websockets-windows-phone-more/#comment-22375))
 
 > ftp27 says:
 >
@@ -166,7 +166,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — August 4, 2015 at 4:38 pm ([permalink](https://www.codenameone.com/blog/invite-friends-websockets-windows-phone-more.html#comment-22305))
+### **shannah78** — August 4, 2015 at 4:38 pm ([permalink](/blog/invite-friends-websockets-windows-phone-more/#comment-22305))
 
 > shannah78 says:
 >
@@ -175,7 +175,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ftp27** — August 5, 2015 at 8:17 am ([permalink](https://www.codenameone.com/blog/invite-friends-websockets-windows-phone-more.html#comment-21544))
+### **ftp27** — August 5, 2015 at 8:17 am ([permalink](/blog/invite-friends-websockets-windows-phone-more/#comment-21544))
 
 > ftp27 says:
 >

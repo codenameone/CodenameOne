@@ -205,14 +205,14 @@ Figure 8. Sample containing round border variants
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Yaakov Gesher** — September 14, 2016 at 6:01 am ([permalink](https://www.codenameone.com/blog/round-border.html#comment-22811))
+### **Yaakov Gesher** — September 14, 2016 at 6:01 am ([permalink](/blog/round-border/#comment-22811))
 
 > This looks great! Is there a Material Design theme available/in the works?
 >
 
 
 
-### **Shai Almog** — September 15, 2016 at 3:43 am ([permalink](https://www.codenameone.com/blog/round-border.html#comment-24227))
+### **Shai Almog** — September 15, 2016 at 3:43 am ([permalink](/blog/round-border/#comment-24227))
 
 > Thanks, we are working on bringing material design concepts into Codename One. E.g. yesterdays floating button post.  
 > Most of those concepts don’t really fit into the idea of a “theme” but rather widgets… If you have a specific thought or something else you want from material design let us know.
@@ -220,7 +220,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chibuike Mba** — September 16, 2016 at 7:36 pm ([permalink](https://www.codenameone.com/blog/round-border.html#comment-22645))
+### **Chibuike Mba** — September 16, 2016 at 7:36 pm ([permalink](/blog/round-border/#comment-22645))
 
 > Nice one Shai. Good job.
 >

@@ -23,7 +23,7 @@ So I’ve created a new video that’s more up to date. I discuss lists as a con
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Tommy Mogaka** — October 26, 2017 at 2:09 pm ([permalink](https://www.codenameone.com/blog/tutorial-creating-lists.html#comment-23770))
+### **Tommy Mogaka** — October 26, 2017 at 2:09 pm ([permalink](/blog/tutorial-creating-lists/#comment-23770))
 
 > Tommy Mogaka says:
 >
@@ -32,7 +32,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 27, 2017 at 4:31 am ([permalink](https://www.codenameone.com/blog/tutorial-creating-lists.html#comment-23532))
+### **Shai Almog** — October 27, 2017 at 4:31 am ([permalink](/blog/tutorial-creating-lists/#comment-23532))
 
 > Shai Almog says:
 >
@@ -42,7 +42,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Tommy Mogaka** — October 27, 2017 at 11:48 am ([permalink](https://www.codenameone.com/blog/tutorial-creating-lists.html#comment-24153))
+### **Tommy Mogaka** — October 27, 2017 at 11:48 am ([permalink](/blog/tutorial-creating-lists/#comment-24153))
 
 > Tommy Mogaka says:
 >
@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 28, 2017 at 4:54 am ([permalink](https://www.codenameone.com/blog/tutorial-creating-lists.html#comment-23739))
+### **Shai Almog** — October 28, 2017 at 4:54 am ([permalink](/blog/tutorial-creating-lists/#comment-23739))
 
 > Shai Almog says:
 >
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — November 4, 2017 at 4:03 pm ([permalink](https://www.codenameone.com/blog/tutorial-creating-lists.html#comment-24220))
+### **Francesco Galgani** — November 4, 2017 at 4:03 pm ([permalink](/blog/tutorial-creating-lists/#comment-24220))
 
 > Francesco Galgani says:
 >
@@ -72,16 +72,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 5, 2017 at 5:05 am ([permalink](https://www.codenameone.com/blog/tutorial-creating-lists.html#comment-23696))
+### **Shai Almog** — November 5, 2017 at 5:05 am ([permalink](/blog/tutorial-creating-lists/#comment-23696))
 
 > Shai Almog says:
 >
-> Thanks. All of my new videos on youtube have subtitles which you can turn on using the CC button. You can also see the full transcript of this and other videos in the how do I page for each of them here [https://www.codenameone.com…](<https://www.codenameone.com/how-do-i.html>)
+> Thanks. All of my new videos on youtube have subtitles which you can turn on using the CC button. You can also see the full transcript of this and other videos in the how do I page for each of them here [https://www.codenameone.com…](</how-do-i/>)
 >
 
 
 
-### **מֶרֶס יָֽשָׁבְעָם** — February 2, 2020 at 3:27 am ([permalink](https://www.codenameone.com/blog/tutorial-creating-lists.html#comment-21376))
+### **מֶרֶס יָֽשָׁבְעָם** — February 2, 2020 at 3:27 am ([permalink](/blog/tutorial-creating-lists/#comment-21376))
 
 > [מֶרֶס יָֽשָׁבְעָם](https://lh3.googleusercontent.com/a-/AAuE7mB3cyN4s67wp3h7huxY5OJOpFN36eyqduFhS7KW) says:
 >

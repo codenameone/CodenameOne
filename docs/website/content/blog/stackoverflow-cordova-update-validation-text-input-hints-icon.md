@@ -102,7 +102,7 @@ run I think this is a huge improvement.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — December 9, 2015 at 10:46 am ([permalink](https://www.codenameone.com/blog/stackoverflow-cordova-update-validation-text-input-hints-icon.html#comment-22589))
+### **Diamond** — December 9, 2015 at 10:46 am ([permalink](/blog/stackoverflow-cordova-update-validation-text-input-hints-icon/#comment-22589))
 
 > Diamond says:
 >
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 9, 2015 at 11:58 am ([permalink](https://www.codenameone.com/blog/stackoverflow-cordova-update-validation-text-input-hints-icon.html#comment-22597))
+### **Shai Almog** — December 9, 2015 at 11:58 am ([permalink](/blog/stackoverflow-cordova-update-validation-text-input-hints-icon/#comment-22597))
 
 > Shai Almog says:
 >

@@ -91,7 +91,7 @@ You can also try out the [OCR.net](https://www.ocr.net) app which uses the cn1-f
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Dave Gunawan** — November 18, 2016 at 2:56 pm ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23144))
+### **Dave Gunawan** — November 18, 2016 at 2:56 pm ([permalink](/blog/native-file-open-dialogs/#comment-23144))
 
 > for the FileChooser, how do I make it so that it takes all types of file ?  
 > (instead of just the one listed in the param in example below)
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — November 18, 2016 at 5:45 pm ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23095))
+### **shannah78** — November 18, 2016 at 5:45 pm ([permalink](/blog/native-file-open-dialogs/#comment-23095))
 
 > Use “*/*” for all mimetypes. Or.. you should be able to just pass null for the type.
 >
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Stefan Blomen** — January 18, 2017 at 11:33 am ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23189))
+### **Stefan Blomen** — January 18, 2017 at 11:33 am ([permalink](/blog/native-file-open-dialogs/#comment-23189))
 
 > 1.) The UWP build fails if FileChooser is used  
 > 2.) On some versions of Android (maybe < 5) files with extensions unknwon to the system (i.e. “[test.abc](<http://test.abc>)”) cannot be opened. The ActionEvent is null in this case. I tried several mime types including “*/*”. On an Android device with version 7 it works. Any clues?
@@ -122,7 +122,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — January 18, 2017 at 5:29 pm ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23318))
+### **shannah78** — January 18, 2017 at 5:29 pm ([permalink](/blog/native-file-open-dialogs/#comment-23318))
 
 > shannah78 says:
 >
@@ -137,7 +137,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kai** — February 7, 2017 at 1:00 pm ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23297))
+### **Kai** — February 7, 2017 at 1:00 pm ([permalink](/blog/native-file-open-dialogs/#comment-23297))
 
 > Kai says:
 >
@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 8, 2017 at 8:35 am ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23070))
+### **Shai Almog** — February 8, 2017 at 8:35 am ([permalink](/blog/native-file-open-dialogs/#comment-23070))
 
 > Shai Almog says:
 >
@@ -156,7 +156,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — May 7, 2018 at 4:37 pm ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23758))
+### **Francesco Galgani** — May 7, 2018 at 4:37 pm ([permalink](/blog/native-file-open-dialogs/#comment-23758))
 
 > Francesco Galgani says:
 >
@@ -166,7 +166,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ankush Sharma** — October 11, 2018 at 9:28 am ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23849))
+### **Ankush Sharma** — October 11, 2018 at 9:28 am ([permalink](/blog/native-file-open-dialogs/#comment-23849))
 
 > Ankush Sharma says:
 >
@@ -175,7 +175,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 12, 2018 at 4:07 am ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-24094))
+### **Shai Almog** — October 12, 2018 at 4:07 am ([permalink](/blog/native-file-open-dialogs/#comment-24094))
 
 > Shai Almog says:
 >
@@ -184,7 +184,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Thomas McNeill** — December 26, 2018 at 5:56 pm ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-23989))
+### **Thomas McNeill** — December 26, 2018 at 5:56 pm ([permalink](/blog/native-file-open-dialogs/#comment-23989))
 
 > Thomas McNeill says:
 >
@@ -193,7 +193,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 27, 2018 at 4:28 am ([permalink](https://www.codenameone.com/blog/native-file-open-dialogs.html#comment-24056))
+### **Shai Almog** — December 27, 2018 at 4:28 am ([permalink](/blog/native-file-open-dialogs/#comment-24056))
 
 > Shai Almog says:
 >

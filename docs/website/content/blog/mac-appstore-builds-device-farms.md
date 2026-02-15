@@ -45,7 +45,7 @@ We’ll hopefully post a more in-depth tutorial on this within the next couple o
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — November 11, 2017 at 11:52 pm ([permalink](https://www.codenameone.com/blog/mac-appstore-builds-device-farms.html#comment-23614))
+### **Francesco Galgani** — November 11, 2017 at 11:52 pm ([permalink](/blog/mac-appstore-builds-device-farms/#comment-23614))
 
 > Francesco Galgani says:
 >
@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 12, 2017 at 5:19 am ([permalink](https://www.codenameone.com/blog/mac-appstore-builds-device-farms.html#comment-24211))
+### **Shai Almog** — November 12, 2017 at 5:19 am ([permalink](/blog/mac-appstore-builds-device-farms/#comment-24211))
 
 > Shai Almog says:
 >
@@ -63,11 +63,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — November 14, 2017 at 1:47 am ([permalink](https://www.codenameone.com/blog/mac-appstore-builds-device-farms.html#comment-23867))
+### **Francesco Galgani** — November 14, 2017 at 1:47 am ([permalink](/blog/mac-appstore-builds-device-farms/#comment-23867))
 
 > Francesco Galgani says:
 >
-> Thank you. My problem is that in the developer guide I found very few information (in the section 13.6 “Device Testing Framework/Unit Testing”, pages 412-413) and in the Codename One website I found only a very short tutorial of two minutes: [https://www.codenameone.com…](<https://www.codenameone.com/blog/test-it.html>)
+> Thank you. My problem is that in the developer guide I found very few information (in the section 13.6 “Device Testing Framework/Unit Testing”, pages 412-413) and in the Codename One website I found only a very short tutorial of two minutes: [https://www.codenameone.com…](</blog/test-it/>)
 >
 > I didn’t find any more information. I read the API and I also tried a pull request: [https://github.com/codename…](<https://github.com/codenameone/CodenameOne/pull/2276>)
 >
@@ -76,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 14, 2017 at 4:59 am ([permalink](https://www.codenameone.com/blog/mac-appstore-builds-device-farms.html#comment-21588))
+### **Shai Almog** — November 14, 2017 at 4:59 am ([permalink](/blog/mac-appstore-builds-device-farms/#comment-21588))
 
 > Shai Almog says:
 >

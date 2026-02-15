@@ -43,7 +43,7 @@ The more similar a language, and its build outputs are to Java, the easier it wi
 
 Currently I’m only aware of one language (other than Java) that doesn’t require a runtime library, and that is [Mirah](http://www.mirah.org/).
 
-__ |  Codename One also supports [Mirah](https://www.codenameone.com/blog/mirah-for-codename-one.html)  
+__ |  Codename One also supports [Mirah](/blog/mirah-for-codename-one/)  
 ---|---  
   
 #### Assessing the Byte-Code
@@ -392,7 +392,7 @@ Hacking on JVM byte-code can actually be a lot of fun. If you are interested in 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Gareth Murfin** — July 18, 2017 at 1:19 pm ([permalink](https://www.codenameone.com/blog/how-to-port-jvm-languages-to-codename-one.html#comment-23526))
+### **Gareth Murfin** — July 18, 2017 at 1:19 pm ([permalink](/blog/how-to-port-jvm-languages-to-codename-one/#comment-23526))
 
 > Gareth Murfin says:
 >
@@ -401,7 +401,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Don't Bother** — July 18, 2017 at 5:07 pm ([permalink](https://www.codenameone.com/blog/how-to-port-jvm-languages-to-codename-one.html#comment-23307))
+### **Don't Bother** — July 18, 2017 at 5:07 pm ([permalink](/blog/how-to-port-jvm-languages-to-codename-one/#comment-23307))
 
 > Don't Bother says:
 >
@@ -410,7 +410,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — July 18, 2017 at 6:35 pm ([permalink](https://www.codenameone.com/blog/how-to-port-jvm-languages-to-codename-one.html#comment-21522))
+### **shannah78** — July 18, 2017 at 6:35 pm ([permalink](/blog/how-to-port-jvm-languages-to-codename-one/#comment-21522))
 
 > shannah78 says:
 >
@@ -421,7 +421,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gareth Murfin** — July 19, 2017 at 2:19 am ([permalink](https://www.codenameone.com/blog/how-to-port-jvm-languages-to-codename-one.html#comment-23497))
+### **Gareth Murfin** — July 19, 2017 at 2:19 am ([permalink](/blog/how-to-port-jvm-languages-to-codename-one/#comment-23497))
 
 > Gareth Murfin says:
 >
@@ -430,7 +430,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 19, 2017 at 5:08 am ([permalink](https://www.codenameone.com/blog/how-to-port-jvm-languages-to-codename-one.html#comment-23624))
+### **Shai Almog** — July 19, 2017 at 5:08 am ([permalink](/blog/how-to-port-jvm-languages-to-codename-one/#comment-23624))
 
 > Shai Almog says:
 >
@@ -439,7 +439,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Adi J** — August 6, 2017 at 1:11 pm ([permalink](https://www.codenameone.com/blog/how-to-port-jvm-languages-to-codename-one.html#comment-21853))
+### **Adi J** — August 6, 2017 at 1:11 pm ([permalink](/blog/how-to-port-jvm-languages-to-codename-one/#comment-21853))
 
 > Adi J says:
 >
@@ -448,7 +448,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 7, 2017 at 5:23 am ([permalink](https://www.codenameone.com/blog/how-to-port-jvm-languages-to-codename-one.html#comment-23602))
+### **Shai Almog** — August 7, 2017 at 5:23 am ([permalink](/blog/how-to-port-jvm-languages-to-codename-one/#comment-23602))
 
 > Shai Almog says:
 >

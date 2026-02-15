@@ -32,7 +32,7 @@ the automated emails
   
 ### ConnectionRequest Duplicates
 
-[ConnectionRequest](https://www.codenameone.com/javadoc/com/codename1/io/ConnectionRequest.html)  
+[ConnectionRequest](/javadoc/com/codename1/io/ConnectionRequest/)  
 had special protection from duplicate requests for the same data. This was added to prevent cases  
 such as multiple image downloaders fetching the same image over and over again.
 

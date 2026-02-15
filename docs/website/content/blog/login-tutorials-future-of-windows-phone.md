@@ -51,7 +51,7 @@ JavaScript port you would still be able to target older devices if needed.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Hitesh Rawtani** — July 10, 2015 at 4:22 am ([permalink](https://www.codenameone.com/blog/login-tutorials-future-of-windows-phone.html#comment-22202))
+### **Hitesh Rawtani** — July 10, 2015 at 4:22 am ([permalink](/blog/login-tutorials-future-of-windows-phone/#comment-22202))
 
 > Hitesh Rawtani says:
 >
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 10, 2015 at 2:05 pm ([permalink](https://www.codenameone.com/blog/login-tutorials-future-of-windows-phone.html#comment-22274))
+### **Shai Almog** — July 10, 2015 at 2:05 pm ([permalink](/blog/login-tutorials-future-of-windows-phone/#comment-22274))
 
 > Shai Almog says:
 >
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Hitesh Rawtani** — July 11, 2015 at 6:42 am ([permalink](https://www.codenameone.com/blog/login-tutorials-future-of-windows-phone.html#comment-22082))
+### **Hitesh Rawtani** — July 11, 2015 at 6:42 am ([permalink](/blog/login-tutorials-future-of-windows-phone/#comment-22082))
 
 > Hitesh Rawtani says:
 >
@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **J.C** — July 23, 2015 at 11:36 am ([permalink](https://www.codenameone.com/blog/login-tutorials-future-of-windows-phone.html#comment-22394))
+### **J.C** — July 23, 2015 at 11:36 am ([permalink](/blog/login-tutorials-future-of-windows-phone/#comment-22394))
 
 > J.C says:
 >
@@ -89,7 +89,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Fabrício Cabeça** — July 30, 2015 at 11:33 am ([permalink](https://www.codenameone.com/blog/login-tutorials-future-of-windows-phone.html#comment-21602))
+### **Fabrício Cabeça** — July 30, 2015 at 11:33 am ([permalink](/blog/login-tutorials-future-of-windows-phone/#comment-21602))
 
 > Fabrício Cabeça says:
 >

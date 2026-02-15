@@ -95,7 +95,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 13, 2015 at 7:12 am ([permalink](https://www.codenameone.com/blog/with-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch.html#comment-21598))
+### **Anonymous** — March 13, 2015 at 7:12 am ([permalink](/blog/with-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch/#comment-21598))
 
 > Anonymous says:
 >
@@ -104,7 +104,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 13, 2015 at 7:12 am ([permalink](https://www.codenameone.com/blog/with-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch.html#comment-21611))
+### **Anonymous** — March 13, 2015 at 7:12 am ([permalink](/blog/with-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch/#comment-21611))
 
 > Anonymous says:
 >
@@ -115,7 +115,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 13, 2015 at 7:12 am ([permalink](https://www.codenameone.com/blog/with-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch.html#comment-21841))
+### **Anonymous** — March 13, 2015 at 7:12 am ([permalink](/blog/with-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch/#comment-21841))
 
 > Anonymous says:
 >
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 13, 2015 at 7:12 am ([permalink](https://www.codenameone.com/blog/with-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch.html#comment-22328))
+### **Anonymous** — March 13, 2015 at 7:12 am ([permalink](/blog/with-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch/#comment-22328))
 
 > Anonymous says:
 >
@@ -135,7 +135,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 13, 2015 at 7:12 am ([permalink](https://www.codenameone.com/blog/with-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch.html#comment-22343))
+### **Anonymous** — March 13, 2015 at 7:12 am ([permalink](/blog/with-100000-sdk-downloads-mobile-development-platform-codename-one-comes-out-of-beta-with-10-launch/#comment-22343))
 
 > Anonymous says:
 >

@@ -23,7 +23,7 @@ There are still [plenty of issues](https://github.com/codenameone/CodenameOne/is
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **roland tshabalala** — February 26, 2019 at 4:58 pm ([permalink](https://www.codenameone.com/blog/whatsapp-clone-ga.html#comment-23850))
+### **roland tshabalala** — February 26, 2019 at 4:58 pm ([permalink](/blog/whatsapp-clone-ga/#comment-23850))
 
 > roland tshabalala says:
 >
@@ -32,7 +32,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 27, 2019 at 3:26 am ([permalink](https://www.codenameone.com/blog/whatsapp-clone-ga.html#comment-24081))
+### **Shai Almog** — February 27, 2019 at 3:26 am ([permalink](/blog/whatsapp-clone-ga/#comment-24081))
 
 > Shai Almog says:
 >

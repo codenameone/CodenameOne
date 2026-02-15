@@ -31,19 +31,19 @@ First [Jeremy](http://stackoverflow.com/users/5427671/j%c3%a9r%c3%a9my-marquer) 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **3lix** — February 24, 2017 at 5:15 pm ([permalink](https://www.codenameone.com/blog/questions-of-the-week-44.html#comment-23168))
+### **3lix** — February 24, 2017 at 5:15 pm ([permalink](/blog/questions-of-the-week-44/#comment-23168))
 
 > 3lix says:
 >
 > Is 3.6.0 the lastest update?  
-> I thought last week you mentioned pushing updates: [https://www.codenameone.com…](<https://www.codenameone.com/blog/questions-of-the-week-43.html>)  
+> I thought last week you mentioned pushing updates: [https://www.codenameone.com…](</blog/questions-of-the-week-43/>)  
 > But I think the lastest update I see is 3.6.0 [https://www.codenameone.com…](<https://www.codenameone.com/files/netbeans/updates.xml>) released on 2017/01/10.  
 > Thanks!
 >
 
 
 
-### **Shai Almog** — February 25, 2017 at 5:29 am ([permalink](https://www.codenameone.com/blog/questions-of-the-week-44.html#comment-21571))
+### **Shai Almog** — February 25, 2017 at 5:29 am ([permalink](/blog/questions-of-the-week-44/#comment-21571))
 
 > Shai Almog says:
 >

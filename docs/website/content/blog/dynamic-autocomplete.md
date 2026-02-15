@@ -13,7 +13,7 @@ author: Shai Almog
 
 With the fix for [issue #1694](https://github.com/codenameone/CodenameOne/issues/1694) we can now have  
 a moderately simple method of creating an  
-[AutoCompleteTextField](https://www.codenameone.com/javadoc/com/codename1/ui/AutoCompleteTextField.html)  
+[AutoCompleteTextField](/javadoc/com/codename1/ui/AutoCompleteTextField/)  
 that works with a webservice. This has been requested quite often and was quite frustrating to implement in the past  
 it is now relatively simple with just a few lines of code.
 
@@ -93,7 +93,7 @@ Notice that it relies on a call to the Google webservice as such:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Carlos** — July 14, 2016 at 3:46 pm ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-22871))
+### **Carlos** — July 14, 2016 at 3:46 pm ([permalink](/blog/dynamic-autocomplete/#comment-22871))
 
 > Carlos says:
 >
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 15, 2016 at 4:01 am ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-22878))
+### **Shai Almog** — July 15, 2016 at 4:01 am ([permalink](/blog/dynamic-autocomplete/#comment-22878))
 
 > Shai Almog says:
 >
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond** — July 15, 2016 at 9:03 am ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-22852))
+### **Diamond** — July 15, 2016 at 9:03 am ([permalink](/blog/dynamic-autocomplete/#comment-22852))
 
 > Diamond says:
 >
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 16, 2016 at 4:30 am ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-22725))
+### **Shai Almog** — July 16, 2016 at 4:30 am ([permalink](/blog/dynamic-autocomplete/#comment-22725))
 
 > Shai Almog says:
 >
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond** — July 19, 2016 at 8:07 pm ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-22942))
+### **Diamond** — July 19, 2016 at 8:07 pm ([permalink](/blog/dynamic-autocomplete/#comment-22942))
 
 > Diamond says:
 >
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 20, 2016 at 4:26 am ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-22935))
+### **Shai Almog** — July 20, 2016 at 4:26 am ([permalink](/blog/dynamic-autocomplete/#comment-22935))
 
 > Shai Almog says:
 >
@@ -174,7 +174,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond** — July 22, 2016 at 10:57 am ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-22785))
+### **Diamond** — July 22, 2016 at 10:57 am ([permalink](/blog/dynamic-autocomplete/#comment-22785))
 
 > Diamond says:
 >
@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 23, 2016 at 4:44 am ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-22779))
+### **Shai Almog** — July 23, 2016 at 4:44 am ([permalink](/blog/dynamic-autocomplete/#comment-22779))
 
 > Shai Almog says:
 >
@@ -192,7 +192,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **emaalam** — April 27, 2017 at 12:56 pm ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-23346))
+### **emaalam** — April 27, 2017 at 12:56 pm ([permalink](/blog/dynamic-autocomplete/#comment-23346))
 
 > emaalam says:
 >
@@ -202,7 +202,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **emaalam** — April 27, 2017 at 3:33 pm ([permalink](https://www.codenameone.com/blog/dynamic-autocomplete.html#comment-23250))
+### **emaalam** — April 27, 2017 at 3:33 pm ([permalink](/blog/dynamic-autocomplete/#comment-23250))
 
 > emaalam says:
 >

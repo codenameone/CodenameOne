@@ -55,7 +55,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — June 27, 2013 at 5:43 pm ([permalink](https://www.codenameone.com/blog/bouncy-castle-crypto-api.html#comment-21701))
+### **Anonymous** — June 27, 2013 at 5:43 pm ([permalink](/blog/bouncy-castle-crypto-api/#comment-21701))
 
 > Anonymous says:
 >
@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 15, 2014 at 9:54 pm ([permalink](https://www.codenameone.com/blog/bouncy-castle-crypto-api.html#comment-22025))
+### **Anonymous** — January 15, 2014 at 9:54 pm ([permalink](/blog/bouncy-castle-crypto-api/#comment-22025))
 
 > Anonymous says:
 >
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 16, 2014 at 4:12 am ([permalink](https://www.codenameone.com/blog/bouncy-castle-crypto-api.html#comment-21919))
+### **Anonymous** — January 16, 2014 at 4:12 am ([permalink](/blog/bouncy-castle-crypto-api/#comment-21919))
 
 > Anonymous says:
 >
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 26, 2014 at 6:27 am ([permalink](https://www.codenameone.com/blog/bouncy-castle-crypto-api.html#comment-21900))
+### **Anonymous** — October 26, 2014 at 6:27 am ([permalink](/blog/bouncy-castle-crypto-api/#comment-21900))
 
 > Anonymous says:
 >
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 26, 2014 at 9:44 am ([permalink](https://www.codenameone.com/blog/bouncy-castle-crypto-api.html#comment-21995))
+### **Anonymous** — October 26, 2014 at 9:44 am ([permalink](/blog/bouncy-castle-crypto-api/#comment-21995))
 
 > Anonymous says:
 >
@@ -104,7 +104,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 26, 2014 at 3:52 pm ([permalink](https://www.codenameone.com/blog/bouncy-castle-crypto-api.html#comment-22105))
+### **Anonymous** — October 26, 2014 at 3:52 pm ([permalink](/blog/bouncy-castle-crypto-api/#comment-22105))
 
 > Anonymous says:
 >
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kaya TC** — March 7, 2016 at 11:21 am ([permalink](https://www.codenameone.com/blog/bouncy-castle-crypto-api.html#comment-22700))
+### **Kaya TC** — March 7, 2016 at 11:21 am ([permalink](/blog/bouncy-castle-crypto-api/#comment-22700))
 
 > Kaya TC says:
 >
@@ -125,7 +125,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 8, 2016 at 3:31 am ([permalink](https://www.codenameone.com/blog/bouncy-castle-crypto-api.html#comment-22458))
+### **Shai Almog** — March 8, 2016 at 3:31 am ([permalink](/blog/bouncy-castle-crypto-api/#comment-22458))
 
 > Shai Almog says:
 >

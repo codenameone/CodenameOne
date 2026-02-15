@@ -72,7 +72,7 @@ on the device.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Nilmar Castro** — December 28, 2016 at 12:58 pm ([permalink](https://www.codenameone.com/blog/debug-a-codename-one-app-on-an-android-device.html#comment-22976))
+### **Nilmar Castro** — December 28, 2016 at 12:58 pm ([permalink](/blog/debug-a-codename-one-app-on-an-android-device/#comment-22976))
 
 > Nilmar Castro says:
 >
@@ -86,7 +86,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 29, 2016 at 5:41 am ([permalink](https://www.codenameone.com/blog/debug-a-codename-one-app-on-an-android-device.html#comment-23219))
+### **Shai Almog** — December 29, 2016 at 5:41 am ([permalink](/blog/debug-a-codename-one-app-on-an-android-device/#comment-23219))
 
 > Shai Almog says:
 >

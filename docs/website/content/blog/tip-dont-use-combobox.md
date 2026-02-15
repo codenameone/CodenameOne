@@ -153,21 +153,21 @@ What are your thoughts on the options listed above? Did I miss a use case for wh
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Ulises Escobar Aranda** — October 17, 2016 at 2:48 pm ([permalink](https://www.codenameone.com/blog/tip-dont-use-combobox.html#comment-23042))
+### **Ulises Escobar Aranda** — October 17, 2016 at 2:48 pm ([permalink](/blog/tip-dont-use-combobox/#comment-23042))
 
 > The reason why I have not stopped using the combobox is because I use a list caption-value, with repeated titles. Is there any way that you can add this functionality to the Picker and also a getSelectedIndex() and setSelectedIndex() functions?
 >
 
 
 
-### **Shai Almog** — October 18, 2016 at 2:49 am ([permalink](https://www.codenameone.com/blog/tip-dont-use-combobox.html#comment-22855))
+### **Shai Almog** — October 18, 2016 at 2:49 am ([permalink](/blog/tip-dont-use-combobox/#comment-22855))
 
 > The picker is implemented natively so no, something like this will not be realistic in the picker. I think this falls squarely into the Button+Dialog territory
 >
 
 
 
-### **Tommy Mogaka** — October 18, 2016 at 1:39 pm ([permalink](https://www.codenameone.com/blog/tip-dont-use-combobox.html#comment-21657))
+### **Tommy Mogaka** — October 18, 2016 at 1:39 pm ([permalink](/blog/tip-dont-use-combobox/#comment-21657))
 
 > I agree… combo lists can be a nightmare and styling them is just the begining! Even so, I think it is still the best component for displaying a selection of large data in a way that the user can quickly choose what they want e.g. in the case of countries as shown below. The combo here is better be replaceable by an autocomplete textfield because the user already knows what s/he wants. Still, in the case that they don’t know what they want to select in advance, isn’t a combo way better?  
 > combo_countries = new ComboBox();  
@@ -198,7 +198,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 19, 2016 at 8:20 am ([permalink](https://www.codenameone.com/blog/tip-dont-use-combobox.html#comment-22996))
+### **Shai Almog** — October 19, 2016 at 8:20 am ([permalink](/blog/tip-dont-use-combobox/#comment-22996))
 
 > Shai Almog says:
 >
@@ -207,7 +207,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mo** — March 8, 2017 at 8:18 pm ([permalink](https://www.codenameone.com/blog/tip-dont-use-combobox.html#comment-23129))
+### **Mo** — March 8, 2017 at 8:18 pm ([permalink](/blog/tip-dont-use-combobox/#comment-23129))
 
 > Mo says:
 >
@@ -216,7 +216,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 9, 2017 at 7:29 am ([permalink](https://www.codenameone.com/blog/tip-dont-use-combobox.html#comment-23152))
+### **Shai Almog** — March 9, 2017 at 7:29 am ([permalink](/blog/tip-dont-use-combobox/#comment-23152))
 
 > Shai Almog says:
 >
@@ -226,7 +226,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mo** — March 9, 2017 at 2:31 pm ([permalink](https://www.codenameone.com/blog/tip-dont-use-combobox.html#comment-23445))
+### **Mo** — March 9, 2017 at 2:31 pm ([permalink](/blog/tip-dont-use-combobox/#comment-23445))
 
 > Mo says:
 >
@@ -240,7 +240,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 10, 2017 at 8:47 am ([permalink](https://www.codenameone.com/blog/tip-dont-use-combobox.html#comment-23454))
+### **Shai Almog** — March 10, 2017 at 8:47 am ([permalink](/blog/tip-dont-use-combobox/#comment-23454))
 
 > Shai Almog says:
 >

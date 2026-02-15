@@ -413,7 +413,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 29, 2015 at 3:48 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22312))
+### **Anonymous** — January 29, 2015 at 3:48 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22312))
 
 > Anonymous says:
 >
@@ -422,7 +422,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 29, 2015 at 4:07 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22125))
+### **Anonymous** — January 29, 2015 at 4:07 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22125))
 
 > Anonymous says:
 >
@@ -433,7 +433,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 29, 2015 at 4:23 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-21597))
+### **Anonymous** — January 29, 2015 at 4:23 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-21597))
 
 > Anonymous says:
 >
@@ -442,7 +442,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 31, 2015 at 7:11 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22054))
+### **Anonymous** — January 31, 2015 at 7:11 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22054))
 
 > Anonymous says:
 >
@@ -465,7 +465,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **José Helana** — December 7, 2015 at 8:21 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22348))
+### **José Helana** — December 7, 2015 at 8:21 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22348))
 
 > José Helana says:
 >
@@ -474,7 +474,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 8, 2015 at 4:47 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22333))
+### **Shai Almog** — December 8, 2015 at 4:47 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22333))
 
 > Shai Almog says:
 >
@@ -484,7 +484,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Franck Marchand** — March 3, 2016 at 10:17 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22691))
+### **Franck Marchand** — March 3, 2016 at 10:17 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22691))
 
 > Franck Marchand says:
 >
@@ -494,7 +494,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 4, 2016 at 3:42 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22525))
+### **Shai Almog** — March 4, 2016 at 3:42 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22525))
 
 > Shai Almog says:
 >
@@ -503,7 +503,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Franck Marchand** — March 4, 2016 at 1:13 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22660))
+### **Franck Marchand** — March 4, 2016 at 1:13 pm ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22660))
 
 > Franck Marchand says:
 >
@@ -522,7 +522,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 5, 2016 at 4:13 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22372))
+### **Shai Almog** — March 5, 2016 at 4:13 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22372))
 
 > Shai Almog says:
 >
@@ -531,7 +531,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Franck Marchand** — March 7, 2016 at 11:54 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-22638))
+### **Franck Marchand** — March 7, 2016 at 11:54 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-22638))
 
 > Franck Marchand says:
 >
@@ -540,7 +540,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ahmed Elnabwy** — May 5, 2017 at 6:45 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-21529))
+### **Ahmed Elnabwy** — May 5, 2017 at 6:45 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-21529))
 
 > Ahmed Elnabwy says:
 >
@@ -549,7 +549,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 6, 2017 at 5:41 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics-part-2-drawing-an-analog-clock.html#comment-23439))
+### **Shai Almog** — May 6, 2017 at 5:41 am ([permalink](/blog/codename-one-graphics-part-2-drawing-an-analog-clock/#comment-23439))
 
 > Shai Almog says:
 >

@@ -50,7 +50,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — April 14, 2014 at 8:37 am ([permalink](https://www.codenameone.com/blog/placing.html#comment-21673))
+### **Anonymous** — April 14, 2014 at 8:37 am ([permalink](/blog/placing/#comment-21673))
 
 > Anonymous says:
 >
@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 16, 2014 at 4:42 am ([permalink](https://www.codenameone.com/blog/placing.html#comment-21947))
+### **Anonymous** — April 16, 2014 at 4:42 am ([permalink](/blog/placing/#comment-21947))
 
 > Anonymous says:
 >
@@ -68,7 +68,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 16, 2014 at 4:22 pm ([permalink](https://www.codenameone.com/blog/placing.html#comment-21674))
+### **Anonymous** — April 16, 2014 at 4:22 pm ([permalink](/blog/placing/#comment-21674))
 
 > Anonymous says:
 >
@@ -77,7 +77,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 22, 2014 at 9:25 am ([permalink](https://www.codenameone.com/blog/placing.html#comment-21439))
+### **Anonymous** — April 22, 2014 at 9:25 am ([permalink](/blog/placing/#comment-21439))
 
 > Anonymous says:
 >
@@ -86,7 +86,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 25, 2014 at 4:54 am ([permalink](https://www.codenameone.com/blog/placing.html#comment-21445))
+### **Anonymous** — April 25, 2014 at 4:54 am ([permalink](/blog/placing/#comment-21445))
 
 > Anonymous says:
 >
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 25, 2014 at 10:38 am ([permalink](https://www.codenameone.com/blog/placing.html#comment-24237))
+### **Anonymous** — April 25, 2014 at 10:38 am ([permalink](/blog/placing/#comment-24237))
 
 > Anonymous says:
 >

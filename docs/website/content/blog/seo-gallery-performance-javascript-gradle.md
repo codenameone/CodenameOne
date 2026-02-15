@@ -72,13 +72,13 @@ Please let us know at once if there are any recent regressions related to the An
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chibuike Mba** — February 19, 2016 at 2:56 pm ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22426))
+### **Chibuike Mba** — February 19, 2016 at 2:56 pm ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22426))
 
 > Chibuike Mba says:
 >
 > Hi Shai, we have CodenameOne logo and link on our app website: [http://ozioma.net](<http://ozioma.net>)
 >
-> Our app “Ozioma” is already on the CodenameOne app gallery here: [https://www.codenameone.com…](<https://www.codenameone.com/featured-ozioma.html>) but I want to change the screenshots of the app to the newer version screenshot, how can I do that?
+> Our app “Ozioma” is already on the CodenameOne app gallery here: [https://www.codenameone.com…](</featured-ozioma/>) but I want to change the screenshots of the app to the newer version screenshot, how can I do that?
 >
 > App package id: net.chibex.ozioma
 >
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Fabrizio Grassi** — February 20, 2016 at 12:16 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22618))
+### **Fabrizio Grassi** — February 20, 2016 at 12:16 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22618))
 
 > Fabrizio Grassi says:
 >
@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 20, 2016 at 4:07 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22628))
+### **Shai Almog** — February 20, 2016 at 4:07 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22628))
 
 > Shai Almog says:
 >
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 20, 2016 at 4:07 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22482))
+### **Shai Almog** — February 20, 2016 at 4:07 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22482))
 
 > Shai Almog says:
 >
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chibuike Mba** — February 20, 2016 at 8:28 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22583))
+### **Chibuike Mba** — February 20, 2016 at 8:28 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22583))
 
 > Chibuike Mba says:
 >
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 21, 2016 at 4:01 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22350))
+### **Shai Almog** — February 21, 2016 at 4:01 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22350))
 
 > Shai Almog says:
 >
@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chibuike Mba** — February 21, 2016 at 11:40 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-21624))
+### **Chibuike Mba** — February 21, 2016 at 11:40 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-21624))
 
 > Chibuike Mba says:
 >
@@ -156,7 +156,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Yaakov Gesher** — March 1, 2016 at 10:07 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-21493))
+### **Yaakov Gesher** — March 1, 2016 at 10:07 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-21493))
 
 > Yaakov Gesher says:
 >
@@ -165,7 +165,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **sao** — March 1, 2016 at 11:12 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-21554))
+### **sao** — March 1, 2016 at 11:12 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-21554))
 
 > sao says:
 >
@@ -182,7 +182,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 2, 2016 at 4:17 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22535))
+### **Shai Almog** — March 2, 2016 at 4:17 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22535))
 
 > Shai Almog says:
 >
@@ -191,7 +191,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 2, 2016 at 4:17 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-22270))
+### **Shai Almog** — March 2, 2016 at 4:17 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-22270))
 
 > Shai Almog says:
 >
@@ -200,7 +200,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **James van Kessel** — March 9, 2017 at 8:54 pm ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-21567))
+### **James van Kessel** — March 9, 2017 at 8:54 pm ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-21567))
 
 > James van Kessel says:
 >
@@ -212,7 +212,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 10, 2017 at 8:41 am ([permalink](https://www.codenameone.com/blog/seo-gallery-performance-javascript-gradle.html#comment-23225))
+### **Shai Almog** — March 10, 2017 at 8:41 am ([permalink](/blog/seo-gallery-performance-javascript-gradle/#comment-23225))
 
 > Shai Almog says:
 >

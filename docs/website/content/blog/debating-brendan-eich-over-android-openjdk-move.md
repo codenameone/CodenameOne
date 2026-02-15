@@ -155,7 +155,7 @@ not free of any costs. But everything has a cost and this one is probably worth 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Bo83** — January 6, 2016 at 5:20 pm ([permalink](https://www.codenameone.com/blog/debating-brendan-eich-over-android-openjdk-move.html#comment-22182))
+### **Bo83** — January 6, 2016 at 5:20 pm ([permalink](/blog/debating-brendan-eich-over-android-openjdk-move/#comment-22182))
 
 > Bo83 says:
 >
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 6, 2016 at 5:28 pm ([permalink](https://www.codenameone.com/blog/debating-brendan-eich-over-android-openjdk-move.html#comment-22522))
+### **Shai Almog** — January 6, 2016 at 5:28 pm ([permalink](/blog/debating-brendan-eich-over-android-openjdk-move/#comment-22522))
 
 > Shai Almog says:
 >
@@ -175,7 +175,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chad** — January 6, 2016 at 10:56 pm ([permalink](https://www.codenameone.com/blog/debating-brendan-eich-over-android-openjdk-move.html#comment-22389))
+### **Chad** — January 6, 2016 at 10:56 pm ([permalink](/blog/debating-brendan-eich-over-android-openjdk-move/#comment-22389))
 
 > Chad says:
 >
@@ -184,7 +184,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 7, 2016 at 3:37 am ([permalink](https://www.codenameone.com/blog/debating-brendan-eich-over-android-openjdk-move.html#comment-22671))
+### **Shai Almog** — January 7, 2016 at 3:37 am ([permalink](/blog/debating-brendan-eich-over-android-openjdk-move/#comment-22671))
 
 > Shai Almog says:
 >

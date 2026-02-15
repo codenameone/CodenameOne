@@ -129,7 +129,7 @@ complete in time.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — October 19, 2016 at 12:50 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-22917))
+### **bryan** — October 19, 2016 at 12:50 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-22917))
 
 > bryan says:
 >
@@ -138,7 +138,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ross Taylor** — October 19, 2016 at 9:27 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-22753))
+### **Ross Taylor** — October 19, 2016 at 9:27 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-22753))
 
 > Ross Taylor says:
 >
@@ -147,7 +147,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 20, 2016 at 2:10 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-22764))
+### **Shai Almog** — October 20, 2016 at 2:10 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-22764))
 
 > Shai Almog says:
 >
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **leroadrunner** — November 1, 2016 at 2:43 pm ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23024))
+### **leroadrunner** — November 1, 2016 at 2:43 pm ([permalink](/blog/template-clean-modern-ui-kit/#comment-23024))
 
 > leroadrunner says:
 >
@@ -170,7 +170,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 2, 2016 at 1:36 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-22998))
+### **Shai Almog** — November 2, 2016 at 1:36 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-22998))
 
 > Shai Almog says:
 >
@@ -179,7 +179,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **leroadrunner** — November 2, 2016 at 1:01 pm ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-22909))
+### **leroadrunner** — November 2, 2016 at 1:01 pm ([permalink](/blog/template-clean-modern-ui-kit/#comment-22909))
 
 > leroadrunner says:
 >
@@ -190,7 +190,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — January 16, 2017 at 6:52 pm ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23017))
+### **salah Alhaddabi** — January 16, 2017 at 6:52 pm ([permalink](/blog/template-clean-modern-ui-kit/#comment-23017))
 
 > salah Alhaddabi says:
 >
@@ -199,7 +199,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 17, 2017 at 5:25 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23002))
+### **Shai Almog** — January 17, 2017 at 5:25 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-23002))
 
 > Shai Almog says:
 >
@@ -209,7 +209,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — January 17, 2017 at 5:47 pm ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-22958))
+### **salah Alhaddabi** — January 17, 2017 at 5:47 pm ([permalink](/blog/template-clean-modern-ui-kit/#comment-22958))
 
 > salah Alhaddabi says:
 >
@@ -220,7 +220,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 18, 2017 at 7:24 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23018))
+### **Shai Almog** — January 18, 2017 at 7:24 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-23018))
 
 > Shai Almog says:
 >
@@ -234,7 +234,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — January 18, 2017 at 3:02 pm ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23296))
+### **salah Alhaddabi** — January 18, 2017 at 3:02 pm ([permalink](/blog/template-clean-modern-ui-kit/#comment-23296))
 
 > salah Alhaddabi says:
 >
@@ -243,7 +243,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 19, 2017 at 6:27 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23243))
+### **Shai Almog** — January 19, 2017 at 6:27 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-23243))
 
 > Shai Almog says:
 >
@@ -252,7 +252,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — January 19, 2017 at 8:08 pm ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-22991))
+### **salah Alhaddabi** — January 19, 2017 at 8:08 pm ([permalink](/blog/template-clean-modern-ui-kit/#comment-22991))
 
 > salah Alhaddabi says:
 >
@@ -261,7 +261,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Faten Sahli** — April 27, 2017 at 9:58 pm ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23109))
+### **Faten Sahli** — April 27, 2017 at 9:58 pm ([permalink](/blog/template-clean-modern-ui-kit/#comment-23109))
 
 > Faten Sahli says:
 >
@@ -270,7 +270,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 28, 2017 at 5:41 am ([permalink](https://www.codenameone.com/blog/template-clean-modern-ui-kit.html#comment-23505))
+### **Shai Almog** — April 28, 2017 at 5:41 am ([permalink](/blog/template-clean-modern-ui-kit/#comment-23505))
 
 > Shai Almog says:
 >

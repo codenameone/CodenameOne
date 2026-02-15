@@ -35,7 +35,7 @@ In August, Android App Bundle will become the required format for submitting to 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Francesco Galgani** — June 6, 2021 at 12:57 pm ([permalink](https://www.codenameone.com/blog/android-app-bundle-support.html#comment-24464))
+### **Francesco Galgani** — June 6, 2021 at 12:57 pm ([permalink](/blog/android-app-bundle-support/#comment-24464))
 
 > Francesco Galgani says:
 >
@@ -44,7 +44,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 6, 2021 at 2:01 pm ([permalink](https://www.codenameone.com/blog/android-app-bundle-support.html#comment-24466))
+### **Shai Almog** — June 6, 2021 at 2:01 pm ([permalink](/blog/android-app-bundle-support/#comment-24466))
 
 > Shai Almog says:
 >
@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chris Vorster** — September 11, 2021 at 12:56 am ([permalink](https://www.codenameone.com/blog/android-app-bundle-support.html#comment-24479))
+### **Chris Vorster** — September 11, 2021 at 12:56 am ([permalink](/blog/android-app-bundle-support/#comment-24479))
 
 > Chris Vorster says:
 >
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lianna Casper** — September 11, 2021 at 4:12 am ([permalink](https://www.codenameone.com/blog/android-app-bundle-support.html#comment-24480))
+### **Lianna Casper** — September 11, 2021 at 4:12 am ([permalink](/blog/android-app-bundle-support/#comment-24480))
 
 > Lianna Casper says:
 >

@@ -145,7 +145,7 @@ Please use the comments section for suggestions of future comparison segments.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — April 30, 2016 at 8:37 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22630))
+### **bryan** — April 30, 2016 at 8:37 am ([permalink](/blog/comparing-qt-and-codename-one/#comment-22630))
 
 > bryan says:
 >
@@ -154,7 +154,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 1, 2016 at 4:39 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22641))
+### **Shai Almog** — May 1, 2016 at 4:39 am ([permalink](/blog/comparing-qt-and-codename-one/#comment-22641))
 
 > Shai Almog says:
 >
@@ -216,7 +216,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bryan** — May 1, 2016 at 12:49 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22790))
+### **bryan** — May 1, 2016 at 12:49 pm ([permalink](/blog/comparing-qt-and-codename-one/#comment-22790))
 
 > bryan says:
 >
@@ -225,7 +225,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Johan Vos** — May 2, 2016 at 9:14 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22519))
+### **Johan Vos** — May 2, 2016 at 9:14 am ([permalink](/blog/comparing-qt-and-codename-one/#comment-22519))
 
 > Johan Vos says:
 >
@@ -234,7 +234,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 2, 2016 at 9:17 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22809))
+### **Shai Almog** — May 2, 2016 at 9:17 am ([permalink](/blog/comparing-qt-and-codename-one/#comment-22809))
 
 > Shai Almog says:
 >
@@ -243,7 +243,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Felix Bembrick** — May 2, 2016 at 11:15 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22848))
+### **Felix Bembrick** — May 2, 2016 at 11:15 am ([permalink](/blog/comparing-qt-and-codename-one/#comment-22848))
 
 > Felix Bembrick says:
 >
@@ -258,7 +258,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 2, 2016 at 11:24 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22721))
+### **Shai Almog** — May 2, 2016 at 11:24 am ([permalink](/blog/comparing-qt-and-codename-one/#comment-22721))
 
 > Shai Almog says:
 >
@@ -279,7 +279,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Felix Bembrick** — May 2, 2016 at 11:25 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22857))
+### **Felix Bembrick** — May 2, 2016 at 11:25 am ([permalink](/blog/comparing-qt-and-codename-one/#comment-22857))
 
 > Felix Bembrick says:
 >
@@ -292,7 +292,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 2, 2016 at 11:28 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-21484))
+### **Shai Almog** — May 2, 2016 at 11:28 am ([permalink](/blog/comparing-qt-and-codename-one/#comment-21484))
 
 > Shai Almog says:
 >
@@ -307,7 +307,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Felix Bembrick** — May 2, 2016 at 11:29 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22448))
+### **Felix Bembrick** — May 2, 2016 at 11:29 am ([permalink](/blog/comparing-qt-and-codename-one/#comment-22448))
 
 > Felix Bembrick says:
 >
@@ -316,7 +316,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Felix Bembrick** — May 2, 2016 at 11:31 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22610))
+### **Felix Bembrick** — May 2, 2016 at 11:31 am ([permalink](/blog/comparing-qt-and-codename-one/#comment-22610))
 
 > Felix Bembrick says:
 >
@@ -325,7 +325,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 2, 2016 at 11:34 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22467))
+### **Shai Almog** — May 2, 2016 at 11:34 am ([permalink](/blog/comparing-qt-and-codename-one/#comment-22467))
 
 > Shai Almog says:
 >
@@ -338,7 +338,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Felix Bembrick** — May 2, 2016 at 11:35 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22577))
+### **Felix Bembrick** — May 2, 2016 at 11:35 am ([permalink](/blog/comparing-qt-and-codename-one/#comment-22577))
 
 > Felix Bembrick says:
 >
@@ -349,7 +349,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Felix Bembrick** — May 2, 2016 at 11:39 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22631))
+### **Felix Bembrick** — May 2, 2016 at 11:39 am ([permalink](/blog/comparing-qt-and-codename-one/#comment-22631))
 
 > Felix Bembrick says:
 >
@@ -358,7 +358,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 2, 2016 at 11:44 am ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22642))
+### **Shai Almog** — May 2, 2016 at 11:44 am ([permalink](/blog/comparing-qt-and-codename-one/#comment-22642))
 
 > Shai Almog says:
 >
@@ -388,7 +388,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Felix Bembrick** — May 2, 2016 at 12:29 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22868))
+### **Felix Bembrick** — May 2, 2016 at 12:29 pm ([permalink](/blog/comparing-qt-and-codename-one/#comment-22868))
 
 > Felix Bembrick says:
 >
@@ -407,7 +407,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 2, 2016 at 1:23 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22791))
+### **Shai Almog** — May 2, 2016 at 1:23 pm ([permalink](/blog/comparing-qt-and-codename-one/#comment-22791))
 
 > Shai Almog says:
 >
@@ -426,7 +426,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Felix Bembrick** — May 2, 2016 at 6:31 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22875))
+### **Felix Bembrick** — May 2, 2016 at 6:31 pm ([permalink](/blog/comparing-qt-and-codename-one/#comment-22875))
 
 > Felix Bembrick says:
 >
@@ -447,7 +447,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 2, 2016 at 7:16 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22812))
+### **Shai Almog** — May 2, 2016 at 7:16 pm ([permalink](/blog/comparing-qt-and-codename-one/#comment-22812))
 
 > Shai Almog says:
 >
@@ -467,7 +467,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Felix Bembrick** — May 2, 2016 at 8:19 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22849))
+### **Felix Bembrick** — May 2, 2016 at 8:19 pm ([permalink](/blog/comparing-qt-and-codename-one/#comment-22849))
 
 > Felix Bembrick says:
 >
@@ -488,7 +488,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 2, 2016 at 8:38 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-22722))
+### **Shai Almog** — May 2, 2016 at 8:38 pm ([permalink](/blog/comparing-qt-and-codename-one/#comment-22722))
 
 > Shai Almog says:
 >
@@ -507,7 +507,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kyri Ioulianou** — June 15, 2016 at 5:36 pm ([permalink](https://www.codenameone.com/blog/comparing-qt-and-codename-one.html#comment-24212))
+### **Kyri Ioulianou** — June 15, 2016 at 5:36 pm ([permalink](/blog/comparing-qt-and-codename-one/#comment-24212))
 
 > Kyri Ioulianou says:
 >

@@ -19,7 +19,7 @@ I don’t think we’ll offer anything remotely close to the deal we have with t
 ### Parse
 
 One of the things discussed by people who contacted me is parse support. I wanted to talk about that in the bootcamp but decided it would be too much of a detour for me to cover that material. Then I got into a discussion with  
-[Chidiebere G.U. Okwudire](https://www.codenameone.com/blog/how-i-chose-my-replacement-for-parse-com.html) who wrote the parse4cn1 cn1lib and maintains it.
+[Chidiebere G.U. Okwudire](/blog/how-i-chose-my-replacement-for-parse-com/) who wrote the parse4cn1 cn1lib and maintains it.
 
 As part of that we’ll add a workshop day to the bootcamp where he can cover Parse, parse4cn1 & maybe provide some insight into the process of extending Codename One from the outside. I’m sure it will be illuminating to all of us (myself included).
 
@@ -47,7 +47,7 @@ This is the last full day of registration so if you still didn’t signup I sugg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — March 15, 2017 at 3:37 pm ([permalink](https://www.codenameone.com/blog/bootcamp-parse-bouns-post-materials.html#comment-23009))
+### **Chidiebere Okwudire** — March 15, 2017 at 3:37 pm ([permalink](/blog/bootcamp-parse-bouns-post-materials/#comment-23009))
 
 > Chidiebere Okwudire says:
 >
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Andrew Nyago** — March 15, 2017 at 3:38 pm ([permalink](https://www.codenameone.com/blog/bootcamp-parse-bouns-post-materials.html#comment-23166))
+### **Andrew Nyago** — March 15, 2017 at 3:38 pm ([permalink](/blog/bootcamp-parse-bouns-post-materials/#comment-23166))
 
 > Andrew Nyago says:
 >
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jared Ruplinger** — March 15, 2017 at 4:15 pm ([permalink](https://www.codenameone.com/blog/bootcamp-parse-bouns-post-materials.html#comment-23280))
+### **Jared Ruplinger** — March 15, 2017 at 4:15 pm ([permalink](/blog/bootcamp-parse-bouns-post-materials/#comment-23280))
 
 > Jared Ruplinger says:
 >
@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chidiebere Okwudire** — March 15, 2017 at 5:35 pm ([permalink](https://www.codenameone.com/blog/bootcamp-parse-bouns-post-materials.html#comment-23314))
+### **Chidiebere Okwudire** — March 15, 2017 at 5:35 pm ([permalink](/blog/bootcamp-parse-bouns-post-materials/#comment-23314))
 
 > Chidiebere Okwudire says:
 >

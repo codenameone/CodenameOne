@@ -23,19 +23,19 @@ Including intercom itself required a single build hint: `ios.pods=Intercom` whic
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **3lix** — February 13, 2017 at 5:02 pm ([permalink](https://www.codenameone.com/blog/tip-use-ios-cocoapods-dependencies-native-code.html#comment-23342))
+### **3lix** — February 13, 2017 at 5:02 pm ([permalink](/blog/tip-use-ios-cocoapods-dependencies-native-code/#comment-23342))
 
 > 3lix says:
 >
 > I am not familiar with cocoapods.  
 > I have two questions:  
 > 1) When adding a a cocoapod library would it work on all three platforms (iOS , Android and Windows? )  
-> 2) In your previous post you had mentioned that there are over 18000 libraries. [https://www.codenameone.com…](<https://www.codenameone.com/blog/cocoapods.html>) Do they need to be converted to CN1LIBS before use (some sort of a JAVA api) ?
+> 2) In your previous post you had mentioned that there are over 18000 libraries. [https://www.codenameone.com…](</blog/cocoapods/>) Do they need to be converted to CN1LIBS before use (some sort of a JAVA api) ?
 >
 
 
 
-### **Shai Almog** — February 14, 2017 at 8:02 am ([permalink](https://www.codenameone.com/blog/tip-use-ios-cocoapods-dependencies-native-code.html#comment-23351))
+### **Shai Almog** — February 14, 2017 at 8:02 am ([permalink](/blog/tip-use-ios-cocoapods-dependencies-native-code/#comment-23351))
 
 > Shai Almog says:
 >
@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **3lix** — February 14, 2017 at 4:13 pm ([permalink](https://www.codenameone.com/blog/tip-use-ios-cocoapods-dependencies-native-code.html#comment-22856))
+### **3lix** — February 14, 2017 at 4:13 pm ([permalink](/blog/tip-use-ios-cocoapods-dependencies-native-code/#comment-22856))
 
 > 3lix says:
 >

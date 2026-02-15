@@ -200,7 +200,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — July 15, 2013 at 10:22 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-24246))
+### **Anonymous** — July 15, 2013 at 10:22 am ([permalink](/blog/why-mobile-web-is-slow/#comment-24246))
 
 > Anonymous says:
 >
@@ -209,7 +209,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 11:19 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21963))
+### **Anonymous** — July 15, 2013 at 11:19 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21963))
 
 > Anonymous says:
 >
@@ -224,7 +224,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 11:27 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-24157))
+### **Anonymous** — July 15, 2013 at 11:27 am ([permalink](/blog/why-mobile-web-is-slow/#comment-24157))
 
 > Anonymous says:
 >
@@ -241,7 +241,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 11:30 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21888))
+### **Anonymous** — July 15, 2013 at 11:30 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21888))
 
 > Anonymous says:
 >
@@ -260,7 +260,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 11:38 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21638))
+### **Anonymous** — July 15, 2013 at 11:38 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21638))
 
 > Anonymous says:
 >
@@ -275,7 +275,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 11:51 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21784))
+### **Anonymous** — July 15, 2013 at 11:51 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21784))
 
 > Anonymous says:
 >
@@ -284,7 +284,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 11:56 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21856))
+### **Anonymous** — July 15, 2013 at 11:56 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21856))
 
 > Anonymous says:
 >
@@ -299,7 +299,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 11:56 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21908))
+### **Anonymous** — July 15, 2013 at 11:56 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21908))
 
 > Anonymous says:
 >
@@ -308,7 +308,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 12:05 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21902))
+### **Anonymous** — July 15, 2013 at 12:05 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21902))
 
 > Anonymous says:
 >
@@ -327,7 +327,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 1:11 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21971))
+### **Anonymous** — July 15, 2013 at 1:11 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21971))
 
 > Anonymous says:
 >
@@ -340,7 +340,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 1:50 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21695))
+### **Anonymous** — July 15, 2013 at 1:50 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21695))
 
 > Anonymous says:
 >
@@ -349,7 +349,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 3:09 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21760))
+### **Anonymous** — July 15, 2013 at 3:09 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21760))
 
 > Anonymous says:
 >
@@ -358,7 +358,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 3:14 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21894))
+### **Anonymous** — July 15, 2013 at 3:14 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21894))
 
 > Anonymous says:
 >
@@ -379,7 +379,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 3:20 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21752))
+### **Anonymous** — July 15, 2013 at 3:20 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21752))
 
 > Anonymous says:
 >
@@ -388,7 +388,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 3:25 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21942))
+### **Anonymous** — July 15, 2013 at 3:25 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21942))
 
 > Anonymous says:
 >
@@ -397,7 +397,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 3:26 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21749))
+### **Anonymous** — July 15, 2013 at 3:26 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21749))
 
 > Anonymous says:
 >
@@ -406,7 +406,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 3:32 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21738))
+### **Anonymous** — July 15, 2013 at 3:32 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21738))
 
 > Anonymous says:
 >
@@ -417,7 +417,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 3:32 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21755))
+### **Anonymous** — July 15, 2013 at 3:32 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21755))
 
 > Anonymous says:
 >
@@ -430,7 +430,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 3:55 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21769))
+### **Anonymous** — July 15, 2013 at 3:55 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21769))
 
 > Anonymous says:
 >
@@ -445,7 +445,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 3:59 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-24232))
+### **Anonymous** — July 15, 2013 at 3:59 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-24232))
 
 > Anonymous says:
 >
@@ -454,7 +454,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 4:32 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21698))
+### **Anonymous** — July 15, 2013 at 4:32 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21698))
 
 > Anonymous says:
 >
@@ -477,7 +477,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 4:34 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21842))
+### **Anonymous** — July 15, 2013 at 4:34 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21842))
 
 > Anonymous says:
 >
@@ -496,7 +496,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 4:39 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21763))
+### **Anonymous** — July 15, 2013 at 4:39 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21763))
 
 > Anonymous says:
 >
@@ -507,7 +507,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 4:53 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21832))
+### **Anonymous** — July 15, 2013 at 4:53 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21832))
 
 > Anonymous says:
 >
@@ -528,7 +528,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 4:54 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-24249))
+### **Anonymous** — July 15, 2013 at 4:54 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-24249))
 
 > Anonymous says:
 >
@@ -539,7 +539,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 4:55 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21713))
+### **Anonymous** — July 15, 2013 at 4:55 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21713))
 
 > Anonymous says:
 >
@@ -548,7 +548,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 5:02 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21825))
+### **Anonymous** — July 15, 2013 at 5:02 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21825))
 
 > Anonymous says:
 >
@@ -561,7 +561,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 5:08 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21665))
+### **Anonymous** — July 15, 2013 at 5:08 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21665))
 
 > Anonymous says:
 >
@@ -574,7 +574,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 5:21 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21810))
+### **Anonymous** — July 15, 2013 at 5:21 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21810))
 
 > Anonymous says:
 >
@@ -585,7 +585,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 5:53 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21775))
+### **Anonymous** — July 15, 2013 at 5:53 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21775))
 
 > Anonymous says:
 >
@@ -600,7 +600,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 5:59 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21817))
+### **Anonymous** — July 15, 2013 at 5:59 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21817))
 
 > Anonymous says:
 >
@@ -613,7 +613,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 6:42 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21807))
+### **Anonymous** — July 15, 2013 at 6:42 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21807))
 
 > Anonymous says:
 >
@@ -638,7 +638,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 7:13 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-24252))
+### **Anonymous** — July 15, 2013 at 7:13 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-24252))
 
 > Anonymous says:
 >
@@ -661,7 +661,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 9:20 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21792))
+### **Anonymous** — July 15, 2013 at 9:20 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21792))
 
 > Anonymous says:
 >
@@ -674,7 +674,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 15, 2013 at 10:52 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21865))
+### **Anonymous** — July 15, 2013 at 10:52 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21865))
 
 > Anonymous says:
 >
@@ -685,7 +685,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 1:13 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21744))
+### **Anonymous** — July 16, 2013 at 1:13 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21744))
 
 > Anonymous says:
 >
@@ -702,7 +702,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 1:28 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21787))
+### **Anonymous** — July 16, 2013 at 1:28 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21787))
 
 > Anonymous says:
 >
@@ -719,7 +719,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 1:31 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21735))
+### **Anonymous** — July 16, 2013 at 1:31 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21735))
 
 > Anonymous says:
 >
@@ -730,7 +730,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 3:42 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21706))
+### **Anonymous** — July 16, 2013 at 3:42 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21706))
 
 > Anonymous says:
 >
@@ -741,7 +741,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 4:35 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21692))
+### **Anonymous** — July 16, 2013 at 4:35 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21692))
 
 > Anonymous says:
 >
@@ -754,7 +754,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 6:15 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21802))
+### **Anonymous** — July 16, 2013 at 6:15 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21802))
 
 > Anonymous says:
 >
@@ -767,7 +767,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 6:15 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21956))
+### **Anonymous** — July 16, 2013 at 6:15 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21956))
 
 > Anonymous says:
 >
@@ -786,7 +786,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 6:18 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21880))
+### **Anonymous** — July 16, 2013 at 6:18 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21880))
 
 > Anonymous says:
 >
@@ -795,7 +795,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 7:01 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21702))
+### **Anonymous** — July 16, 2013 at 7:01 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21702))
 
 > Anonymous says:
 >
@@ -804,7 +804,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 7:09 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21871))
+### **Anonymous** — July 16, 2013 at 7:09 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21871))
 
 > Anonymous says:
 >
@@ -821,7 +821,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 8:57 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21617))
+### **Anonymous** — July 16, 2013 at 8:57 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21617))
 
 > Anonymous says:
 >
@@ -830,7 +830,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 9:04 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21757))
+### **Anonymous** — July 16, 2013 at 9:04 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21757))
 
 > Anonymous says:
 >
@@ -845,7 +845,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 9:27 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21929))
+### **Anonymous** — July 16, 2013 at 9:27 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21929))
 
 > Anonymous says:
 >
@@ -854,7 +854,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 9:32 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21627))
+### **Anonymous** — July 16, 2013 at 9:32 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21627))
 
 > Anonymous says:
 >
@@ -869,7 +869,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 9:41 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21979))
+### **Anonymous** — July 16, 2013 at 9:41 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21979))
 
 > Anonymous says:
 >
@@ -882,7 +882,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 10:17 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21964))
+### **Anonymous** — July 16, 2013 at 10:17 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21964))
 
 > Anonymous says:
 >
@@ -891,7 +891,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 10:24 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-24158))
+### **Anonymous** — July 16, 2013 at 10:24 am ([permalink](/blog/why-mobile-web-is-slow/#comment-24158))
 
 > Anonymous says:
 >
@@ -906,7 +906,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 12:27 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21889))
+### **Anonymous** — July 16, 2013 at 12:27 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21889))
 
 > Anonymous says:
 >
@@ -921,7 +921,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 1:19 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21639))
+### **Anonymous** — July 16, 2013 at 1:19 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21639))
 
 > Anonymous says:
 >
@@ -936,7 +936,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 1:39 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21785))
+### **Anonymous** — July 16, 2013 at 1:39 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21785))
 
 > Anonymous says:
 >
@@ -949,7 +949,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 3:29 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21857))
+### **Anonymous** — July 16, 2013 at 3:29 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21857))
 
 > Anonymous says:
 >
@@ -958,7 +958,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 3:36 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21909))
+### **Anonymous** — July 16, 2013 at 3:36 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21909))
 
 > Anonymous says:
 >
@@ -967,7 +967,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 5:51 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21903))
+### **Anonymous** — July 16, 2013 at 5:51 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21903))
 
 > Anonymous says:
 >
@@ -976,7 +976,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 16, 2013 at 10:58 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21972))
+### **Anonymous** — July 16, 2013 at 10:58 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21972))
 
 > Anonymous says:
 >
@@ -985,7 +985,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 17, 2013 at 1:06 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21955))
+### **Anonymous** — July 17, 2013 at 1:06 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21955))
 
 > Anonymous says:
 >
@@ -996,7 +996,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 17, 2013 at 1:24 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21761))
+### **Anonymous** — July 17, 2013 at 1:24 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21761))
 
 > Anonymous says:
 >
@@ -1005,7 +1005,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 17, 2013 at 2:19 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21895))
+### **Anonymous** — July 17, 2013 at 2:19 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21895))
 
 > Anonymous says:
 >
@@ -1020,7 +1020,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 17, 2013 at 2:41 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-24247))
+### **Anonymous** — July 17, 2013 at 2:41 am ([permalink](/blog/why-mobile-web-is-slow/#comment-24247))
 
 > Anonymous says:
 >
@@ -1031,7 +1031,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 17, 2013 at 5:20 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21943))
+### **Anonymous** — July 17, 2013 at 5:20 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21943))
 
 > Anonymous says:
 >
@@ -1040,7 +1040,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 17, 2013 at 5:29 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21667))
+### **Anonymous** — July 17, 2013 at 5:29 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21667))
 
 > Anonymous says:
 >
@@ -1049,7 +1049,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 17, 2013 at 5:55 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21740))
+### **Anonymous** — July 17, 2013 at 5:55 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21740))
 
 > Anonymous says:
 >
@@ -1060,7 +1060,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 17, 2013 at 2:51 pm ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21999))
+### **Anonymous** — July 17, 2013 at 2:51 pm ([permalink](/blog/why-mobile-web-is-slow/#comment-21999))
 
 > Anonymous says:
 >
@@ -1073,7 +1073,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 24, 2013 at 12:54 am ([permalink](https://www.codenameone.com/blog/why-mobile-web-is-slow.html#comment-21770))
+### **Anonymous** — July 24, 2013 at 12:54 am ([permalink](/blog/why-mobile-web-is-slow/#comment-21770))
 
 > Anonymous says:
 >

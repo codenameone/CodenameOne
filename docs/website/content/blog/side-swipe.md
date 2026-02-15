@@ -57,7 +57,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — November 5, 2014 at 10:47 am ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22122))
+### **Anonymous** — November 5, 2014 at 10:47 am ([permalink](/blog/side-swipe/#comment-22122))
 
 > Anonymous says:
 >
@@ -68,7 +68,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 5, 2014 at 12:36 pm ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-21839))
+### **Anonymous** — November 5, 2014 at 12:36 pm ([permalink](/blog/side-swipe/#comment-21839))
 
 > Anonymous says:
 >
@@ -77,7 +77,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 5, 2014 at 6:53 pm ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-21686))
+### **Anonymous** — November 5, 2014 at 6:53 pm ([permalink](/blog/side-swipe/#comment-21686))
 
 > Anonymous says:
 >
@@ -86,7 +86,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 20, 2014 at 8:20 pm ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22007))
+### **Anonymous** — November 20, 2014 at 8:20 pm ([permalink](/blog/side-swipe/#comment-22007))
 
 > Anonymous says:
 >
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 21, 2014 at 3:23 am ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22291))
+### **Anonymous** — November 21, 2014 at 3:23 am ([permalink](/blog/side-swipe/#comment-22291))
 
 > Anonymous says:
 >
@@ -104,7 +104,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 1, 2014 at 4:36 pm ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22283))
+### **Anonymous** — December 1, 2014 at 4:36 pm ([permalink](/blog/side-swipe/#comment-22283))
 
 > Anonymous says:
 >
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 2, 2014 at 5:04 am ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22293))
+### **Anonymous** — December 2, 2014 at 5:04 am ([permalink](/blog/side-swipe/#comment-22293))
 
 > Anonymous says:
 >
@@ -122,7 +122,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 2, 2014 at 8:42 am ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22008))
+### **Anonymous** — December 2, 2014 at 8:42 am ([permalink](/blog/side-swipe/#comment-22008))
 
 > Anonymous says:
 >
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 2, 2014 at 3:10 pm ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22133))
+### **Anonymous** — December 2, 2014 at 3:10 pm ([permalink](/blog/side-swipe/#comment-22133))
 
 > Anonymous says:
 >
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 2, 2014 at 3:57 pm ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22311))
+### **Anonymous** — December 2, 2014 at 3:57 pm ([permalink](/blog/side-swipe/#comment-22311))
 
 > Anonymous says:
 >
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 3, 2014 at 5:43 am ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22124))
+### **Anonymous** — December 3, 2014 at 5:43 am ([permalink](/blog/side-swipe/#comment-22124))
 
 > Anonymous says:
 >
@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 5, 2014 at 7:40 am ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-22117))
+### **Anonymous** — December 5, 2014 at 7:40 am ([permalink](/blog/side-swipe/#comment-22117))
 
 > Anonymous says:
 >
@@ -171,7 +171,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 6, 2014 at 1:58 pm ([permalink](https://www.codenameone.com/blog/side-swipe.html#comment-24164))
+### **Anonymous** — December 6, 2014 at 1:58 pm ([permalink](/blog/side-swipe/#comment-24164))
 
 > Anonymous says:
 >

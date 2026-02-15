@@ -140,7 +140,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — February 26, 2014 at 4:31 pm ([permalink](https://www.codenameone.com/blog/json-overscroll-more.html#comment-21814))
+### **Anonymous** — February 26, 2014 at 4:31 pm ([permalink](/blog/json-overscroll-more/#comment-21814))
 
 > Anonymous says:
 >
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 27, 2014 at 3:51 am ([permalink](https://www.codenameone.com/blog/json-overscroll-more.html#comment-21779))
+### **Anonymous** — February 27, 2014 at 3:51 am ([permalink](/blog/json-overscroll-more/#comment-21779))
 
 > Anonymous says:
 >
@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 24, 2014 at 12:27 pm ([permalink](https://www.codenameone.com/blog/json-overscroll-more.html#comment-21983))
+### **Anonymous** — March 24, 2014 at 12:27 pm ([permalink](/blog/json-overscroll-more/#comment-21983))
 
 > Anonymous says:
 >
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 24, 2014 at 4:32 pm ([permalink](https://www.codenameone.com/blog/json-overscroll-more.html#comment-21438))
+### **Anonymous** — March 24, 2014 at 4:32 pm ([permalink](/blog/json-overscroll-more/#comment-21438))
 
 > Anonymous says:
 >

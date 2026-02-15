@@ -38,7 +38,7 @@ committing to a paid account.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Maaike Z** — May 12, 2015 at 7:43 pm ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-21649))
+### **Maaike Z** — May 12, 2015 at 7:43 pm ([permalink](/blog/aligning-prices/#comment-21649))
 
 > Maaike Z says:
 >
@@ -47,7 +47,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 13, 2015 at 4:27 am ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-22250))
+### **Shai Almog** — May 13, 2015 at 4:27 am ([permalink](/blog/aligning-prices/#comment-22250))
 
 > Shai Almog says:
 >
@@ -58,7 +58,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Fabrício Cabeça** — May 13, 2015 at 7:39 pm ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-22383))
+### **Fabrício Cabeça** — May 13, 2015 at 7:39 pm ([permalink](/blog/aligning-prices/#comment-22383))
 
 > Fabrício Cabeça says:
 >
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Maaike Z** — May 15, 2015 at 1:52 pm ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-22110))
+### **Maaike Z** — May 15, 2015 at 1:52 pm ([permalink](/blog/aligning-prices/#comment-22110))
 
 > Maaike Z says:
 >
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **J.C** — May 15, 2015 at 3:09 pm ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-24169))
+### **J.C** — May 15, 2015 at 3:09 pm ([permalink](/blog/aligning-prices/#comment-24169))
 
 > J.C says:
 >
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 15, 2015 at 4:26 pm ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-22138))
+### **Shai Almog** — May 15, 2015 at 4:26 pm ([permalink](/blog/aligning-prices/#comment-22138))
 
 > Shai Almog says:
 >
@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **J.C** — May 15, 2015 at 5:49 pm ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-21650))
+### **J.C** — May 15, 2015 at 5:49 pm ([permalink](/blog/aligning-prices/#comment-21650))
 
 > J.C says:
 >
@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chen Fishbein** — May 16, 2015 at 6:07 am ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-22251))
+### **Chen Fishbein** — May 16, 2015 at 6:07 am ([permalink](/blog/aligning-prices/#comment-22251))
 
 > Chen Fishbein says:
 >
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Maaike Z** — May 21, 2015 at 9:15 pm ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-22073))
+### **Maaike Z** — May 21, 2015 at 9:15 pm ([permalink](/blog/aligning-prices/#comment-22073))
 
 > Maaike Z says:
 >
@@ -128,7 +128,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 22, 2015 at 3:44 am ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-22411))
+### **Shai Almog** — May 22, 2015 at 3:44 am ([permalink](/blog/aligning-prices/#comment-22411))
 
 > Shai Almog says:
 >
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Eric** — May 22, 2015 at 9:31 am ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-22111))
+### **Eric** — May 22, 2015 at 9:31 am ([permalink](/blog/aligning-prices/#comment-22111))
 
 > Eric says:
 >
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 22, 2015 at 10:14 am ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-24170))
+### **Shai Almog** — May 22, 2015 at 10:14 am ([permalink](/blog/aligning-prices/#comment-24170))
 
 > Shai Almog says:
 >
@@ -160,7 +160,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **huwab0** — May 22, 2015 at 10:15 am ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-22355))
+### **huwab0** — May 22, 2015 at 10:15 am ([permalink](/blog/aligning-prices/#comment-22355))
 
 > huwab0 says:
 >
@@ -173,7 +173,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Eric** — May 22, 2015 at 10:32 am ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-22296))
+### **Eric** — May 22, 2015 at 10:32 am ([permalink](/blog/aligning-prices/#comment-22296))
 
 > Eric says:
 >
@@ -182,7 +182,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chen Fishbein** — May 22, 2015 at 10:56 am ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-22139))
+### **Chen Fishbein** — May 22, 2015 at 10:56 am ([permalink](/blog/aligning-prices/#comment-22139))
 
 > Chen Fishbein says:
 >
@@ -193,7 +193,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chen Fishbein** — May 22, 2015 at 10:58 am ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-22363))
+### **Chen Fishbein** — May 22, 2015 at 10:58 am ([permalink](/blog/aligning-prices/#comment-22363))
 
 > Chen Fishbein says:
 >
@@ -202,7 +202,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **huwab0** — May 22, 2015 at 1:00 pm ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-24179))
+### **huwab0** — May 22, 2015 at 1:00 pm ([permalink](/blog/aligning-prices/#comment-24179))
 
 > huwab0 says:
 >
@@ -211,7 +211,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **rhg1968** — May 22, 2015 at 1:04 pm ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-22418))
+### **rhg1968** — May 22, 2015 at 1:04 pm ([permalink](/blog/aligning-prices/#comment-22418))
 
 > rhg1968 says:
 >
@@ -220,7 +220,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Benjamin Vander Stichelen** — May 23, 2015 at 2:35 am ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-22338))
+### **Benjamin Vander Stichelen** — May 23, 2015 at 2:35 am ([permalink](/blog/aligning-prices/#comment-22338))
 
 > Benjamin Vander Stichelen says:
 >
@@ -239,7 +239,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chen Fishbein** — May 23, 2015 at 5:37 am ([permalink](https://www.codenameone.com/blog/aligning-prices.html#comment-22209))
+### **Chen Fishbein** — May 23, 2015 at 5:37 am ([permalink](/blog/aligning-prices/#comment-22209))
 
 > Chen Fishbein says:
 >

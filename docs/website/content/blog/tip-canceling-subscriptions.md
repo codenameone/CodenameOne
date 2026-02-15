@@ -32,7 +32,7 @@ If you run into billing issues be sure to contact our support, using the chat bu
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **baron** — December 1, 2018 at 10:27 am ([permalink](https://www.codenameone.com/blog/tip-canceling-subscriptions.html#comment-23984))
+### **baron** — December 1, 2018 at 10:27 am ([permalink](/blog/tip-canceling-subscriptions/#comment-23984))
 
 > baron says:
 >
@@ -44,7 +44,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 2, 2018 at 7:16 am ([permalink](https://www.codenameone.com/blog/tip-canceling-subscriptions.html#comment-23957))
+### **Shai Almog** — December 2, 2018 at 7:16 am ([permalink](/blog/tip-canceling-subscriptions/#comment-23957))
 
 > Shai Almog says:
 >

@@ -11,7 +11,7 @@ author: Steve Hannah
 
 ![Header Image](/blog/intro-to-in-app-purchase/in-app-purchase.jpg)
 
-__ |  This is the first post in a three-part series on In-App purchase. Please check out [Part 2: Introduction to In-App Purchase](https://www.codenameone.com/blog/in-app-purchase-non-renewable-subscriptions.html) and [Part 3: Auto-renewing Subscriptions in iOS and Android](https://www.codenameone.com/blog/autorenewing-subscriptions-in-ios-and-android.html).   
+__ |  This is the first post in a three-part series on In-App purchase. Please check out [Part 2: Introduction to In-App Purchase](/blog/in-app-purchase-non-renewable-subscriptions/) and [Part 3: Auto-renewing Subscriptions in iOS and Android](/blog/autorenewing-subscriptions-in-ios-and-android/).   
 ---|---  
   
 In-app purchase is a helpful tool for making app development profitable. Codename One has supported in-app purchases of consumable and non-consumable products on Android and iOS for some time now, and with the next update we are adding support for subscriptions. For such a seemingly simple task, in-app purchase involves a lot of moving parts – especially when it comes to subscriptions. For this reason, I’ll be splitting this topic up into a few different blog posts. This post will provide a light introduction to in-app purchase and subscriptions, and show you how to support them in your app. In subsequent posts, I’ll go deeper into some more advanced topics such as receipt validation, server-side subscription management (which is required for subscriptions in the iTunes store), and the specifics of how to set up in-app purchases in both Google Play and the iTunes stores.
@@ -196,7 +196,7 @@ __ |  When we eventually set up the products in the iTunes store we will need to
   
 ## Next Up: Non-Renewable Subscriptions
 
-Read more: [Part 2: Introduction to In-App Purchase](https://www.codenameone.com/blog/in-app-purchase-non-renewable-subscriptions.html)
+Read more: [Part 2: Introduction to In-App Purchase](/blog/in-app-purchase-non-renewable-subscriptions/)
 ---
 
 ## Archived Comments
@@ -204,7 +204,7 @@ Read more: [Part 2: Introduction to In-App Purchase](https://www.codenameone.com
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **salah Alhaddabi** — December 28, 2016 at 7:38 pm ([permalink](https://www.codenameone.com/blog/intro-to-in-app-purchase.html#comment-23026))
+### **salah Alhaddabi** — December 28, 2016 at 7:38 pm ([permalink](/blog/intro-to-in-app-purchase/#comment-23026))
 
 > Very nice Steve.
 >

@@ -17,22 +17,22 @@ enhancements were made to the code as well as one new niche component.
 
 ### ConnectionRequest.downloadImageToStorage
 
-We have multiple ways to download an image and our general favorite is the [URLImage](https://www.codenameone.com/javadoc/com/codename1/ui/URLImage.html).  
-However, the [URLImage](https://www.codenameone.com/javadoc/com/codename1/ui/URLImage.html) assumes  
+We have multiple ways to download an image and our general favorite is the [URLImage](/javadoc/com/codename1/ui/URLImage/).  
+However, the [URLImage](/javadoc/com/codename1/ui/URLImage/) assumes  
 that you know the size of the image in advance or that you are willing to resize it. In that regard it works great for  
 some use cases but not so much for others.
 
-In those other cases we usually recommend [one of the Util methods](https://www.codenameone.com/javadoc/com/codename1/io/Util.html#downloadUrlToStorageInBackground-java.lang.String-java.lang.String-com.codename1.ui.events.ActionListener-).  
+In those other cases we usually recommend [one of the Util methods](/javadoc/com/codename1/io/Util/#downloadUrlToStorageInBackground-java.lang.String-java.lang.String-com.codename1.ui.events.ActionListener-).  
 However, that might not always be appropriate since some edge cases might require more complex  
 manipulation of requests e.g. making a `POST` request to get an image.
 
 __ |  Adding global headers is another use case but you can use  
-[addDefaultHeader](https://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html#addDefaultHeader-java.lang.String-java.lang.String-)  
+[addDefaultHeader](/javadoc/com/codename1/io/NetworkManager/#addDefaultHeader-java.lang.String-java.lang.String-)  
 to add those.   
 ---|---  
   
 To make this process simpler we added a set of helper methods to  
-[ConnectionRequest that downloads images directly](https://www.codenameone.com/javadoc/com/codename1/io/ConnectionRequest.html#downloadImageToStorage-java.lang.String-com.codename1.util.SuccessCallback-).
+[ConnectionRequest that downloads images directly](/javadoc/com/codename1/io/ConnectionRequest/#downloadImageToStorage-java.lang.String-com.codename1.util.SuccessCallback-).
 
 These methods complement the `Util` methods but go a bit further and feature very terse syntax e.g. we can just  
 download a `ConnectionRequest` to `Storage` using code like this:
@@ -46,19 +46,19 @@ You will notice that the terse code above accepted an argument that isn’t an `
 since it passes an `Image` object in the callback.
 
 Historically we had a little known interface in Codename One that was inspired by GWT called  
-[Callback](https://www.codenameone.com/javadoc/com/codename1/util/Callback.html). This interface  
+[Callback](/javadoc/com/codename1/util/Callback/). This interface  
 was used mainly for webservice calls so it had `onSuccess`/`onError` methods and a generic based response.
 
 With Java 8 lambdas it occurred to us that it makes more sense to split this interface into two interfaces so  
 we can write more terse code and so we now have:  
-[SuccessCallback](https://www.codenameone.com/javadoc/com/codename1/util/SuccessCallback.html) &  
-[FailureCallback](https://www.codenameone.com/javadoc/com/codename1/util/FailureCallback.html).
+[SuccessCallback](/javadoc/com/codename1/util/SuccessCallback/) &  
+[FailureCallback](/javadoc/com/codename1/util/FailureCallback/).
 
 These are pretty convenient and I’m pretty sure we’ll use them elsewhere.
 
 ### Signature
 
-As part of his work for a customer Steve implemented the [SignatureComponent](https://www.codenameone.com/javadoc/com/codename1/components/SignatureComponent.html).  
+As part of his work for a customer Steve implemented the [SignatureComponent](/javadoc/com/codename1/components/SignatureComponent/).  
 This allows an app to show a surface where the user can scribble a signature to approve a contract or detail  
 within the app.
 
@@ -85,7 +85,7 @@ Simple usage of the `SignatureComponent` class looks like this:
 
 #### Component.remove()
 
-We added the ability to do [Component.remove()](https://www.codenameone.com/javadoc/com/codename1/ui/Component.html#remove--).  
+We added the ability to do [Component.remove()](/javadoc/com/codename1/ui/Component/#remove--).  
 This is really shorthand syntax for the somewhat contrived `getParent()` syntax but it’s also pretty helpful when  
 we aren’t sure if there is a parent.
 
@@ -93,7 +93,7 @@ So in effect it saves us the cost of an additional if statement.
 
 #### Generic Action Listener & NetworkEvent Callbacks
 
-Up until now [NetworkEvent](https://www.codenameone.com/javadoc/com/codename1/io/NetworkEvent.html)  
+Up until now [NetworkEvent](/javadoc/com/codename1/io/NetworkEvent/)  
 was pretty painful to use. E.g. if you wanted to monitor networking code via a listener you always had to  
 downcast to the `NetworkEvent` e.g.:
     
@@ -154,14 +154,14 @@ This also applies to padding so you can use that syntax there.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Yaakov Gesher** — March 1, 2016 at 10:15 am ([permalink](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html#comment-22509))
+### **Yaakov Gesher** — March 1, 2016 at 10:15 am ([permalink](/blog/downloads-callbacks-signature-more/#comment-22509))
 
 > Great stuff! It’s wonderful to see constant API improvements and new features every month!
 >
 
 
 
-### **Flying Bytes Jansen** — March 9, 2016 at 2:46 pm ([permalink](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html#comment-22477))
+### **Flying Bytes Jansen** — March 9, 2016 at 2:46 pm ([permalink](/blog/downloads-callbacks-signature-more/#comment-22477))
 
 > Flying Bytes Jansen says:
 >
@@ -170,7 +170,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 10, 2016 at 3:44 am ([permalink](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html#comment-22649))
+### **Shai Almog** — March 10, 2016 at 3:44 am ([permalink](/blog/downloads-callbacks-signature-more/#comment-22649))
 
 > Shai Almog says:
 >
@@ -179,7 +179,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Flying Bytes Jansen** — March 10, 2016 at 8:49 am ([permalink](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html#comment-22541))
+### **Flying Bytes Jansen** — March 10, 2016 at 8:49 am ([permalink](/blog/downloads-callbacks-signature-more/#comment-22541))
 
 > Flying Bytes Jansen says:
 >
@@ -188,7 +188,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mahmoud** — July 30, 2018 at 9:56 am ([permalink](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html#comment-23766))
+### **Mahmoud** — July 30, 2018 at 9:56 am ([permalink](/blog/downloads-callbacks-signature-more/#comment-23766))
 
 > Mahmoud says:
 >
@@ -203,7 +203,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 31, 2018 at 5:20 am ([permalink](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html#comment-23768))
+### **Shai Almog** — July 31, 2018 at 5:20 am ([permalink](/blog/downloads-callbacks-signature-more/#comment-23768))
 
 > Shai Almog says:
 >
@@ -213,7 +213,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mahmoud** — July 31, 2018 at 5:38 am ([permalink](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html#comment-23799))
+### **Mahmoud** — July 31, 2018 at 5:38 am ([permalink](/blog/downloads-callbacks-signature-more/#comment-23799))
 
 > Mahmoud says:
 >
@@ -222,7 +222,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 2, 2018 at 5:51 am ([permalink](https://www.codenameone.com/blog/downloads-callbacks-signature-more.html#comment-23441))
+### **Shai Almog** — August 2, 2018 at 5:51 am ([permalink](/blog/downloads-callbacks-signature-more/#comment-23441))
 
 > Shai Almog says:
 >

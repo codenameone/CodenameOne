@@ -135,7 +135,7 @@ This is by no means the final version of this. These sort of files tend to chang
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Martin Grajcar** — November 4, 2018 at 3:11 pm ([permalink](https://www.codenameone.com/blog/tip-using-git-for-codename-one-projects.html#comment-24007))
+### **Martin Grajcar** — November 4, 2018 at 3:11 pm ([permalink](/blog/tip-using-git-for-codename-one-projects/#comment-24007))
 
 > Martin Grajcar says:
 >
@@ -144,7 +144,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 5, 2018 at 5:26 am ([permalink](https://www.codenameone.com/blog/tip-using-git-for-codename-one-projects.html#comment-23901))
+### **Shai Almog** — November 5, 2018 at 5:26 am ([permalink](/blog/tip-using-git-for-codename-one-projects/#comment-23901))
 
 > Shai Almog says:
 >
@@ -154,11 +154,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Martin Grajcar** — November 5, 2018 at 3:19 pm ([permalink](https://www.codenameone.com/blog/tip-using-git-for-codename-one-projects.html#comment-23972))
+### **Martin Grajcar** — November 5, 2018 at 3:19 pm ([permalink](/blog/tip-using-git-for-codename-one-projects/#comment-23972))
 
 > Martin Grajcar says:
 >
-> It may be out of date, but at most by a week as on Oct 29, I created a new project. I edited it manually, because of [https://www.codenameone.com…](<https://www.codenameone.com/blog/tip-using-lombok-other-tools.html>).
+> It may be out of date, but at most by a week as on Oct 29, I created a new project. I edited it manually, because of [https://www.codenameone.com…](</blog/tip-using-lombok-other-tools/>).
 >
 > There are many `<mkdir dir=”override”/>` there, but there’s none before the copy in the jar target. So I added it now.
 >
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 6, 2018 at 6:55 am ([permalink](https://www.codenameone.com/blog/tip-using-git-for-codename-one-projects.html#comment-23883))
+### **Shai Almog** — November 6, 2018 at 6:55 am ([permalink](/blog/tip-using-git-for-codename-one-projects/#comment-23883))
 
 > Shai Almog says:
 >
@@ -176,7 +176,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ThomasH99** — September 19, 2021 at 2:30 pm ([permalink](https://www.codenameone.com/blog/tip-using-git-for-codename-one-projects.html#comment-24482))
+### **ThomasH99** — September 19, 2021 at 2:30 pm ([permalink](/blog/tip-using-git-for-codename-one-projects/#comment-24482))
 
 > ThomasH99 says:
 >

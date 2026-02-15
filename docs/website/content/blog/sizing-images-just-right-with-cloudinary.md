@@ -11,7 +11,7 @@ author: Steve Hannah
 
 ![Header Image](/blog/sizing-images-just-right-with-cloudinary/cloud-based-image-management.jpg)
 
-As I discussed in a [previous article](https://www.codenameone.com/blog/i-am-your-density.html), creating a beautiful user interface that behaves appropriately across multiple devices can be a challenge, what with the vast array of screen sizes that your app may be deployed to. Codename One provides you with some power tools on this front. E.g.:
+As I discussed in a [previous article](/blog/i-am-your-density/), creating a beautiful user interface that behaves appropriately across multiple devices can be a challenge, what with the vast array of screen sizes that your app may be deployed to. Codename One provides you with some power tools on this front. E.g.:
 
   1. Multi-images
 
@@ -149,7 +149,7 @@ The cn1lib is a fairly straight port of Cloudinary’s official Java API, and sh
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — November 25, 2015 at 5:40 pm ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-22398))
+### **Diamond** — November 25, 2015 at 5:40 pm ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-22398))
 
 > Hi Steve,
 >
@@ -165,7 +165,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — November 26, 2015 at 12:06 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-22405))
+### **shannah78** — November 26, 2015 at 12:06 am ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-22405))
 
 > Thanks for the tip on image names and underscores.
 >
@@ -176,7 +176,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bryan** — November 26, 2015 at 6:03 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-22497))
+### **bryan** — November 26, 2015 at 6:03 am ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-22497))
 
 > bryan says:
 >
@@ -187,7 +187,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — November 26, 2015 at 4:45 pm ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-22439))
+### **shannah78** — November 26, 2015 at 4:45 pm ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-22439))
 
 > shannah78 says:
 >
@@ -196,7 +196,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Carl-Erik Kopseng** — August 30, 2016 at 8:10 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23005))
+### **Carl-Erik Kopseng** — August 30, 2016 at 8:10 am ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-23005))
 
 > Carl-Erik Kopseng says:
 >
@@ -205,7 +205,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 31, 2016 at 4:31 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-22713))
+### **Shai Almog** — August 31, 2016 at 4:31 am ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-22713))
 
 > Shai Almog says:
 >
@@ -215,7 +215,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gert** — March 24, 2017 at 3:12 pm ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23153))
+### **Gert** — March 24, 2017 at 3:12 pm ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-23153))
 
 > Gert says:
 >
@@ -232,7 +232,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 25, 2017 at 5:48 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23047))
+### **Shai Almog** — March 25, 2017 at 5:48 am ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-23047))
 
 > Shai Almog says:
 >
@@ -241,7 +241,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gert** — March 25, 2017 at 5:59 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23446))
+### **Gert** — March 25, 2017 at 5:59 am ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-23446))
 
 > Gert says:
 >
@@ -255,7 +255,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 26, 2017 at 5:08 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23389))
+### **Shai Almog** — March 26, 2017 at 5:08 am ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-23389))
 
 > Shai Almog says:
 >
@@ -266,7 +266,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gert** — March 28, 2017 at 12:26 pm ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23226))
+### **Gert** — March 28, 2017 at 12:26 pm ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-23226))
 
 > Gert says:
 >
@@ -281,7 +281,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — March 28, 2017 at 4:39 pm ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23311))
+### **shannah78** — March 28, 2017 at 4:39 pm ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-23311))
 
 > shannah78 says:
 >
@@ -290,7 +290,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gert** — March 30, 2017 at 2:27 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23463))
+### **Gert** — March 30, 2017 at 2:27 am ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-23463))
 
 > Gert says:
 >
@@ -309,7 +309,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gert** — March 30, 2017 at 10:15 am ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23330))
+### **Gert** — March 30, 2017 at 10:15 am ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-23330))
 
 > Gert says:
 >
@@ -321,7 +321,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — March 30, 2017 at 6:06 pm ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23271))
+### **shannah78** — March 30, 2017 at 6:06 pm ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-23271))
 
 > shannah78 says:
 >
@@ -330,7 +330,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gert** — April 1, 2017 at 2:24 pm ([permalink](https://www.codenameone.com/blog/sizing-images-just-right-with-cloudinary.html#comment-23010))
+### **Gert** — April 1, 2017 at 2:24 pm ([permalink](/blog/sizing-images-just-right-with-cloudinary/#comment-23010))
 
 > Gert says:
 >

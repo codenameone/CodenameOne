@@ -35,7 +35,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — May 23, 2013 at 5:20 am ([permalink](https://www.codenameone.com/blog/introducing-codename-one-maker.html#comment-21626))
+### **Anonymous** — May 23, 2013 at 5:20 am ([permalink](/blog/introducing-codename-one-maker/#comment-21626))
 
 > Anonymous says:
 >
@@ -44,7 +44,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — May 23, 2013 at 1:01 pm ([permalink](https://www.codenameone.com/blog/introducing-codename-one-maker.html#comment-21768))
+### **Anonymous** — May 23, 2013 at 1:01 pm ([permalink](/blog/introducing-codename-one-maker/#comment-21768))
 
 > Anonymous says:
 >
@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — May 24, 2013 at 3:32 am ([permalink](https://www.codenameone.com/blog/introducing-codename-one-maker.html#comment-24231))
+### **Anonymous** — May 24, 2013 at 3:32 am ([permalink](/blog/introducing-codename-one-maker/#comment-24231))
 
 > Anonymous says:
 >

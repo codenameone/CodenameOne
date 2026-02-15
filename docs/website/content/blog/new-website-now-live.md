@@ -67,14 +67,14 @@ old repository will no longer work…
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **ftp27** — March 17, 2015 at 3:12 pm ([permalink](https://www.codenameone.com/blog/new-website-now-live.html#comment-22081))
+### **ftp27** — March 17, 2015 at 3:12 pm ([permalink](/blog/new-website-now-live/#comment-22081))
 
 > ftp27 says:
 >
 > Very sad bugs in new build server. Builds automatically deleted after build.
 
 
-### **Shai Almog** — March 17, 2015 at 6:01 pm ([permalink](https://www.codenameone.com/blog/new-website-now-live.html#comment-22091))
+### **Shai Almog** — March 17, 2015 at 6:01 pm ([permalink](/blog/new-website-now-live/#comment-22091))
 
 > Shai Almog says:
 >
@@ -83,14 +83,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I see a build in progress here. Old builds are only kept up to 5 past builds and only for paying users. This was always the case.
 
 
-### **ftp27** — March 19, 2015 at 10:57 am ([permalink](https://www.codenameone.com/blog/new-website-now-live.html#comment-22136))
+### **ftp27** — March 19, 2015 at 10:57 am ([permalink](/blog/new-website-now-live/#comment-22136))
 
 > ftp27 says:
 >
 > It’s works. Thanks!
 
 
-### **Chidiebere Okwudire** — May 20, 2015 at 10:25 am ([permalink](https://www.codenameone.com/blog/new-website-now-live.html#comment-22400))
+### **Chidiebere Okwudire** — May 20, 2015 at 10:25 am ([permalink](/blog/new-website-now-live/#comment-22400))
 
 > Chidiebere Okwudire says:
 >
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Note, this information is still available via wikipedia at [http://en.wikipedia.org/wik…](<http://en.wikipedia.org/wiki/Codename_One>)
 
 
-### **Shai Almog** — May 20, 2015 at 5:15 pm ([permalink](https://www.codenameone.com/blog/new-website-now-live.html#comment-22193))
+### **Shai Almog** — May 20, 2015 at 5:15 pm ([permalink](/blog/new-website-now-live/#comment-22193))
 
 > Shai Almog says:
 >
@@ -107,7 +107,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > The wikipedia article is actually out of date since we now support a JavaScript build target so our platform support is wider.
 
 
-### **Chidiebere Okwudire** — May 21, 2015 at 7:08 am ([permalink](https://www.codenameone.com/blog/new-website-now-live.html#comment-22230))
+### **Chidiebere Okwudire** — May 21, 2015 at 7:08 am ([permalink](/blog/new-website-now-live/#comment-22230))
 
 > Chidiebere Okwudire says:
 >

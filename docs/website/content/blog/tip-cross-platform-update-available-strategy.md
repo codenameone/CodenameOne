@@ -130,7 +130,7 @@ different version deprecation policies for different OS’s (e.g. for the case o
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jérémy MARQUER** — November 28, 2016 at 2:31 pm ([permalink](https://www.codenameone.com/blog/tip-cross-platform-update-available-strategy.html#comment-23065))
+### **Jérémy MARQUER** — November 28, 2016 at 2:31 pm ([permalink](/blog/tip-cross-platform-update-available-strategy/#comment-23065))
 
 > Jérémy MARQUER says:
 >
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 30, 2016 at 4:05 am ([permalink](https://www.codenameone.com/blog/tip-cross-platform-update-available-strategy.html#comment-23229))
+### **Shai Almog** — November 30, 2016 at 4:05 am ([permalink](/blog/tip-cross-platform-update-available-strategy/#comment-23229))
 
 > Shai Almog says:
 >

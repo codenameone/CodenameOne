@@ -66,7 +66,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — April 22, 2014 at 9:28 am ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-22003))
+### **Anonymous** — April 22, 2014 at 9:28 am ([permalink](/blog/fast-push-communication-using-pubnub/#comment-22003))
 
 > Anonymous says:
 >
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 6, 2014 at 8:07 pm ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-24239))
+### **Anonymous** — September 6, 2014 at 8:07 pm ([permalink](/blog/fast-push-communication-using-pubnub/#comment-24239))
 
 > Anonymous says:
 >
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 7, 2014 at 3:00 am ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-21878))
+### **Anonymous** — September 7, 2014 at 3:00 am ([permalink](/blog/fast-push-communication-using-pubnub/#comment-21878))
 
 > Anonymous says:
 >
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 7, 2014 at 8:31 am ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-21733))
+### **Anonymous** — September 7, 2014 at 8:31 am ([permalink](/blog/fast-push-communication-using-pubnub/#comment-21733))
 
 > Anonymous says:
 >
@@ -102,7 +102,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 7, 2014 at 1:31 pm ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-22040))
+### **Anonymous** — September 7, 2014 at 1:31 pm ([permalink](/blog/fast-push-communication-using-pubnub/#comment-22040))
 
 > Anonymous says:
 >
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 18, 2014 at 5:09 am ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-22198))
+### **Anonymous** — September 18, 2014 at 5:09 am ([permalink](/blog/fast-push-communication-using-pubnub/#comment-22198))
 
 > Anonymous says:
 >
@@ -120,7 +120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Linsong Wang** — December 19, 2016 at 8:08 pm ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-23161))
+### **Linsong Wang** — December 19, 2016 at 8:08 pm ([permalink](/blog/fast-push-communication-using-pubnub/#comment-23161))
 
 > Linsong Wang says:
 >
@@ -129,7 +129,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 20, 2016 at 5:28 am ([permalink](https://www.codenameone.com/blog/fast-push-communication-using-pubnub.html#comment-23277))
+### **Shai Almog** — December 20, 2016 at 5:28 am ([permalink](/blog/fast-push-communication-using-pubnub/#comment-23277))
 
 > Shai Almog says:
 >

@@ -590,28 +590,28 @@ You can check out the final source code of this tutorial [here](https://github.c
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Lanre Makinde** — August 17, 2015 at 6:37 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-5.html#comment-22339))
+### **Lanre Makinde** — August 17, 2015 at 6:37 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-5/#comment-22339))
 
 > Whoaoooooo. U guys are so far ahead. For you to despite your busy schedule have time for this kinda tutorials. Although I will wish to see login through twitter handled in your tutorial as well. Thanks great guys, great work.
 >
 
 
 
-### **salah Alhaddabi** — November 19, 2016 at 1:34 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-5.html#comment-23150))
+### **salah Alhaddabi** — November 19, 2016 at 1:34 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-5/#comment-23150))
 
 > Dear Shai, I have tried the chat app up until now without the pubnub functionality. I have copied the exact same code from here and also missing pieces from gethub. When I use it on the simulator and clock on google login I login ok. But when I try to get friends I get an error even when the token is valid. I immediately get 400 error code when I try to use facebook login. I have tried the app on my android device S7 and I get a message the socialChat app has closed when I click on google login.
 >
 
 
 
-### **Shai Almog** — November 20, 2016 at 6:13 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-5.html#comment-23092))
+### **Shai Almog** — November 20, 2016 at 6:13 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-5/#comment-23092))
 
 > Try running with the device connected with a cable and DDMS to see the output.
 >
 
 
 
-### **salah Alhaddabi** — November 20, 2016 at 6:34 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-5.html#comment-23174))
+### **salah Alhaddabi** — November 20, 2016 at 6:34 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-5/#comment-23174))
 
 > Dear Shai,
 >
@@ -620,14 +620,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 21, 2016 at 4:52 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-5.html#comment-23025))
+### **Shai Almog** — November 21, 2016 at 4:52 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-5/#comment-23025))
 
 > You don’t need to open the APK in Android studio. Just run the app as usual on the device and in android studio select the DDMS tool. This will open a special console on the bottom where you can pick your device and look thru the logs.
 >
 
 
 
-### **salah Alhaddabi** — November 21, 2016 at 6:59 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-5.html#comment-23036))
+### **salah Alhaddabi** — November 21, 2016 at 6:59 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-5/#comment-23036))
 
 > Dear Shai,
 >
@@ -645,7 +645,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 22, 2016 at 4:49 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-5.html#comment-23218))
+### **Shai Almog** — November 22, 2016 at 4:49 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-5/#comment-23218))
 
 > As explained in the article Facebook doesn’t provide access to all your contacts. It only provides access to contacts who installed the app…
 >

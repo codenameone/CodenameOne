@@ -45,7 +45,7 @@ As ink and paper took over languages that didn’t have a writing system before 
 
 The problem of RTL languages is far more difficult as numbers or other languages are still written from left to right. This is called: bidi (bi-directional). That means a sentence starts from the right, skips to the left to show a number then goes back.
 
-Because RTL languages are read from the right side users expect the entire UI to be reversed. That means all UI elements should be aligned to the right and all components should be in the exact flipped order. This is done automatically in Codename One see the [i18n tutorial](https://www.codenameone.com/how-do-i---localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app.html).
+Because RTL languages are read from the right side users expect the entire UI to be reversed. That means all UI elements should be aligned to the right and all components should be in the exact flipped order. This is done automatically in Codename One see the [i18n tutorial](/how-do-i---localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app/).
 
 Up until now we couldn’t do this for the side menu but now that [Francesco Galgani](https://github.com/jsfan3) introduced support for [right side menu in his PR](https://github.com/codenameone/CodenameOne/pull/2437) and [followup PR](https://github.com/codenameone/CodenameOne/pull/2439) this is finally possible!
 

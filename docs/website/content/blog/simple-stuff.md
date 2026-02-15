@@ -118,7 +118,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 21, 2013 at 6:37 pm ([permalink](https://www.codenameone.com/blog/simple-stuff.html#comment-21896))
+### **Anonymous** — October 21, 2013 at 6:37 pm ([permalink](/blog/simple-stuff/#comment-21896))
 
 > Anonymous says:
 >
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 22, 2013 at 3:08 am ([permalink](https://www.codenameone.com/blog/simple-stuff.html#comment-24256))
+### **Anonymous** — October 22, 2013 at 3:08 am ([permalink](/blog/simple-stuff/#comment-24256))
 
 > Anonymous says:
 >
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 31, 2013 at 5:21 pm ([permalink](https://www.codenameone.com/blog/simple-stuff.html#comment-24234))
+### **Anonymous** — October 31, 2013 at 5:21 pm ([permalink](/blog/simple-stuff/#comment-24234))
 
 > Anonymous says:
 >
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 1, 2013 at 4:29 am ([permalink](https://www.codenameone.com/blog/simple-stuff.html#comment-21700))
+### **Anonymous** — November 1, 2013 at 4:29 am ([permalink](/blog/simple-stuff/#comment-21700))
 
 > Anonymous says:
 >
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 25, 2020 at 11:38 am ([permalink](https://www.codenameone.com/blog/simple-stuff.html#comment-21391))
+### **Anonymous** — September 25, 2020 at 11:38 am ([permalink](/blog/simple-stuff/#comment-21391))
 
 > Anonymous says:
 >

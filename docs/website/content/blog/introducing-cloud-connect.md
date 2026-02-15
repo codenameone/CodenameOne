@@ -31,7 +31,7 @@ But even more importantly, scrolling behavior and editing is impacted by design 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **codelessfuture** — November 20, 2018 at 11:00 am ([permalink](https://www.codenameone.com/blog/introducing-cloud-connect.html#comment-23935))
+### **codelessfuture** — November 20, 2018 at 11:00 am ([permalink](/blog/introducing-cloud-connect/#comment-23935))
 
 > codelessfuture says:
 >
@@ -40,7 +40,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 20, 2018 at 11:02 am ([permalink](https://www.codenameone.com/blog/introducing-cloud-connect.html#comment-24073))
+### **Shai Almog** — November 20, 2018 at 11:02 am ([permalink](/blog/introducing-cloud-connect/#comment-24073))
 
 > Shai Almog says:
 >
@@ -49,7 +49,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 20, 2018 at 11:07 am ([permalink](https://www.codenameone.com/blog/introducing-cloud-connect.html#comment-24083))
+### **Shai Almog** — November 20, 2018 at 11:07 am ([permalink](/blog/introducing-cloud-connect/#comment-24083))
 
 > Shai Almog says:
 >
@@ -58,7 +58,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Boniface N. Githinji** — November 20, 2018 at 11:38 am ([permalink](https://www.codenameone.com/blog/introducing-cloud-connect.html#comment-24103))
+### **Boniface N. Githinji** — November 20, 2018 at 11:38 am ([permalink](/blog/introducing-cloud-connect/#comment-24103))
 
 > Boniface N. Githinji says:
 >
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 21, 2018 at 7:08 am ([permalink](https://www.codenameone.com/blog/introducing-cloud-connect.html#comment-24026))
+### **Shai Almog** — November 21, 2018 at 7:08 am ([permalink](/blog/introducing-cloud-connect/#comment-24026))
 
 > Shai Almog says:
 >
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chen Fishbein** — November 22, 2018 at 7:19 am ([permalink](https://www.codenameone.com/blog/introducing-cloud-connect.html#comment-24085))
+### **Chen Fishbein** — November 22, 2018 at 7:19 am ([permalink](/blog/introducing-cloud-connect/#comment-24085))
 
 > Chen Fishbein says:
 >

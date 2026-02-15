@@ -59,14 +59,14 @@ To be fair, these lessons are shorter as I get to the point faster and I improve
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Stefan Eder** — May 23, 2018 at 10:27 am ([permalink](https://www.codenameone.com/blog/lightweight-picker-device-detection.html#comment-23619))
+### **Stefan Eder** — May 23, 2018 at 10:27 am ([permalink](/blog/lightweight-picker-device-detection/#comment-23619))
 
 > Would it be possible now to have a UI like in the IOS calendar app where the pickers slide in between the other controls – thus not open a dialog to choose but stay on the same form?
 >
 
 
 
-### **Stefan Eder** — May 23, 2018 at 11:13 am ([permalink](https://www.codenameone.com/blog/lightweight-picker-device-detection.html#comment-23683))
+### **Stefan Eder** — May 23, 2018 at 11:13 am ([permalink](/blog/lightweight-picker-device-detection/#comment-23683))
 
 > Stefan Eder says:
 >
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 24, 2018 at 4:05 am ([permalink](https://www.codenameone.com/blog/lightweight-picker-device-detection.html#comment-23946))
+### **Shai Almog** — May 24, 2018 at 4:05 am ([permalink](/blog/lightweight-picker-device-detection/#comment-23946))
 
 > Shai Almog says:
 >
@@ -86,7 +86,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — May 25, 2018 at 3:36 pm ([permalink](https://www.codenameone.com/blog/lightweight-picker-device-detection.html#comment-21636))
+### **Francesco Galgani** — May 25, 2018 at 3:36 pm ([permalink](/blog/lightweight-picker-device-detection/#comment-21636))
 
 > Francesco Galgani says:
 >

@@ -61,7 +61,7 @@ Thank you!
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Francesco Galgani** — August 23, 2021 at 6:32 am ([permalink](https://www.codenameone.com/blog/moving-the-support-to-reddit.html#comment-24476))
+### **Francesco Galgani** — August 23, 2021 at 6:32 am ([permalink](/blog/moving-the-support-to-reddit/#comment-24476))
 
 > Francesco Galgani says:
 >
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 24, 2021 at 1:43 am ([permalink](https://www.codenameone.com/blog/moving-the-support-to-reddit.html#comment-24477))
+### **Shai Almog** — August 24, 2021 at 1:43 am ([permalink](/blog/moving-the-support-to-reddit/#comment-24477))
 
 > Shai Almog says:
 >
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — August 24, 2021 at 7:28 pm ([permalink](https://www.codenameone.com/blog/moving-the-support-to-reddit.html#comment-24478))
+### **Francesco Galgani** — August 24, 2021 at 7:28 pm ([permalink](/blog/moving-the-support-to-reddit/#comment-24478))
 
 > Francesco Galgani says:
 >

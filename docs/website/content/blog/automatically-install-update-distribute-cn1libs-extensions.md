@@ -62,7 +62,7 @@ project.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — June 8, 2016 at 2:50 pm ([permalink](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html#comment-21512))
+### **Chidiebere Okwudire** — June 8, 2016 at 2:50 pm ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-21512))
 
 > This sounds really cool! I’m definitely gonna try it out in the upcoming parse4cn1 update scheduled for later this month and give you feedback.
 >
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Can’t wait to try this out 🙂
 
 
-### **Shai Almog** — June 9, 2016 at 3:50 am ([permalink](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html#comment-22892))
+### **Shai Almog** — June 9, 2016 at 3:50 am ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-22892))
 
 > Thanks!
 >
@@ -81,26 +81,26 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > FYI parse4cn1 is already in the current repository (we added most of our existing cn1libs section). At the moment we didn’t take that strategy and it’s listed as the standard cn1lib.
 
 
-### **Chidiebere Okwudire** — June 9, 2016 at 7:47 am ([permalink](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html#comment-22696))
+### **Chidiebere Okwudire** — June 9, 2016 at 7:47 am ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-22696))
 
 > Yeah, I already peeped at the git repo. The version number is also incorrect but that’s no problem. I’ll fix it within the coming update hopefully next week. At the time, I’ll also split it up
 
 
-### **Shai Almog** — June 9, 2016 at 8:05 am ([permalink](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html#comment-22810))
+### **Shai Almog** — June 9, 2016 at 8:05 am ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-22810))
 
 > Shai Almog says:
 >
 > Notice that this isn’t the “actual” version number. It’s the version in our repo which is an integer. We use this to determine if there is an update only and this isn’t displayed to the user… So the number is fine in that sense.
 
 
-### **Chidiebere Okwudire** — June 17, 2016 at 8:30 am ([permalink](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html#comment-22817))
+### **Chidiebere Okwudire** — June 17, 2016 at 8:30 am ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-22817))
 
 > Chidiebere Okwudire says:
 >
 > Good point. By the way, do the IDEs automatically detect updates of the github repo is are the changes only available after the weekly cn1 updates?
 
 
-### **Shai Almog** — June 17, 2016 at 11:51 am ([permalink](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html#comment-22709))
+### **Shai Almog** — June 17, 2016 at 11:51 am ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-22709))
 
 > Shai Almog says:
 >
@@ -109,14 +109,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > The logic is that we want the ability to migrate hosting. In the past we had an update center for NetBeans on Google code and it seems some people were still using it until now… In the future github might come down on partial binary hosting and we’d like such an eventuality to be seamless to our users.
 
 
-### **Jérémy MARQUER** — August 9, 2016 at 10:15 am ([permalink](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html#comment-22970))
+### **Jérémy MARQUER** — August 9, 2016 at 10:15 am ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-22970))
 
 > Jérémy MARQUER says:
 >
 > Hey. I cannot access to the new Preferences UI of CN1 with eclipse. My cn1 plugin version is “1.0.0.201608062027”. Thanks.
 
 
-### **Shai Almog** — August 10, 2016 at 5:37 am ([permalink](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html#comment-22470))
+### **Shai Almog** — August 10, 2016 at 5:37 am ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-22470))
 
 > Shai Almog says:
 >
@@ -125,7 +125,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Are you using JDK 8 to run Eclipse (you need to set it up in eclipse.ini)?
 
 
-### **Jérémy MARQUER** — August 10, 2016 at 7:09 am ([permalink](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html#comment-22734))
+### **Jérémy MARQUER** — August 10, 2016 at 7:09 am ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-22734))
 
 > Jérémy MARQUER says:
 >
@@ -134,7 +134,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > C:/Program Files/Java/jre1.8.0_77/bin/javaw.exe”
 
 
-### **Shai Almog** — August 11, 2016 at 4:41 am ([permalink](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html#comment-21456))
+### **Shai Almog** — August 11, 2016 at 4:41 am ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-21456))
 
 > Shai Almog says:
 >
@@ -142,7 +142,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Assuming it’s there try running it from command line using java -jar c:myuserhomedir.codenameoneguibuilder_1.jar -settings path_to_project[codenameone_settings.proper…](<http://codenameone_settings.properties>) are there any errors printed to the console?
 
-### **Jérémy MARQUER** — August 11, 2016 at 7:12 am ([permalink](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html#comment-22557))
+### **Jérémy MARQUER** — August 11, 2016 at 7:12 am ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-22557))
 
 > Jérémy MARQUER says:
 >
@@ -150,21 +150,21 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > (and no errors printed)
 
 
-### **Shai Almog** — August 12, 2016 at 4:16 am ([permalink](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html#comment-22903))
+### **Shai Almog** — August 12, 2016 at 4:16 am ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-22903))
 
 > Shai Almog says:
 >
 > That’s a problem. We’ll look into it.
 
 
-### **Jérémy MARQUER** — August 17, 2016 at 4:31 pm ([permalink](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html#comment-22635))
+### **Jérémy MARQUER** — August 17, 2016 at 4:31 pm ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-22635))
 
 > Jérémy MARQUER says:
 >
 > It’s ok, thanks.
 
 
-### **Julien Sosin** — December 5, 2017 at 3:24 pm ([permalink](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html#comment-23705))
+### **Julien Sosin** — December 5, 2017 at 3:24 pm ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-23705))
 
 > Julien Sosin says:
 >
@@ -173,7 +173,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > How can I delete a lib ? I tried CodeScanner but it looks deprecated and I can’t build iOS app anymore :/
 
 
-### **Shai Almog** — December 6, 2017 at 9:11 am ([permalink](https://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html#comment-23713))
+### **Shai Almog** — December 6, 2017 at 9:11 am ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-23713))
 
 > Shai Almog says:
 >

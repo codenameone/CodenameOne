@@ -42,7 +42,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — February 28, 2013 at 7:21 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-21664))
+### **Anonymous** — February 28, 2013 at 7:21 pm ([permalink](/blog/hamburger-sidemenu/#comment-21664))
 
 > Anonymous says:
 >
@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 1, 2013 at 6:37 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-21915))
+### **Anonymous** — March 1, 2013 at 6:37 am ([permalink](/blog/hamburger-sidemenu/#comment-21915))
 
 > Anonymous says:
 >
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — August 17, 2013 at 4:36 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-21666))
+### **Anonymous** — August 17, 2013 at 4:36 pm ([permalink](/blog/hamburger-sidemenu/#comment-21666))
 
 > Anonymous says:
 >
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — August 18, 2013 at 1:34 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-21917))
+### **Anonymous** — August 18, 2013 at 1:34 am ([permalink](/blog/hamburger-sidemenu/#comment-21917))
 
 > Anonymous says:
 >
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — August 18, 2013 at 7:20 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-21811))
+### **Anonymous** — August 18, 2013 at 7:20 am ([permalink](/blog/hamburger-sidemenu/#comment-21811))
 
 > Anonymous says:
 >
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **George Njoroge** — September 4, 2015 at 9:29 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-22218))
+### **George Njoroge** — September 4, 2015 at 9:29 am ([permalink](/blog/hamburger-sidemenu/#comment-22218))
 
 > George Njoroge says:
 >
@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 5, 2015 at 3:58 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-22340))
+### **Shai Almog** — September 5, 2015 at 3:58 am ([permalink](/blog/hamburger-sidemenu/#comment-22340))
 
 > Shai Almog says:
 >
@@ -117,7 +117,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Bertrand Gauvreau** — October 16, 2015 at 3:52 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-22442))
+### **Bertrand Gauvreau** — October 16, 2015 at 3:52 pm ([permalink](/blog/hamburger-sidemenu/#comment-22442))
 
 > Bertrand Gauvreau says:
 >
@@ -129,7 +129,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 17, 2015 at 4:33 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-22367))
+### **Shai Almog** — October 17, 2015 at 4:33 am ([permalink](/blog/hamburger-sidemenu/#comment-22367))
 
 > Shai Almog says:
 >
@@ -141,7 +141,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Bertrand Gauvreau** — October 17, 2015 at 12:46 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-24182))
+### **Bertrand Gauvreau** — October 17, 2015 at 12:46 pm ([permalink](/blog/hamburger-sidemenu/#comment-24182))
 
 > Bertrand Gauvreau says:
 >
@@ -150,7 +150,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mahmoud** — March 26, 2016 at 8:43 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-22701))
+### **Mahmoud** — March 26, 2016 at 8:43 pm ([permalink](/blog/hamburger-sidemenu/#comment-22701))
 
 > Mahmoud says:
 >
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 27, 2016 at 4:26 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-21503))
+### **Shai Almog** — March 27, 2016 at 4:26 am ([permalink](/blog/hamburger-sidemenu/#comment-21503))
 
 > Shai Almog says:
 >
@@ -170,7 +170,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mahmoud** — March 27, 2016 at 5:43 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-24203))
+### **Mahmoud** — March 27, 2016 at 5:43 am ([permalink](/blog/hamburger-sidemenu/#comment-24203))
 
 > Mahmoud says:
 >
@@ -179,7 +179,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Akinniranye James** — September 14, 2016 at 1:39 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-22559))
+### **Akinniranye James** — September 14, 2016 at 1:39 pm ([permalink](/blog/hamburger-sidemenu/#comment-22559))
 
 > Akinniranye James says:
 >
@@ -188,7 +188,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 15, 2016 at 3:47 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-22762))
+### **Shai Almog** — September 15, 2016 at 3:47 am ([permalink](/blog/hamburger-sidemenu/#comment-22762))
 
 > Shai Almog says:
 >
@@ -199,7 +199,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Akinniranye James** — September 15, 2016 at 8:01 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-21458))
+### **Akinniranye James** — September 15, 2016 at 8:01 pm ([permalink](/blog/hamburger-sidemenu/#comment-21458))
 
 > Akinniranye James says:
 >
@@ -208,7 +208,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Akinniranye James** — September 15, 2016 at 8:26 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-21823))
+### **Akinniranye James** — September 15, 2016 at 8:26 pm ([permalink](/blog/hamburger-sidemenu/#comment-21823))
 
 > Akinniranye James says:
 >
@@ -217,7 +217,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **tracey-de santa** — July 26, 2017 at 6:21 am ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-23538))
+### **tracey-de santa** — July 26, 2017 at 6:21 am ([permalink](/blog/hamburger-sidemenu/#comment-23538))
 
 > tracey-de santa says:
 >
@@ -226,7 +226,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Akinniranye James** — July 26, 2017 at 3:59 pm ([permalink](https://www.codenameone.com/blog/hamburger-sidemenu.html#comment-23253))
+### **Akinniranye James** — July 26, 2017 at 3:59 pm ([permalink](/blog/hamburger-sidemenu/#comment-23253))
 
 > Akinniranye James says:
 >

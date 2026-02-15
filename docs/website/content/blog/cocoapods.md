@@ -86,7 +86,7 @@ __ |  Note that the `ios.pods.sources` directive is optional
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — January 24, 2017 at 2:14 am ([permalink](https://www.codenameone.com/blog/cocoapods.html#comment-23114))
+### **Chidiebere Okwudire** — January 24, 2017 at 2:14 am ([permalink](/blog/cocoapods/#comment-23114))
 
 > Chidiebere Okwudire says:
 >
@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **3lix** — February 13, 2017 at 3:55 pm ([permalink](https://www.codenameone.com/blog/cocoapods.html#comment-24126))
+### **3lix** — February 13, 2017 at 3:55 pm ([permalink](/blog/cocoapods/#comment-24126))
 
 > 3lix says:
 >
@@ -104,7 +104,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 14, 2017 at 8:02 am ([permalink](https://www.codenameone.com/blog/cocoapods.html#comment-23239))
+### **Shai Almog** — February 14, 2017 at 8:02 am ([permalink](/blog/cocoapods/#comment-23239))
 
 > Shai Almog says:
 >
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — October 17, 2018 at 9:40 pm ([permalink](https://www.codenameone.com/blog/cocoapods.html#comment-23942))
+### **Francesco Galgani** — October 17, 2018 at 9:40 pm ([permalink](/blog/cocoapods/#comment-23942))
 
 > Francesco Galgani says:
 >
@@ -122,11 +122,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 18, 2018 at 4:04 am ([permalink](https://www.codenameone.com/blog/cocoapods.html#comment-23919))
+### **Shai Almog** — October 18, 2018 at 4:04 am ([permalink](/blog/cocoapods/#comment-23919))
 
 > Shai Almog says:
 >
-> Sure, Gradle: [https://www.codenameone.com…](<https://www.codenameone.com/blog/tip-use-android-gradle-dependencies-native-code.html>)
+> Sure, Gradle: [https://www.codenameone.com…](</blog/tip-use-android-gradle-dependencies-native-code/>)
 >
 
 

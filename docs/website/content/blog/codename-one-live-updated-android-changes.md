@@ -53,7 +53,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — December 16, 2013 at 7:37 pm ([permalink](https://www.codenameone.com/blog/codename-one-live-updated-android-changes.html#comment-22001))
+### **Anonymous** — December 16, 2013 at 7:37 pm ([permalink](/blog/codename-one-live-updated-android-changes/#comment-22001))
 
 > Anonymous says:
 >
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 17, 2013 at 2:54 am ([permalink](https://www.codenameone.com/blog/codename-one-live-updated-android-changes.html#comment-21859))
+### **Anonymous** — December 17, 2013 at 2:54 am ([permalink](/blog/codename-one-live-updated-android-changes/#comment-21859))
 
 > Anonymous says:
 >

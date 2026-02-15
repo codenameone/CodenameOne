@@ -113,7 +113,7 @@ If you know of other attractive solutions, have success stories/useful tips to s
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Marian Ignev** — September 25, 2016 at 4:31 am ([permalink](https://www.codenameone.com/blog/how-i-chose-my-replacement-for-parse-com-part-2.html#comment-22973))
+### **Marian Ignev** — September 25, 2016 at 4:31 am ([permalink](/blog/how-i-chose-my-replacement-for-parse-com-part-2/#comment-22973))
 
 > Marian Ignev says:
 >
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 
 
-### **Chidiebere Okwudire** — September 29, 2016 at 11:00 am ([permalink](https://www.codenameone.com/blog/how-i-chose-my-replacement-for-parse-com-part-2.html#comment-22965))
+### **Chidiebere Okwudire** — September 29, 2016 at 11:00 am ([permalink](/blog/how-i-chose-my-replacement-for-parse-com-part-2/#comment-22965))
 
 > Chidiebere Okwudire says:
 >
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I look forward to your response and once again thanks for taking your time to engage in this conversation.
 
 
-### **Marian Ignev** — September 30, 2016 at 2:38 am ([permalink](https://www.codenameone.com/blog/how-i-chose-my-replacement-for-parse-com-part-2.html#comment-22997))
+### **Marian Ignev** — September 30, 2016 at 2:38 am ([permalink](/blog/how-i-chose-my-replacement-for-parse-com-part-2/#comment-22997))
 
 > Marian Ignev says:
 >

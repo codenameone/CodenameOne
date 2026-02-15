@@ -57,7 +57,7 @@ that in mind as we are reviewing the demos.
 ### Date Time Picker issue
 
 Picker is implemented natively on the device. The DateTime picker is a platform specific concept in iOS. Every  
-time I need to deal with the [Picker class](https://www.codenameone.com/javadoc/com/codename1/ui/spinner/Picker.html)  
+time I need to deal with the [Picker class](/javadoc/com/codename1/ui/spinner/Picker/)  
 I’m reminded on how good we have it thanks to lightweight architecture.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37117122/date-time-picker-issue-in-codename-one)

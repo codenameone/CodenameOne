@@ -69,7 +69,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — November 15, 2013 at 4:15 pm ([permalink](https://www.codenameone.com/blog/lts-blog-post-and-updates.html#comment-21715))
+### **Anonymous** — November 15, 2013 at 4:15 pm ([permalink](/blog/lts-blog-post-and-updates/#comment-21715))
 
 > Anonymous says:
 >
@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 15, 2013 at 6:38 pm ([permalink](https://www.codenameone.com/blog/lts-blog-post-and-updates.html#comment-21827))
+### **Anonymous** — November 15, 2013 at 6:38 pm ([permalink](/blog/lts-blog-post-and-updates/#comment-21827))
 
 > Anonymous says:
 >

@@ -54,7 +54,7 @@ Check out the [SafeAreasSample](https://github.com/codenameone/CodenameOne/blob/
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — February 10, 2020 at 11:40 am ([permalink](https://www.codenameone.com/blog/safe-areas.html#comment-21379))
+### **Francesco Galgani** — February 10, 2020 at 11:40 am ([permalink](/blog/safe-areas/#comment-21379))
 
 > Thank you Steve, this solves a lot of issues in a simple way! 😀  
 > Is it fine if it’s applied to the contentPane?
@@ -62,14 +62,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — February 10, 2020 at 1:25 pm ([permalink](https://www.codenameone.com/blog/safe-areas.html#comment-21381))
+### **Steve Hannah** — February 10, 2020 at 1:25 pm ([permalink](/blog/safe-areas/#comment-21381))
 
 > You can apply it to the content pane as long as you don’t have any components that are supposed to bleed to the edge. E.g. If you have tabs, it would look weird because the tab buttons wouldn’t be at the very bottom of the screen.
 >
 
 
 
-### **Javier Anton** — March 10, 2021 at 1:33 pm ([permalink](https://www.codenameone.com/blog/safe-areas.html#comment-24411))
+### **Javier Anton** — March 10, 2021 at 1:33 pm ([permalink](/blog/safe-areas/#comment-24411))
 
 > Javier Anton says:
 >

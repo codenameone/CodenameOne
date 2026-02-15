@@ -267,14 +267,14 @@ I have also posted a short screencast of the demo app on youtube:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chibuike Mba** — March 16, 2017 at 5:12 pm ([permalink](https://www.codenameone.com/blog/jquery-css-style-selectors-for-cn1.html#comment-23290))
+### **Chibuike Mba** — March 16, 2017 at 5:12 pm ([permalink](/blog/jquery-css-style-selectors-for-cn1/#comment-23290))
 
 > WOW! Steve this is cool, will definitely try things out with this coding convention. Anybody with good background knowledge of jQuery will really appreciate this. Doing native mobile like jQuery ninja. Great job. 🙂
 >
 
 
 
-### **shannah78** — March 16, 2017 at 5:21 pm ([permalink](https://www.codenameone.com/blog/jquery-css-style-selectors-for-cn1.html#comment-23198))
+### **shannah78** — March 16, 2017 at 5:21 pm ([permalink](/blog/jquery-css-style-selectors-for-cn1/#comment-23198))
 
 > shannah78 says:
 >

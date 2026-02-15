@@ -85,7 +85,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — February 12, 2013 at 6:41 am ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-24156))
+### **Anonymous** — February 12, 2013 at 6:41 am ([permalink](/blog/new-preliminary-library-support/#comment-24156))
 
 > Anonymous says:
 >
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 15, 2013 at 2:10 pm ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-21887))
+### **Anonymous** — February 15, 2013 at 2:10 pm ([permalink](/blog/new-preliminary-library-support/#comment-21887))
 
 > Anonymous says:
 >
@@ -107,7 +107,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 18, 2013 at 10:07 pm ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-21801))
+### **Anonymous** — June 18, 2013 at 10:07 pm ([permalink](/blog/new-preliminary-library-support/#comment-21801))
 
 > Anonymous says:
 >
@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — June 19, 2013 at 4:26 am ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-21953))
+### **Anonymous** — June 19, 2013 at 4:26 am ([permalink](/blog/new-preliminary-library-support/#comment-21953))
 
 > Anonymous says:
 >
@@ -129,7 +129,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 23, 2014 at 11:25 pm ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-22212))
+### **Anonymous** — October 23, 2014 at 11:25 pm ([permalink](/blog/new-preliminary-library-support/#comment-22212))
 
 > Anonymous says:
 >
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 24, 2014 at 9:59 am ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-21595))
+### **Anonymous** — October 24, 2014 at 9:59 am ([permalink](/blog/new-preliminary-library-support/#comment-21595))
 
 > Anonymous says:
 >
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **David Hinckley** — December 25, 2015 at 10:23 am ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-22308))
+### **David Hinckley** — December 25, 2015 at 10:23 am ([permalink](/blog/new-preliminary-library-support/#comment-22308))
 
 > David Hinckley says:
 >
@@ -158,18 +158,18 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 26, 2015 at 5:00 am ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-22370))
+### **Shai Almog** — December 26, 2015 at 5:00 am ([permalink](/blog/new-preliminary-library-support/#comment-22370))
 
 > Shai Almog says:
 >
-> We just didn’t implement this on Eclipse. Back when we did this there wasn’t much demand and most of the hardcore hackers used NetBeans since it made it easier to work with our sources: [https://www.codenameone.com…](<https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html>)
+> We just didn’t implement this on Eclipse. Back when we did this there wasn’t much demand and most of the hardcore hackers used NetBeans since it made it easier to work with our sources: [https://www.codenameone.com…](</blog/how-to-use-the-codename-one-sources/>)
 >
 > We’ll add this in a future update, however you can just open any existing library project and just change it to suite your needs since they are just ant projects that don’t need much IDE integration.
 >
 
 
 
-### **Orlando D'Free** — March 31, 2016 at 8:36 am ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-22572))
+### **Orlando D'Free** — March 31, 2016 at 8:36 am ([permalink](/blog/new-preliminary-library-support/#comment-22572))
 
 > Orlando D'Free says:
 >
@@ -182,7 +182,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 1, 2016 at 3:20 am ([permalink](https://www.codenameone.com/blog/new-preliminary-library-support.html#comment-22640))
+### **Shai Almog** — April 1, 2016 at 3:20 am ([permalink](/blog/new-preliminary-library-support/#comment-22640))
 
 > Shai Almog says:
 >

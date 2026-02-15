@@ -52,7 +52,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 25, 2013 at 12:27 am ([permalink](https://www.codenameone.com/blog/please-help-us-by-taking-this-survey.html#comment-21944))
+### **Anonymous** — October 25, 2013 at 12:27 am ([permalink](/blog/please-help-us-by-taking-this-survey/#comment-21944))
 
 > Anonymous says:
 >
@@ -63,7 +63,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 25, 2013 at 8:10 am ([permalink](https://www.codenameone.com/blog/please-help-us-by-taking-this-survey.html#comment-21668))
+### **Anonymous** — October 25, 2013 at 8:10 am ([permalink](/blog/please-help-us-by-taking-this-survey/#comment-21668))
 
 > Anonymous says:
 >

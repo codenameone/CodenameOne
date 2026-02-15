@@ -37,7 +37,7 @@ This can have far reaching effect as a lot of our components currently feature d
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — August 24, 2017 at 3:43 pm ([permalink](https://www.codenameone.com/blog/millimeter-underline.html#comment-23703))
+### **Francesco Galgani** — August 24, 2017 at 3:43 pm ([permalink](/blog/millimeter-underline/#comment-23703))
 
 > Francesco Galgani says:
 >
@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 25, 2017 at 3:24 am ([permalink](https://www.codenameone.com/blog/millimeter-underline.html#comment-23711))
+### **Shai Almog** — August 25, 2017 at 3:24 am ([permalink](/blog/millimeter-underline/#comment-23711))
 
 > Shai Almog says:
 >

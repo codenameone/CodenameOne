@@ -25,7 +25,7 @@ If you want to revert to the old behavior you can do so by setting the build hin
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — August 29, 2018 at 11:23 am ([permalink](https://www.codenameone.com/blog/no-more-ios-screenshots.html#comment-21579))
+### **Francesco Galgani** — August 29, 2018 at 11:23 am ([permalink](/blog/no-more-ios-screenshots/#comment-21579))
 
 > Francesco Galgani says:
 >
@@ -34,7 +34,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — August 29, 2018 at 12:04 pm ([permalink](https://www.codenameone.com/blog/no-more-ios-screenshots.html#comment-23733))
+### **Francesco Galgani** — August 29, 2018 at 12:04 pm ([permalink](/blog/no-more-ios-screenshots/#comment-23733))
 
 > Francesco Galgani says:
 >
@@ -43,7 +43,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 30, 2018 at 5:42 am ([permalink](https://www.codenameone.com/blog/no-more-ios-screenshots.html#comment-23892))
+### **Shai Almog** — August 30, 2018 at 5:42 am ([permalink](/blog/no-more-ios-screenshots/#comment-23892))
 
 > Shai Almog says:
 >

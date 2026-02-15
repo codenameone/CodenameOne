@@ -47,14 +47,14 @@ it based on demand.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — September 14, 2016 at 3:10 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22898))
+### **Chidiebere Okwudire** — September 14, 2016 at 3:10 pm ([permalink](/blog/floating-button/#comment-22898))
 
 > Another nice one! Does the “+” also animate to an “x” when opening the sub-menu? 🙂
 >
 
 
 
-### **Lukman Javalove Idealist Jaji** — September 14, 2016 at 3:15 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22986))
+### **Lukman Javalove Idealist Jaji** — September 14, 2016 at 3:15 pm ([permalink](/blog/floating-button/#comment-22986))
 
 > Lukman Javalove Idealist Jaji says:
 >
@@ -63,7 +63,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Bayu Sanjaya** — September 14, 2016 at 7:32 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22922))
+### **Bayu Sanjaya** — September 14, 2016 at 7:32 pm ([permalink](/blog/floating-button/#comment-22922))
 
 > Bayu Sanjaya says:
 >
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 15, 2016 at 3:58 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22788))
+### **Shai Almog** — September 15, 2016 at 3:58 am ([permalink](/blog/floating-button/#comment-22788))
 
 > Shai Almog says:
 >
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 15, 2016 at 4:00 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22908))
+### **Shai Almog** — September 15, 2016 at 4:00 am ([permalink](/blog/floating-button/#comment-22908))
 
 > Shai Almog says:
 >
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 15, 2016 at 4:01 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22708))
+### **Shai Almog** — September 15, 2016 at 4:01 am ([permalink](/blog/floating-button/#comment-22708))
 
 > Shai Almog says:
 >
@@ -102,7 +102,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Bayu Sanjaya** — September 15, 2016 at 4:04 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22979))
+### **Bayu Sanjaya** — September 15, 2016 at 4:04 am ([permalink](/blog/floating-button/#comment-22979))
 
 > Bayu Sanjaya says:
 >
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 15, 2016 at 4:59 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22685))
+### **Shai Almog** — September 15, 2016 at 4:59 am ([permalink](/blog/floating-button/#comment-22685))
 
 > Shai Almog says:
 >
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Jérémy MARQUER** — September 15, 2016 at 7:17 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22743))
+### **Jérémy MARQUER** — September 15, 2016 at 7:17 am ([permalink](/blog/floating-button/#comment-22743))
 
 > Jérémy MARQUER says:
 >
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Andreas Grätz** — September 17, 2016 at 3:47 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23102))
+### **Andreas Grätz** — September 17, 2016 at 3:47 pm ([permalink](/blog/floating-button/#comment-23102))
 
 > Andreas Grätz says:
 >
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 18, 2016 at 4:05 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23113))
+### **Shai Almog** — September 18, 2016 at 4:05 am ([permalink](/blog/floating-button/#comment-23113))
 
 > Shai Almog says:
 >
@@ -150,7 +150,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **disqus** — September 30, 2016 at 9:42 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23041))
+### **disqus** — September 30, 2016 at 9:42 pm ([permalink](/blog/floating-button/#comment-23041))
 
 > disqus says:
 >
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 1, 2016 at 1:30 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-22834))
+### **Shai Almog** — October 1, 2016 at 1:30 am ([permalink](/blog/floating-button/#comment-22834))
 
 > Shai Almog says:
 >
@@ -168,7 +168,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ShmuDesign** — March 1, 2017 at 8:11 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23177))
+### **ShmuDesign** — March 1, 2017 at 8:11 am ([permalink](/blog/floating-button/#comment-23177))
 
 > ShmuDesign says:
 >
@@ -177,7 +177,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 2, 2017 at 8:35 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23224))
+### **Shai Almog** — March 2, 2017 at 8:35 am ([permalink](/blog/floating-button/#comment-23224))
 
 > Shai Almog says:
 >
@@ -187,7 +187,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mo** — June 24, 2017 at 10:40 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23479))
+### **Mo** — June 24, 2017 at 10:40 pm ([permalink](/blog/floating-button/#comment-23479))
 
 > Mo says:
 >
@@ -199,7 +199,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 25, 2017 at 4:45 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23483))
+### **Shai Almog** — June 25, 2017 at 4:45 am ([permalink](/blog/floating-button/#comment-23483))
 
 > Shai Almog says:
 >
@@ -208,7 +208,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mo** — June 25, 2017 at 1:28 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23508))
+### **Mo** — June 25, 2017 at 1:28 pm ([permalink](/blog/floating-button/#comment-23508))
 
 > Mo says:
 >
@@ -217,7 +217,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mo** — June 25, 2017 at 11:08 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23593))
+### **Mo** — June 25, 2017 at 11:08 pm ([permalink](/blog/floating-button/#comment-23593))
 
 > Mo says:
 >
@@ -226,7 +226,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 26, 2017 at 4:37 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23562))
+### **Shai Almog** — June 26, 2017 at 4:37 am ([permalink](/blog/floating-button/#comment-23562))
 
 > Shai Almog says:
 >
@@ -236,12 +236,12 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think you might be able to workaround this by disabling RTL on the content pane and aligning the FAB to the left.
 >
-> FYI You can also try to fix this issue yourself and submit a pull request which is excellent practice. I have a tutorial about that here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html>)
+> FYI You can also try to fix this issue yourself and submit a pull request which is excellent practice. I have a tutorial about that here: [https://www.codenameone.com…](</blog/how-to-use-the-codename-one-sources/>)
 >
 
 
 
-### **Mo** — July 2, 2017 at 10:53 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23460))
+### **Mo** — July 2, 2017 at 10:53 am ([permalink](/blog/floating-button/#comment-23460))
 
 > Mo says:
 >
@@ -251,7 +251,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 3, 2017 at 3:13 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23537))
+### **Shai Almog** — July 3, 2017 at 3:13 pm ([permalink](/blog/floating-button/#comment-23537))
 
 > Shai Almog says:
 >
@@ -260,7 +260,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Tommy Mogaka** — July 12, 2018 at 10:51 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23927))
+### **Tommy Mogaka** — July 12, 2018 at 10:51 am ([permalink](/blog/floating-button/#comment-23927))
 
 > Tommy Mogaka says:
 >
@@ -290,7 +290,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 13, 2018 at 4:51 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-23847))
+### **Shai Almog** — July 13, 2018 at 4:51 am ([permalink](/blog/floating-button/#comment-23847))
 
 > Shai Almog says:
 >
@@ -299,7 +299,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Tommy Mogaka** — February 3, 2019 at 1:34 pm ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-24015))
+### **Tommy Mogaka** — February 3, 2019 at 1:34 pm ([permalink](/blog/floating-button/#comment-24015))
 
 > Tommy Mogaka says:
 >
@@ -328,7 +328,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 4, 2019 at 3:31 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-24021))
+### **Shai Almog** — February 4, 2019 at 3:31 am ([permalink](/blog/floating-button/#comment-24021))
 
 > Shai Almog says:
 >
@@ -337,7 +337,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Tommy Mogaka** — February 4, 2019 at 7:31 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-24027))
+### **Tommy Mogaka** — February 4, 2019 at 7:31 am ([permalink](/blog/floating-button/#comment-24027))
 
 > Tommy Mogaka says:
 >
@@ -348,7 +348,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 5, 2019 at 3:10 am ([permalink](https://www.codenameone.com/blog/floating-button.html#comment-24053))
+### **Shai Almog** — February 5, 2019 at 3:10 am ([permalink](/blog/floating-button/#comment-24053))
 
 > Shai Almog says:
 >

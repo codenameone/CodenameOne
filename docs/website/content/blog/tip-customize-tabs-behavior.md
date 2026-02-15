@@ -78,14 +78,14 @@ Figure 2. In landscape we have more space so a line break isn’t necessary
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Durank** — September 28, 2020 at 4:37 pm ([permalink](https://www.codenameone.com/blog/tip-customize-tabs-behavior.html#comment-24347))
+### **Durank** — September 28, 2020 at 4:37 pm ([permalink](/blog/tip-customize-tabs-behavior/#comment-24347))
 
 > How can I add form instead a container to the taps for better scalability code?
 >
 
 
 
-### **Shai Almog** — September 29, 2020 at 2:44 am ([permalink](https://www.codenameone.com/blog/tip-customize-tabs-behavior.html#comment-24350))
+### **Shai Almog** — September 29, 2020 at 2:44 am ([permalink](/blog/tip-customize-tabs-behavior/#comment-24350))
 
 > Adding forms into a Container is a bad practice. A form is huge and heavyweight. You should do the reverse and add a container into a form and tab.
 >

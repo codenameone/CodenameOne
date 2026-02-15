@@ -30,7 +30,7 @@ Since the cn1lib is pretty simple it can probably be enhanced to support more el
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Lukman Javalove Idealist Jaji** — May 4, 2017 at 5:43 am ([permalink](https://www.codenameone.com/blog/fingerprint-touchid-support.html#comment-24130))
+### **Lukman Javalove Idealist Jaji** — May 4, 2017 at 5:43 am ([permalink](/blog/fingerprint-touchid-support/#comment-24130))
 
 > Lukman Javalove Idealist Jaji says:
 >
@@ -44,7 +44,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 5, 2017 at 4:46 am ([permalink](https://www.codenameone.com/blog/fingerprint-touchid-support.html#comment-23559))
+### **Shai Almog** — May 5, 2017 at 4:46 am ([permalink](/blog/fingerprint-touchid-support/#comment-23559))
 
 > Shai Almog says:
 >
@@ -53,7 +53,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gareth Murfin** — July 6, 2017 at 11:36 pm ([permalink](https://www.codenameone.com/blog/fingerprint-touchid-support.html#comment-24135))
+### **Gareth Murfin** — July 6, 2017 at 11:36 pm ([permalink](/blog/fingerprint-touchid-support/#comment-24135))
 
 > Gareth Murfin says:
 >
@@ -62,7 +62,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 7, 2017 at 4:17 am ([permalink](https://www.codenameone.com/blog/fingerprint-touchid-support.html#comment-22614))
+### **Shai Almog** — July 7, 2017 at 4:17 am ([permalink](/blog/fingerprint-touchid-support/#comment-22614))
 
 > Shai Almog says:
 >
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Yishai Steinhart** — July 6, 2018 at 7:37 pm ([permalink](https://www.codenameone.com/blog/fingerprint-touchid-support.html#comment-23791))
+### **Yishai Steinhart** — July 6, 2018 at 7:37 pm ([permalink](/blog/fingerprint-touchid-support/#comment-23791))
 
 > Yishai Steinhart says:
 >
@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 7, 2018 at 4:50 am ([permalink](https://www.codenameone.com/blog/fingerprint-touchid-support.html#comment-23961))
+### **Shai Almog** — July 7, 2018 at 4:50 am ([permalink](/blog/fingerprint-touchid-support/#comment-23961))
 
 > Shai Almog says:
 >

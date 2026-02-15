@@ -100,7 +100,7 @@ As always I really appreciate the comments and feedback, if you have thoughts or
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Dalvik** — June 21, 2017 at 11:22 am ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-21850))
+### **Dalvik** — June 21, 2017 at 11:22 am ([permalink](/blog/good-to-great/#comment-21850))
 
 > Dalvik says:
 >
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 21, 2017 at 11:41 am ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23415))
+### **Shai Almog** — June 21, 2017 at 11:41 am ([permalink](/blog/good-to-great/#comment-23415))
 
 > Shai Almog says:
 >
@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kolawole Tajudeen** — June 21, 2017 at 11:43 am ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-21861))
+### **Kolawole Tajudeen** — June 21, 2017 at 11:43 am ([permalink](/blog/good-to-great/#comment-21861))
 
 > Kolawole Tajudeen says:
 >
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Andrew Ughonu** — June 21, 2017 at 11:55 am ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23495))
+### **Andrew Ughonu** — June 21, 2017 at 11:55 am ([permalink](/blog/good-to-great/#comment-23495))
 
 > Andrew Ughonu says:
 >
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — June 21, 2017 at 12:54 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23252))
+### **salah Alhaddabi** — June 21, 2017 at 12:54 pm ([permalink](/blog/good-to-great/#comment-23252))
 
 > salah Alhaddabi says:
 >
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Dalvik** — June 21, 2017 at 12:58 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23112))
+### **Dalvik** — June 21, 2017 at 12:58 pm ([permalink](/blog/good-to-great/#comment-23112))
 
 > Dalvik says:
 >
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 21, 2017 at 1:27 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23610))
+### **Shai Almog** — June 21, 2017 at 1:27 pm ([permalink](/blog/good-to-great/#comment-23610))
 
 > Shai Almog says:
 >
@@ -166,7 +166,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 21, 2017 at 1:29 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23411))
+### **Shai Almog** — June 21, 2017 at 1:29 pm ([permalink](/blog/good-to-great/#comment-23411))
 
 > Shai Almog says:
 >
@@ -175,7 +175,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 21, 2017 at 1:31 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23275))
+### **Shai Almog** — June 21, 2017 at 1:31 pm ([permalink](/blog/good-to-great/#comment-23275))
 
 > Shai Almog says:
 >
@@ -185,7 +185,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — June 21, 2017 at 2:12 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23451))
+### **Francesco Galgani** — June 21, 2017 at 2:12 pm ([permalink](/blog/good-to-great/#comment-23451))
 
 > Francesco Galgani says:
 >
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **3lix** — June 21, 2017 at 2:48 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23356))
+### **3lix** — June 21, 2017 at 2:48 pm ([permalink](/blog/good-to-great/#comment-23356))
 
 > 3lix says:
 >
@@ -206,7 +206,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 21, 2017 at 3:09 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23517))
+### **Shai Almog** — June 21, 2017 at 3:09 pm ([permalink](/blog/good-to-great/#comment-23517))
 
 > Shai Almog says:
 >
@@ -216,7 +216,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 21, 2017 at 3:10 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23579))
+### **Shai Almog** — June 21, 2017 at 3:10 pm ([permalink](/blog/good-to-great/#comment-23579))
 
 > Shai Almog says:
 >
@@ -225,7 +225,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Roman H.** — June 21, 2017 at 4:05 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23611))
+### **Roman H.** — June 21, 2017 at 4:05 pm ([permalink](/blog/good-to-great/#comment-23611))
 
 > Roman H. says:
 >
@@ -234,7 +234,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **John Barrett** — June 21, 2017 at 4:53 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23592))
+### **John Barrett** — June 21, 2017 at 4:53 pm ([permalink](/blog/good-to-great/#comment-23592))
 
 > John Barrett says:
 >
@@ -243,7 +243,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 22, 2017 at 4:19 am ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-21862))
+### **Shai Almog** — June 22, 2017 at 4:19 am ([permalink](/blog/good-to-great/#comment-21862))
 
 > Shai Almog says:
 >
@@ -254,7 +254,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 22, 2017 at 4:22 am ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23488))
+### **Shai Almog** — June 22, 2017 at 4:22 am ([permalink](/blog/good-to-great/#comment-23488))
 
 > Shai Almog says:
 >
@@ -265,7 +265,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Riper3-3** — June 22, 2017 at 7:42 am ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23396))
+### **Riper3-3** — June 22, 2017 at 7:42 am ([permalink](/blog/good-to-great/#comment-23396))
 
 > Riper3-3 says:
 >
@@ -274,7 +274,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 22, 2017 at 9:45 am ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23634))
+### **Shai Almog** — June 22, 2017 at 9:45 am ([permalink](/blog/good-to-great/#comment-23634))
 
 > Shai Almog says:
 >
@@ -290,7 +290,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Sibasish Mohanty** — June 22, 2017 at 11:06 am ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23570))
+### **Sibasish Mohanty** — June 22, 2017 at 11:06 am ([permalink](/blog/good-to-great/#comment-23570))
 
 > Sibasish Mohanty says:
 >
@@ -299,7 +299,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Andrew Nyago** — June 22, 2017 at 11:31 am ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23357))
+### **Andrew Nyago** — June 22, 2017 at 11:31 am ([permalink](/blog/good-to-great/#comment-23357))
 
 > Andrew Nyago says:
 >
@@ -308,7 +308,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 22, 2017 at 2:55 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23458))
+### **Shai Almog** — June 22, 2017 at 2:55 pm ([permalink](/blog/good-to-great/#comment-23458))
 
 > Shai Almog says:
 >
@@ -318,7 +318,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **John Barrett** — June 22, 2017 at 3:33 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23552))
+### **John Barrett** — June 22, 2017 at 3:33 pm ([permalink](/blog/good-to-great/#comment-23552))
 
 > John Barrett says:
 >
@@ -327,7 +327,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **nasznjoka** — June 22, 2017 at 3:48 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23469))
+### **nasznjoka** — June 22, 2017 at 3:48 pm ([permalink](/blog/good-to-great/#comment-23469))
 
 > nasznjoka says:
 >
@@ -336,7 +336,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 22, 2017 at 5:52 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23536))
+### **Shai Almog** — June 22, 2017 at 5:52 pm ([permalink](/blog/good-to-great/#comment-23536))
 
 > Shai Almog says:
 >
@@ -347,7 +347,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **adhiguna mahendra** — June 23, 2017 at 3:25 am ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-21521))
+### **adhiguna mahendra** — June 23, 2017 at 3:25 am ([permalink](/blog/good-to-great/#comment-21521))
 
 > adhiguna mahendra says:
 >
@@ -356,7 +356,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 23, 2017 at 4:35 am ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23496))
+### **Shai Almog** — June 23, 2017 at 4:35 am ([permalink](/blog/good-to-great/#comment-23496))
 
 > Shai Almog says:
 >
@@ -367,7 +367,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Amuche Chimezie** — June 23, 2017 at 2:07 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23060))
+### **Amuche Chimezie** — June 23, 2017 at 2:07 pm ([permalink](/blog/good-to-great/#comment-23060))
 
 > Amuche Chimezie says:
 >
@@ -376,7 +376,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Amuche Chimezie** — June 23, 2017 at 2:08 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23202))
+### **Amuche Chimezie** — June 23, 2017 at 2:08 pm ([permalink](/blog/good-to-great/#comment-23202))
 
 > Amuche Chimezie says:
 >
@@ -385,7 +385,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Amuche Chimezie** — June 23, 2017 at 2:10 pm ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23600))
+### **Amuche Chimezie** — June 23, 2017 at 2:10 pm ([permalink](/blog/good-to-great/#comment-23600))
 
 > Amuche Chimezie says:
 >
@@ -394,7 +394,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 24, 2017 at 5:14 am ([permalink](https://www.codenameone.com/blog/good-to-great.html#comment-23156))
+### **Shai Almog** — June 24, 2017 at 5:14 am ([permalink](/blog/good-to-great/#comment-23156))
 
 > Shai Almog says:
 >

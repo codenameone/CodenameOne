@@ -17,37 +17,37 @@ Version 3.5 is a **huge** release that includes the long awaited Windows Univers
 
 ### Highlights of this Release
 
-  * **Beta version of the UWP (Universal Windows Platform) Port** – Codename One [supports native Windows 10 universal apps](https://www.codenameone.com/manual/appendix-uwp.html) that you can sell thru the Windows Store
+  * **Beta version of the UWP (Universal Windows Platform) Port** – Codename One [supports native Windows 10 universal apps](/manual/appendix-uwp/) that you can sell thru the Windows Store
 
-  * **New GUI Builder Release** – We released the [new GUI builder](https://www.codenameone.com/blog/using-the-new-gui-builder.html). It still has rough edges but is improving at a rapid pace
+  * **New GUI Builder Release** – We released the [new GUI builder](/blog/using-the-new-gui-builder/). It still has rough edges but is improving at a rapid pace
 
   * **New Settings UI featuring the Extensions Library** – This is a complete [redesign of the core settings/preferences](http://www.codenameone.com/blog/new-preferences-command-state-localization-locking.html) within Codename One. It started as the settings UI for IntelliJ/IDEA and we liked it so much we decided to make it the default for all IDE’s. This tool makes the process of [installing/discovering cn1libs (libraries/extensions/plugins)](http://www.codenameone.com/blog/automatically-install-update-distribute-cn1libs-extensions.html) trivial!
 
   * **Experimental New Peer Component Mode** – We now allow [more elaborate lightweight heavyweight mixing mode](http://www.codenameone.com/blog/new-android-peer-mode.html) on the Android port and soon on other ports
 
-  * **Seamless support for Android Marshmallow permissions** – This requires [no code changes](https://www.codenameone.com/blog/switching-on-android-marshmallow-permission-prompts.html) for most applications. We also support this in the [simulator & native code](https://www.codenameone.com/blog/marshmallow-permissions-in-the-simulator-and-native-code.html).
+  * **Seamless support for Android Marshmallow permissions** – This requires [no code changes](/blog/switching-on-android-marshmallow-permission-prompts/) for most applications. We also support this in the [simulator & native code](/blog/marshmallow-permissions-in-the-simulator-and-native-code/).
 
-  * **Removed Skins from Simulator** – We [moved skins to the more menu](https://www.codenameone.com/blog/unskin-proxy-support.html) where you can be download them dynamically. We also added new skins and a [skin designer tool](https://www.codenameone.com/blog/skin-designer.html)…​  
+  * **Removed Skins from Simulator** – We [moved skins to the more menu](/blog/unskin-proxy-support/) where you can be download them dynamically. We also added new skins and a [skin designer tool](/blog/skin-designer/)…​  
 This reduced the size of our distribution by almost 30MB!
 
   * **Added Background Fetch Support** – This allows [downloading in the background in iOS/Android](http://www.codenameone.com/blog/background-fetch.html)
 
-  * **New Accordion Component** – Allows [folding/expanding UI elements](https://www.codenameone.com/blog/accordion-component.html)
+  * **New Accordion Component** – Allows [folding/expanding UI elements](/blog/accordion-component/)
 
-  * **New ComponentAnimation methods for Compound Animations** – allow more [elaborate animation effects](https://www.codenameone.com/blog/composite-animations.html)
+  * **New ComponentAnimation methods for Compound Animations** – allow more [elaborate animation effects](/blog/composite-animations/)
 
-  * **Material Icons Enhancements** – [used thru the code](https://www.codenameone.com/blog/toolbar-back-easier-material-icons.html) and map to [different component selection states](http://www.codenameone.com/blog/pressed-selected-icon-font-utf-8.html) seamlessly
+  * **Material Icons Enhancements** – [used thru the code](/blog/toolbar-back-easier-material-icons/) and map to [different component selection states](http://www.codenameone.com/blog/pressed-selected-icon-font-utf-8.html) seamlessly
 
-  * **Search Command in the Toolbar** – It’s now trivial to [add search](https://www.codenameone.com/blog/toolbar-search-mode.html) into the title area
+  * **Search Command in the Toolbar** – It’s now trivial to [add search](/blog/toolbar-search-mode/) into the title area
 
-  * **Proxy Support** – [for simulator & build process](https://www.codenameone.com/blog/unskin-proxy-support.html)
+  * **Proxy Support** – [for simulator & build process](/blog/unskin-proxy-support/)
 
-  * **Demos Rewritten** – we rewrote/revisited the following demos: [Property Cross](https://www.codenameone.com/blog/property-cross-revisited.html), [Charts](https://www.codenameone.com/blog/charts-demo-revisited.html), [Social Boo](https://www.codenameone.com/blog/social-boo-revisited.html), [Dr. Sbaitso](http://www.codenameone.com/blog/dr-sbaitso-revisited.html), [Chrome](https://www.codenameone.com/blog/chrome-demo.html),  
-[Clock](https://www.codenameone.com/blog/clock-demo.html) & [Camera](https://www.codenameone.com/blog/camera-demo.html). They are now all Java 8 based, they use the newer API’s such Toolbar and proper fonts.
+  * **Demos Rewritten** – we rewrote/revisited the following demos: [Property Cross](/blog/property-cross-revisited/), [Charts](/blog/charts-demo-revisited/), [Social Boo](/blog/social-boo-revisited/), [Dr. Sbaitso](http://www.codenameone.com/blog/dr-sbaitso-revisited.html), [Chrome](/blog/chrome-demo/),  
+[Clock](/blog/clock-demo/) & [Camera](/blog/camera-demo/). They are now all Java 8 based, they use the newer API’s such Toolbar and proper fonts.
 
-  * **Simplified ToastBar** – Added [simple error message handling](https://www.codenameone.com/blog/zip-and-toast.html), regular [messages](https://www.codenameone.com/blog/toastbar-messages.html) and [download progress indication](https://www.codenameone.com/blog/toast-downloads.html)
+  * **Simplified ToastBar** – Added [simple error message handling](/blog/zip-and-toast/), regular [messages](/blog/toastbar-messages/) and [download progress indication](/blog/toast-downloads/)
 
-  * **Finished migration to the new push servers** – the last few users are leaving and [soon the old servers will be retired](https://www.codenameone.com/blog/migration-to-the-new-push-servers-completed.html)
+  * **Finished migration to the new push servers** – the last few users are leaving and [soon the old servers will be retired](/blog/migration-to-the-new-push-servers-completed/)
 
 ### Lowlights
 
@@ -75,7 +75,7 @@ Version 3.6 is scheduled for December of 2016. 3.7 is scheduled for April 4th 20
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Nigel Chomba** — August 5, 2016 at 3:04 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-5-now-live.html#comment-22547))
+### **Nigel Chomba** — August 5, 2016 at 3:04 pm ([permalink](/blog/codename-one-3-5-now-live/#comment-22547))
 
 > Nigel Chomba says:
 >
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 6, 2016 at 4:54 am ([permalink](https://www.codenameone.com/blog/codename-one-3-5-now-live.html#comment-22364))
+### **Shai Almog** — August 6, 2016 at 4:54 am ([permalink](/blog/codename-one-3-5-now-live/#comment-22364))
 
 > Shai Almog says:
 >
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Hristo Vrigazov** — August 13, 2016 at 4:58 am ([permalink](https://www.codenameone.com/blog/codename-one-3-5-now-live.html#comment-21452))
+### **Hristo Vrigazov** — August 13, 2016 at 4:58 am ([permalink](/blog/codename-one-3-5-now-live/#comment-21452))
 
 > Hristo Vrigazov says:
 >

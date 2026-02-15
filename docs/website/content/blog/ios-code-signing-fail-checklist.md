@@ -127,7 +127,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 8, 2013 at 12:37 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-22046))
+### **Anonymous** — October 8, 2013 at 12:37 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-22046))
 
 > Anonymous says:
 >
@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 8, 2013 at 5:38 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-21973))
+### **Anonymous** — October 8, 2013 at 5:38 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-21973))
 
 > Anonymous says:
 >
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 6, 2014 at 3:25 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-22022))
+### **Anonymous** — March 6, 2014 at 3:25 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-22022))
 
 > Anonymous says:
 >
@@ -168,7 +168,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 14, 2014 at 9:47 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-24215))
+### **Anonymous** — July 14, 2014 at 9:47 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-24215))
 
 > Anonymous says:
 >
@@ -179,14 +179,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — July 14, 2014 at 9:48 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-21916))
+### **Anonymous** — July 14, 2014 at 9:48 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-21916))
 
 > Anonymous says:
 >
 
 
 
-### **Anonymous** — August 9, 2014 at 3:56 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-21949))
+### **Anonymous** — August 9, 2014 at 3:56 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-21949))
 
 > Anonymous says:
 >
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — August 10, 2014 at 3:19 am ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-21678))
+### **Anonymous** — August 10, 2014 at 3:19 am ([permalink](/blog/ios-code-signing-fail-checklist/#comment-21678))
 
 > Anonymous says:
 >
@@ -204,7 +204,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 22, 2014 at 3:50 am ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-22134))
+### **Anonymous** — September 22, 2014 at 3:50 am ([permalink](/blog/ios-code-signing-fail-checklist/#comment-22134))
 
 > Anonymous says:
 >
@@ -215,7 +215,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 13, 2015 at 5:57 am ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-22352))
+### **Anonymous** — February 13, 2015 at 5:57 am ([permalink](/blog/ios-code-signing-fail-checklist/#comment-22352))
 
 > Anonymous says:
 >
@@ -226,7 +226,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 13, 2015 at 1:30 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-22018))
+### **Anonymous** — February 13, 2015 at 1:30 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-22018))
 
 > Anonymous says:
 >
@@ -237,7 +237,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 13, 2015 at 4:16 pm ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-24166))
+### **Anonymous** — February 13, 2015 at 4:16 pm ([permalink](/blog/ios-code-signing-fail-checklist/#comment-24166))
 
 > Anonymous says:
 >
@@ -246,7 +246,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 14, 2015 at 3:33 am ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-21997))
+### **Anonymous** — February 14, 2015 at 3:33 am ([permalink](/blog/ios-code-signing-fail-checklist/#comment-21997))
 
 > Anonymous says:
 >
@@ -257,7 +257,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 17, 2015 at 10:48 am ([permalink](https://www.codenameone.com/blog/ios-code-signing-fail-checklist.html#comment-24188))
+### **Anonymous** — February 17, 2015 at 10:48 am ([permalink](/blog/ios-code-signing-fail-checklist/#comment-24188))
 
 > Anonymous says:
 >

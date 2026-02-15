@@ -43,14 +43,14 @@ Figure 1. New Post Form in The Facebook Clone App
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Julio Valeriron Ochoa** — November 29, 2022 at 2:29 pm ([permalink](https://www.codenameone.com/blog/spatial-pluggable-sqlite.html#comment-24548))
+### **Julio Valeriron Ochoa** — November 29, 2022 at 2:29 pm ([permalink](/blog/spatial-pluggable-sqlite/#comment-24548))
 
 > how turn on encryptation mode in sqlite
 >
 
 
 
-### **Kimotho E** — July 9, 2024 at 4:51 pm ([permalink](https://www.codenameone.com/blog/spatial-pluggable-sqlite.html#comment-24621))
+### **Kimotho E** — July 9, 2024 at 4:51 pm ([permalink](/blog/spatial-pluggable-sqlite/#comment-24621))
 
 > Kimotho E says:
 >
@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 10, 2024 at 2:31 am ([permalink](https://www.codenameone.com/blog/spatial-pluggable-sqlite.html#comment-24622))
+### **Shai Almog** — July 10, 2024 at 2:31 am ([permalink](/blog/spatial-pluggable-sqlite/#comment-24622))
 
 > Shai Almog says:
 >

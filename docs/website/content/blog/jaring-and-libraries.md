@@ -122,7 +122,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 6, 2014 at 10:32 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-22246))
+### **Anonymous** — October 6, 2014 at 10:32 am ([permalink](/blog/jaring-and-libraries/#comment-22246))
 
 > Anonymous says:
 >
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 7, 2014 at 3:17 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-22259))
+### **Anonymous** — October 7, 2014 at 3:17 am ([permalink](/blog/jaring-and-libraries/#comment-22259))
 
 > Anonymous says:
 >
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 16, 2014 at 11:42 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-22164))
+### **Anonymous** — October 16, 2014 at 11:42 am ([permalink](/blog/jaring-and-libraries/#comment-22164))
 
 > Anonymous says:
 >
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 16, 2014 at 10:33 pm ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-22282))
+### **Anonymous** — October 16, 2014 at 10:33 pm ([permalink](/blog/jaring-and-libraries/#comment-22282))
 
 > Anonymous says:
 >
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 18, 2014 at 7:19 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-21662))
+### **Anonymous** — October 18, 2014 at 7:19 am ([permalink](/blog/jaring-and-libraries/#comment-21662))
 
 > Anonymous says:
 >
@@ -173,7 +173,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 18, 2014 at 8:54 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-22176))
+### **Anonymous** — October 18, 2014 at 8:54 am ([permalink](/blog/jaring-and-libraries/#comment-22176))
 
 > Anonymous says:
 >
@@ -188,7 +188,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 24, 2014 at 4:07 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-21926))
+### **Anonymous** — October 24, 2014 at 4:07 am ([permalink](/blog/jaring-and-libraries/#comment-21926))
 
 > Anonymous says:
 >
@@ -203,7 +203,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 24, 2014 at 10:02 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-22052))
+### **Anonymous** — October 24, 2014 at 10:02 am ([permalink](/blog/jaring-and-libraries/#comment-22052))
 
 > Anonymous says:
 >
@@ -214,7 +214,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 24, 2014 at 6:16 pm ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-21927))
+### **Anonymous** — November 24, 2014 at 6:16 pm ([permalink](/blog/jaring-and-libraries/#comment-21927))
 
 > Anonymous says:
 >
@@ -223,7 +223,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 25, 2014 at 4:50 am ([permalink](https://www.codenameone.com/blog/jaring-and-libraries.html#comment-22309))
+### **Anonymous** — November 25, 2014 at 4:50 am ([permalink](/blog/jaring-and-libraries/#comment-22309))
 
 > Anonymous says:
 >

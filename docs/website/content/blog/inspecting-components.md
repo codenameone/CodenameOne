@@ -48,7 +48,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — February 24, 2013 at 6:51 pm ([permalink](https://www.codenameone.com/blog/inspecting-components.html#comment-21637))
+### **Anonymous** — February 24, 2013 at 6:51 pm ([permalink](/blog/inspecting-components/#comment-21637))
 
 > Anonymous says:
 >
@@ -57,7 +57,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 25, 2013 at 4:53 am ([permalink](https://www.codenameone.com/blog/inspecting-components.html#comment-21728))
+### **Anonymous** — February 25, 2013 at 4:53 am ([permalink](/blog/inspecting-components/#comment-21728))
 
 > Anonymous says:
 >
@@ -66,7 +66,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 27, 2013 at 8:35 am ([permalink](https://www.codenameone.com/blog/inspecting-components.html#comment-21831))
+### **Anonymous** — February 27, 2013 at 8:35 am ([permalink](/blog/inspecting-components/#comment-21831))
 
 > Anonymous says:
 >
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 27, 2013 at 9:12 am ([permalink](https://www.codenameone.com/blog/inspecting-components.html#comment-24248))
+### **Anonymous** — February 27, 2013 at 9:12 am ([permalink](/blog/inspecting-components/#comment-24248))
 
 > Anonymous says:
 >

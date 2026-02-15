@@ -99,7 +99,7 @@ are getting thru.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Aquila CodenameOne** — July 19, 2016 at 1:13 pm ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-22698))
+### **Aquila CodenameOne** — July 19, 2016 at 1:13 pm ([permalink](/blog/clarifying-our-support/#comment-22698))
 
 > Aquila CodenameOne says:
 >
@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 20, 2016 at 4:31 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-21455))
+### **Shai Almog** — July 20, 2016 at 4:31 am ([permalink](/blog/clarifying-our-support/#comment-21455))
 
 > Shai Almog says:
 >
@@ -117,7 +117,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **madhu thestudent** — August 19, 2016 at 9:10 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-21460))
+### **madhu thestudent** — August 19, 2016 at 9:10 am ([permalink](/blog/clarifying-our-support/#comment-21460))
 
 > madhu thestudent says:
 >
@@ -126,7 +126,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **madhu thestudent** — August 19, 2016 at 9:15 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-22862))
+### **madhu thestudent** — August 19, 2016 at 9:15 am ([permalink](/blog/clarifying-our-support/#comment-22862))
 
 > madhu thestudent says:
 >
@@ -135,7 +135,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 20, 2016 at 4:21 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-22794))
+### **Shai Almog** — August 20, 2016 at 4:21 am ([permalink](/blog/clarifying-our-support/#comment-22794))
 
 > Shai Almog says:
 >
@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Peter Hric** — September 5, 2016 at 2:43 pm ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-22907))
+### **Peter Hric** — September 5, 2016 at 2:43 pm ([permalink](/blog/clarifying-our-support/#comment-22907))
 
 > Peter Hric says:
 >
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 6, 2016 at 3:53 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-22897))
+### **Shai Almog** — September 6, 2016 at 3:53 am ([permalink](/blog/clarifying-our-support/#comment-22897))
 
 > Shai Almog says:
 >
@@ -172,7 +172,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Emmanuel Njoku** — September 22, 2016 at 7:51 pm ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-23158))
+### **Emmanuel Njoku** — September 22, 2016 at 7:51 pm ([permalink](/blog/clarifying-our-support/#comment-23158))
 
 > Emmanuel Njoku says:
 >
@@ -203,7 +203,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 23, 2016 at 4:35 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-22923))
+### **Shai Almog** — September 23, 2016 at 4:35 am ([permalink](/blog/clarifying-our-support/#comment-22923))
 
 > Shai Almog says:
 >
@@ -212,7 +212,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Raghu vasa** — September 29, 2016 at 7:53 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-21464))
+### **Raghu vasa** — September 29, 2016 at 7:53 am ([permalink](/blog/clarifying-our-support/#comment-21464))
 
 > Raghu vasa says:
 >
@@ -227,7 +227,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 30, 2016 at 6:50 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-22890))
+### **Shai Almog** — September 30, 2016 at 6:50 am ([permalink](/blog/clarifying-our-support/#comment-22890))
 
 > Shai Almog says:
 >
@@ -237,7 +237,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Aquila CodenameOne** — October 19, 2016 at 12:18 pm ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-22820))
+### **Aquila CodenameOne** — October 19, 2016 at 12:18 pm ([permalink](/blog/clarifying-our-support/#comment-22820))
 
 > Aquila CodenameOne says:
 >
@@ -252,7 +252,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 20, 2016 at 2:11 am ([permalink](https://www.codenameone.com/blog/clarifying-our-support.html#comment-23052))
+### **Shai Almog** — October 20, 2016 at 2:11 am ([permalink](/blog/clarifying-our-support/#comment-23052))
 
 > Shai Almog says:
 >

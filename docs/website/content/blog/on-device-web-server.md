@@ -31,7 +31,7 @@ You can install the cn1lib like you can any other cn1lib from the Extension Mana
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — August 28, 2018 at 3:30 pm ([permalink](https://www.codenameone.com/blog/on-device-web-server.html#comment-24043))
+### **Francesco Galgani** — August 28, 2018 at 3:30 pm ([permalink](/blog/on-device-web-server/#comment-24043))
 
 > Francesco Galgani says:
 >
@@ -40,7 +40,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 29, 2018 at 3:27 pm ([permalink](https://www.codenameone.com/blog/on-device-web-server.html#comment-23821))
+### **Shai Almog** — August 29, 2018 at 3:27 pm ([permalink](/blog/on-device-web-server/#comment-23821))
 
 > Shai Almog says:
 >
@@ -49,7 +49,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Carlos** — February 22, 2019 at 10:29 am ([permalink](https://www.codenameone.com/blog/on-device-web-server.html#comment-24076))
+### **Carlos** — February 22, 2019 at 10:29 am ([permalink](/blog/on-device-web-server/#comment-24076))
 
 > Carlos says:
 >
@@ -58,7 +58,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 23, 2019 at 5:39 am ([permalink](https://www.codenameone.com/blog/on-device-web-server.html#comment-24046))
+### **Shai Almog** — February 23, 2019 at 5:39 am ([permalink](/blog/on-device-web-server/#comment-24046))
 
 > Shai Almog says:
 >
@@ -67,7 +67,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Carlos** — February 23, 2019 at 6:06 pm ([permalink](https://www.codenameone.com/blog/on-device-web-server.html#comment-24111))
+### **Carlos** — February 23, 2019 at 6:06 pm ([permalink](/blog/on-device-web-server/#comment-24111))
 
 > Carlos says:
 >
@@ -76,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 24, 2019 at 4:32 am ([permalink](https://www.codenameone.com/blog/on-device-web-server.html#comment-24089))
+### **Shai Almog** — February 24, 2019 at 4:32 am ([permalink](/blog/on-device-web-server/#comment-24089))
 
 > Shai Almog says:
 >
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Carlos** — February 24, 2019 at 7:42 pm ([permalink](https://www.codenameone.com/blog/on-device-web-server.html#comment-23824))
+### **Carlos** — February 24, 2019 at 7:42 pm ([permalink](/blog/on-device-web-server/#comment-23824))
 
 > Carlos says:
 >

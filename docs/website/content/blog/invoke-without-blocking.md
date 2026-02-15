@@ -139,14 +139,14 @@ E.g.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Durank** — December 4, 2019 at 8:52 pm ([permalink](https://www.codenameone.com/blog/invoke-without-blocking.html#comment-24275))
+### **Durank** — December 4, 2019 at 8:52 pm ([permalink](/blog/invoke-without-blocking/#comment-24275))
 
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
 > can I used this code to avoid stopping my infinite rotating image animation while I paint others components in the screen?
 
 
-### **Steve Hannah** — December 5, 2019 at 6:37 pm ([permalink](https://www.codenameone.com/blog/invoke-without-blocking.html#comment-24274))
+### **Steve Hannah** — December 5, 2019 at 6:37 pm ([permalink](/blog/invoke-without-blocking/#comment-24274))
 
 > [Steve Hannah](https://lh3.googleusercontent.com/a-/AAuE7mBmUCgKSZtJ2cqeHgj6bdPY2AAQ10roHlMpgRWc) says:
 >

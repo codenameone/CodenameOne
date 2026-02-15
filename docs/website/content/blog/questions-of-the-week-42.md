@@ -31,7 +31,7 @@ Even if we ask you for a change we really appreciate the involvement as we think
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **João Bastos** — February 19, 2017 at 9:53 am ([permalink](https://www.codenameone.com/blog/questions-of-the-week-42.html#comment-23019))
+### **João Bastos** — February 19, 2017 at 9:53 am ([permalink](/blog/questions-of-the-week-42/#comment-23019))
 
 > João Bastos says:
 >
@@ -50,7 +50,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 20, 2017 at 8:28 am ([permalink](https://www.codenameone.com/blog/questions-of-the-week-42.html#comment-22823))
+### **Shai Almog** — February 20, 2017 at 8:28 am ([permalink](/blog/questions-of-the-week-42/#comment-22823))
 
 > Shai Almog says:
 >

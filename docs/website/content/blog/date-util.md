@@ -61,7 +61,7 @@ This would create a border whose corners are round except for the bottom left co
 
 The `Rest` class now [supports the HTTP PATCH method](https://github.com/codenameone/CodenameOne/issues/2372) which was missing from the API before. It’s not as common as other API’s so it went unnoticed for a while.
 
-It works pretty much like every other [Rest API request](https://www.codenameone.com/blog/terse-rest-api.html).
+It works pretty much like every other [Rest API request](/blog/terse-rest-api/).
 ---
 
 ## Archived Comments
@@ -69,7 +69,7 @@ It works pretty much like every other [Rest API request](https://www.codenameone
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — April 9, 2018 at 12:07 pm ([permalink](https://www.codenameone.com/blog/date-util.html#comment-23804))
+### **Francesco Galgani** — April 9, 2018 at 12:07 pm ([permalink](/blog/date-util/#comment-23804))
 
 > Francesco Galgani says:
 >

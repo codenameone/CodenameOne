@@ -82,7 +82,7 @@ __ |  The variable duke is the image of the icon placed into the src directory
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **beck** — September 11, 2016 at 9:46 am ([permalink](https://www.codenameone.com/blog/in-the-shadow.html#comment-22916))
+### **beck** — September 11, 2016 at 9:46 am ([permalink](/blog/in-the-shadow/#comment-22916))
 
 > beck says:
 >
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 12, 2016 at 4:17 am ([permalink](https://www.codenameone.com/blog/in-the-shadow.html#comment-22972))
+### **Shai Almog** — September 12, 2016 at 4:17 am ([permalink](/blog/in-the-shadow/#comment-22972))
 
 > Shai Almog says:
 >
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Bayu Sanjaya** — September 12, 2016 at 1:09 pm ([permalink](https://www.codenameone.com/blog/in-the-shadow.html#comment-23022))
+### **Bayu Sanjaya** — September 12, 2016 at 1:09 pm ([permalink](/blog/in-the-shadow/#comment-23022))
 
 > Bayu Sanjaya says:
 >
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 13, 2016 at 3:47 am ([permalink](https://www.codenameone.com/blog/in-the-shadow.html#comment-21463))
+### **Shai Almog** — September 13, 2016 at 3:47 am ([permalink](/blog/in-the-shadow/#comment-21463))
 
 > Shai Almog says:
 >
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ali Ahmadur Rahman** — August 5, 2018 at 8:42 pm ([permalink](https://www.codenameone.com/blog/in-the-shadow.html#comment-23820))
+### **Ali Ahmadur Rahman** — August 5, 2018 at 8:42 pm ([permalink](/blog/in-the-shadow/#comment-23820))
 
 > Ali Ahmadur Rahman says:
 >
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Martin Brook** — October 28, 2018 at 10:17 am ([permalink](https://www.codenameone.com/blog/in-the-shadow.html#comment-23950))
+### **Martin Brook** — October 28, 2018 at 10:17 am ([permalink](/blog/in-the-shadow/#comment-23950))
 
 > Martin Brook says:
 >

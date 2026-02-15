@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/crisp-cn1lib/new-features-1.jpg)
 
-Crisp powers the chat button in the bottom right portion of our site. It also handles emails and a host of other great features. One feature we didn’t take advantage of is the mobile app support. To solve that we just issued a new [Crisp cn1lib](https://github.com/codenameone/CrispCodenameOneSDK) which we integrated into the new versions of our [Android](https://www.codenameone.com/blog/build-app-beta.html) and [iOS](https://www.codenameone.com/blog/build-app-on-ios.html) apps.
+Crisp powers the chat button in the bottom right portion of our site. It also handles emails and a host of other great features. One feature we didn’t take advantage of is the mobile app support. To solve that we just issued a new [Crisp cn1lib](https://github.com/codenameone/CrispCodenameOneSDK) which we integrated into the new versions of our [Android](/blog/build-app-beta/) and [iOS](/blog/build-app-on-ios/) apps.
 
 You can install it yourself using the extension manager and use it with the instructions [here](https://github.com/codenameone/CrispCodenameOneSDK).
 
@@ -29,7 +29,7 @@ However, its silly to wrap the native libraries when I can use HTML directly and
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Boniface N. Githinji** — October 26, 2018 at 3:37 pm ([permalink](https://www.codenameone.com/blog/crisp-cn1lib.html#comment-24039))
+### **Boniface N. Githinji** — October 26, 2018 at 3:37 pm ([permalink](/blog/crisp-cn1lib/#comment-24039))
 
 > Boniface N. Githinji says:
 >
@@ -40,7 +40,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Boniface N. Githinji** — October 26, 2018 at 3:44 pm ([permalink](https://www.codenameone.com/blog/crisp-cn1lib.html#comment-24064))
+### **Boniface N. Githinji** — October 26, 2018 at 3:44 pm ([permalink](/blog/crisp-cn1lib/#comment-24064))
 
 > Boniface N. Githinji says:
 >

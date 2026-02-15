@@ -90,7 +90,7 @@ You will notice I somewhat glazed over the error handling which will go to the g
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chibuike Mba** — February 10, 2018 at 5:13 pm ([permalink](https://www.codenameone.com/blog/new-rest-calls.html#comment-23657))
+### **Chibuike Mba** — February 10, 2018 at 5:13 pm ([permalink](/blog/new-rest-calls/#comment-23657))
 
 > Chibuike Mba says:
 >
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 11, 2018 at 7:30 am ([permalink](https://www.codenameone.com/blog/new-rest-calls.html#comment-23816))
+### **Shai Almog** — February 11, 2018 at 7:30 am ([permalink](/blog/new-rest-calls/#comment-23816))
 
 > Shai Almog says:
 >
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mohamed Selim** — May 1, 2018 at 2:11 am ([permalink](https://www.codenameone.com/blog/new-rest-calls.html#comment-23855))
+### **Mohamed Selim** — May 1, 2018 at 2:11 am ([permalink](/blog/new-rest-calls/#comment-23855))
 
 > Mohamed Selim says:
 >
@@ -123,7 +123,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 1, 2018 at 4:29 am ([permalink](https://www.codenameone.com/blog/new-rest-calls.html#comment-23889))
+### **Shai Almog** — May 1, 2018 at 4:29 am ([permalink](/blog/new-rest-calls/#comment-23889))
 
 > Shai Almog says:
 >
@@ -134,7 +134,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mohamed Selim** — May 1, 2018 at 1:20 pm ([permalink](https://www.codenameone.com/blog/new-rest-calls.html#comment-23974))
+### **Mohamed Selim** — May 1, 2018 at 1:20 pm ([permalink](/blog/new-rest-calls/#comment-23974))
 
 > Mohamed Selim says:
 >
@@ -143,16 +143,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 2, 2018 at 2:28 pm ([permalink](https://www.codenameone.com/blog/new-rest-calls.html#comment-24327))
+### **Shai Almog** — May 2, 2018 at 2:28 pm ([permalink](/blog/new-rest-calls/#comment-24327))
 
 > Shai Almog says:
 >
-> Sorry I’ve never worked with PHP so I have no experience with that and can’t really help. However, Steve wrote about xatafaces and CRUD operations to mysql here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/connecting-to-a-mysql-database.html>)
+> Sorry I’ve never worked with PHP so I have no experience with that and can’t really help. However, Steve wrote about xatafaces and CRUD operations to mysql here: [https://www.codenameone.com…](</blog/connecting-to-a-mysql-database/>)
 >
 
 
 
-### **Tafadzwa Moyo** — February 27, 2019 at 12:01 pm ([permalink](https://www.codenameone.com/blog/new-rest-calls.html#comment-23979))
+### **Tafadzwa Moyo** — February 27, 2019 at 12:01 pm ([permalink](/blog/new-rest-calls/#comment-23979))
 
 > Tafadzwa Moyo says:
 >
@@ -165,7 +165,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 28, 2019 at 3:25 am ([permalink](https://www.codenameone.com/blog/new-rest-calls.html#comment-23985))
+### **Shai Almog** — February 28, 2019 at 3:25 am ([permalink](/blog/new-rest-calls/#comment-23985))
 
 > Shai Almog says:
 >

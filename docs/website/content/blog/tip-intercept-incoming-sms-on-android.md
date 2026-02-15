@@ -263,7 +263,7 @@ Some of the things I touched here might be a bit “hairy” in terms of native 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — September 20, 2017 at 1:43 pm ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-24152))
+### **Diamond** — September 20, 2017 at 1:43 pm ([permalink](/blog/tip-intercept-incoming-sms-on-android/#comment-24152))
 
 > Diamond says:
 >
@@ -272,7 +272,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond** — September 21, 2017 at 7:11 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-23738))
+### **Diamond** — September 21, 2017 at 7:11 am ([permalink](/blog/tip-intercept-incoming-sms-on-android/#comment-23738))
 
 > Diamond says:
 >
@@ -281,7 +281,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 21, 2017 at 8:05 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-21527))
+### **Shai Almog** — September 21, 2017 at 8:05 am ([permalink](/blog/tip-intercept-incoming-sms-on-android/#comment-21527))
 
 > Shai Almog says:
 >
@@ -290,7 +290,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond** — September 21, 2017 at 8:28 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-23747))
+### **Diamond** — September 21, 2017 at 8:28 am ([permalink](/blog/tip-intercept-incoming-sms-on-android/#comment-23747))
 
 > Diamond says:
 >
@@ -299,7 +299,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond** — September 21, 2017 at 8:43 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-23628))
+### **Diamond** — September 21, 2017 at 8:43 am ([permalink](/blog/tip-intercept-incoming-sms-on-android/#comment-23628))
 
 > Diamond says:
 >
@@ -308,7 +308,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **George Kent** — September 21, 2017 at 9:00 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-23655))
+### **George Kent** — September 21, 2017 at 9:00 am ([permalink](/blog/tip-intercept-incoming-sms-on-android/#comment-23655))
 
 > George Kent says:
 >
@@ -317,7 +317,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 21, 2017 at 10:25 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-24136))
+### **Shai Almog** — September 21, 2017 at 10:25 am ([permalink](/blog/tip-intercept-incoming-sms-on-android/#comment-24136))
 
 > Shai Almog says:
 >
@@ -326,7 +326,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 21, 2017 at 10:30 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-23671))
+### **Shai Almog** — September 21, 2017 at 10:30 am ([permalink](/blog/tip-intercept-incoming-sms-on-android/#comment-23671))
 
 > Shai Almog says:
 >
@@ -335,7 +335,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Rashedul Hasan** — August 11, 2018 at 9:29 pm ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-24024))
+### **Rashedul Hasan** — August 11, 2018 at 9:29 pm ([permalink](/blog/tip-intercept-incoming-sms-on-android/#comment-24024))
 
 > Rashedul Hasan says:
 >
@@ -344,12 +344,12 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 12, 2018 at 4:37 am ([permalink](https://www.codenameone.com/blog/tip-intercept-incoming-sms-on-android.html#comment-24051))
+### **Shai Almog** — August 12, 2018 at 4:37 am ([permalink](/blog/tip-intercept-incoming-sms-on-android/#comment-24051))
 
 > Shai Almog says:
 >
 > Hi,  
-> see this video on native interfaces. It should explain it clearly [https://www.codenameone.com…]([https://www.codenameone.com/how-do-i—access-native-device-functionality-invoke-native-interfaces.html](https://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces.html))
+> see this video on native interfaces. It should explain it clearly [https://www.codenameone.com…]([/how-do-i—access-native-device-functionality-invoke-native-interfaces.html](https://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces/))
 >
 
 

@@ -13,7 +13,7 @@ author: Shai Almog
 
 Steve committed the [upcoming Windows port to out github repository](https://github.com/codenameone/CodenameOne/tree/master/Ports/UWP/VSProjectTemplate)  
 it’s still work in progress so you can’t physically target it as part of the build system although we hope to move  
-this port out relatively quickly. This should be more doable thanks to the [iKVM route](https://www.codenameone.com/blog/new-windows-port.html)  
+this port out relatively quickly. This should be more doable thanks to the [iKVM route](/blog/new-windows-port/)  
 & the [work from Fabricio](https://github.com/Pmovil/CN1WindowsPort) both of which saved a lot of the effort in this port.
 
 You can take a look at this port if you are Windows inclined and let us know what you think.
@@ -49,7 +49,7 @@ It seems that in iOS when you have a list of contacts and you minimize the appli
 the list won’t be refreshed even if you re-invoke `getAllContacts()`.
 
 iOS caches the data for the contacts and we need to explicitly refresh the list using  
-[ContactsManager.refresh()](https://www.codenameone.com/javadoc/com/codename1/contacts/ContactsManager.html#refresh--)  
+[ContactsManager.refresh()](/javadoc/com/codename1/contacts/ContactsManager/#refresh--)  
 which you can call in the `start()` method in case the app is being restored. This method won’t do anything  
 in other platforms but if you need it then it’s pretty valuable.
 

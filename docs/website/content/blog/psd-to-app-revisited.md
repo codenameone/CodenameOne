@@ -401,14 +401,14 @@ You can derive the regular styles from the selected/pressed styles but one of th
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **salah Alhaddabi** — November 14, 2016 at 8:12 pm ([permalink](https://www.codenameone.com/blog/psd-to-app-revisited.html#comment-23195))
+### **salah Alhaddabi** — November 14, 2016 at 8:12 pm ([permalink](/blog/psd-to-app-revisited/#comment-23195))
 
 > Dear Shai, Separator UIID is missing. Will you please provide it as I am having a gap between the text fields and the gray line is not appearing.
 >
 
 
 
-### **Shai Almog** — November 15, 2016 at 5:26 am ([permalink](https://www.codenameone.com/blog/psd-to-app-revisited.html#comment-23054))
+### **Shai Almog** — November 15, 2016 at 5:26 am ([permalink](/blog/psd-to-app-revisited/#comment-23054))
 
 > Se is defined like this with 1 pixel padding on all sides and 0 margin
 >
@@ -417,49 +417,49 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — November 15, 2016 at 2:28 pm ([permalink](https://www.codenameone.com/blog/psd-to-app-revisited.html#comment-22807))
+### **salah Alhaddabi** — November 15, 2016 at 2:28 pm ([permalink](/blog/psd-to-app-revisited/#comment-22807))
 
 > Thank you soooo much dear really appreciate your help a lot!!!
 >
 
 
 
-### **salah Alhaddabi** — November 19, 2016 at 2:14 pm ([permalink](https://www.codenameone.com/blog/psd-to-app-revisited.html#comment-23160))
+### **salah Alhaddabi** — November 19, 2016 at 2:14 pm ([permalink](/blog/psd-to-app-revisited/#comment-23160))
 
 > Dear Shai, I am so surprised to see that the toolbar on android has still white background while it works fine on ios. Also when I change the device on the simulator from ios 6 plus or android Samsung S7 to other samller devices the screens look ugly and the toolbar becomes white the the title area appears even though I have hidden it. Please help!!
 >
 
 
 
-### **Shai Almog** — November 20, 2016 at 6:13 am ([permalink](https://www.codenameone.com/blog/psd-to-app-revisited.html#comment-22925))
+### **Shai Almog** — November 20, 2016 at 6:13 am ([permalink](/blog/psd-to-app-revisited/#comment-22925))
 
 > Override the border of title area UIID as empty.
 >
 
 
 
-### **salah Alhaddabi** — November 20, 2016 at 4:37 pm ([permalink](https://www.codenameone.com/blog/psd-to-app-revisited.html#comment-22975))
+### **salah Alhaddabi** — November 20, 2016 at 4:37 pm ([permalink](/blog/psd-to-app-revisited/#comment-22975))
 
 > very nice very nice thanks a million!!
 >
 
 
 
-### **zainab** — March 22, 2017 at 10:02 pm ([permalink](https://www.codenameone.com/blog/psd-to-app-revisited.html#comment-23344))
+### **zainab** — March 22, 2017 at 10:02 pm ([permalink](/blog/psd-to-app-revisited/#comment-23344))
 
 > can any one give me the java code for the first basic form. the one without styling. please. thank you so much in advanced
 >
 
 
 
-### **zainab** — March 22, 2017 at 10:05 pm ([permalink](https://www.codenameone.com/blog/psd-to-app-revisited.html#comment-23353))
+### **zainab** — March 22, 2017 at 10:05 pm ([permalink](/blog/psd-to-app-revisited/#comment-23353))
 
 > I am having difficulties with netbeans running the simple signup form. can anyone help with the code and all plugins please.
 >
 
 
 
-### **Shai Almog** — March 23, 2017 at 5:57 am ([permalink](https://www.codenameone.com/blog/psd-to-app-revisited.html#comment-23107))
+### **Shai Almog** — March 23, 2017 at 5:57 am ([permalink](/blog/psd-to-app-revisited/#comment-23107))
 
 > There is one plugin and that is the Codename One plugin which you can install via the download section of this website. It also includes the code for this demo if you go to File -> New Project -> Codename One -> Demos you would see the PSD demo code
 >

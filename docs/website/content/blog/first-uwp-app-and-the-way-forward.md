@@ -39,35 +39,35 @@ affect the UWP port!
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — September 5, 2016 at 8:30 pm ([permalink](https://www.codenameone.com/blog/first-uwp-app-and-the-way-forward.html#comment-22735))
+### **bryan** — September 5, 2016 at 8:30 pm ([permalink](/blog/first-uwp-app-and-the-way-forward/#comment-22735))
 
 > bryan says:
 >
 > Overflow menu commands don’t display correctly
 
 
-### **Shai Almog** — September 6, 2016 at 3:56 am ([permalink](https://www.codenameone.com/blog/first-uwp-app-and-the-way-forward.html#comment-23006))
+### **Shai Almog** — September 6, 2016 at 3:56 am ([permalink](/blog/first-uwp-app-and-the-way-forward/#comment-23006))
 
 > Shai Almog says:
 >
 > Thanks, we noticed that too after this went live. It’s an odd issue.
 
 
-### **bryan** — September 6, 2016 at 3:59 am ([permalink](https://www.codenameone.com/blog/first-uwp-app-and-the-way-forward.html#comment-22751))
+### **bryan** — September 6, 2016 at 3:59 am ([permalink](/blog/first-uwp-app-and-the-way-forward/#comment-22751))
 
 > bryan says:
 >
 > It’s the same issue I raised a few days ago. It works fine in a debug build, but not in an app store build.
 
 
-### **Ross Taylor** — September 6, 2016 at 12:51 pm ([permalink](https://www.codenameone.com/blog/first-uwp-app-and-the-way-forward.html#comment-22971))
+### **Ross Taylor** — September 6, 2016 at 12:51 pm ([permalink](/blog/first-uwp-app-and-the-way-forward/#comment-22971))
 
 > Ross Taylor says:
 >
 > Strange afaik, Skype will be discontinued for Windows phones 7 – 8.1, but nothing was mentioned about Windows Phone 10?
 
 
-### **Shai Almog** — September 6, 2016 at 1:30 pm ([permalink](https://www.codenameone.com/blog/first-uwp-app-and-the-way-forward.html#comment-22946))
+### **Shai Almog** — September 6, 2016 at 1:30 pm ([permalink](/blog/first-uwp-app-and-the-way-forward/#comment-22946))
 
 > Shai Almog says:
 >
@@ -82,14 +82,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ross Taylor** — September 6, 2016 at 1:49 pm ([permalink](https://www.codenameone.com/blog/first-uwp-app-and-the-way-forward.html#comment-23021))
+### **Ross Taylor** — September 6, 2016 at 1:49 pm ([permalink](/blog/first-uwp-app-and-the-way-forward/#comment-23021))
 
 > Ross Taylor says:
 >
 > Ah, thanks clearing things up! Good to know CN1 is making effort to reach all platforms.
 
 
-### **Jaanus Hansen** — September 11, 2016 at 11:01 am ([permalink](https://www.codenameone.com/blog/first-uwp-app-and-the-way-forward.html#comment-22953))
+### **Jaanus Hansen** — September 11, 2016 at 11:01 am ([permalink](/blog/first-uwp-app-and-the-way-forward/#comment-22953))
 
 > Jaanus Hansen says:
 >
@@ -98,7 +98,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 12, 2016 at 4:20 am ([permalink](https://www.codenameone.com/blog/first-uwp-app-and-the-way-forward.html#comment-22947))
+### **Shai Almog** — September 12, 2016 at 4:20 am ([permalink](/blog/first-uwp-app-and-the-way-forward/#comment-22947))
 
 > Shai Almog says:
 >

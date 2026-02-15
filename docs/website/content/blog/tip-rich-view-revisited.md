@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/tip-rich-view-revisited/tip.jpg)
 
-A couple of years ago I posted a [tip about rich text view](https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html) which worked out reasonably well. But it’s a bit outdated by now and it’s worth revisiting. During these two years we published the [Facebook Clone](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java) which used this component.
+A couple of years ago I posted a [tip about rich text view](/blog/tip-lightweight-rich-text-view/) which worked out reasonably well. But it’s a bit outdated by now and it’s worth revisiting. During these two years we published the [Facebook Clone](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java) which used this component.
 
 In the facebook clone I did a lot of work for the rich text. This work added support for alignment and clickable hyperlinks as well as a couple of bug fixes. Following is the code I used in the Facebook Clone for the rich text.
     
@@ -176,7 +176,7 @@ In the facebook clone I did a lot of work for the rich text. This work added sup
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Durank** — September 30, 2020 at 12:19 pm ([permalink](https://www.codenameone.com/blog/tip-rich-view-revisited.html#comment-24349))
+### **Durank** — September 30, 2020 at 12:19 pm ([permalink](/blog/tip-rich-view-revisited/#comment-24349))
 
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
@@ -185,11 +185,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 1, 2020 at 6:38 am ([permalink](https://www.codenameone.com/blog/tip-rich-view-revisited.html#comment-24352))
+### **Shai Almog** — October 1, 2020 at 6:38 am ([permalink](/blog/tip-rich-view-revisited/#comment-24352))
 
 > Shai Almog says:
 >
-> This is available in the post I linked above: <https://www.codenameone.com/blog/tip-lightweight-rich-text-view.html>
+> This is available in the post I linked above: </blog/tip-lightweight-rich-text-view/>
 >
 > “`  
 > hi.add(new RichTextView(“This is plain text **this is bold** and _this is italic_ and all of this breaks lines nicely as well….”));  
@@ -198,7 +198,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Julio Valeriron Ochoa** — September 23, 2021 at 12:51 pm ([permalink](https://www.codenameone.com/blog/tip-rich-view-revisited.html#comment-24494))
+### **Julio Valeriron Ochoa** — September 23, 2021 at 12:51 pm ([permalink](/blog/tip-rich-view-revisited/#comment-24494))
 
 > Julio Valeriron Ochoa says:
 >
@@ -207,7 +207,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lianna Casper** — September 23, 2021 at 4:27 pm ([permalink](https://www.codenameone.com/blog/tip-rich-view-revisited.html#comment-24496))
+### **Lianna Casper** — September 23, 2021 at 4:27 pm ([permalink](/blog/tip-rich-view-revisited/#comment-24496))
 
 > Lianna Casper says:
 >

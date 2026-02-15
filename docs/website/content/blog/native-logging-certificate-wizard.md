@@ -41,7 +41,7 @@ With those two things in mind we decided to postpone Codename One 5.0 to Septemb
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chris** — June 20, 2018 at 4:43 am ([permalink](https://www.codenameone.com/blog/native-logging-certificate-wizard.html#comment-23700))
+### **Chris** — June 20, 2018 at 4:43 am ([permalink](/blog/native-logging-certificate-wizard/#comment-23700))
 
 > Chris says:
 >
@@ -52,7 +52,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — June 20, 2018 at 2:13 pm ([permalink](https://www.codenameone.com/blog/native-logging-certificate-wizard.html#comment-24000))
+### **Francesco Galgani** — June 20, 2018 at 2:13 pm ([permalink](/blog/native-logging-certificate-wizard/#comment-24000))
 
 > Francesco Galgani says:
 >
@@ -63,7 +63,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Yaakov Gesher** — June 23, 2018 at 10:10 pm ([permalink](https://www.codenameone.com/blog/native-logging-certificate-wizard.html#comment-23947))
+### **Yaakov Gesher** — June 23, 2018 at 10:10 pm ([permalink](/blog/native-logging-certificate-wizard/#comment-23947))
 
 > Yaakov Gesher says:
 >

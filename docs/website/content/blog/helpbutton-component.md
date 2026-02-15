@@ -9,7 +9,7 @@ date: '2020-10-31'
 author: Steve Hannah
 ---
 
-This is the second is a series of blog posts hightlighting some of the components available in the CodeRAD cn1lib. The [first post (or series of posts) introduced the RAD Chatroom component](https://www.codenameone.com/blog/rad-chatroom-part-1.html), a rich 2nd order UI component that encapsulates the user interface for a fully functional chat room.
+This is the second is a series of blog posts hightlighting some of the components available in the CodeRAD cn1lib. The [first post (or series of posts) introduced the RAD Chatroom component](/blog/rad-chatroom-part-1/), a rich 2nd order UI component that encapsulates the user interface for a fully functional chat room.
 
 __ |  A second-order UI component is a complex UI component, usually composed of multiple basic components, which is designed for a specific type of application. Some examples of second-order UI components are login forms, contacts lists, chat room components, news lists, etc..   
 ---|---  

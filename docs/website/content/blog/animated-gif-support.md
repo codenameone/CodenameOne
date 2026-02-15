@@ -45,7 +45,7 @@ Notice the following:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **salah Alhaddabi** — August 10, 2017 at 1:01 pm ([permalink](https://www.codenameone.com/blog/animated-gif-support.html#comment-23745))
+### **salah Alhaddabi** — August 10, 2017 at 1:01 pm ([permalink](/blog/animated-gif-support/#comment-23745))
 
 > salah Alhaddabi says:
 >
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 11, 2017 at 7:22 am ([permalink](https://www.codenameone.com/blog/animated-gif-support.html#comment-23653))
+### **Shai Almog** — August 11, 2017 at 7:22 am ([permalink](/blog/animated-gif-support/#comment-23653))
 
 > Shai Almog says:
 >
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — August 16, 2017 at 5:19 pm ([permalink](https://www.codenameone.com/blog/animated-gif-support.html#comment-23444))
+### **Francesco Galgani** — August 16, 2017 at 5:19 pm ([permalink](/blog/animated-gif-support/#comment-23444))
 
 > Francesco Galgani says:
 >
@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 17, 2017 at 4:39 am ([permalink](https://www.codenameone.com/blog/animated-gif-support.html#comment-24151))
+### **Shai Almog** — August 17, 2017 at 4:39 am ([permalink](/blog/animated-gif-support/#comment-24151))
 
 > Shai Almog says:
 >
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — August 17, 2017 at 9:39 am ([permalink](https://www.codenameone.com/blog/animated-gif-support.html#comment-23637))
+### **Francesco Galgani** — August 17, 2017 at 9:39 am ([permalink](/blog/animated-gif-support/#comment-23637))
 
 > Francesco Galgani says:
 >
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 18, 2017 at 5:56 am ([permalink](https://www.codenameone.com/blog/animated-gif-support.html#comment-23418))
+### **Shai Almog** — August 18, 2017 at 5:56 am ([permalink](/blog/animated-gif-support/#comment-23418))
 
 > Shai Almog says:
 >
@@ -102,7 +102,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Rainer** — August 23, 2017 at 7:52 pm ([permalink](https://www.codenameone.com/blog/animated-gif-support.html#comment-24219))
+### **Rainer** — August 23, 2017 at 7:52 pm ([permalink](/blog/animated-gif-support/#comment-24219))
 
 > Rainer says:
 >
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 24, 2017 at 9:04 am ([permalink](https://www.codenameone.com/blog/animated-gif-support.html#comment-23695))
+### **Shai Almog** — August 24, 2017 at 9:04 am ([permalink](/blog/animated-gif-support/#comment-23695))
 
 > Shai Almog says:
 >

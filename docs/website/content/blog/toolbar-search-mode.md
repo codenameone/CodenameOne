@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/toolbar-search-mode/toolbar-search-mode.jpg)
 
-The [Toolbar](https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html) is a pretty flexible  
+The [Toolbar](/javadoc/com/codename1/ui/Toolbar/) is a pretty flexible  
 API for handling the title area. It allows a lot of things including search but up until now that very common  
 use case was not a standard part of the API.
 
@@ -100,7 +100,7 @@ will start off as both functional and attractive.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Mac Flanegan** — February 17, 2017 at 9:08 pm ([permalink](https://www.codenameone.com/blog/toolbar-search-mode.html#comment-23368))
+### **Mac Flanegan** — February 17, 2017 at 9:08 pm ([permalink](/blog/toolbar-search-mode/#comment-23368))
 
 > Mac Flanegan says:
 >
@@ -119,12 +119,12 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I believe the component is interpreting ENTER as a new line rather than executing the command.
 
 
-### **Shai Almog** — February 18, 2017 at 10:57 am ([permalink](https://www.codenameone.com/blog/toolbar-search-mode.html#comment-23288))
+### **Shai Almog** — February 18, 2017 at 10:57 am ([permalink](/blog/toolbar-search-mode/#comment-23288))
 
 > Shai Almog says:
 >
 > Hi,  
-> I’ll make it so “[m.search](<http://m.search>)” in the resource bundle will allow you to localize this. This video is a bit old but it discusses localizations: [https://www.codenameone.com…]([https://www.codenameone.com/how-do-i—localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app.html](https://www.codenameone.com/how-do-i---localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app.html))
+> I’ll make it so “[m.search](<http://m.search>)” in the resource bundle will allow you to localize this. This video is a bit old but it discusses localizations: [https://www.codenameone.com…]([/how-do-i—localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app.html](https://www.codenameone.com/how-do-i---localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app/))
 >
 > Currently we don’t support disabling the animation but what did you do that triggered this? It’s hard for me to visualize the issue you’re seeing.
 >
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Search happens as you type so I’m not sure how you are seeing that behavior. I think the problem is that you aren’t using revalidate or animateLayout to show your changes to the UI and so the search only updates when we do it on the back button.
 
 
-### **Mac Flanegan** — February 18, 2017 at 12:47 pm ([permalink](https://www.codenameone.com/blog/toolbar-search-mode.html#comment-23196))
+### **Mac Flanegan** — February 18, 2017 at 12:47 pm ([permalink](/blog/toolbar-search-mode/#comment-23196))
 
 > Mac Flanegan says:
 >
@@ -145,16 +145,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > So I could make small hacks like search.getSearchTextField (). PutClientProperty (“searchField”, Boolean.TRUE);
 
 
-### **Shai Almog** — February 19, 2017 at 7:15 am ([permalink](https://www.codenameone.com/blog/toolbar-search-mode.html#comment-23139))
+### **Shai Almog** — February 19, 2017 at 7:15 am ([permalink](/blog/toolbar-search-mode/#comment-23139))
 
 > Shai Almog says:
 >
 > The problem with doing things like this is that the more you expose people end up relying on edge cases of the API and you can’t change them. E.g. in the future we might want to support iOS style search where the text field appears below the title. If we expose too much of the implementation details this can become a problem.
 >
-> Notice you can still add features to this thru a pull request to our main repository which is really easy to do: [https://www.codenameone.com…](<https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html>)
+> Notice you can still add features to this thru a pull request to our main repository which is really easy to do: [https://www.codenameone.com…](</blog/how-to-use-the-codename-one-sources/>)
 
 
-### **Nils Lamb** — August 4, 2017 at 12:08 pm ([permalink](https://www.codenameone.com/blog/toolbar-search-mode.html#comment-23325))
+### **Nils Lamb** — August 4, 2017 at 12:08 pm ([permalink](/blog/toolbar-search-mode/#comment-23325))
 
 > Nils Lamb says:
 >
@@ -162,21 +162,21 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Is this implemented already?
 
 
-### **Shai Almog** — August 5, 2017 at 6:23 am ([permalink](https://www.codenameone.com/blog/toolbar-search-mode.html#comment-23406))
+### **Shai Almog** — August 5, 2017 at 6:23 am ([permalink](/blog/toolbar-search-mode/#comment-23406))
 
 > Shai Almog says:
 >
 > Yes it was implemented but looking at the code it’s possible this wasn’t 100% correct for all cases. I made a fix which will hopefully resolve the issue you are seeing.
 
 
-### **Yaakov Gesher** — February 27, 2018 at 1:25 pm ([permalink](https://www.codenameone.com/blog/toolbar-search-mode.html#comment-23773))
+### **Yaakov Gesher** — February 27, 2018 at 1:25 pm ([permalink](/blog/toolbar-search-mode/#comment-23773))
 
 > Yaakov Gesher says:
 >
 > Hi, is there a way to filter out the events from the SearchBar so that I know when the ENTER key was pressed? I’m interested in only executing a search when the user initiates it by pressing the search key
 
 
-### **Shai Almog** — February 28, 2018 at 8:59 am ([permalink](https://www.codenameone.com/blog/toolbar-search-mode.html#comment-23905))
+### **Shai Almog** — February 28, 2018 at 8:59 am ([permalink](/blog/toolbar-search-mode/#comment-23905))
 
 > Shai Almog says:
 >

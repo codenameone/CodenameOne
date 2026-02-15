@@ -58,7 +58,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — April 30, 2014 at 2:04 am ([permalink](https://www.codenameone.com/blog/new-vm.html#comment-21505))
+### **Anonymous** — April 30, 2014 at 2:04 am ([permalink](/blog/new-vm/#comment-21505))
 
 > Anonymous says:
 >
@@ -67,7 +67,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — April 30, 2014 at 2:20 am ([permalink](https://www.codenameone.com/blog/new-vm.html#comment-21924))
+### **Anonymous** — April 30, 2014 at 2:20 am ([permalink](/blog/new-vm/#comment-21924))
 
 > Anonymous says:
 >

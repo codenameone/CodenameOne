@@ -81,7 +81,7 @@ The one hurdle is that the guide is written using asciidoc which is a simple lan
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — August 19, 2017 at 7:37 pm ([permalink](https://www.codenameone.com/blog/tip-edit-docs-fun-profit.html#comment-23761))
+### **Francesco Galgani** — August 19, 2017 at 7:37 pm ([permalink](/blog/tip-edit-docs-fun-profit/#comment-23761))
 
 > Thank you Shai.  
 > Are the wiki modifications by users automatically converted to the manual pages in the Codename One site without any check by the Codename One team?
@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 20, 2017 at 4:58 am ([permalink](https://www.codenameone.com/blog/tip-edit-docs-fun-profit.html#comment-23434))
+### **Shai Almog** — August 20, 2017 at 4:58 am ([permalink](/blog/tip-edit-docs-fun-profit/#comment-23434))
 
 > No. We monitor the edits and review every change. Then when we choose we sync it to the site.
 >

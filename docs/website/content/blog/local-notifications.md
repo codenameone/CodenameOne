@@ -104,7 +104,7 @@ You can see a full sample that uses the new local notifications API [here](https
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Carlos** — October 1, 2015 at 10:32 am ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-22385))
+### **Carlos** — October 1, 2015 at 10:32 am ([permalink](/blog/local-notifications/#comment-22385))
 
 > Cool.
 >
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — October 1, 2015 at 3:18 pm ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-22395))
+### **shannah78** — October 1, 2015 at 3:18 pm ([permalink](/blog/local-notifications/#comment-22395))
 
 > shannah78 says:
 >
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Nick Koirala** — October 5, 2015 at 9:20 pm ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-22402))
+### **Nick Koirala** — October 5, 2015 at 9:20 pm ([permalink](/blog/local-notifications/#comment-22402))
 
 > Nick Koirala says:
 >
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ahmed** — November 1, 2015 at 9:17 pm ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-22503))
+### **ahmed** — November 1, 2015 at 9:17 pm ([permalink](/blog/local-notifications/#comment-22503))
 
 > ahmed says:
 >
@@ -142,7 +142,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 2, 2015 at 3:27 am ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-22278))
+### **Shai Almog** — November 2, 2015 at 3:27 am ([permalink](/blog/local-notifications/#comment-22278))
 
 > Shai Almog says:
 >
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ahmed** — November 2, 2015 at 4:30 am ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-22205))
+### **ahmed** — November 2, 2015 at 4:30 am ([permalink](/blog/local-notifications/#comment-22205))
 
 > ahmed says:
 >
@@ -160,7 +160,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — November 5, 2015 at 3:54 pm ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-22387))
+### **shannah78** — November 5, 2015 at 3:54 pm ([permalink](/blog/local-notifications/#comment-22387))
 
 > shannah78 says:
 >
@@ -169,7 +169,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — November 5, 2015 at 3:56 pm ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-22397))
+### **shannah78** — November 5, 2015 at 3:56 pm ([permalink](/blog/local-notifications/#comment-22397))
 
 > shannah78 says:
 >
@@ -178,7 +178,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ahmed** — November 5, 2015 at 4:27 pm ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-22404))
+### **ahmed** — November 5, 2015 at 4:27 pm ([permalink](/blog/local-notifications/#comment-22404))
 
 > ahmed says:
 >
@@ -187,7 +187,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — November 5, 2015 at 5:26 pm ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-22496))
+### **shannah78** — November 5, 2015 at 5:26 pm ([permalink](/blog/local-notifications/#comment-22496))
 
 > shannah78 says:
 >
@@ -200,7 +200,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ahmed** — November 6, 2015 at 7:04 pm ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-21488))
+### **ahmed** — November 6, 2015 at 7:04 pm ([permalink](/blog/local-notifications/#comment-21488))
 
 > ahmed says:
 >
@@ -209,7 +209,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Keshav Rai** — April 11, 2016 at 4:22 pm ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-22620))
+### **Keshav Rai** — April 11, 2016 at 4:22 pm ([permalink](/blog/local-notifications/#comment-22620))
 
 > Keshav Rai says:
 >
@@ -220,7 +220,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chen Fishbein** — April 22, 2016 at 8:46 pm ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-22566))
+### **Chen Fishbein** — April 22, 2016 at 8:46 pm ([permalink](/blog/local-notifications/#comment-22566))
 
 > Chen Fishbein says:
 >
@@ -230,7 +230,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lukman Javalove Idealist Jaji** — June 21, 2016 at 10:19 pm ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-22681))
+### **Lukman Javalove Idealist Jaji** — June 21, 2016 at 10:19 pm ([permalink](/blog/local-notifications/#comment-22681))
 
 > Lukman Javalove Idealist Jaji says:
 >
@@ -239,7 +239,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 22, 2016 at 3:42 am ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-22740))
+### **Shai Almog** — June 22, 2016 at 3:42 am ([permalink](/blog/local-notifications/#comment-22740))
 
 > Shai Almog says:
 >
@@ -248,7 +248,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **madhu thestudent** — July 20, 2016 at 11:44 am ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-21653))
+### **madhu thestudent** — July 20, 2016 at 11:44 am ([permalink](/blog/local-notifications/#comment-21653))
 
 > madhu thestudent says:
 >
@@ -257,7 +257,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **madhu thestudent** — July 20, 2016 at 11:44 am ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-22556))
+### **madhu thestudent** — July 20, 2016 at 11:44 am ([permalink](/blog/local-notifications/#comment-22556))
 
 > madhu thestudent says:
 >
@@ -266,7 +266,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Daniel Le Cardinal** — April 13, 2017 at 3:04 pm ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-23058))
+### **Daniel Le Cardinal** — April 13, 2017 at 3:04 pm ([permalink](/blog/local-notifications/#comment-23058))
 
 > Daniel Le Cardinal says:
 >
@@ -276,7 +276,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 14, 2017 at 4:39 am ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-23048))
+### **Shai Almog** — April 14, 2017 at 4:39 am ([permalink](/blog/local-notifications/#comment-23048))
 
 > Shai Almog says:
 >
@@ -288,7 +288,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 14, 2017 at 4:40 am ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-23437))
+### **Shai Almog** — April 14, 2017 at 4:40 am ([permalink](/blog/local-notifications/#comment-23437))
 
 > Shai Almog says:
 >
@@ -299,7 +299,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chibuike Mba** — May 10, 2017 at 7:22 am ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-23585))
+### **Chibuike Mba** — May 10, 2017 at 7:22 am ([permalink](/blog/local-notifications/#comment-23585))
 
 > Chibuike Mba says:
 >
@@ -310,7 +310,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 11, 2017 at 9:25 am ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-23456))
+### **Shai Almog** — May 11, 2017 at 9:25 am ([permalink](/blog/local-notifications/#comment-23456))
 
 > Shai Almog says:
 >
@@ -319,7 +319,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chibuike Mba** — May 11, 2017 at 10:43 am ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-23322))
+### **Chibuike Mba** — May 11, 2017 at 10:43 am ([permalink](/blog/local-notifications/#comment-23322))
 
 > Chibuike Mba says:
 >
@@ -328,7 +328,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — May 5, 2020 at 10:11 am ([permalink](https://www.codenameone.com/blog/local-notifications.html#comment-21397))
+### **Ch Hjelm** — May 5, 2020 at 10:11 am ([permalink](/blog/local-notifications/#comment-21397))
 
 > [Ch Hjelm](https://lh3.googleusercontent.com/-D-GIdg1DASY/AAAAAAAAAAI/AAAAAAAAAAA/AAKWJJMNPAANy-qutSCtrOnc0icrNWiskQ/photo.jpg) says:
 >

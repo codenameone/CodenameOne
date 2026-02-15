@@ -322,21 +322,21 @@ You can check out the final source code of this tutorial [here](https://github.c
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Nigel Chomba** — July 22, 2015 at 5:24 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-2.html#comment-22264))
+### **Nigel Chomba** — July 22, 2015 at 5:24 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-2/#comment-22264))
 
 > i am following…..Great stuff co-founder
 >
 
 
 
-### **Francesco Galgani** — February 4, 2018 at 2:32 pm ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-2.html#comment-23913))
+### **Francesco Galgani** — February 4, 2018 at 2:32 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-2/#comment-23913))
 
 > Are the information and code of this tutorial about Facebook login and Google login still valid?
 >
 
 
 
-### **Shai Almog** — February 5, 2018 at 5:05 am ([permalink](https://www.codenameone.com/blog/building-a-chat-app-with-codename-one-part-2.html#comment-23617))
+### **Shai Almog** — February 5, 2018 at 5:05 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-2/#comment-23617))
 
 > Should be. It’s a bit old so I’d like to refresh it eventually.
 >

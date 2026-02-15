@@ -315,7 +315,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 19, 2015 at 8:15 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-22016))
+### **Anonymous** — January 19, 2015 at 8:15 am ([permalink](/blog/codename-one-graphics/#comment-22016))
 
 > Anonymous says:
 >
@@ -324,7 +324,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 19, 2015 at 9:19 am ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-21663))
+### **Anonymous** — January 19, 2015 at 9:19 am ([permalink](/blog/codename-one-graphics/#comment-21663))
 
 > Anonymous says:
 >
@@ -333,7 +333,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 19, 2015 at 1:07 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-22009))
+### **Anonymous** — January 19, 2015 at 1:07 pm ([permalink](/blog/codename-one-graphics/#comment-22009))
 
 > Anonymous says:
 >
@@ -342,7 +342,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 19, 2015 at 1:13 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-24175))
+### **Anonymous** — January 19, 2015 at 1:13 pm ([permalink](/blog/codename-one-graphics/#comment-24175))
 
 > Anonymous says:
 >
@@ -353,7 +353,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 19, 2015 at 2:31 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-22100))
+### **Anonymous** — January 19, 2015 at 2:31 pm ([permalink](/blog/codename-one-graphics/#comment-22100))
 
 > Anonymous says:
 >
@@ -362,7 +362,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 30, 2015 at 6:51 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-22342))
+### **Anonymous** — January 30, 2015 at 6:51 pm ([permalink](/blog/codename-one-graphics/#comment-22342))
 
 > Anonymous says:
 >
@@ -435,7 +435,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 30, 2015 at 7:44 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-22327))
+### **Anonymous** — January 30, 2015 at 7:44 pm ([permalink](/blog/codename-one-graphics/#comment-22327))
 
 > Anonymous says:
 >
@@ -450,7 +450,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 31, 2015 at 3:45 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-21840))
+### **Anonymous** — January 31, 2015 at 3:45 pm ([permalink](/blog/codename-one-graphics/#comment-21840))
 
 > Anonymous says:
 >
@@ -481,7 +481,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 31, 2015 at 3:48 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-22200))
+### **Anonymous** — January 31, 2015 at 3:48 pm ([permalink](/blog/codename-one-graphics/#comment-22200))
 
 > Anonymous says:
 >
@@ -490,7 +490,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 31, 2015 at 4:23 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-21608))
+### **Anonymous** — January 31, 2015 at 4:23 pm ([permalink](/blog/codename-one-graphics/#comment-21608))
 
 > Anonymous says:
 >
@@ -501,7 +501,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 31, 2015 at 6:16 pm ([permalink](https://www.codenameone.com/blog/codename-one-graphics.html#comment-21952))
+### **Anonymous** — January 31, 2015 at 6:16 pm ([permalink](/blog/codename-one-graphics/#comment-21952))
 
 > Anonymous says:
 >

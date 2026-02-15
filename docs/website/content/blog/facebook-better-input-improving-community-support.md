@@ -61,7 +61,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — November 20, 2013 at 12:57 pm ([permalink](https://www.codenameone.com/blog/facebook-better-input-improving-community-support.html#comment-22010))
+### **Anonymous** — November 20, 2013 at 12:57 pm ([permalink](/blog/facebook-better-input-improving-community-support/#comment-22010))
 
 > Anonymous says:
 >
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 20, 2013 at 12:59 pm ([permalink](https://www.codenameone.com/blog/facebook-better-input-improving-community-support.html#comment-24254))
+### **Anonymous** — November 20, 2013 at 12:59 pm ([permalink](/blog/facebook-better-input-improving-community-support/#comment-24254))
 
 > Anonymous says:
 >
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 20, 2013 at 11:51 pm ([permalink](https://www.codenameone.com/blog/facebook-better-input-improving-community-support.html#comment-21746))
+### **Anonymous** — November 20, 2013 at 11:51 pm ([permalink](/blog/facebook-better-input-improving-community-support/#comment-21746))
 
 > Anonymous says:
 >
@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 21, 2013 at 2:46 am ([permalink](https://www.codenameone.com/blog/facebook-better-input-improving-community-support.html#comment-21789))
+### **Anonymous** — November 21, 2013 at 2:46 am ([permalink](/blog/facebook-better-input-improving-community-support/#comment-21789))
 
 > Anonymous says:
 >
@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 21, 2013 at 5:27 am ([permalink](https://www.codenameone.com/blog/facebook-better-input-improving-community-support.html#comment-21804))
+### **Anonymous** — November 21, 2013 at 5:27 am ([permalink](/blog/facebook-better-input-improving-community-support/#comment-21804))
 
 > Anonymous says:
 >
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 23, 2013 at 5:17 am ([permalink](https://www.codenameone.com/blog/facebook-better-input-improving-community-support.html#comment-22055))
+### **Anonymous** — November 23, 2013 at 5:17 am ([permalink](/blog/facebook-better-input-improving-community-support/#comment-22055))
 
 > Anonymous says:
 >
@@ -125,7 +125,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 23, 2013 at 5:29 am ([permalink](https://www.codenameone.com/blog/facebook-better-input-improving-community-support.html#comment-21873))
+### **Anonymous** — November 23, 2013 at 5:29 am ([permalink](/blog/facebook-better-input-improving-community-support/#comment-21873))
 
 > Anonymous says:
 >
@@ -138,7 +138,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — November 27, 2013 at 8:55 am ([permalink](https://www.codenameone.com/blog/facebook-better-input-improving-community-support.html#comment-21891))
+### **Anonymous** — November 27, 2013 at 8:55 am ([permalink](/blog/facebook-better-input-improving-community-support/#comment-21891))
 
 > Anonymous says:
 >

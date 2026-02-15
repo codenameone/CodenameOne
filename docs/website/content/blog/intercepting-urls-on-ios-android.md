@@ -115,7 +115,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — August 12, 2017 at 10:56 am ([permalink](https://www.codenameone.com/blog/intercepting-urls-on-ios-android.html#comment-23753))
+### **Francesco Galgani** — August 12, 2017 at 10:56 am ([permalink](/blog/intercepting-urls-on-ios-android/#comment-23753))
 
 > Francesco Galgani says:
 >
@@ -129,14 +129,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > So, my questions are if this post is still update and if it’s correctly formatted (it’s not clear if the build arguments for Android and iOS are in only one row).
 >
 > I suppose that the build arguments are the ones described in “Sending Arguments To The Build Server”, is it right?  
-> [https://www.codenameone.com…](<https://www.codenameone.com/manual/advanced-topics.html#_sending_arguments_to_the_build_server>)
+> [https://www.codenameone.com…](</manual/advanced-topics/#_sending_arguments_to_the_build_server>)
 >
 > Thank you.
 >
 
 
 
-### **Shai Almog** — August 13, 2017 at 5:32 am ([permalink](https://www.codenameone.com/blog/intercepting-urls-on-ios-android.html#comment-23424))
+### **Shai Almog** — August 13, 2017 at 5:32 am ([permalink](/blog/intercepting-urls-on-ios-android/#comment-23424))
 
 > Shai Almog says:
 >
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — July 11, 2018 at 6:22 pm ([permalink](https://www.codenameone.com/blog/intercepting-urls-on-ios-android.html#comment-23649))
+### **Francesco Galgani** — July 11, 2018 at 6:22 pm ([permalink](/blog/intercepting-urls-on-ios-android/#comment-23649))
 
 > Francesco Galgani says:
 >
@@ -158,13 +158,13 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 12, 2018 at 5:39 am ([permalink](https://www.codenameone.com/blog/intercepting-urls-on-ios-android.html#comment-23986))
+### **Shai Almog** — July 12, 2018 at 5:39 am ([permalink](/blog/intercepting-urls-on-ios-android/#comment-23986))
 
 > Shai Almog says:
 >
 > I don’t recall this at all, it’s been 4 years since I wrote that so no idea…
 >
-> This isn’t mentioned in the developer guide section though: [https://www.codenameone.com…](<https://www.codenameone.com/manual/advanced-topics.html>)
+> This isn’t mentioned in the developer guide section though: [https://www.codenameone.com…](</manual/advanced-topics/>)
 >
 
 

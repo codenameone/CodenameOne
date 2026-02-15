@@ -48,7 +48,7 @@ Happy learning!
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Francesco Galgani** — January 7, 2021 at 11:32 am ([permalink](https://www.codenameone.com/blog/why-you-should-learn-spring-boot-in-2021.html#comment-24372))
+### **Francesco Galgani** — January 7, 2021 at 11:32 am ([permalink](/blog/why-you-should-learn-spring-boot-in-2021/#comment-24372))
 
 > Francesco Galgani says:
 >

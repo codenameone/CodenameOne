@@ -30,7 +30,7 @@ tutorial. We now have 2 ad networks integrated in that way which means that if y
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — March 2, 2015 at 1:29 pm ([permalink](https://www.codenameone.com/blog/flurry-interstitial-ads-analytics.html#comment-22119))
+### **Anonymous** — March 2, 2015 at 1:29 pm ([permalink](/blog/flurry-interstitial-ads-analytics/#comment-22119))
 
 > Anonymous says:
 >
@@ -47,7 +47,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 3, 2015 at 2:04 am ([permalink](https://www.codenameone.com/blog/flurry-interstitial-ads-analytics.html#comment-22295))
+### **Anonymous** — March 3, 2015 at 2:04 am ([permalink](/blog/flurry-interstitial-ads-analytics/#comment-22295))
 
 > Anonymous says:
 >

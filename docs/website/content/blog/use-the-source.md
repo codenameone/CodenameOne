@@ -116,7 +116,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Maaike Z** — May 22, 2015 at 6:45 pm ([permalink](https://www.codenameone.com/blog/use-the-source.html#comment-24190))
+### **Maaike Z** — May 22, 2015 at 6:45 pm ([permalink](/blog/use-the-source/#comment-24190))
 
 > Maaike Z says:
 >

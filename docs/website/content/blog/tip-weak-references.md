@@ -93,7 +93,7 @@ __ |  This relies on a change to the `CN` class that will be a part of next week
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Martin Grajcar** — November 4, 2018 at 4:38 pm ([permalink](https://www.codenameone.com/blog/tip-weak-references.html#comment-24098))
+### **Martin Grajcar** — November 4, 2018 at 4:38 pm ([permalink](/blog/tip-weak-references/#comment-24098))
 
 > Martin Grajcar says:
 >
@@ -102,7 +102,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 5, 2018 at 5:25 am ([permalink](https://www.codenameone.com/blog/tip-weak-references.html#comment-23910))
+### **Shai Almog** — November 5, 2018 at 5:25 am ([permalink](/blog/tip-weak-references/#comment-23910))
 
 > Shai Almog says:
 >

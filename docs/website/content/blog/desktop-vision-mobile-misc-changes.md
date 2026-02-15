@@ -109,7 +109,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — February 6, 2014 at 6:04 am ([permalink](https://www.codenameone.com/blog/desktop-vision-mobile-misc-changes.html#comment-21846))
+### **Anonymous** — February 6, 2014 at 6:04 am ([permalink](/blog/desktop-vision-mobile-misc-changes/#comment-21846))
 
 > Anonymous says:
 >

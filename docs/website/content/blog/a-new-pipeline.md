@@ -85,7 +85,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 28, 2014 at 5:22 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline.html#comment-21912))
+### **Anonymous** — January 28, 2014 at 5:22 am ([permalink](/blog/a-new-pipeline/#comment-21912))
 
 > Anonymous says:
 >
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — February 5, 2014 at 5:46 am ([permalink](https://www.codenameone.com/blog/a-new-pipeline.html#comment-24236))
+### **Anonymous** — February 5, 2014 at 5:46 am ([permalink](/blog/a-new-pipeline/#comment-24236))
 
 > Anonymous says:
 >
@@ -105,7 +105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — March 12, 2014 at 1:13 pm ([permalink](https://www.codenameone.com/blog/a-new-pipeline.html#comment-21796))
+### **Anonymous** — March 12, 2014 at 1:13 pm ([permalink](/blog/a-new-pipeline/#comment-21796))
 
 > Anonymous says:
 >

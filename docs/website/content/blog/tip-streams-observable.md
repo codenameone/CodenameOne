@@ -11,9 +11,9 @@ author: Shai Almog
 
 ![Header Image](/blog/tip-streams-observable/tip.jpg)
 
-We got a [pull request](https://github.com/codenameone/CodenameOne/pull/2336) the other day that reminded me of some hidden functionality in Codename One that most developers aren’t aware of: observable input streams. By default Codename One API’s try to return [BufferedInputStream](https://www.codenameone.com/javadoc/com/codename1/io/BufferedInputStream.html) and [BufferedOutputStream](https://www.codenameone.com/javadoc/com/codename1/io/BufferedOutputStream.html) instances from our internal API’s. Those classes aren’t the typical `java.io` versions but rather ones from the `com.codename1.io` package.
+We got a [pull request](https://github.com/codenameone/CodenameOne/pull/2336) the other day that reminded me of some hidden functionality in Codename One that most developers aren’t aware of: observable input streams. By default Codename One API’s try to return [BufferedInputStream](/javadoc/com/codename1/io/BufferedInputStream/) and [BufferedOutputStream](/javadoc/com/codename1/io/BufferedOutputStream/) instances from our internal API’s. Those classes aren’t the typical `java.io` versions but rather ones from the `com.codename1.io` package.
 
-That API allows us to add functionality into the streams without breaking the Java compatibility or specs. One such feature is [setProgressListener(IOProgressListener)](https://www.codenameone.com/javadoc/com/codename1/io/BufferedInputStream.html#setProgressListener-com.codename1.io.IOProgressListener-). This is probably better explained with a simple sample:
+That API allows us to add functionality into the streams without breaking the Java compatibility or specs. One such feature is [setProgressListener(IOProgressListener)](/javadoc/com/codename1/io/BufferedInputStream/#setProgressListener-com.codename1.io.IOProgressListener-). This is probably better explained with a simple sample:
     
     
     final Status status = ToastBar.getInstance().createStatus(); __**(1)**
@@ -46,7 +46,7 @@ There are quite a few API’s in Codename One that are hidden under the surface.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chibuike Mba** — March 1, 2018 at 8:48 pm ([permalink](https://www.codenameone.com/blog/tip-streams-observable.html#comment-21589))
+### **Chibuike Mba** — March 1, 2018 at 8:48 pm ([permalink](/blog/tip-streams-observable/#comment-21589))
 
 > Chibuike Mba says:
 >
@@ -58,7 +58,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 2, 2018 at 4:50 am ([permalink](https://www.codenameone.com/blog/tip-streams-observable.html#comment-21643))
+### **Shai Almog** — March 2, 2018 at 4:50 am ([permalink](/blog/tip-streams-observable/#comment-21643))
 
 > Shai Almog says:
 >
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chibuike Mba** — March 2, 2018 at 6:53 am ([permalink](https://www.codenameone.com/blog/tip-streams-observable.html#comment-23707))
+### **Chibuike Mba** — March 2, 2018 at 6:53 am ([permalink](/blog/tip-streams-observable/#comment-23707))
 
 > Chibuike Mba says:
 >
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 3, 2018 at 9:39 am ([permalink](https://www.codenameone.com/blog/tip-streams-observable.html#comment-23715))
+### **Shai Almog** — March 3, 2018 at 9:39 am ([permalink](/blog/tip-streams-observable/#comment-23715))
 
 > Shai Almog says:
 >
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chibuike Mba** — March 5, 2018 at 2:48 pm ([permalink](https://www.codenameone.com/blog/tip-streams-observable.html#comment-23674))
+### **Chibuike Mba** — March 5, 2018 at 2:48 pm ([permalink](/blog/tip-streams-observable/#comment-23674))
 
 > Chibuike Mba says:
 >
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Chibuike Mba** — March 7, 2018 at 5:55 pm ([permalink](https://www.codenameone.com/blog/tip-streams-observable.html#comment-23930))
+### **Chibuike Mba** — March 7, 2018 at 5:55 pm ([permalink](/blog/tip-streams-observable/#comment-23930))
 
 > Chibuike Mba says:
 >
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 8, 2018 at 6:26 am ([permalink](https://www.codenameone.com/blog/tip-streams-observable.html#comment-23937))
+### **Shai Almog** — March 8, 2018 at 6:26 am ([permalink](/blog/tip-streams-observable/#comment-23937))
 
 > Shai Almog says:
 >

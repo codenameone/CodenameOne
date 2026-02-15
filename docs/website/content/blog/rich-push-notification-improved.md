@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/rich-push-notification-improved/new-features-3.jpg)
 
-Last week Steve committed the final piece of the [rich push notification support RFE](https://github.com/codenameone/CodenameOne/issues/2208). This commit introduces support for replies in push messages. This came too late for the [whatsapp clone](https://www.codenameone.com/blog/whatsapp-clone.html) but if you want to build an app of this type you would need this feature.
+Last week Steve committed the final piece of the [rich push notification support RFE](https://github.com/codenameone/CodenameOne/issues/2208). This commit introduces support for replies in push messages. This came too late for the [whatsapp clone](/blog/whatsapp-clone/) but if you want to build an app of this type you would need this feature.
 
 The app main class should implement `PushActionProvider`. This defines a method that returns a set of categories. E.g.
     
@@ -74,14 +74,14 @@ An example push callback method to retrieve this data:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Ch Hjelm** — May 21, 2019 at 11:12 am ([permalink](https://www.codenameone.com/blog/rich-push-notification-improved.html#comment-24062))
+### **Ch Hjelm** — May 21, 2019 at 11:12 am ([permalink](/blog/rich-push-notification-improved/#comment-24062))
 
-> This is a great feature! Is it possible to use the rich push features with *local* notifications (described here[](<https://www.codenameone.com/blog/local-notifications.html>)? E.g. is it possible to call the `PushContent.get()` from within the callback `localNotificationReceived(String notificationId)`?
+> This is a great feature! Is it possible to use the rich push features with *local* notifications (described here[](</blog/local-notifications/>)? E.g. is it possible to call the `PushContent.get()` from within the callback `localNotificationReceived(String notificationId)`?
 >
 
 
 
-### **Shai Almog** — May 22, 2019 at 9:33 am ([permalink](https://www.codenameone.com/blog/rich-push-notification-improved.html#comment-24109))
+### **Shai Almog** — May 22, 2019 at 9:33 am ([permalink](/blog/rich-push-notification-improved/#comment-24109))
 
 > Shai Almog says:
 >
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — May 22, 2019 at 4:45 pm ([permalink](https://www.codenameone.com/blog/rich-push-notification-improved.html#comment-24097))
+### **Ch Hjelm** — May 22, 2019 at 4:45 pm ([permalink](/blog/rich-push-notification-improved/#comment-24097))
 
 > Ch Hjelm says:
 >
@@ -99,7 +99,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 23, 2019 at 5:05 am ([permalink](https://www.codenameone.com/blog/rich-push-notification-improved.html#comment-24116))
+### **Shai Almog** — May 23, 2019 at 5:05 am ([permalink](/blog/rich-push-notification-improved/#comment-24116))
 
 > Shai Almog says:
 >
@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Rochana Sawatzky** — July 9, 2020 at 2:04 pm ([permalink](https://www.codenameone.com/blog/rich-push-notification-improved.html#comment-24293))
+### **Rochana Sawatzky** — July 9, 2020 at 2:04 pm ([permalink](/blog/rich-push-notification-improved/#comment-24293))
 
 > [Rochana Sawatzky](https://avatars3.githubusercontent.com/u/25064795?v=4) says:
 >
@@ -117,7 +117,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 10, 2020 at 4:12 am ([permalink](https://www.codenameone.com/blog/rich-push-notification-improved.html#comment-24292))
+### **Shai Almog** — July 10, 2020 at 4:12 am ([permalink](/blog/rich-push-notification-improved/#comment-24292))
 
 > Shai Almog says:
 >
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Rochana Sawatzky** — July 11, 2020 at 4:39 am ([permalink](https://www.codenameone.com/blog/rich-push-notification-improved.html#comment-24017))
+### **Rochana Sawatzky** — July 11, 2020 at 4:39 am ([permalink](/blog/rich-push-notification-improved/#comment-24017))
 
 > [Rochana Sawatzky](https://avatars3.githubusercontent.com/u/25064795?v=4) says:
 >

@@ -97,7 +97,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — August 12, 2013 at 8:28 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-21826))
+### **Anonymous** — August 12, 2013 at 8:28 am ([permalink](/blog/in-a-pinch/#comment-21826))
 
 > Anonymous says:
 >
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mahmoud** — April 3, 2016 at 7:35 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22797))
+### **Mahmoud** — April 3, 2016 at 7:35 am ([permalink](/blog/in-a-pinch/#comment-22797))
 
 > Mahmoud says:
 >
@@ -120,19 +120,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 4, 2016 at 2:30 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22808))
+### **Shai Almog** — April 4, 2016 at 2:30 am ([permalink](/blog/in-a-pinch/#comment-22808))
 
 > Shai Almog says:
 >
 > Hi,  
-> there is a code sample within the JavaDocs that covers just that use case: [https://www.codenameone.com…](<https://www.codenameone.com/javadoc/com/codename1/components/ImageViewer.html>)  
+> there is a code sample within the JavaDocs that covers just that use case: [https://www.codenameone.com…](</javadoc/com/codename1/components/ImageViewer/>)  
 > It’s also included in the developer guide section of the ImageViewer:  
-> [https://www.codenameone.com…](<https://www.codenameone.com/manual/components.html#_imageviewer>)
+> [https://www.codenameone.com…](</manual/components/#_imageviewer>)
 >
 
 
 
-### **Mahmoud** — April 5, 2016 at 8:11 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22492))
+### **Mahmoud** — April 5, 2016 at 8:11 am ([permalink](/blog/in-a-pinch/#comment-22492))
 
 > Mahmoud says:
 >
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mahmoud** — June 25, 2016 at 1:24 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22758))
+### **Mahmoud** — June 25, 2016 at 1:24 am ([permalink](/blog/in-a-pinch/#comment-22758))
 
 > Mahmoud says:
 >
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 25, 2016 at 5:56 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22624))
+### **Shai Almog** — June 25, 2016 at 5:56 am ([permalink](/blog/in-a-pinch/#comment-22624))
 
 > Shai Almog says:
 >
@@ -170,7 +170,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mahmoud** — June 25, 2016 at 11:05 pm ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-21519))
+### **Mahmoud** — June 25, 2016 at 11:05 pm ([permalink](/blog/in-a-pinch/#comment-21519))
 
 > Mahmoud says:
 >
@@ -179,7 +179,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 26, 2016 at 4:48 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22800))
+### **Shai Almog** — June 26, 2016 at 4:48 am ([permalink](/blog/in-a-pinch/#comment-22800))
 
 > Shai Almog says:
 >
@@ -188,7 +188,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mahmoud** — June 26, 2016 at 7:13 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22851))
+### **Mahmoud** — June 26, 2016 at 7:13 am ([permalink](/blog/in-a-pinch/#comment-22851))
 
 > Mahmoud says:
 >
@@ -197,7 +197,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 27, 2016 at 3:06 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22860))
+### **Shai Almog** — June 27, 2016 at 3:06 am ([permalink](/blog/in-a-pinch/#comment-22860))
 
 > Shai Almog says:
 >
@@ -208,7 +208,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Mahmoud** — July 1, 2016 at 4:09 pm ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22901))
+### **Mahmoud** — July 1, 2016 at 4:09 pm ([permalink](/blog/in-a-pinch/#comment-22901))
 
 > Mahmoud says:
 >
@@ -219,7 +219,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 2, 2016 at 4:29 am ([permalink](https://www.codenameone.com/blog/in-a-pinch.html#comment-22959))
+### **Shai Almog** — July 2, 2016 at 4:29 am ([permalink](/blog/in-a-pinch/#comment-22959))
 
 > Shai Almog says:
 >

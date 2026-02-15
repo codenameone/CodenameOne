@@ -33,7 +33,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Murali Kumar** — June 4, 2016 at 1:54 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-22586))
+### **Murali Kumar** — June 4, 2016 at 1:54 pm ([permalink](/blog/test-it/#comment-22586))
 
 > Murali Kumar says:
 >
@@ -42,7 +42,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 5, 2016 at 4:14 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-22770))
+### **Shai Almog** — June 5, 2016 at 4:14 am ([permalink](/blog/test-it/#comment-22770))
 
 > Shai Almog says:
 >
@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Hristo Vrigazov** — September 4, 2016 at 8:17 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-21430))
+### **Hristo Vrigazov** — September 4, 2016 at 8:17 am ([permalink](/blog/test-it/#comment-21430))
 
 > Hristo Vrigazov says:
 >
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 5, 2016 at 4:25 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-22761))
+### **Shai Almog** — September 5, 2016 at 4:25 am ([permalink](/blog/test-it/#comment-22761))
 
 > Shai Almog says:
 >
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Takii Marskii** — October 19, 2016 at 9:03 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24228))
+### **Takii Marskii** — October 19, 2016 at 9:03 pm ([permalink](/blog/test-it/#comment-24228))
 
 > Takii Marskii says:
 >
@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 20, 2016 at 2:12 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-23116))
+### **Shai Almog** — October 20, 2016 at 2:12 am ([permalink](/blog/test-it/#comment-23116))
 
 > Shai Almog says:
 >
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kumuda Garlapati** — May 1, 2024 at 6:14 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24603))
+### **Kumuda Garlapati** — May 1, 2024 at 6:14 pm ([permalink](/blog/test-it/#comment-24603))
 
 > Kumuda Garlapati says:
 >
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 2, 2024 at 1:27 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24604))
+### **Shai Almog** — May 2, 2024 at 1:27 am ([permalink](/blog/test-it/#comment-24604))
 
 > Shai Almog says:
 >
@@ -105,7 +105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kumuda Garlapati** — May 2, 2024 at 12:31 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24605))
+### **Kumuda Garlapati** — May 2, 2024 at 12:31 pm ([permalink](/blog/test-it/#comment-24605))
 
 > Kumuda Garlapati says:
 >
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kumuda Garlapati** — May 8, 2024 at 4:03 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24607))
+### **Kumuda Garlapati** — May 8, 2024 at 4:03 pm ([permalink](/blog/test-it/#comment-24607))
 
 > Kumuda Garlapati says:
 >
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 9, 2024 at 10:34 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24609))
+### **Shai Almog** — May 9, 2024 at 10:34 am ([permalink](/blog/test-it/#comment-24609))
 
 > Shai Almog says:
 >
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > In this case it seems that the failure is triggered by code that shows a progress indicator for a long running task. When recording this wasn’t caught since we skip delays. Otherwise your code would be littered with “sleep” commands. The code is running too quickly and is then running into the InfiniteProgress component which has taken over the form. You need to wait within the test code for the InfiniteProgress to complete.
 
 
-### **Kumuda Garlapati** — May 8, 2024 at 5:16 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24608))
+### **Kumuda Garlapati** — May 8, 2024 at 5:16 pm ([permalink](/blog/test-it/#comment-24608))
 
 > Kumuda Garlapati says:
 >
@@ -150,7 +150,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kumuda Garlapati** — May 9, 2024 at 12:17 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24610))
+### **Kumuda Garlapati** — May 9, 2024 at 12:17 pm ([permalink](/blog/test-it/#comment-24610))
 
 > Kumuda Garlapati says:
 >
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kumuda Garlapati** — May 10, 2024 at 4:43 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24611))
+### **Kumuda Garlapati** — May 10, 2024 at 4:43 pm ([permalink](/blog/test-it/#comment-24611))
 
 > Kumuda Garlapati says:
 >
@@ -168,7 +168,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kumuda Garlapati** — September 5, 2024 at 2:11 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24633))
+### **Kumuda Garlapati** — September 5, 2024 at 2:11 pm ([permalink](/blog/test-it/#comment-24633))
 
 > Kumuda Garlapati says:
 >
@@ -177,7 +177,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 6, 2024 at 3:02 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24634))
+### **Shai Almog** — September 6, 2024 at 3:02 am ([permalink](/blog/test-it/#comment-24634))
 
 > Shai Almog says:
 >
@@ -186,7 +186,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kumuda Garlapati** — September 6, 2024 at 3:05 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24635))
+### **Kumuda Garlapati** — September 6, 2024 at 3:05 pm ([permalink](/blog/test-it/#comment-24635))
 
 > Kumuda Garlapati says:
 >
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kumuda Garlapati** — October 17, 2024 at 2:44 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24643))
+### **Kumuda Garlapati** — October 17, 2024 at 2:44 pm ([permalink](/blog/test-it/#comment-24643))
 
 > Kumuda Garlapati says:
 >
@@ -204,7 +204,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 19, 2024 at 5:23 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24645))
+### **Shai Almog** — October 19, 2024 at 5:23 am ([permalink](/blog/test-it/#comment-24645))
 
 > Shai Almog says:
 >
@@ -214,7 +214,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kumuda Garlapati** — October 21, 2024 at 12:58 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24647))
+### **Kumuda Garlapati** — October 21, 2024 at 12:58 pm ([permalink](/blog/test-it/#comment-24647))
 
 > Kumuda Garlapati says:
 >
@@ -223,7 +223,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Kumuda Garlapati** — January 7, 2025 at 4:50 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24669))
+### **Kumuda Garlapati** — January 7, 2025 at 4:50 pm ([permalink](/blog/test-it/#comment-24669))
 
 > Kumuda Garlapati says:
 >
@@ -232,7 +232,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 8, 2025 at 2:50 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24671))
+### **Shai Almog** — January 8, 2025 at 2:50 am ([permalink](/blog/test-it/#comment-24671))
 
 > Shai Almog says:
 >
@@ -241,14 +241,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gaurav P** — January 8, 2025 at 1:36 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24672))
+### **Gaurav P** — January 8, 2025 at 1:36 pm ([permalink](/blog/test-it/#comment-24672))
 
 > Gaurav P says:
 >
 > Hi Shai, is there any ETA we have at the moment for enabling accessibility on Android or iOS. as this is stopping us to perform UI testing on different platforms like iOS, Android, Windows or Mac. Kindly advise
 
 
-### **Gaurav P** — January 8, 2025 at 1:38 pm ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24673))
+### **Gaurav P** — January 8, 2025 at 1:38 pm ([permalink](/blog/test-it/#comment-24673))
 
 > Gaurav P says:
 >
@@ -257,7 +257,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 9, 2025 at 2:56 am ([permalink](https://www.codenameone.com/blog/test-it.html#comment-24674))
+### **Shai Almog** — January 9, 2025 at 2:56 am ([permalink](/blog/test-it/#comment-24674))
 
 > Shai Almog says:
 >

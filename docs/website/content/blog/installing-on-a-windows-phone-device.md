@@ -33,7 +33,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — January 22, 2015 at 4:42 pm ([permalink](https://www.codenameone.com/blog/installing-on-a-windows-phone-device.html#comment-21607))
+### **Anonymous** — January 22, 2015 at 4:42 pm ([permalink](/blog/installing-on-a-windows-phone-device/#comment-21607))
 
 > Anonymous says:
 >

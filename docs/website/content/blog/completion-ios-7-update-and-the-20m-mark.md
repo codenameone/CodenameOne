@@ -122,7 +122,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — August 29, 2013 at 3:45 am ([permalink](https://www.codenameone.com/blog/completion-ios-7-update-and-the-20m-mark.html#comment-21745))
+### **Anonymous** — August 29, 2013 at 3:45 am ([permalink](/blog/completion-ios-7-update-and-the-20m-mark/#comment-21745))
 
 > Anonymous says:
 >
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — August 29, 2013 at 3:50 am ([permalink](https://www.codenameone.com/blog/completion-ios-7-update-and-the-20m-mark.html#comment-21788))
+### **Anonymous** — August 29, 2013 at 3:50 am ([permalink](/blog/completion-ios-7-update-and-the-20m-mark/#comment-21788))
 
 > Anonymous says:
 >
@@ -142,7 +142,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 11, 2014 at 1:25 pm ([permalink](https://www.codenameone.com/blog/completion-ios-7-update-and-the-20m-mark.html#comment-22224))
+### **Anonymous** — September 11, 2014 at 1:25 pm ([permalink](/blog/completion-ios-7-update-and-the-20m-mark/#comment-22224))
 
 > Anonymous says:
 >
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — September 12, 2014 at 6:12 am ([permalink](https://www.codenameone.com/blog/completion-ios-7-update-and-the-20m-mark.html#comment-22061))
+### **Anonymous** — September 12, 2014 at 6:12 am ([permalink](/blog/completion-ios-7-update-and-the-20m-mark/#comment-22061))
 
 > Anonymous says:
 >
@@ -160,7 +160,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — January 27, 2015 at 6:55 am ([permalink](https://www.codenameone.com/blog/completion-ios-7-update-and-the-20m-mark.html#comment-22294))
+### **Anonymous** — January 27, 2015 at 6:55 am ([permalink](/blog/completion-ios-7-update-and-the-20m-mark/#comment-22294))
 
 > Anonymous says:
 >

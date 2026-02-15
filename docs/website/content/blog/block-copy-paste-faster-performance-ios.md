@@ -32,7 +32,7 @@ One of the things to notice in the issue discussion is that the original optimiz
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **M Usman Nu** — February 10, 2017 at 1:52 pm ([permalink](https://www.codenameone.com/blog/block-copy-paste-faster-performance-ios.html#comment-23327))
+### **M Usman Nu** — February 10, 2017 at 1:52 pm ([permalink](/blog/block-copy-paste-faster-performance-ios/#comment-23327))
 
 > M Usman Nu says:
 >
@@ -41,7 +41,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 11, 2017 at 5:57 am ([permalink](https://www.codenameone.com/blog/block-copy-paste-faster-performance-ios.html#comment-23098))
+### **Shai Almog** — February 11, 2017 at 5:57 am ([permalink](/blog/block-copy-paste-faster-performance-ios/#comment-23098))
 
 > Shai Almog says:
 >

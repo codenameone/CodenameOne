@@ -27,7 +27,7 @@ We might release several plugin updates in the near future to iron out bugs and 
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **salah Alhaddabi** — June 21, 2017 at 4:51 am ([permalink](https://www.codenameone.com/blog/code-freeze-for-3-7.html#comment-23523))
+### **salah Alhaddabi** — June 21, 2017 at 4:51 am ([permalink](/blog/code-freeze-for-3-7/#comment-23523))
 
 > salah Alhaddabi says:
 >
@@ -36,7 +36,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — June 21, 2017 at 5:22 pm ([permalink](https://www.codenameone.com/blog/code-freeze-for-3-7.html#comment-23561))
+### **Francesco Galgani** — June 21, 2017 at 5:22 pm ([permalink](/blog/code-freeze-for-3-7/#comment-23561))
 
 > Francesco Galgani says:
 >
@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 22, 2017 at 4:24 am ([permalink](https://www.codenameone.com/blog/code-freeze-for-3-7.html#comment-23546))
+### **Shai Almog** — June 22, 2017 at 4:24 am ([permalink](/blog/code-freeze-for-3-7/#comment-23546))
 
 > Shai Almog says:
 >

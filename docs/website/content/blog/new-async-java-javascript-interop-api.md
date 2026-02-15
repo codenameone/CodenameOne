@@ -11,16 +11,16 @@ author: Steve Hannah
 
 ![Header Image](/blog/new-async-java-javascript-interop-api/html5-banner.jpg)
 
-We recently introduced a new API for interacting with Javascript in Codename One. This new API is part of the [BrowserComponent](https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html) class, and effectively replaces the [com.codename1.javascript package](https://www.codenameone.com/javadoc/com/codename1/javascript/package-summary.html), which is now deprecated.
+We recently introduced a new API for interacting with Javascript in Codename One. This new API is part of the [BrowserComponent](/javadoc/com/codename1/ui/BrowserComponent/) class, and effectively replaces the [com.codename1.javascript package](/javadoc/com/codename1/javascript/package-summary/), which is now deprecated.
 
 ## So what was wrong with the old API?
 
-The old API provided a synchronous wrapper around an inherently asynchronous process, and made extensive use of [invokeAndBlock()](https://www.codenameone.com/javadoc/com/codename1/ui/Display.html#invokeAndBlock-java.lang.Runnable-) underneath the covers. This resulted in a very nice API with high-level abstractions that played nicely with a synchronous programming model, but it came with a price-tag in terms of performance, complexity, and predictability. Let’s take a simple example, getting a reference to the “window” object:
+The old API provided a synchronous wrapper around an inherently asynchronous process, and made extensive use of [invokeAndBlock()](/javadoc/com/codename1/ui/Display/#invokeAndBlock-java.lang.Runnable-) underneath the covers. This resulted in a very nice API with high-level abstractions that played nicely with a synchronous programming model, but it came with a price-tag in terms of performance, complexity, and predictability. Let’s take a simple example, getting a reference to the “window” object:
     
     
     JSObject window = ctx.get("window");
 
-This code looks harmless enough, but this is actually quite expensive. It issues a command to the `BrowserComponent`, and uses [invokeAndBlock()](https://www.codenameone.com/javadoc/com/codename1/ui/Display.html#invokeAndBlock-java.lang.Runnable-) to wait for the command to go through and send back a response. [invokeAndBlock()](https://www.codenameone.com/javadoc/com/codename1/ui/Display.html#invokeAndBlock-java.lang.Runnable-) is a magical tool that allows you to “block” without blocking the EDT, but it has its costs, and shouldn’t be overused. Most of the Codename One APIs that use `invokeAndBlock()` indicate this in their name. E.g. `Component.animateLayoutAndWait()`. This gives you the expectation that this call could take some time, and helps to alert you to the underlying cost.
+This code looks harmless enough, but this is actually quite expensive. It issues a command to the `BrowserComponent`, and uses [invokeAndBlock()](/javadoc/com/codename1/ui/Display/#invokeAndBlock-java.lang.Runnable-) to wait for the command to go through and send back a response. [invokeAndBlock()](/javadoc/com/codename1/ui/Display/#invokeAndBlock-java.lang.Runnable-) is a magical tool that allows you to “block” without blocking the EDT, but it has its costs, and shouldn’t be overused. Most of the Codename One APIs that use `invokeAndBlock()` indicate this in their name. E.g. `Component.animateLayoutAndWait()`. This gives you the expectation that this call could take some time, and helps to alert you to the underlying cost.
 
 The problem with the `ctx.get("window")` call is that it looks the same as a call to `Map.get(key)`. There’s no indication that this call is expensive and could take time. One call like this probably isn’t a big deal, but it doesn’t take long before you have dozens or even hundreds of calls like this littered throughout your codebase, and they can be hard to pick out.
 
@@ -28,7 +28,7 @@ The problem with the `ctx.get("window")` call is that it looks the same as a cal
 
 The new API fully embraces the asynchronous nature of Javascript. It uses callbacks instead of return values, and provides convenience wrappers with the appropriate “AndWait()” naming convention to allow for synchronous usage. Let’s look at a simple example:
 
-__ |  In all of the sample code below, you can assume that variables named `bc` represent an instance of [BrowserComponent](https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html).   
+__ |  In all of the sample code below, you can assume that variables named `bc` represent an instance of [BrowserComponent](/javadoc/com/codename1/ui/BrowserComponent/).   
 ---|---  
       
     
@@ -37,14 +37,14 @@ __ |  In all of the sample code below, you can assume that variables named `bc` 
         res -> Log.p("The result was "+res.getInt())
     );
 
-This code should output “The result was 7” to the console. It is fully asynchronous, so you can include this code anywhere without worrying about it “bogging down” your code. The full signature of this form of the [execute()](https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#execute-java.lang.String-com.codename1.util.SuccessCallback-) method is:
+This code should output “The result was 7” to the console. It is fully asynchronous, so you can include this code anywhere without worrying about it “bogging down” your code. The full signature of this form of the [execute()](/javadoc/com/codename1/ui/BrowserComponent/#execute-java.lang.String-com.codename1.util.SuccessCallback-) method is:
     
     
     public void execute(String js, SuccessCallback<JSRef> callback)
 
 The first parameter is just a javascript expression. This javascript **MUST** call either `callback.onSuccess(result)` or `callback.onError(message, errCode)` at some point in order for your callback to be called.
 
-The second parameter is your callback that is executed from the javascript side, when `callback.onSuccess(res)` is called. The callback takes a single parameter of type [JSRef](https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.JSRef.html) which is a generic wrapper around a javascript variable. JSRef has accessors to retrieve the value as some of the primitive types. E.g. `getBoolean()`, `getDouble()`, `getInt()`, `toString()`, and it provides some introspection via the `getType()` method.
+The second parameter is your callback that is executed from the javascript side, when `callback.onSuccess(res)` is called. The callback takes a single parameter of type [JSRef](/javadoc/com/codename1/ui/BrowserComponent.JSRef/) which is a generic wrapper around a javascript variable. JSRef has accessors to retrieve the value as some of the primitive types. E.g. `getBoolean()`, `getDouble()`, `getInt()`, `toString()`, and it provides some introspection via the `getType()` method.
 
 __ |  It is worth noting that the callback method can only take a single parameter. If you need to pass multiple parameters, you may consider including them in a single string which you parse in your callback.   
 ---|---  
@@ -90,7 +90,7 @@ Now it will work no matter how many times the button is clicked.
 
 ## Passing Parameters to Javascript
 
-In many cases, the javascript expressions that you execute will include parameters from your java code. Properly escaping these parameters is tricky at worst, and annoying at best. E.g. If you’re passing a string, you need to make sure that it escapes quotes and new lines properly or it will cause the javascript to have a syntax error. Luckily we provide variants of `execute()` and [addJSCallback()](https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html#addJSCallback-java.lang.String-com.codename1.util.SuccessCallback-) that allow you to pass your parameters and have them automatically escaped.
+In many cases, the javascript expressions that you execute will include parameters from your java code. Properly escaping these parameters is tricky at worst, and annoying at best. E.g. If you’re passing a string, you need to make sure that it escapes quotes and new lines properly or it will cause the javascript to have a syntax error. Luckily we provide variants of `execute()` and [addJSCallback()](/javadoc/com/codename1/ui/BrowserComponent/#addJSCallback-java.lang.String-com.codename1.util.SuccessCallback-) that allow you to pass your parameters and have them automatically escaped.
 
 For example, suppose we want to pass a string with text to set in a textarea within the webpage. We can do something like:
     
@@ -107,7 +107,7 @@ The gist is that you embed placeholders in the javascript expression that are re
 
 ## Proxy Objects
 
-The new API also includes a [JSProxy](https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.JSProxy.html) class that encapsulates a Javascript object simplify the getting and setting of properties on Javascript objects – and the calling of their methods. It provides essentially three core methods, along with several variants of each to allow for async or synchronous usages, parameters, and timeouts.
+The new API also includes a [JSProxy](/javadoc/com/codename1/ui/BrowserComponent.JSProxy/) class that encapsulates a Javascript object simplify the getting and setting of properties on Javascript objects – and the calling of their methods. It provides essentially three core methods, along with several variants of each to allow for async or synchronous usages, parameters, and timeouts.
 
 E.g. We might want to create a proxy for the [window.location](https://developer.mozilla.org/en-US/docs/Web/API/Window/location) object so that we can access its properties more easily from Java.
     
@@ -143,7 +143,7 @@ And call its methods:
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **RWang** — February 18, 2018 at 2:41 pm ([permalink](https://www.codenameone.com/blog/new-async-java-javascript-interop-api.html#comment-23554))
+### **RWang** — February 18, 2018 at 2:41 pm ([permalink](/blog/new-async-java-javascript-interop-api/#comment-23554))
 
 > RWang says:
 >
@@ -152,7 +152,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — February 19, 2018 at 1:38 pm ([permalink](https://www.codenameone.com/blog/new-async-java-javascript-interop-api.html#comment-23795))
+### **shannah78** — February 19, 2018 at 1:38 pm ([permalink](/blog/new-async-java-javascript-interop-api/#comment-23795))
 
 > shannah78 says:
 >
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ZombieLover** — March 14, 2018 at 4:35 pm ([permalink](https://www.codenameone.com/blog/new-async-java-javascript-interop-api.html#comment-23618))
+### **ZombieLover** — March 14, 2018 at 4:35 pm ([permalink](/blog/new-async-java-javascript-interop-api/#comment-23618))
 
 > ZombieLover says:
 >
@@ -173,7 +173,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ZombieLover** — March 15, 2018 at 9:09 am ([permalink](https://www.codenameone.com/blog/new-async-java-javascript-interop-api.html#comment-23945))
+### **ZombieLover** — March 15, 2018 at 9:09 am ([permalink](/blog/new-async-java-javascript-interop-api/#comment-23945))
 
 > ZombieLover says:
 >

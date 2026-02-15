@@ -170,7 +170,7 @@ We can do lots of things but to do those we need feedback and traction. Feedback
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Tom Tantisalidchai** — July 11, 2017 at 12:14 pm ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-23443))
+### **Tom Tantisalidchai** — July 11, 2017 at 12:14 pm ([permalink](/blog/kotlin-support-public-beta/#comment-23443))
 
 > Tom Tantisalidchai says:
 >
@@ -179,7 +179,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — July 11, 2017 at 5:46 pm ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-24150))
+### **salah Alhaddabi** — July 11, 2017 at 5:46 pm ([permalink](/blog/kotlin-support-public-beta/#comment-24150))
 
 > salah Alhaddabi says:
 >
@@ -188,7 +188,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — July 11, 2017 at 5:54 pm ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-24141))
+### **shannah78** — July 11, 2017 at 5:54 pm ([permalink](/blog/kotlin-support-public-beta/#comment-24141))
 
 > shannah78 says:
 >
@@ -197,7 +197,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 12, 2017 at 5:07 am ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-24218))
+### **Shai Almog** — July 12, 2017 at 5:07 am ([permalink](/blog/kotlin-support-public-beta/#comment-24218))
 
 > Shai Almog says:
 >
@@ -206,7 +206,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — July 12, 2017 at 6:06 pm ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-23702))
+### **shannah78** — July 12, 2017 at 6:06 pm ([permalink](/blog/kotlin-support-public-beta/#comment-23702))
 
 > shannah78 says:
 >
@@ -216,7 +216,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Albert Gao** — October 8, 2017 at 9:12 pm ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-23722))
+### **Albert Gao** — October 8, 2017 at 9:12 pm ([permalink](/blog/kotlin-support-public-beta/#comment-23722))
 
 > Albert Gao says:
 >
@@ -225,7 +225,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — October 9, 2017 at 4:38 am ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-23553))
+### **Shai Almog** — October 9, 2017 at 4:38 am ([permalink](/blog/kotlin-support-public-beta/#comment-23553))
 
 > Shai Almog says:
 >
@@ -234,7 +234,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Thomas** — March 2, 2018 at 3:04 am ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-23959))
+### **Thomas** — March 2, 2018 at 3:04 am ([permalink](/blog/kotlin-support-public-beta/#comment-23959))
 
 > Thomas says:
 >
@@ -244,7 +244,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 2, 2018 at 4:52 am ([permalink](https://www.codenameone.com/blog/kotlin-support-public-beta.html#comment-23698))
+### **Shai Almog** — March 2, 2018 at 4:52 am ([permalink](/blog/kotlin-support-public-beta/#comment-23698))
 
 > Shai Almog says:
 >

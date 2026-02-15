@@ -46,7 +46,7 @@ Another thing on our todo list for the past couple of years is packaging everyth
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Mark Korsak** — January 13, 2017 at 5:29 pm ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-22847))
+### **Mark Korsak** — January 13, 2017 at 5:29 pm ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-22847))
 
 > Mark Korsak says:
 >
@@ -55,7 +55,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **João Bastos** — January 13, 2017 at 11:43 pm ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23259))
+### **João Bastos** — January 13, 2017 at 11:43 pm ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23259))
 
 > João Bastos says:
 >
@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ahmed Kamel Taha** — January 16, 2017 at 11:21 pm ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23286))
+### **Ahmed Kamel Taha** — January 16, 2017 at 11:21 pm ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23286))
 
 > Ahmed Kamel Taha says:
 >
@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 17, 2017 at 5:21 am ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23295))
+### **Shai Almog** — January 17, 2017 at 5:21 am ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23295))
 
 > Shai Almog says:
 >
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Nkansah Rexford** — January 17, 2017 at 9:57 am ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23145))
+### **Nkansah Rexford** — January 17, 2017 at 9:57 am ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23145))
 
 > Nkansah Rexford says:
 >
@@ -103,7 +103,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 20, 2017 at 12:37 pm ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-24123))
+### **Shai Almog** — January 20, 2017 at 12:37 pm ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-24123))
 
 > Shai Almog says:
 >
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **noxiouz** — January 25, 2017 at 6:01 pm ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23003))
+### **noxiouz** — January 25, 2017 at 6:01 pm ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23003))
 
 > noxiouz says:
 >
@@ -124,11 +124,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 26, 2017 at 6:58 am ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23176))
+### **Shai Almog** — January 26, 2017 at 6:58 am ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23176))
 
 > Shai Almog says:
 >
-> I wrote a bit about it here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/migrating-away-from-app-engine.html>)  
+> I wrote a bit about it here: [https://www.codenameone.com…](</blog/migrating-away-from-app-engine/>)  
 > Generally Google just started overcharging us at a rate that would have bankrupted us very quickly.
 >
 > The problem is that to be effective PaaS sometimes hides details and in this case we had no way to track the cause of the HUGE expenses. I opened a ticket with Google as a gold customer (400USD per month for that “privilege”) and essentially got an “it’s a problem on your end, we checked in our logs”. Which is essentially a big F U.
@@ -138,7 +138,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **John Scarborough** — February 21, 2017 at 10:09 am ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23090))
+### **John Scarborough** — February 21, 2017 at 10:09 am ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23090))
 
 > John Scarborough says:
 >
@@ -147,7 +147,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **smaugstheswagger** — November 25, 2017 at 10:46 am ([permalink](https://www.codenameone.com/blog/migrating-from-digital-ocean-linode.html#comment-23827))
+### **smaugstheswagger** — November 25, 2017 at 10:46 am ([permalink](/blog/migrating-from-digital-ocean-linode/#comment-23827))
 
 > smaugstheswagger says:
 >

@@ -78,7 +78,7 @@ You can now also commit, push and send a pull request with the changes.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Ch Hjelm** — June 19, 2016 at 6:15 am ([permalink](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html#comment-22579))
+### **Ch Hjelm** — June 19, 2016 at 6:15 am ([permalink](/blog/how-to-use-the-codename-one-sources/#comment-22579))
 
 > Ch Hjelm says:
 >
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 20, 2016 at 4:10 am ([permalink](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html#comment-22732))
+### **Shai Almog** — June 20, 2016 at 4:10 am ([permalink](/blog/how-to-use-the-codename-one-sources/#comment-22732))
 
 > Shai Almog says:
 >
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — June 20, 2016 at 9:52 pm ([permalink](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html#comment-22675))
+### **Ch Hjelm** — June 20, 2016 at 9:52 pm ([permalink](/blog/how-to-use-the-codename-one-sources/#comment-22675))
 
 > Ch Hjelm says:
 >
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 21, 2016 at 3:45 am ([permalink](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html#comment-22934))
+### **Shai Almog** — June 21, 2016 at 3:45 am ([permalink](/blog/how-to-use-the-codename-one-sources/#comment-22934))
 
 > Shai Almog says:
 >
@@ -122,7 +122,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **AMDP AMDP** — March 23, 2017 at 12:00 pm ([permalink](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html#comment-23130))
+### **AMDP AMDP** — March 23, 2017 at 12:00 pm ([permalink](/blog/how-to-use-the-codename-one-sources/#comment-23130))
 
 > AMDP AMDP says:
 >
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — March 24, 2017 at 5:33 am ([permalink](https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html#comment-23299))
+### **Shai Almog** — March 24, 2017 at 5:33 am ([permalink](/blog/how-to-use-the-codename-one-sources/#comment-23299))
 
 > Shai Almog says:
 >

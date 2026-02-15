@@ -68,7 +68,7 @@ I had to grab screenshots of every UI setting and if I wanted to revise somethin
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — May 15, 2018 at 2:56 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23383))
+### **Francesco Galgani** — May 15, 2018 at 2:56 pm ([permalink](/blog/live-css-update/#comment-23383))
 
 > Thank you very much 🙂
 >
@@ -77,7 +77,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Durank** — May 17, 2018 at 8:55 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23938))
+### **Durank** — May 17, 2018 at 8:55 pm ([permalink](/blog/live-css-update/#comment-23938))
 
 > Durank says:
 >
@@ -86,7 +86,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — June 10, 2018 at 9:17 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23926))
+### **Francesco Galgani** — June 10, 2018 at 9:17 pm ([permalink](/blog/live-css-update/#comment-23926))
 
 > Francesco Galgani says:
 >
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 11, 2018 at 5:03 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23806))
+### **Shai Almog** — June 11, 2018 at 5:03 am ([permalink](/blog/live-css-update/#comment-23806))
 
 > Shai Almog says:
 >
@@ -105,7 +105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 1, 2018 at 6:24 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-21646))
+### **Denis** — August 1, 2018 at 6:24 am ([permalink](/blog/live-css-update/#comment-21646))
 
 > Denis says:
 >
@@ -119,7 +119,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 2, 2018 at 5:54 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23718))
+### **Shai Almog** — August 2, 2018 at 5:54 am ([permalink](/blog/live-css-update/#comment-23718))
 
 > Shai Almog says:
 >
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 2, 2018 at 6:25 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24032))
+### **Denis** — August 2, 2018 at 6:25 am ([permalink](/blog/live-css-update/#comment-24032))
 
 > Denis says:
 >
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 2, 2018 at 6:35 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23933))
+### **Shai Almog** — August 2, 2018 at 6:35 am ([permalink](/blog/live-css-update/#comment-23933))
 
 > Shai Almog says:
 >
@@ -174,7 +174,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 2, 2018 at 6:50 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23940))
+### **Denis** — August 2, 2018 at 6:50 am ([permalink](/blog/live-css-update/#comment-23940))
 
 > Denis says:
 >
@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 2, 2018 at 12:29 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23917))
+### **Shai Almog** — August 2, 2018 at 12:29 pm ([permalink](/blog/live-css-update/#comment-23917))
 
 > Shai Almog says:
 >
@@ -192,7 +192,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 2, 2018 at 12:52 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24036))
+### **Denis** — August 2, 2018 at 12:52 pm ([permalink](/blog/live-css-update/#comment-24036))
 
 > Denis says:
 >
@@ -203,7 +203,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 2, 2018 at 6:35 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23621))
+### **Shai Almog** — August 2, 2018 at 6:35 pm ([permalink](/blog/live-css-update/#comment-23621))
 
 > Shai Almog says:
 >
@@ -212,7 +212,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 3, 2018 at 5:53 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23948))
+### **Denis** — August 3, 2018 at 5:53 am ([permalink](/blog/live-css-update/#comment-23948))
 
 > Denis says:
 >
@@ -221,7 +221,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 3, 2018 at 1:14 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24005))
+### **Shai Almog** — August 3, 2018 at 1:14 pm ([permalink](/blog/live-css-update/#comment-24005))
 
 > Shai Almog says:
 >
@@ -230,7 +230,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 3, 2018 at 2:15 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-21537))
+### **Denis** — August 3, 2018 at 2:15 pm ([permalink](/blog/live-css-update/#comment-21537))
 
 > Denis says:
 >
@@ -242,7 +242,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 4, 2018 at 8:48 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23908))
+### **Shai Almog** — August 4, 2018 at 8:48 am ([permalink](/blog/live-css-update/#comment-23908))
 
 > Shai Almog says:
 >
@@ -253,7 +253,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 4, 2018 at 12:36 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23899))
+### **Denis** — August 4, 2018 at 12:36 pm ([permalink](/blog/live-css-update/#comment-23899))
 
 > Denis says:
 >
@@ -273,7 +273,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 5, 2018 at 4:53 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23701))
+### **Shai Almog** — August 5, 2018 at 4:53 am ([permalink](/blog/live-css-update/#comment-23701))
 
 > Shai Almog says:
 >
@@ -282,7 +282,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 5, 2018 at 9:35 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23832))
+### **Denis** — August 5, 2018 at 9:35 pm ([permalink](/blog/live-css-update/#comment-23832))
 
 > Denis says:
 >
@@ -315,7 +315,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 6, 2018 at 4:16 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23740))
+### **Shai Almog** — August 6, 2018 at 4:16 am ([permalink](/blog/live-css-update/#comment-23740))
 
 > Shai Almog says:
 >
@@ -324,7 +324,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 6, 2018 at 12:50 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24023))
+### **Denis** — August 6, 2018 at 12:50 pm ([permalink](/blog/live-css-update/#comment-24023))
 
 > Denis says:
 >
@@ -335,7 +335,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 6, 2018 at 8:16 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24050))
+### **Denis** — August 6, 2018 at 8:16 pm ([permalink](/blog/live-css-update/#comment-24050))
 
 > Denis says:
 >
@@ -352,7 +352,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 7, 2018 at 5:54 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23784))
+### **Shai Almog** — August 7, 2018 at 5:54 am ([permalink](/blog/live-css-update/#comment-23784))
 
 > Shai Almog says:
 >
@@ -369,7 +369,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 7, 2018 at 6:51 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23962))
+### **Denis** — August 7, 2018 at 6:51 am ([permalink](/blog/live-css-update/#comment-23962))
 
 > Denis says:
 >
@@ -378,7 +378,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 8, 2018 at 4:43 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24054))
+### **Shai Almog** — August 8, 2018 at 4:43 am ([permalink](/blog/live-css-update/#comment-24054))
 
 > Shai Almog says:
 >
@@ -405,7 +405,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 8, 2018 at 6:38 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23809))
+### **Denis** — August 8, 2018 at 6:38 am ([permalink](/blog/live-css-update/#comment-23809))
 
 > Denis says:
 >
@@ -450,7 +450,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 9, 2018 at 7:33 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23994))
+### **Shai Almog** — August 9, 2018 at 7:33 am ([permalink](/blog/live-css-update/#comment-23994))
 
 > Shai Almog says:
 >
@@ -459,7 +459,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 9, 2018 at 8:05 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23858))
+### **Denis** — August 9, 2018 at 8:05 am ([permalink](/blog/live-css-update/#comment-23858))
 
 > Denis says:
 >
@@ -469,16 +469,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 10, 2018 at 4:56 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23558))
+### **Shai Almog** — August 10, 2018 at 4:56 am ([permalink](/blog/live-css-update/#comment-23558))
 
 > Shai Almog says:
 >
-> The default code for a new project enables the toolbar. No theme constant etc. See the toolbar code here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/new-default-code.html>)
+> The default code for a new project enables the toolbar. No theme constant etc. See the toolbar code here: [https://www.codenameone.com…](</blog/new-default-code/>)
 >
 
 
 
-### **Denis** — August 10, 2018 at 5:59 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23760))
+### **Denis** — August 10, 2018 at 5:59 am ([permalink](/blog/live-css-update/#comment-23760))
 
 > Denis says:
 >
@@ -487,7 +487,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 10, 2018 at 7:41 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23783))
+### **Denis** — August 10, 2018 at 7:41 am ([permalink](/blog/live-css-update/#comment-23783))
 
 > Denis says:
 >
@@ -496,7 +496,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 11, 2018 at 3:57 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24012))
+### **Shai Almog** — August 11, 2018 at 3:57 am ([permalink](/blog/live-css-update/#comment-24012))
 
 > Shai Almog says:
 >
@@ -507,7 +507,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 11, 2018 at 6:30 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24018))
+### **Denis** — August 11, 2018 at 6:30 am ([permalink](/blog/live-css-update/#comment-24018))
 
 > Denis says:
 >
@@ -516,7 +516,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 15, 2018 at 7:39 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24047))
+### **Denis** — August 15, 2018 at 7:39 am ([permalink](/blog/live-css-update/#comment-24047))
 
 > Denis says:
 >
@@ -525,7 +525,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 16, 2018 at 4:50 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23988))
+### **Shai Almog** — August 16, 2018 at 4:50 am ([permalink](/blog/live-css-update/#comment-23988))
 
 > Shai Almog says:
 >
@@ -534,7 +534,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Denis** — August 16, 2018 at 10:28 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24060))
+### **Denis** — August 16, 2018 at 10:28 am ([permalink](/blog/live-css-update/#comment-24060))
 
 > Denis says:
 >
@@ -549,17 +549,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 17, 2018 at 3:40 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-23918))
+### **Shai Almog** — August 17, 2018 at 3:40 am ([permalink](/blog/live-css-update/#comment-23918))
 
 > Shai Almog says:
 >
-> There is an experimental feature to hide the status bar here: [https://www.codenameone.com…](<https://www.codenameone.com/blog/new-skins-san-francisco-font.html>)  
+> There is an experimental feature to hide the status bar here: [https://www.codenameone.com…](</blog/new-skins-san-francisco-font/>)  
 > Notice that the ad you are seeing is full screen but it also doesn’t show the battery/clock etc. which is pretty problematic. It might have issues with notche UI’s.
 >
 
 
 
-### **Denis** — August 17, 2018 at 7:19 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24038))
+### **Denis** — August 17, 2018 at 7:19 am ([permalink](/blog/live-css-update/#comment-24038))
 
 > Denis says:
 >
@@ -568,7 +568,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ThomasH99** — January 29, 2021 at 9:29 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24388))
+### **ThomasH99** — January 29, 2021 at 9:29 pm ([permalink](/blog/live-css-update/#comment-24388))
 
 > ThomasH99 says:
 >
@@ -577,7 +577,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 30, 2021 at 6:11 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24389))
+### **Shai Almog** — January 30, 2021 at 6:11 am ([permalink](/blog/live-css-update/#comment-24389))
 
 > Shai Almog says:
 >
@@ -586,7 +586,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ThomasH99** — January 30, 2021 at 9:02 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24390))
+### **ThomasH99** — January 30, 2021 at 9:02 pm ([permalink](/blog/live-css-update/#comment-24390))
 
 > ThomasH99 says:
 >
@@ -610,7 +610,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — January 31, 2021 at 2:26 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24391))
+### **Shai Almog** — January 31, 2021 at 2:26 am ([permalink](/blog/live-css-update/#comment-24391))
 
 > Shai Almog says:
 >
@@ -622,28 +622,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ThomasH99** — February 2, 2021 at 5:54 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24395))
+### **ThomasH99** — February 2, 2021 at 5:54 pm ([permalink](/blog/live-css-update/#comment-24395))
 
 > ThomasH99 says:
 >
 > No, I don’t see that text anymore, only when I compile the project, not each time I change the css file. For a new project it works correctly. I’ve also checked that css is activated in the CN1 settings. I’ve made a lot of changes to the project, so difficult to trace it back. What kind of changes could break the css? At least, when this feature is not working anymore, you realize how nice it is 😉
 
 
-### **Shai Almog** — February 3, 2021 at 3:17 am ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24397))
+### **Shai Almog** — February 3, 2021 at 3:17 am ([permalink](/blog/live-css-update/#comment-24397))
 
 > Shai Almog says:
 >
 > Check if codenameone_settings.properties has the csswatcher.enabled=true entry. Also look at the CSS file itself and the related generated files. Make sure they don’t have some weird permissions or restrictions that might be blocking the CSS compiler.
 
 
-### **ThomasH99** — February 4, 2021 at 6:55 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24398))
+### **ThomasH99** — February 4, 2021 at 6:55 pm ([permalink](/blog/live-css-update/#comment-24398))
 
 > ThomasH99 says:
 >
 > I tried adding the setting csswatcher.enabled=true, but still not loading. This setting is also not present in the HelloWorld example that works correctly, so it doesn’t seem to be necessary. And since the css file is loaded correctly each time the project is recompiled, I guess there shouldn’t any issues in the file itself or the generated files… I also tried updating the cn1libs, copying over the CodeNameOneBuildClient.jar from HelloWorld and deleting the files theme.css.checksums, theme.css.merged and theme.css.merged.checksums, but also no change. I’m using Netbeans 12.2 – could that have an impact? WIth CN1 Preferences editor is 6.5.
 
 
-### **Steve Hannah** — February 4, 2021 at 7:11 pm ([permalink](https://www.codenameone.com/blog/live-css-update.html#comment-24399))
+### **Steve Hannah** — February 4, 2021 at 7:11 pm ([permalink](/blog/live-css-update/#comment-24399))
 
 > Steve Hannah says:
 >

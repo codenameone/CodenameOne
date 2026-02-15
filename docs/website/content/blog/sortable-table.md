@@ -39,7 +39,7 @@ Notice this works with numbers, Strings and might work with dates but you can ge
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Francesco Galgani** — August 16, 2017 at 4:59 pm ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-23686))
+### **Francesco Galgani** — August 16, 2017 at 4:59 pm ([permalink](/blog/sortable-table/#comment-23686))
 
 > Francesco Galgani says:
 >
@@ -48,7 +48,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — August 16, 2017 at 5:11 pm ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-21471))
+### **Francesco Galgani** — August 16, 2017 at 5:11 pm ([permalink](/blog/sortable-table/#comment-21471))
 
 > Francesco Galgani says:
 >
@@ -61,7 +61,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 17, 2017 at 4:39 am ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-23549))
+### **Shai Almog** — August 17, 2017 at 4:39 am ([permalink](/blog/sortable-table/#comment-23549))
 
 > Shai Almog says:
 >
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — August 17, 2017 at 9:35 am ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-23645))
+### **Francesco Galgani** — August 17, 2017 at 9:35 am ([permalink](/blog/sortable-table/#comment-23645))
 
 > Francesco Galgani says:
 >
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 18, 2017 at 5:53 am ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-23573))
+### **Shai Almog** — August 18, 2017 at 5:53 am ([permalink](/blog/sortable-table/#comment-23573))
 
 > Shai Almog says:
 >
@@ -88,7 +88,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **salah Alhaddabi** — August 21, 2017 at 4:44 am ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-23520))
+### **salah Alhaddabi** — August 21, 2017 at 4:44 am ([permalink](/blog/sortable-table/#comment-23520))
 
 > salah Alhaddabi says:
 >
@@ -97,7 +97,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **SoAppMedia** — August 21, 2017 at 4:42 pm ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-21525))
+### **SoAppMedia** — August 21, 2017 at 4:42 pm ([permalink](/blog/sortable-table/#comment-21525))
 
 > SoAppMedia says:
 >
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — August 21, 2017 at 5:02 pm ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-21854))
+### **Francesco Galgani** — August 21, 2017 at 5:02 pm ([permalink](/blog/sortable-table/#comment-21854))
 
 > Francesco Galgani says:
 >
@@ -115,7 +115,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — August 22, 2017 at 5:27 am ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-23613))
+### **Shai Almog** — August 22, 2017 at 5:27 am ([permalink](/blog/sortable-table/#comment-23613))
 
 > Shai Almog says:
 >
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — August 22, 2017 at 11:13 am ([permalink](https://www.codenameone.com/blog/sortable-table.html#comment-23565))
+### **Francesco Galgani** — August 22, 2017 at 11:13 am ([permalink](/blog/sortable-table/#comment-23565))
 
 > Francesco Galgani says:
 >

@@ -58,7 +58,7 @@ this is a tentative date and until we actually see everything working for elabor
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Chidiebere Okwudire** — May 2, 2016 at 1:40 pm ([permalink](https://www.codenameone.com/blog/windows-phone-8-1-uwp-support.html#comment-22798))
+### **Chidiebere Okwudire** — May 2, 2016 at 1:40 pm ([permalink](/blog/windows-phone-8-1-uwp-support/#comment-22798))
 
 > Chidiebere Okwudire says:
 >
@@ -67,7 +67,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gareth Murfin** — May 3, 2016 at 11:27 am ([permalink](https://www.codenameone.com/blog/windows-phone-8-1-uwp-support.html#comment-22756))
+### **Gareth Murfin** — May 3, 2016 at 11:27 am ([permalink](/blog/windows-phone-8-1-uwp-support/#comment-22756))
 
 > Gareth Murfin says:
 >
@@ -76,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 4, 2016 at 5:04 am ([permalink](https://www.codenameone.com/blog/windows-phone-8-1-uwp-support.html#comment-22729))
+### **Shai Almog** — May 4, 2016 at 5:04 am ([permalink](/blog/windows-phone-8-1-uwp-support/#comment-22729))
 
 > Shai Almog says:
 >
@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lana** — March 27, 2017 at 1:48 am ([permalink](https://www.codenameone.com/blog/windows-phone-8-1-uwp-support.html#comment-23170))
+### **Lana** — March 27, 2017 at 1:48 am ([permalink](/blog/windows-phone-8-1-uwp-support/#comment-23170))
 
 > Lana says:
 >
@@ -97,7 +97,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **shannah78** — March 27, 2017 at 5:28 pm ([permalink](https://www.codenameone.com/blog/windows-phone-8-1-uwp-support.html#comment-21574))
+### **shannah78** — March 27, 2017 at 5:28 pm ([permalink](/blog/windows-phone-8-1-uwp-support/#comment-21574))
 
 > shannah78 says:
 >

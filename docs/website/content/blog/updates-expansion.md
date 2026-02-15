@@ -33,7 +33,7 @@ We postponed version 7.0 multiple times by now and I still don’t see how we’
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Boniface Githinji** — November 25, 2019 at 9:43 am ([permalink](https://www.codenameone.com/blog/updates-expansion.html#comment-24268))
+### **Boniface Githinji** — November 25, 2019 at 9:43 am ([permalink](/blog/updates-expansion/#comment-24268))
 
 > [Boniface Githinji](https://lh3.googleusercontent.com/a-/AAuE7mA-hb6mEOeaoepbAdoZXUhwzjcubsocbfFBQwAcaA) says:
 >
@@ -42,7 +42,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — November 28, 2019 at 1:29 pm ([permalink](https://www.codenameone.com/blog/updates-expansion.html#comment-24270))
+### **Ch Hjelm** — November 28, 2019 at 1:29 pm ([permalink](/blog/updates-expansion/#comment-24270))
 
 > [Ch Hjelm](https://lh3.googleusercontent.com/-D-GIdg1DASY/AAAAAAAAAAI/AAAAAAAAAAA/AAKWJJMNPAANy-qutSCtrOnc0icrNWiskQ/photo.jpg) says:
 >
@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 29, 2019 at 3:04 am ([permalink](https://www.codenameone.com/blog/updates-expansion.html#comment-24273))
+### **Shai Almog** — November 29, 2019 at 3:04 am ([permalink](/blog/updates-expansion/#comment-24273))
 
 > Shai Almog says:
 >
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Ch Hjelm** — April 18, 2020 at 7:26 am ([permalink](https://www.codenameone.com/blog/updates-expansion.html#comment-21394))
+### **Ch Hjelm** — April 18, 2020 at 7:26 am ([permalink](/blog/updates-expansion/#comment-21394))
 
 > [Ch Hjelm](https://lh3.googleusercontent.com/-D-GIdg1DASY/AAAAAAAAAAI/AAAAAAAAAAA/AAKWJJMNPAANy-qutSCtrOnc0icrNWiskQ/photo.jpg) says:
 >
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 18, 2020 at 7:52 am ([permalink](https://www.codenameone.com/blog/updates-expansion.html#comment-21395))
+### **Shai Almog** — April 18, 2020 at 7:52 am ([permalink](/blog/updates-expansion/#comment-21395))
 
 > Shai Almog says:
 >

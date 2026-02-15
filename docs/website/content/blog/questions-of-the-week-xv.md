@@ -132,7 +132,7 @@ camera controls but those API’s are very low level and thus fragmented.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Eric** — July 22, 2016 at 1:38 pm ([permalink](https://www.codenameone.com/blog/questions-of-the-week-xv.html#comment-22705))
+### **Eric** — July 22, 2016 at 1:38 pm ([permalink](/blog/questions-of-the-week-xv/#comment-22705))
 
 > Eric says:
 >
@@ -142,7 +142,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — July 22, 2016 at 1:55 pm ([permalink](https://www.codenameone.com/blog/questions-of-the-week-xv.html#comment-22960))
+### **Shai Almog** — July 22, 2016 at 1:55 pm ([permalink](/blog/questions-of-the-week-xv/#comment-22960))
 
 > Shai Almog says:
 >

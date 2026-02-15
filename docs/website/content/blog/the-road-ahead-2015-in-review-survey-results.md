@@ -250,7 +250,7 @@ we often shift our opinions on things as we move forward and if we get enough fe
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Diamond** — January 4, 2016 at 3:34 pm ([permalink](https://www.codenameone.com/blog/the-road-ahead-2015-in-review-survey-results.html#comment-22475))
+### **Diamond** — January 4, 2016 at 3:34 pm ([permalink](/blog/the-road-ahead-2015-in-review-survey-results/#comment-22475))
 
 > Diamond says:
 >
@@ -266,7 +266,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > On a separate note, As codename one is open source, I think you should devise a way to attract more code contributions by all developers. As most of us create some cool features and unique codes but never contribute them back. Look for a way to promote the culture.
 
 
-### **Shai Almog** — January 4, 2016 at 6:27 pm ([permalink](https://www.codenameone.com/blog/the-road-ahead-2015-in-review-survey-results.html#comment-22647))
+### **Shai Almog** — January 4, 2016 at 6:27 pm ([permalink](/blog/the-road-ahead-2015-in-review-survey-results/#comment-22647))
 
 > Shai Almog says:
 >
@@ -279,7 +279,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > But the main value of being open source is the community aspect, e.g. the work you are doing in stack overflow is tremendous!
 
 
-### **Jerry** — January 4, 2016 at 7:05 pm ([permalink](https://www.codenameone.com/blog/the-road-ahead-2015-in-review-survey-results.html#comment-21553))
+### **Jerry** — January 4, 2016 at 7:05 pm ([permalink](/blog/the-road-ahead-2015-in-review-survey-results/#comment-21553))
 
 > Jerry says:
 >
@@ -287,7 +287,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I would love to see you integrate the CSS plugin into CN1 after a little more housekeeping on the Plugin. This will make it easier to work with, especially for the new starters. I believe you will be overwhelmed by the result.
 
 
-### **Shai Almog** — January 5, 2016 at 3:39 am ([permalink](https://www.codenameone.com/blog/the-road-ahead-2015-in-review-survey-results.html#comment-22361))
+### **Shai Almog** — January 5, 2016 at 3:39 am ([permalink](/blog/the-road-ahead-2015-in-review-survey-results/#comment-22361))
 
 > Shai Almog says:
 >
@@ -300,14 +300,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I think a lot of the people advocating CSS have a bit of a misconception of how it will “feel” within the Codename One developer workflow. I’d like to know if my concerns are founded or not before we take this big piece of code with all its baggage into Codename One.
 
 
-### **gardnr** — August 1, 2016 at 9:58 pm ([permalink](https://www.codenameone.com/blog/the-road-ahead-2015-in-review-survey-results.html#comment-22961))
+### **gardnr** — August 1, 2016 at 9:58 pm ([permalink](/blog/the-road-ahead-2015-in-review-survey-results/#comment-22961))
 
 > gardnr says:
 >
 > The next sentences after “The reason is conceptual.” go on to discuss technical aspects of adding reflection.
 
 
-### **Shai Almog** — August 2, 2016 at 3:54 am ([permalink](https://www.codenameone.com/blog/the-road-ahead-2015-in-review-survey-results.html#comment-22993))
+### **Shai Almog** — August 2, 2016 at 3:54 am ([permalink](/blog/the-road-ahead-2015-in-review-survey-results/#comment-22993))
 
 > Shai Almog says:
 >

@@ -40,7 +40,7 @@ infinite scrolling etc…​
 To modernize the demo we started by updating the syntax to use Java 8 features such as lambdas, diamond operator  
 etc.
 
-We then migrated the code to use the new [Toolbar API](https://www.codenameone.com/javadoc/com/codename1/ui/Toolbar.html)  
+We then migrated the code to use the new [Toolbar API](/javadoc/com/codename1/ui/Toolbar/)  
 & updated the syntax to use the terse version of the layout code.
 
 We changed the back button behavior to use the `Toolbar` which looks great but the biggest effect was in a  

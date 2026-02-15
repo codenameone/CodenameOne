@@ -196,7 +196,7 @@ superior gc.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **manezi** — April 30, 2015 at 12:22 pm ([permalink](https://www.codenameone.com/blog/codename-one-3-0-now-live.html#comment-22103))
+### **manezi** — April 30, 2015 at 12:22 pm ([permalink](/blog/codename-one-3-0-now-live/#comment-22103))
 
 > manezi says:
 >

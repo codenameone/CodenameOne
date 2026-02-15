@@ -217,7 +217,7 @@ That’s all there is to it. You can start working with the new maven project an
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved here for historical context. New discussion happens in the Discussion section below._
 
 
-### **Diamond Obama** — April 14, 2021 at 4:43 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24447))
+### **Diamond Obama** — April 14, 2021 at 4:43 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24447))
 
 > Diamond Obama says:
 >
@@ -228,7 +228,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond Obama** — April 14, 2021 at 4:58 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24448))
+### **Diamond Obama** — April 14, 2021 at 4:58 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24448))
 
 > Diamond Obama says:
 >
@@ -243,7 +243,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — April 14, 2021 at 5:01 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24449))
+### **Steve Hannah** — April 14, 2021 at 5:01 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24449))
 
 > Steve Hannah says:
 >
@@ -253,7 +253,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond Obama** — April 14, 2021 at 5:41 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24450))
+### **Diamond Obama** — April 14, 2021 at 5:41 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24450))
 
 > Diamond Obama says:
 >
@@ -262,7 +262,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — April 14, 2021 at 5:51 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24451))
+### **Steve Hannah** — April 14, 2021 at 5:51 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24451))
 
 > Steve Hannah says:
 >
@@ -280,7 +280,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Diamond Mubaarak** — April 15, 2021 at 8:22 am ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24452))
+### **Diamond Mubaarak** — April 15, 2021 at 8:22 am ([permalink](/blog/migrating-your-project-to-maven/#comment-24452))
 
 > Diamond Mubaarak says:
 >
@@ -289,7 +289,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > BTW, “Post Comment” on this WebPage is sometimes hidden and only shows when you hover.
 
 
-### **Steve Hannah** — April 15, 2021 at 12:07 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24453))
+### **Steve Hannah** — April 15, 2021 at 12:07 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24453))
 
 > Steve Hannah says:
 >
@@ -300,7 +300,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I guess this is why best practice is to distribute with bundled JRE. The first release of this tool I generated native apps for (on Mac and Windows) using the build server, but decided to forego that as the jar distribution seemed to work just as well. Perhaps I need to generate launch scripts for the jar executable to help choose an appropriate JRE.
 
 
-### **ThomasH99** — September 19, 2021 at 2:08 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24481))
+### **ThomasH99** — September 19, 2021 at 2:08 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24481))
 
 > ThomasH99 says:
 >
@@ -313,7 +313,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ThomasH99** — September 19, 2021 at 7:06 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24485))
+### **ThomasH99** — September 19, 2021 at 7:06 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24485))
 
 > ThomasH99 says:
 >
@@ -322,7 +322,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ThomasH99** — September 19, 2021 at 7:43 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24486))
+### **ThomasH99** — September 19, 2021 at 7:43 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24486))
 
 > ThomasH99 says:
 >
@@ -331,7 +331,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ThomasH99** — September 19, 2021 at 8:43 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24487))
+### **ThomasH99** — September 19, 2021 at 8:43 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24487))
 
 > ThomasH99 says:
 >
@@ -340,7 +340,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — September 21, 2021 at 11:54 am ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24489))
+### **Steve Hannah** — September 21, 2021 at 11:54 am ([permalink](/blog/migrating-your-project-to-maven/#comment-24489))
 
 > Steve Hannah says:
 >
@@ -352,7 +352,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ThomasH99** — September 22, 2021 at 7:04 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24491))
+### **ThomasH99** — September 22, 2021 at 7:04 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24491))
 
 > ThomasH99 says:
 >
@@ -361,7 +361,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **ThomasH99** — September 22, 2021 at 8:16 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24492))
+### **ThomasH99** — September 22, 2021 at 8:16 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24492))
 
 > ThomasH99 says:
 >
@@ -370,7 +370,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Adrian Ionescu** — September 23, 2021 at 4:17 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24495))
+### **Adrian Ionescu** — September 23, 2021 at 4:17 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24495))
 
 > Adrian Ionescu says:
 >
@@ -379,7 +379,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Steve Hannah** — September 23, 2021 at 4:50 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24497))
+### **Steve Hannah** — September 23, 2021 at 4:50 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24497))
 
 > Steve Hannah says:
 >
@@ -388,7 +388,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Adrian Ionescu** — September 23, 2021 at 6:54 pm ([permalink](https://www.codenameone.com/blog/migrating-your-project-to-maven.html#comment-24498))
+### **Adrian Ionescu** — September 23, 2021 at 6:54 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24498))
 
 > Adrian Ionescu says:
 >

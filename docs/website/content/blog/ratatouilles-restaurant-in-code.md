@@ -172,7 +172,7 @@ adding/removing the details component and invoking the `animateLayout` method.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Jaanus Hansen** — December 2, 2015 at 8:50 pm ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-22444))
+### **Jaanus Hansen** — December 2, 2015 at 8:50 pm ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-22444))
 
 > Jaanus Hansen says:
 >
@@ -181,7 +181,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bryan** — December 2, 2015 at 10:36 pm ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-22378))
+### **bryan** — December 2, 2015 at 10:36 pm ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-22378))
 
 > bryan says:
 >
@@ -190,7 +190,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 3, 2015 at 3:31 am ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-22562))
+### **Shai Almog** — December 3, 2015 at 3:31 am ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-22562))
 
 > Shai Almog says:
 >
@@ -201,7 +201,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 3, 2015 at 3:36 am ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-22570))
+### **Shai Almog** — December 3, 2015 at 3:36 am ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-22570))
 
 > Shai Almog says:
 >
@@ -215,7 +215,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bryan** — December 3, 2015 at 4:28 am ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-22575))
+### **bryan** — December 3, 2015 at 4:28 am ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-22575))
 
 > bryan says:
 >
@@ -249,7 +249,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 3, 2015 at 5:36 am ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-21549))
+### **Shai Almog** — December 3, 2015 at 5:36 am ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-21549))
 
 > Shai Almog says:
 >
@@ -258,7 +258,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — December 4, 2015 at 8:39 am ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-22480))
+### **Shai Almog** — December 4, 2015 at 8:39 am ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-22480))
 
 > Shai Almog says:
 >
@@ -267,7 +267,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **bryan** — December 6, 2015 at 4:04 am ([permalink](https://www.codenameone.com/blog/ratatouilles-restaurant-in-code.html#comment-22581))
+### **bryan** — December 6, 2015 at 4:04 am ([permalink](/blog/ratatouilles-restaurant-in-code/#comment-22581))
 
 > bryan says:
 >

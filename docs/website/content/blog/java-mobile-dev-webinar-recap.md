@@ -57,14 +57,14 @@ Happy coding, and hope to see you all in the next session!
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **ugochukwu** — August 15, 2015 at 9:03 am ([permalink](https://www.codenameone.com/blog/java-mobile-dev-webinar-recap.html#comment-24191))
+### **ugochukwu** — August 15, 2015 at 9:03 am ([permalink](/blog/java-mobile-dev-webinar-recap/#comment-24191))
 
 > thanks for this great tutorial
 >
 
 
 
-### **ugochukwu** — August 15, 2015 at 9:04 am ([permalink](https://www.codenameone.com/blog/java-mobile-dev-webinar-recap.html#comment-22217))
+### **ugochukwu** — August 15, 2015 at 9:04 am ([permalink](/blog/java-mobile-dev-webinar-recap/#comment-22217))
 
 > ugochukwu says:
 >
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Lanre Makinde** — August 17, 2015 at 10:35 pm ([permalink](https://www.codenameone.com/blog/java-mobile-dev-webinar-recap.html#comment-22210))
+### **Lanre Makinde** — August 17, 2015 at 10:35 pm ([permalink](/blog/java-mobile-dev-webinar-recap/#comment-22210))
 
 > Lanre Makinde says:
 >
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **kilani rabah** — February 2, 2016 at 1:13 pm ([permalink](https://www.codenameone.com/blog/java-mobile-dev-webinar-recap.html#comment-22600))
+### **kilani rabah** — February 2, 2016 at 1:13 pm ([permalink](/blog/java-mobile-dev-webinar-recap/#comment-22600))
 
 > kilani rabah says:
 >
@@ -148,7 +148,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 3, 2016 at 3:34 am ([permalink](https://www.codenameone.com/blog/java-mobile-dev-webinar-recap.html#comment-22539))
+### **Shai Almog** — February 3, 2016 at 3:34 am ([permalink](/blog/java-mobile-dev-webinar-recap/#comment-22539))
 
 > Shai Almog says:
 >

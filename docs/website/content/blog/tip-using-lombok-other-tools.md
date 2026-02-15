@@ -63,7 +63,7 @@ If you have a pet tool in your toolbox check it out and see if it works with Cod
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Martin Grajcar** — November 9, 2018 at 2:05 am ([permalink](https://www.codenameone.com/blog/tip-using-lombok-other-tools.html#comment-24030))
+### **Martin Grajcar** — November 9, 2018 at 2:05 am ([permalink](/blog/tip-using-lombok-other-tools/#comment-24030))
 
 > Martin Grajcar says:
 >
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — November 9, 2018 at 6:48 am ([permalink](https://www.codenameone.com/blog/tip-using-lombok-other-tools.html#comment-23709))
+### **Shai Almog** — November 9, 2018 at 6:48 am ([permalink](/blog/tip-using-lombok-other-tools/#comment-23709))
 
 > Shai Almog says:
 >

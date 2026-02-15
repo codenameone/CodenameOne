@@ -25,7 +25,7 @@ We will have the regular Friday release but will only have critical reviewed com
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Javier Anton** — February 1, 2021 at 9:59 pm ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24392))
+### **Javier Anton** — February 1, 2021 at 9:59 pm ([permalink](/blog/code-freeze-for-codename-one-7-0/#comment-24392))
 
 > Javier Anton says:
 >
@@ -36,7 +36,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 2, 2021 at 2:38 am ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24393))
+### **Shai Almog** — February 2, 2021 at 2:38 am ([permalink](/blog/code-freeze-for-codename-one-7-0/#comment-24393))
 
 > Shai Almog says:
 >
@@ -45,7 +45,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — February 6, 2021 at 11:33 pm ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24401))
+### **Javier Anton** — February 6, 2021 at 11:33 pm ([permalink](/blog/code-freeze-for-codename-one-7-0/#comment-24401))
 
 > Javier Anton says:
 >
@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 7, 2021 at 1:58 am ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24403))
+### **Shai Almog** — February 7, 2021 at 1:58 am ([permalink](/blog/code-freeze-for-codename-one-7-0/#comment-24403))
 
 > Shai Almog says:
 >
@@ -63,14 +63,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — February 7, 2021 at 6:21 pm ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24406))
+### **Javier Anton** — February 7, 2021 at 6:21 pm ([permalink](/blog/code-freeze-for-codename-one-7-0/#comment-24406))
 
 > Javier Anton says:
 >
 > I shall look into this, thanks
 
 
-### **Francesco Galgani** — February 2, 2021 at 4:57 pm ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24394))
+### **Francesco Galgani** — February 2, 2021 at 4:57 pm ([permalink](/blog/code-freeze-for-codename-one-7-0/#comment-24394))
 
 > Francesco Galgani says:
 >
@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 3, 2021 at 3:13 am ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24396))
+### **Shai Almog** — February 3, 2021 at 3:13 am ([permalink](/blog/code-freeze-for-codename-one-7-0/#comment-24396))
 
 > Shai Almog says:
 >
@@ -93,7 +93,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — February 6, 2021 at 11:41 pm ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24402))
+### **Javier Anton** — February 6, 2021 at 11:41 pm ([permalink](/blog/code-freeze-for-codename-one-7-0/#comment-24402))
 
 > Javier Anton says:
 >
@@ -102,7 +102,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — February 7, 2021 at 2:03 am ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24404))
+### **Shai Almog** — February 7, 2021 at 2:03 am ([permalink](/blog/code-freeze-for-codename-one-7-0/#comment-24404))
 
 > Shai Almog says:
 >
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Javier Anton** — February 7, 2021 at 6:21 pm ([permalink](https://www.codenameone.com/blog/code-freeze-for-codename-one-7-0.html#comment-24405))
+### **Javier Anton** — February 7, 2021 at 6:21 pm ([permalink](/blog/code-freeze-for-codename-one-7-0/#comment-24405))
 
 > Javier Anton says:
 >

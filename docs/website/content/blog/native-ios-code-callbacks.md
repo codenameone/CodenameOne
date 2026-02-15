@@ -96,7 +96,7 @@ Notice: This post was automatically converted using a script from an older blogg
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Anonymous** — October 22, 2014 at 4:14 am ([permalink](https://www.codenameone.com/blog/native-ios-code-callbacks.html#comment-22099))
+### **Anonymous** — October 22, 2014 at 4:14 am ([permalink](/blog/native-ios-code-callbacks/#comment-22099))
 
 > Anonymous says:
 >
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — October 23, 2014 at 12:30 am ([permalink](https://www.codenameone.com/blog/native-ios-code-callbacks.html#comment-24185))
+### **Anonymous** — October 23, 2014 at 12:30 am ([permalink](/blog/native-ios-code-callbacks/#comment-24185))
 
 > Anonymous says:
 >
@@ -122,7 +122,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 4, 2014 at 12:27 pm ([permalink](https://www.codenameone.com/blog/native-ios-code-callbacks.html#comment-22053))
+### **Anonymous** — December 4, 2014 at 12:27 pm ([permalink](/blog/native-ios-code-callbacks/#comment-22053))
 
 > Anonymous says:
 >
@@ -147,7 +147,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Anonymous** — December 5, 2014 at 3:26 am ([permalink](https://www.codenameone.com/blog/native-ios-code-callbacks.html#comment-22166))
+### **Anonymous** — December 5, 2014 at 3:26 am ([permalink](/blog/native-ios-code-callbacks/#comment-22166))
 
 > Anonymous says:
 >

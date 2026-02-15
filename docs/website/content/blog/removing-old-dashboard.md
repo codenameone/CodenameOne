@@ -29,7 +29,7 @@ This is in addition to the UI overhaul which is worked on [here](https://github.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Durank** — September 11, 2020 at 1:19 pm ([permalink](https://www.codenameone.com/blog/removing-old-dashboard.html#comment-24335))
+### **Durank** — September 11, 2020 at 1:19 pm ([permalink](/blog/removing-old-dashboard/#comment-24335))
 
 > [Durank](https://avatars0.githubusercontent.com/u/16245755?v=4) says:
 >
@@ -38,7 +38,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 12, 2020 at 4:45 am ([permalink](https://www.codenameone.com/blog/removing-old-dashboard.html#comment-24328))
+### **Shai Almog** — September 12, 2020 at 4:45 am ([permalink](/blog/removing-old-dashboard/#comment-24328))
 
 > Shai Almog says:
 >
@@ -47,7 +47,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Carlos Verdier** — September 16, 2020 at 7:19 am ([permalink](https://www.codenameone.com/blog/removing-old-dashboard.html#comment-24341))
+### **Carlos Verdier** — September 16, 2020 at 7:19 am ([permalink](/blog/removing-old-dashboard/#comment-24341))
 
 > [Carlos Verdier](https://lh3.googleusercontent.com/-y-v_mMAwszk/AAAAAAAAAAI/AAAAAAAAAAA/AMZuucmcoea9nf4P3gRHGzB7T7jxG98R1w/photo.jpg) says:
 >
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Francesco Galgani** — September 16, 2020 at 8:33 am ([permalink](https://www.codenameone.com/blog/removing-old-dashboard.html#comment-24342))
+### **Francesco Galgani** — September 16, 2020 at 8:33 am ([permalink](/blog/removing-old-dashboard/#comment-24342))
 
 > [Francesco Galgani](https://lh6.googleusercontent.com/-4K0ax_DVJf4/AAAAAAAAAAI/AAAAAAAAAAA/AMZuuckEd1kcni0y8k6NMzNtxwOCEPatQQ/photo.jpg) says:
 >
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — September 17, 2020 at 4:12 am ([permalink](https://www.codenameone.com/blog/removing-old-dashboard.html#comment-24343))
+### **Shai Almog** — September 17, 2020 at 4:12 am ([permalink](/blog/removing-old-dashboard/#comment-24343))
 
 > Shai Almog says:
 >

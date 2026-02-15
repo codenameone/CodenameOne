@@ -126,7 +126,7 @@ more offerings such as this and expand/bolster our existing offerings.
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **bryan** — April 22, 2015 at 10:33 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22034))
+### **bryan** — April 22, 2015 at 10:33 pm ([permalink](/blog/javascript-port/#comment-22034))
 
 > bryan says:
 >
@@ -135,7 +135,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 23, 2015 at 10:43 am ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22019))
+### **Shai Almog** — April 23, 2015 at 10:43 am ([permalink](/blog/javascript-port/#comment-22019))
 
 > Shai Almog says:
 >
@@ -144,7 +144,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **glegris** — April 29, 2015 at 2:37 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22362))
+### **glegris** — April 29, 2015 at 2:37 pm ([permalink](/blog/javascript-port/#comment-22362))
 
 > glegris says:
 >
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — April 29, 2015 at 5:27 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-24178))
+### **Shai Almog** — April 29, 2015 at 5:27 pm ([permalink](/blog/javascript-port/#comment-24178))
 
 > Shai Almog says:
 >
@@ -169,7 +169,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Thomas Yuen** — May 11, 2015 at 1:42 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22092))
+### **Thomas Yuen** — May 11, 2015 at 1:42 pm ([permalink](/blog/javascript-port/#comment-22092))
 
 > Thomas Yuen says:
 >
@@ -178,7 +178,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 11, 2015 at 2:37 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22373))
+### **Shai Almog** — May 11, 2015 at 2:37 pm ([permalink](/blog/javascript-port/#comment-22373))
 
 > Shai Almog says:
 >
@@ -189,7 +189,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Thomas Yuen** — May 11, 2015 at 5:02 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22238))
+### **Thomas Yuen** — May 11, 2015 at 5:02 pm ([permalink](/blog/javascript-port/#comment-22238))
 
 > Thomas Yuen says:
 >
@@ -198,7 +198,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **KL** — May 14, 2015 at 2:28 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22072))
+### **KL** — May 14, 2015 at 2:28 pm ([permalink](/blog/javascript-port/#comment-22072))
 
 > KL says:
 >
@@ -215,7 +215,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — May 14, 2015 at 6:50 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-21689))
+### **Shai Almog** — May 14, 2015 at 6:50 pm ([permalink](/blog/javascript-port/#comment-21689))
 
 > Shai Almog says:
 >
@@ -225,7 +225,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **KL** — June 7, 2015 at 12:25 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22304))
+### **KL** — June 7, 2015 at 12:25 pm ([permalink](/blog/javascript-port/#comment-22304))
 
 > KL says:
 >
@@ -236,7 +236,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 7, 2015 at 3:05 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-21542))
+### **Shai Almog** — June 7, 2015 at 3:05 pm ([permalink](/blog/javascript-port/#comment-21542))
 
 > Shai Almog says:
 >
@@ -247,7 +247,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **KL** — June 7, 2015 at 3:33 pm ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22314))
+### **KL** — June 7, 2015 at 3:33 pm ([permalink](/blog/javascript-port/#comment-22314))
 
 > KL says:
 >
@@ -256,7 +256,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Gareth Murfin** — May 6, 2016 at 2:18 am ([permalink](https://www.codenameone.com/blog/javascript-port.html#comment-22769))
+### **Gareth Murfin** — May 6, 2016 at 2:18 am ([permalink](/blog/javascript-port/#comment-22769))
 
 > Gareth Murfin says:
 >

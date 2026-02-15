@@ -37,7 +37,7 @@ to help you detect the cases where you do so. Hopefully this will make the migra
 _This post was automatically migrated from the legacy Codename One blog. The original comments are preserved below for historical context. New discussion happens in the Discussion section._
 
 
-### **Gareth Murfin** — June 16, 2016 at 5:02 pm ([permalink](https://www.codenameone.com/blog/ios-http-urls.html#comment-22893))
+### **Gareth Murfin** — June 16, 2016 at 5:02 pm ([permalink](/blog/ios-http-urls/#comment-22893))
 
 > Gareth Murfin says:
 >
@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Shai Almog** — June 17, 2016 at 3:40 am ([permalink](https://www.codenameone.com/blog/ios-http-urls.html#comment-22827))
+### **Shai Almog** — June 17, 2016 at 3:40 am ([permalink](/blog/ios-http-urls/#comment-22827))
 
 > Shai Almog says:
 >
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 
 
-### **Eric Coolman** — July 1, 2016 at 11:24 pm ([permalink](https://www.codenameone.com/blog/ios-http-urls.html#comment-22704))
+### **Eric Coolman** — July 1, 2016 at 11:24 pm ([permalink](/blog/ios-http-urls/#comment-22704))
 
 > Eric Coolman says:
 >
