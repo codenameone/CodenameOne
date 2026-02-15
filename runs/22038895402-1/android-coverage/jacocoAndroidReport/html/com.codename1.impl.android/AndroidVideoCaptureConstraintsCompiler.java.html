@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidVideoCaptureConstraintsCompiler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">AndroidVideoCaptureConstraintsCompiler.java</span></div><h1>AndroidVideoCaptureConstraintsCompiler.java</h1><pre class="source lang-java linenums">/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package com.codename1.impl.android;
+
+import com.codename1.capture.VideoCaptureConstraints;
+
+/**
+ *
+ * @author shannah
+ */
+<span class="fc" id="L14">public class AndroidVideoCaptureConstraintsCompiler implements VideoCaptureConstraints.Compiler {</span>
+
+    @Override
+    public VideoCaptureConstraints compile(VideoCaptureConstraints cnst) {
+<span class="nc" id="L18">        VideoCaptureConstraints out = new VideoCaptureConstraints(cnst);</span>
+        
+        // We can't actually support explicit width and height constraints
+        // right now, so we set these to zero
+<span class="nc" id="L22">        out.preferredHeight(0);</span>
+<span class="nc" id="L23">        out.preferredWidth(0);</span>
+        
+        // But we do support low and high quality
+<span class="nc bnc" id="L26" title="All 2 branches missed.">        switch (cnst.getPreferredQuality()) {</span>
+            case VideoCaptureConstraints.QUALITY_LOW:
+            case VideoCaptureConstraints.QUALITY_HIGH:
+<span class="nc" id="L29">                break;</span>
+            default:
+                // If the constraints don't set quality, but they do set width and height constraints
+                // we can provide a low/high quality hint that might help to satisfy the
+                // caller's intentions.
+                // Smaller than 640x480 we'll call low quality.  That number is just pulled out of the air.
+<span class="nc bnc" id="L35" title="All 4 branches missed.">                if (cnst.getPreferredHeight() &gt; 0 &amp;&amp; cnst.getPreferredWidth() &gt; 0) {</span>
+<span class="nc bnc" id="L36" title="All 4 branches missed.">                    if (cnst.getPreferredHeight() &lt;= 480 || cnst.getPreferredWidth() &lt;= 640) {</span>
+<span class="nc" id="L37">                        out.preferredQuality(VideoCaptureConstraints.QUALITY_LOW);</span>
+                    } else {
+<span class="nc" id="L39">                        out.preferredQuality(VideoCaptureConstraints.QUALITY_HIGH);</span>
+                    }
+                }
+        }
+        
+<span class="nc" id="L44">        return out;</span>
+        
+        
+    }
+    
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

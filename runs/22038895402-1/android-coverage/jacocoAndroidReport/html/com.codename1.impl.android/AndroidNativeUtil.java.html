@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidNativeUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">AndroidNativeUtil.java</span></div><h1>AndroidNativeUtil.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.os.Bundle;
+import android.view.View;
+import com.codename1.impl.android.AndroidImplementation;
+import static com.codename1.impl.android.AndroidImplementation.checkForPermission;
+import com.codename1.ui.Display;
+import java.util.ArrayList;
+import java.util.HashMap;
+
+/**
+ * This is a utility class for common native usages
+ * 
+ * @author Chen
+ */
+<span class="nc" id="L43">public class AndroidNativeUtil {</span>
+    private static ArrayList&lt;LifecycleListener&gt; listeners;
+    private static Bundle activationBundle;
+
+    /**
+     * Allows us to get the bundle that was used to create this activity
+     * @return the bundle instance
+     */
+    public static Bundle getActivationBundle() {
+<span class="nc" id="L52">        return activationBundle;</span>
+    }
+    
+    /**
+     * Binds a callback to lifecycle events
+     * @param l listener
+     */
+    public static void addLifecycleListener(LifecycleListener l) {
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if(listeners == null) {</span>
+<span class="nc" id="L61">            listeners = new ArrayList&lt;LifecycleListener&gt;();</span>
+        }
+<span class="nc" id="L63">        listeners.add(l);</span>
+<span class="nc" id="L64">    }</span>
+    
+    /**
+     * Releases the callback to lifecycle events
+     * @param l listener
+     */
+    public static void removeLifecycleListener(LifecycleListener l) {
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if(listeners == null) {</span>
+<span class="nc" id="L72">            return;</span>
+        }
+<span class="nc" id="L74">        listeners.remove(l);</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if(listeners.isEmpty()) {</span>
+<span class="nc" id="L76">            listeners = null;</span>
+        }
+<span class="nc" id="L78">    }</span>
+    
+    static void onCreate(Bundle savedInstanceState) {
+<span class="fc" id="L81">        activationBundle = savedInstanceState;</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if(listeners != null) {</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            for(LifecycleListener l : listeners) {</span>
+<span class="nc" id="L84">                l.onCreate(savedInstanceState);</span>
+<span class="nc" id="L85">            }</span>
+        }
+<span class="fc" id="L87">    }</span>
+    
+    static void onResume() {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if(listeners != null) {</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            for(LifecycleListener l : listeners) {</span>
+<span class="nc" id="L92">                l.onResume();</span>
+<span class="nc" id="L93">            }</span>
+        }
+<span class="fc" id="L95">    }</span>
+    
+    static void onPause() {
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if(listeners != null) {</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            for(LifecycleListener l : listeners) {</span>
+<span class="nc" id="L100">                l.onPause();</span>
+<span class="nc" id="L101">            }</span>
+        }
+<span class="fc" id="L103">    }</span>
+    
+    static void onDestroy() {
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if(listeners != null) {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            for(LifecycleListener l : listeners) {</span>
+<span class="nc" id="L108">                l.onDestroy();</span>
+<span class="nc" id="L109">            }</span>
+        }
+<span class="fc" id="L111">    }</span>
+    
+    static void onSaveInstanceState(Bundle b) {
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if(listeners != null) {</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            for(LifecycleListener l : listeners) {</span>
+<span class="nc" id="L116">                l.onSaveInstanceState(b);</span>
+<span class="nc" id="L117">            }</span>
+        }
+<span class="nc" id="L119">    }</span>
+    
+    static void onLowMemory() {
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if(listeners != null) {</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">            for(LifecycleListener l : listeners) {</span>
+<span class="nc" id="L124">                l.onLowMemory();</span>
+<span class="nc" id="L125">            }</span>
+        }
+<span class="nc" id="L127">    }</span>
+            
+    /**
+     * Get the main activity
+     */ 
+    public static Activity getActivity(){
+<span class="nc" id="L133">        return AndroidImplementation.getActivity();</span>
+    }
+    
+    public static Context getContext() {
+<span class="nc" id="L137">        return AndroidImplementation.getContext();</span>
+    }
+    
+    /**
+     * Start an intent for result
+     */ 
+    public static void startActivityForResult(Intent intent, int requestCode, final IntentResultListener listener){
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (getActivity() == null) {</span>
+<span class="nc" id="L145">            throw new RuntimeException(&quot;Cannot start activity for result when running in background.&quot;);</span>
+        }
+<span class="nc" id="L147">        final CodenameOneActivity act = (CodenameOneActivity) getActivity();</span>
+<span class="nc" id="L148">        act.setIntentResultListener(new IntentResultListener() {</span>
+
+            @Override
+            public void onActivityResult(int requestCode, int resultCode, Intent data) {
+<span class="nc" id="L152">                listener.onActivityResult(requestCode, resultCode, data);</span>
+<span class="nc" id="L153">                act.restoreIntentResultListener();</span>
+<span class="nc" id="L154">            }</span>
+        });
+<span class="nc" id="L156">        act.startActivityForResult(intent, requestCode);</span>
+<span class="nc" id="L157">    }</span>
+    
+    public static void startActivityForResult(Intent intent, final IntentResultListener listener){
+<span class="nc" id="L160">        startActivityForResult(intent, 2000, listener);</span>
+<span class="nc" id="L161">    }</span>
+    
+    private static HashMap&lt;Class, BitmapViewRenderer&gt; viewRendererMap;
+    
+    public static Bitmap renderViewOnBitmap(final View v, int w, int h) {
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        if(viewRendererMap != null) {</span>
+<span class="nc" id="L167">            BitmapViewRenderer br = viewRendererMap.get(v.getClass());</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">            if(br != null) {                </span>
+<span class="nc" id="L169">                return br.renderViewOnBitmap(v, w, h);</span>
+            }
+        }
+<span class="nc bnc" id="L172" title="All 4 branches missed.">        if(w &lt;= 0 || h &lt;= 0) {</span>
+<span class="nc" id="L173">            return null;</span>
+        }
+<span class="nc" id="L175">        final Bitmap nativeBuffer = Bitmap.createBitmap(</span>
+                        w, h, Bitmap.Config.ARGB_8888);
+<span class="nc" id="L177">        AndroidImplementation.runOnUiThreadAndBlock(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="nc" id="L181">                    Canvas canvas = new Canvas(nativeBuffer);</span>
+<span class="nc" id="L182">                    v.draw(canvas);</span>
+<span class="nc" id="L183">                } catch(Throwable t) {</span>
+<span class="nc" id="L184">                    t.printStackTrace();</span>
+<span class="nc" id="L185">                }</span>
+<span class="nc" id="L186">            }</span>
+        });
+<span class="nc" id="L188">        return nativeBuffer;</span>
+    }
+    
+    public static void registerViewRenderer(Class viewClass, BitmapViewRenderer b) {
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        if(viewRendererMap == null) {</span>
+<span class="nc" id="L193">            viewRendererMap = new HashMap&lt;Class, BitmapViewRenderer&gt;();</span>
+        }
+<span class="nc" id="L195">        viewRendererMap.put(viewClass, b);</span>
+<span class="nc" id="L196">    }</span>
+    
+    public static interface BitmapViewRenderer {
+        public Bitmap renderViewOnBitmap(View v, int w, int h);
+    }
+
+    /**
+     * Sets a callback used to customize permission rationale dialogs.
+     * Passing {@code null} restores the default Codename One Dialog behavior.
+     *
+     * @param callback callback implementation or {@code null}
+     */
+    public static void setPermissionPromptCallback(final PermissionPromptCallback callback) {
+<span class="nc" id="L209">        AndroidImplementation.setPermissionPromptCallback(callback);</span>
+<span class="nc" id="L210">    }</span>
+    
+    /**
+     * Check for a dangerous permission, if the permission is already granted return true, 
+     * otherwise ask the user for the permission.
+     * This method is blocking until a response is returned
+     * 
+     * @param permission the Permission to Ask
+     * @param description show a description to the user why this is needed
+     * @return true if granted false otherwise
+     */
+    public static boolean checkForPermission(String permission, String description){
+<span class="nc" id="L222">        return AndroidImplementation.checkForPermission(permission, description, false);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

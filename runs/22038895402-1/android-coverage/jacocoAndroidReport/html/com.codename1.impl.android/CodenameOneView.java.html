@@ -1,0 +1,681 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CodenameOneView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">CodenameOneView.java</span></div><h1>CodenameOneView.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.app.Activity;
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Rect;
+import android.util.Log;
+import android.view.*;
+import android.view.inputmethod.EditorInfo;
+import android.os.Build;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.PeerComponent;
+import com.codename1.ui.Sheet;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import java.lang.reflect.Method;
+
+
+/**
+ *
+ * @author Chen
+ */
+public class CodenameOneView {
+
+<span class="fc" id="L51">    int width = 1;</span>
+<span class="fc" id="L52">    int height = 1;</span>
+    Bitmap bitmap;
+<span class="fc" id="L54">    AndroidGraphics buffy = null;</span>
+    private Canvas canvas;
+<span class="fc" id="L56">    private AndroidImplementation implementation = null;</span>
+    private final KeyCharacterMap keyCharacterMap;
+<span class="fc" id="L58">    private final Rect bounds = new Rect();</span>
+<span class="fc" id="L59">    private boolean fireKeyDown = false;</span>
+    //private volatile boolean created = false;
+    private boolean drawing;
+
+<span class="fc" id="L63">    private final Rect safeArea = new Rect();</span>
+
+    private static final int VERSION_CODE_P = 28;
+    private static final int VERSION_CODE_M = 23;
+
+<span class="fc" id="L68">    public CodenameOneView(Activity activity, View androidView, AndroidImplementation implementation, boolean drawing) {</span>
+
+<span class="fc" id="L70">        this.implementation = implementation;</span>
+<span class="fc" id="L71">        this.drawing = drawing;</span>
+<span class="fc" id="L72">        androidView.setLayoutParams(new ViewGroup.LayoutParams(</span>
+                ViewGroup.LayoutParams.FILL_PARENT,
+                ViewGroup.LayoutParams.FILL_PARENT));
+<span class="fc" id="L75">        androidView.setFocusable(true);</span>
+<span class="fc" id="L76">        androidView.setFocusableInTouchMode(true);</span>
+<span class="fc" id="L77">        androidView.setEnabled(true);</span>
+<span class="fc" id="L78">        androidView.setClickable(true);</span>
+<span class="fc" id="L79">        androidView.setLongClickable(false);</span>
+        
+        /**
+         * tell the system that we do our own caching and it does not need to
+         * use an extra offscreen bitmap.
+         */
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if(!drawing) {</span>
+<span class="fc" id="L86">            androidView.setWillNotCacheDrawing(false);</span>
+<span class="fc" id="L87">            androidView.setWillNotDraw(true);</span>
+<span class="fc" id="L88">            this.buffy = new AndroidGraphics(implementation, null, false);</span>
+        }
+
+<span class="fc" id="L91">        this.keyCharacterMap = KeyCharacterMap.load(KeyCharacterMap.BUILT_IN_KEYBOARD);</span>
+
+
+        /**
+         * From the docs: &quot;Change whether this view is one of the set of
+         * scrollable containers in its window. This will be used to determine
+         * whether the window can resize or must pan when a soft input area is
+         * open -- scrollable containers allow the window to use resize mode
+         * since the container will appropriately shrink. &quot;
+         */
+<span class="fc" id="L101">        androidView.setScrollContainer(true);</span>
+
+<span class="fc" id="L103">        android.view.Display androidDisplay = ((WindowManager) activity.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();</span>
+<span class="fc" id="L104">        width = androidDisplay.getWidth();</span>
+<span class="fc" id="L105">        height = androidDisplay.getHeight();</span>
+<span class="fc" id="L106">        View rootView = activity.getWindow().getDecorView();</span>
+<span class="fc" id="L107">        rootView.post(new Runnable() {</span>
+            public void run() {
+<span class="fc" id="L109">                updateSafeArea();</span>
+<span class="fc" id="L110">            }</span>
+        });
+<span class="fc" id="L112">        initBitmaps(width, height);</span>
+<span class="fc" id="L113">    }</span>
+
+    public boolean isOpaque() {
+<span class="nc" id="L116">        return true;</span>
+    }
+
+    public void onSurfaceChanged(final int w, final int h) {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if(!Display.isInitialized()) {</span>
+<span class="nc" id="L121">            return;</span>
+        }
+<span class="nc" id="L123">        Display.getInstance().callSerially(new Runnable() {</span>
+
+            public void run() {
+<span class="nc" id="L126">                handleSizeChange(w, h);</span>
+<span class="nc" id="L127">            }</span>
+        });
+<span class="nc" id="L129">    }</span>
+    
+    public void onSurfaceCreated() {
+<span class="nc" id="L132">        this.visibilityChangedTo(true);</span>
+<span class="nc" id="L133">    }</span>
+    
+    public void onSurfaceDestroyed() {
+<span class="nc" id="L136">        this.visibilityChangedTo(false);</span>
+<span class="nc" id="L137">    }</span>
+    
+    private void initBitmaps(int w, int h) {
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if(!drawing) {</span>
+<span class="fc" id="L141">            this.bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);</span>
+<span class="fc" id="L142">            this.canvas = new Canvas(this.bitmap);</span>
+<span class="fc" id="L143">            this.buffy.setCanvas(this.canvas);</span>
+        }
+<span class="fc" id="L145">    }</span>
+
+    public void visibilityChangedTo(boolean visible) {
+<span class="fc" id="L148">        boolean changed = visible;</span>
+<span class="pc bpc" id="L149" title="1 of 4 branches missed.">        if (this.implementation.getCurrentForm() != null &amp;&amp; changed) {</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">            if (visible) {</span>
+<span class="nc" id="L151">                this.implementation.showNotifyPublic();</span>
+                /**
+                 * request a full repaint as our surfaceview is most likely
+                 * black if this app comes back from the background.
+                 */
+<span class="nc" id="L156">                this.implementation.getCurrentForm().repaint();</span>
+                //android.os.Debug.startMethodTracing(&quot;calc&quot;);
+            } else {
+<span class="nc" id="L159">                this.implementation.hideNotifyPublic();</span>
+                //android.os.Debug.stopMethodTracing();
+            }
+        }
+        //flushGraphics();
+<span class="fc" id="L164">    }</span>
+
+    private void updateSafeArea() {
+<span class="fc" id="L167">        final Activity activity = CodenameOneView.this.implementation.getActivity();</span>
+<span class="fc" id="L168">        final Rect rect = this.safeArea;</span>
+<span class="fc" id="L169">        final View rootView = activity.getWindow().getDecorView();</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (Build.VERSION.SDK_INT &gt;= VERSION_CODE_P) {</span>
+            try {
+<span class="fc" id="L172">                Method getRootWindowInsetsMethod = View.class.getMethod(&quot;getRootWindowInsets&quot;);</span>
+<span class="fc" id="L173">                Object insets = getRootWindowInsetsMethod.invoke(rootView);</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                if (insets != null) {</span>
+<span class="fc" id="L175">                    Class&lt;?&gt; windowInsetsClass = Class.forName(&quot;android.view.WindowInsets&quot;);</span>
+<span class="fc" id="L176">                    Method getDisplayCutoutMethod = windowInsetsClass.getMethod(&quot;getDisplayCutout&quot;);</span>
+<span class="fc" id="L177">                    Object cutout = getDisplayCutoutMethod.invoke(insets);</span>
+
+<span class="fc" id="L179">                    int left = 0;</span>
+<span class="fc" id="L180">                    int top = 0;</span>
+<span class="fc" id="L181">                    int right = 0;</span>
+<span class="fc" id="L182">                    int bottom = 0;</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">                    if (cutout != null) {</span>
+<span class="nc" id="L184">                        Class&lt;?&gt; displayCutoutClass = Class.forName(&quot;android.view.DisplayCutout&quot;);</span>
+<span class="nc" id="L185">                        Method getSafeInsetLeft = displayCutoutClass.getMethod(&quot;getSafeInsetLeft&quot;);</span>
+<span class="nc" id="L186">                        Method getSafeInsetTop = displayCutoutClass.getMethod(&quot;getSafeInsetTop&quot;);</span>
+<span class="nc" id="L187">                        Method getSafeInsetRight = displayCutoutClass.getMethod(&quot;getSafeInsetRight&quot;);</span>
+<span class="nc" id="L188">                        Method getSafeInsetBottom = displayCutoutClass.getMethod(&quot;getSafeInsetBottom&quot;);</span>
+<span class="nc" id="L189">                        left = ((Integer) getSafeInsetLeft.invoke(cutout)).intValue();</span>
+<span class="nc" id="L190">                        top = ((Integer) getSafeInsetTop.invoke(cutout)).intValue();</span>
+<span class="nc" id="L191">                        right = ((Integer) getSafeInsetRight.invoke(cutout)).intValue();</span>
+<span class="nc" id="L192">                        bottom = ((Integer) getSafeInsetBottom.invoke(cutout)).intValue();</span>
+                    }
+
+<span class="fc" id="L195">                    boolean imeVisible = false;</span>
+                    try {
+<span class="fc" id="L197">                        Method isVisibleMethod = insets.getClass().getMethod(&quot;isVisible&quot;, int.class);</span>
+<span class="fc" id="L198">                        Class&lt;?&gt; typeClass = Class.forName(&quot;android.view.WindowInsets$Type&quot;);</span>
+<span class="fc" id="L199">                        int imeType = ((Integer) typeClass.getMethod(&quot;ime&quot;).invoke(null)).intValue();</span>
+<span class="fc" id="L200">                        imeVisible = (Boolean) isVisibleMethod.invoke(insets, imeType);</span>
+<span class="nc" id="L201">                    } catch (Throwable t) {</span>
+                        // Fallback or log
+<span class="fc" id="L203">                    }</span>
+
+<span class="fc" id="L205">                    Rect systemBarInsets = AndroidImplementation.getSystemBarInsets(rootView);</span>
+<span class="fc" id="L206">                    top = Math.max(systemBarInsets.top, top);</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                    if (imeVisible) {</span>
+                        // Avoid double-counting the bottom gesture bar
+<span class="nc" id="L209">                        bottom = Math.max(bottom, 0);</span>
+                    } else {
+<span class="fc" id="L211">                        bottom = Math.max(systemBarInsets.bottom, bottom);</span>
+                    }
+<span class="fc" id="L213">                    left = Math.max(systemBarInsets.left, left);</span>
+<span class="fc" id="L214">                    right = Math.max(systemBarInsets.right, right);</span>
+
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                    if (!AndroidImplementation.isImmersive()) {</span>
+<span class="nc" id="L217">                        top -= systemBarInsets.top;</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">                        if (!imeVisible) {</span>
+<span class="nc" id="L219">                            bottom -= systemBarInsets.bottom;</span>
+                        }
+<span class="nc" id="L221">                        left -= systemBarInsets.left;</span>
+<span class="nc" id="L222">                        right -= systemBarInsets.right;</span>
+                    }
+
+                    // Only apply if at least one is non-zero
+<span class="pc bpc" id="L226" title="6 of 8 branches missed.">                    if (left != 0 || top != 0 || right != 0 || bottom != 0) {</span>
+<span class="pc bpc" id="L227" title="3 of 8 branches missed.">                        boolean isChanged = rect.left != left</span>
+                                || rect.right != right
+                                || rect.top != top
+                                || rect.bottom != bottom;
+<span class="fc" id="L231">                        rect.left = left;</span>
+<span class="fc" id="L232">                        rect.top = top;</span>
+<span class="fc" id="L233">                        rect.right = right;</span>
+<span class="fc" id="L234">                        rect.bottom = bottom;</span>
+
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                        if (isChanged) {</span>
+<span class="fc" id="L237">                            Display.getInstance().callSerially(new Runnable() {</span>
+                                public void run() {
+<span class="fc" id="L239">                                    AndroidImplementation.getInstance().revalidate();</span>
+<span class="fc" id="L240">                                }</span>
+                            });
+                        }
+                    }
+                }
+<span class="nc" id="L245">            } catch (Throwable e) {</span>
+<span class="nc" id="L246">                rect.top = 0;</span>
+<span class="nc" id="L247">                rect.left = 0;</span>
+<span class="nc" id="L248">                rect.right = 0;</span>
+<span class="nc" id="L249">                rect.bottom = 0;</span>
+<span class="pc" id="L250">            }</span>
+
+<span class="nc bnc" id="L252" title="All 2 branches missed.">        } else if (Build.VERSION.SDK_INT &gt;= VERSION_CODE_M) {</span>
+<span class="nc" id="L253">            rootView.post(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L255">                    WindowInsets insets = rootView.getRootWindowInsets();</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">                    if (insets != null) {</span>
+<span class="nc" id="L257">                        rect.top = insets.getSystemWindowInsetTop();</span>
+<span class="nc" id="L258">                        rect.left = insets.getSystemWindowInsetLeft();;</span>
+<span class="nc" id="L259">                        rect.right = insets.getSystemWindowInsetRight();</span>
+<span class="nc" id="L260">                        rect.bottom = insets.getSystemWindowInsetBottom();</span>
+                    } else {
+<span class="nc" id="L262">                        rect.top = 0;</span>
+<span class="nc" id="L263">                        rect.left = 0;</span>
+<span class="nc" id="L264">                        rect.right = 0;</span>
+<span class="nc" id="L265">                        rect.bottom = 0;</span>
+                    }
+<span class="nc" id="L267">                }</span>
+            });
+        } else {
+            // For pre-Marshmallow (API &lt; 23), assume full screen
+<span class="nc" id="L271">            rect.top = 0;</span>
+<span class="nc" id="L272">            rect.left = 0;</span>
+<span class="nc" id="L273">            rect.right = 0;</span>
+<span class="nc" id="L274">            rect.bottom = 0;</span>
+        }
+<span class="fc" id="L276">    }</span>
+
+    public void handleSizeChange(int w, int h) {
+
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if(!drawing) {</span>
+<span class="pc bpc" id="L281" title="3 of 6 branches missed.">            if ((this.width != w &amp;&amp; (this.width &lt; w || this.height &lt; h))</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">                    || (bitmap.getHeight() &lt; h)) {</span>
+<span class="fc" id="L283">                this.initBitmaps(w, h);</span>
+            }
+        }
+<span class="pc bpc" id="L286" title="1 of 4 branches missed.">        if (this.width == w &amp;&amp; this.height == h) {</span>
+<span class="fc" id="L287">            return;</span>
+        }
+<span class="fc" id="L289">        this.width = w;</span>
+<span class="fc" id="L290">        this.height = h;</span>
+
+<span class="fc" id="L292">        updateSafeArea();</span>
+
+<span class="fc" id="L294">        Log.d(&quot;Codename One&quot;, &quot;sizechanged: &quot; + width + &quot; &quot; + height + &quot; &quot; + this);</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">        if (this.implementation.getCurrentForm() == null) {</span>
+            /**
+             * make sure a form has been set before we can send events to the
+             * EDT. if we send events before the form has been set we might
+             * deadlock!
+             */
+<span class="nc" id="L301">            return;</span>
+        }
+
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        if (InPlaceEditView.isEditing()) {</span>
+<span class="nc" id="L305">            final Form f = this.implementation.getCurrentForm();</span>
+<span class="nc" id="L306">            ActionListener sizeChanged = new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L309">                    CodenameOneView.this.implementation.getActivity().runOnUiThread(new Runnable() {</span>
+
+                        @Override
+                        public void run() {
+<span class="nc" id="L313">                            InPlaceEditView.reLayoutEdit();</span>
+<span class="nc" id="L314">                        }</span>
+                    });
+<span class="nc" id="L316">                    f.removeSizeChangedListener(this);</span>
+<span class="nc" id="L317">                }</span>
+            };
+<span class="nc" id="L319">            f.addSizeChangedListener(sizeChanged);</span>
+        }
+<span class="fc" id="L321">        Display.getInstance().sizeChanged(w, h);</span>
+<span class="fc" id="L322">    }</span>
+
+    //@Override
+    protected void d(Canvas canvas) {
+<span class="nc bnc" id="L326" title="All 2 branches missed.">        if(!drawing) {</span>
+<span class="nc" id="L327">            boolean empty = canvas.getClipBounds(bounds);</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">            if (empty) {</span>
+                // ??
+<span class="nc" id="L330">                canvas.drawBitmap(bitmap, 0, 0, null);</span>
+            } else {
+<span class="nc" id="L332">                bounds.intersect(0, 0, width, height);</span>
+<span class="nc" id="L333">                canvas.drawBitmap(bitmap, bounds, bounds, null);</span>
+            }
+        }
+<span class="nc" id="L336">    }</span>
+
+    /**
+     * some info from the MIDP docs about keycodes:
+     *
+     * &quot;Applications receive keystroke events in which the individual keys are
+     * named within a space of key codes. Every key for which events are
+     * reported to MIDP applications is assigned a key code. The key code values
+     * are unique for each hardware key unless two keys are obvious synonyms for
+     * each other. MIDP defines the following key codes: KEY_NUM0, KEY_NUM1,
+     * KEY_NUM2, KEY_NUM3, KEY_NUM4, KEY_NUM5, KEY_NUM6, KEY_NUM7, KEY_NUM8,
+     * KEY_NUM9, KEY_STAR, and KEY_POUND. (These key codes correspond to keys on
+     * a ITU-T standard telephone keypad.) Other keys may be present on the
+     * keyboard, and they will generally have key codes distinct from those list
+     * above. In order to guarantee portability, applications should use only
+     * the standard key codes.
+     *
+     * The standard key codes' values are equal to the Unicode encoding for the
+     * character that represents the key. If the device includes any other keys
+     * that have an obvious correspondence to a Unicode character, their key
+     * code values should equal the Unicode encoding for that character. For
+     * keys that have no corresponding Unicode character, the implementation
+     * must use negative values. Zero is defined to be an invalid key code.&quot;
+     *
+     * Because the MIDP implementation is our reference and that implementation
+     * does not interpret the given keycodes we behave alike and pass on the
+     * unicode values.
+     */
+    final static int internalKeyCodeTranslate(int keyCode) {
+        /**
+         * make sure these important keys have a negative value when passed to
+         * Codename One or they might be interpreted as characters.
+         */
+<span class="nc bnc" id="L369" title="All 10 branches missed.">        switch (keyCode) {</span>
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+<span class="nc" id="L371">                return AndroidImplementation.DROID_IMPL_KEY_DOWN;</span>
+            case KeyEvent.KEYCODE_DPAD_UP:
+<span class="nc" id="L373">                return AndroidImplementation.DROID_IMPL_KEY_UP;</span>
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+<span class="nc" id="L375">                return AndroidImplementation.DROID_IMPL_KEY_LEFT;</span>
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+<span class="nc" id="L377">                return AndroidImplementation.DROID_IMPL_KEY_RIGHT;</span>
+            case KeyEvent.KEYCODE_DPAD_CENTER:
+<span class="nc" id="L379">                return AndroidImplementation.DROID_IMPL_KEY_FIRE;</span>
+            case KeyEvent.KEYCODE_MENU:
+<span class="nc" id="L381">                return AndroidImplementation.DROID_IMPL_KEY_MENU;</span>
+            case KeyEvent.KEYCODE_CLEAR:
+<span class="nc" id="L383">                return AndroidImplementation.DROID_IMPL_KEY_CLEAR;</span>
+            case KeyEvent.KEYCODE_DEL:
+<span class="nc" id="L385">                return AndroidImplementation.DROID_IMPL_KEY_BACKSPACE;</span>
+            case KeyEvent.KEYCODE_BACK:
+<span class="nc" id="L387">                return AndroidImplementation.DROID_IMPL_KEY_BACK;</span>
+            default:
+<span class="nc" id="L389">                return keyCode;</span>
+        }
+    }
+
+    public boolean onKeyUpDown(boolean down, int keyCode, KeyEvent event) {
+<span class="nc" id="L394">        keyCode = this.internalKeyCodeTranslate(keyCode);</span>
+
+<span class="nc bnc" id="L396" title="All 3 branches missed.">        switch (keyCode) {</span>
+            case KeyEvent.KEYCODE_VOLUME_DOWN:
+            case KeyEvent.KEYCODE_VOLUME_UP:
+            case KeyEvent.KEYCODE_SEARCH:
+            case KeyEvent.KEYCODE_SHIFT_LEFT:
+            case KeyEvent.KEYCODE_SHIFT_RIGHT:
+            case KeyEvent.KEYCODE_ALT_LEFT:
+            case KeyEvent.KEYCODE_ALT_RIGHT:
+            case KeyEvent.KEYCODE_SYM:
+<span class="nc" id="L405">            return false;</span>
+            case KeyEvent.KEYCODE_ENTER:
+<span class="nc bnc" id="L407" title="All 2 branches missed.">                if(Display.getInstance().getProperty(&quot;sendEnterKey&quot;, &quot;false&quot;).equals(&quot;true&quot;)) {</span>
+<span class="nc bnc" id="L408" title="All 2 branches missed.">                	if (down) {</span>
+<span class="nc" id="L409">                        Display.getInstance().keyPressed(keyCode);</span>
+                    } else {
+<span class="nc" id="L411">                        Display.getInstance().keyReleased(keyCode);</span>
+                    }
+<span class="nc" id="L413">               	    return false;</span>
+                }
+                break;
+                
+            default:
+        }
+
+<span class="nc bnc" id="L420" title="All 2 branches missed.">        if (event.getRepeatCount() &gt; 0) {</span>
+            // skip repeats
+<span class="nc" id="L422">            return true;</span>
+        }
+<span class="nc bnc" id="L424" title="All 2 branches missed.">        if (this.implementation.getCurrentForm() == null) {</span>
+            /**
+             * make sure a form has been set before we can send events to the
+             * EDT. if we send events before the form has been set we might
+             * deadlock!
+             */
+<span class="nc" id="L430">            return true;</span>
+        }
+
+
+<span class="nc bnc" id="L434" title="All 2 branches missed.">        if (keyCode == AndroidImplementation.DROID_IMPL_KEY_FIRE) {</span>
+<span class="nc" id="L435">            this.fireKeyDown = down;</span>
+<span class="nc bnc" id="L436" title="All 8 branches missed.">        } else if (keyCode == AndroidImplementation.DROID_IMPL_KEY_DOWN</span>
+                || keyCode == AndroidImplementation.DROID_IMPL_KEY_UP
+                || keyCode == AndroidImplementation.DROID_IMPL_KEY_LEFT
+                || keyCode == AndroidImplementation.DROID_IMPL_KEY_RIGHT) {
+<span class="nc bnc" id="L440" title="All 2 branches missed.">            if (this.fireKeyDown) {</span>
+                /**
+                 * we keep track of trackball press/release. while it is pressed
+                 * we drop directional movements. these movements are most
+                 * likely not intended. if the device has no trackball i see no
+                 * situation where this additional behavior could hurt.
+                 */
+<span class="nc" id="L447">                return true;</span>
+            }
+        }
+
+<span class="nc bnc" id="L451" title="All 3 branches missed.">        switch (keyCode) {</span>
+
+            case AndroidImplementation.DROID_IMPL_KEY_MENU:
+                //if the native commands are used don't handle the keycode
+<span class="nc bnc" id="L455" title="All 2 branches missed.">                if (Display.getInstance().getCommandBehavior() == Display.COMMAND_BEHAVIOR_NATIVE) {</span>
+<span class="nc" id="L456">                    return false;</span>
+                }
+            case AndroidImplementation.DROID_IMPL_KEY_BACK:
+            case AndroidImplementation.DROID_IMPL_KEY_DOWN:
+            case AndroidImplementation.DROID_IMPL_KEY_UP:
+            case AndroidImplementation.DROID_IMPL_KEY_LEFT:
+            case AndroidImplementation.DROID_IMPL_KEY_RIGHT:
+            case AndroidImplementation.DROID_IMPL_KEY_FIRE:
+            case AndroidImplementation.DROID_IMPL_KEY_CLEAR:
+            case AndroidImplementation.DROID_IMPL_KEY_BACKSPACE:
+                // directly pass to display.
+<span class="nc bnc" id="L467" title="All 2 branches missed.">                if (down) {</span>
+<span class="nc" id="L468">                    Display.getInstance().keyPressed(keyCode);</span>
+                } else {
+<span class="nc" id="L470">                    Display.getInstance().keyReleased(keyCode);</span>
+                }
+<span class="nc" id="L472">                return true;</span>
+
+            default:
+
+                /**
+                 * Codename One's TextField does not seem to work well if two
+                 * keyup-keydown sequences of different keys are not strictly
+                 * sequential. so we pass the up event of a character right
+                 * after the down event. this is exactly the behavior of the
+                 * BlackBerry implementation from this repository and has worked
+                 * well for me. i guess this should be changed as soon as the
+                 * TextField changes.
+                 */
+<span class="nc" id="L485">                int meta = 0;</span>
+<span class="nc bnc" id="L486" title="All 2 branches missed.">                if (event.isShiftPressed()) {</span>
+<span class="nc" id="L487">                    meta |= KeyEvent.META_SHIFT_ON;</span>
+                }
+<span class="nc bnc" id="L489" title="All 2 branches missed.">                if (event.isAltPressed()) {</span>
+<span class="nc" id="L490">                    meta |= KeyEvent.META_ALT_ON;</span>
+                }
+<span class="nc bnc" id="L492" title="All 2 branches missed.">                if (event.isSymPressed()) {</span>
+<span class="nc" id="L493">                    meta |= KeyEvent.META_SYM_ON;</span>
+                }
+<span class="nc" id="L495">                final int nextchar = this.keyCharacterMap.get(keyCode, meta);</span>
+<span class="nc bnc" id="L496" title="All 2 branches missed.">                if (down) {</span>
+<span class="nc" id="L497">                    Display.getInstance().keyPressed(nextchar);</span>
+                } else {
+<span class="nc" id="L499">                    Display.getInstance().keyReleased(nextchar);</span>
+                }
+<span class="nc" id="L501">                return true;</span>
+
+        }
+    }
+
+<span class="fc" id="L506">    private boolean cn1GrabbedPointer = false;</span>
+    //private boolean nativePeerGrabbedPointer = false;
+    
+    public boolean onTouchEvent(MotionEvent event) {
+
+<span class="nc bnc" id="L511" title="All 2 branches missed.">        if (this.implementation.getCurrentForm() == null) {</span>
+            /**
+             * make sure a form has been set before we can send events to the
+             * EDT. if we send events before the form has been set we might
+             * deadlock!
+             */
+<span class="nc" id="L517">            return true;</span>
+        }
+        
+        
+
+<span class="nc" id="L522">        int[] x = null;</span>
+<span class="nc" id="L523">        int[] y = null;</span>
+<span class="nc" id="L524">        int size = event.getPointerCount();</span>
+<span class="nc bnc" id="L525" title="All 2 branches missed.">        if (size &gt; 1) {</span>
+<span class="nc" id="L526">            x = new int[size];</span>
+<span class="nc" id="L527">            y = new int[size];</span>
+<span class="nc bnc" id="L528" title="All 2 branches missed.">            for (int i = 0; i &lt; size; i++) {</span>
+<span class="nc" id="L529">                x[i] = (int) event.getX(i);</span>
+<span class="nc" id="L530">                y[i] = (int) event.getY(i);</span>
+            }
+        }
+       /*
+        if (!cn1GrabbedPointer) {
+            
+            if (x == null) {
+                Component componentAt = this.implementation.getCurrentForm().getComponentAt((int)event.getX(), (int)event.getY());
+                if (componentAt != null &amp;&amp; (componentAt instanceof PeerComponent)) {
+                    
+                    if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                        //nativePeerGrabbedPointer = true;
+                    } else if (event.getAction() == MotionEvent.ACTION_UP) {
+                        //nativePeerGrabbedPointer = false;
+                    }
+                    return false;
+                }
+
+            } else {
+                Component componentAt = this.implementation.getCurrentForm().getComponentAt((int)x[0], (int)y[0]);
+                if (componentAt != null &amp;&amp; (componentAt instanceof PeerComponent)) {
+                    if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                        nativePeerGrabbedPointer = true;
+                    } else if (event.getAction() == MotionEvent.ACTION_UP) {
+                        nativePeerGrabbedPointer = false;
+                    }
+                    return false;
+                }
+            }
+        }
+        */
+        
+        //if (nativePeerGrabbedPointer) {
+        //    return false;
+        //}
+        Component componentAt;
+        try {
+<span class="nc bnc" id="L567" title="All 2 branches missed.">            if (x == null) {</span>
+<span class="nc" id="L568">                componentAt = this.implementation.getCurrentForm().getComponentAt((int)event.getX(), (int)event.getY());</span>
+            } else {
+<span class="nc" id="L570">                componentAt = this.implementation.getCurrentForm().getComponentAt((int)x[0], (int)y[0]);</span>
+            }
+<span class="nc" id="L572">        } catch (Throwable t) {</span>
+            // Since this is is an EDT violation, we may get an exception
+            // Just consume it
+<span class="nc" id="L575">            componentAt = null;</span>
+<span class="nc" id="L576">        }</span>
+<span class="nc" id="L577">        boolean isPeer = (componentAt instanceof PeerComponent);</span>
+<span class="nc bnc" id="L578" title="All 2 branches missed.">        if (isPeer) {</span>
+<span class="nc bnc" id="L579" title="All 2 branches missed.">            int primaryX = x == null ? (int) event.getX() : x[0];</span>
+<span class="nc bnc" id="L580" title="All 2 branches missed.">            int primaryY = y == null ? (int) event.getY() : y[0];</span>
+<span class="nc bnc" id="L581" title="All 2 branches missed.">            isPeer = !Sheet.isSheetVisibleAt(primaryX, primaryY);</span>
+        }
+<span class="nc bnc" id="L583" title="All 4 branches missed.">        boolean consumeEvent = !isPeer || cn1GrabbedPointer;</span>
+    
+<span class="nc bnc" id="L585" title="All 5 branches missed.">        switch (event.getAction()) {</span>
+            case MotionEvent.ACTION_DOWN:
+<span class="nc bnc" id="L587" title="All 2 branches missed.">                if (x == null) {</span>
+<span class="nc" id="L588">                    this.implementation.pointerPressed((int) event.getX(), (int) event.getY());</span>
+                } else {
+<span class="nc" id="L590">                    this.implementation.pointerPressed(x, y);</span>
+                }
+<span class="nc bnc" id="L592" title="All 2 branches missed.">                if (!isPeer) cn1GrabbedPointer = true;</span>
+                break;
+            case MotionEvent.ACTION_UP:
+<span class="nc bnc" id="L595" title="All 2 branches missed.">                if (x == null) {</span>
+<span class="nc" id="L596">                    this.implementation.pointerReleased((int) event.getX(), (int) event.getY());</span>
+                } else {
+<span class="nc" id="L598">                    this.implementation.pointerReleased(x, y);</span>
+                }
+<span class="nc" id="L600">                cn1GrabbedPointer = false;</span>
+<span class="nc" id="L601">                break;</span>
+            case MotionEvent.ACTION_CANCEL:
+<span class="nc" id="L603">                cn1GrabbedPointer = false;</span>
+<span class="nc" id="L604">                break;</span>
+            case MotionEvent.ACTION_MOVE:
+<span class="nc bnc" id="L606" title="All 2 branches missed.">                if (x == null) {</span>
+<span class="nc" id="L607">                    this.implementation.pointerDragged((int) event.getX(), (int) event.getY());</span>
+                } else {
+<span class="nc" id="L609">                    this.implementation.pointerDragged(x, y);</span>
+                }
+                break;
+        }
+
+<span class="nc" id="L614">        return consumeEvent;</span>
+    }
+
+    public AndroidGraphics getGraphics() {
+<span class="nc" id="L618">        return buffy;</span>
+    }
+
+    public int getViewHeight() {
+<span class="nc" id="L622">        return height;</span>
+    }
+
+    public int getViewWidth() {
+<span class="nc" id="L626">        return width;</span>
+    }
+
+    public Rect getSafeArea() {
+<span class="fc" id="L630">        return safeArea;</span>
+    }
+
+    public void setInputType(EditorInfo editorInfo) {
+
+        /**
+         * do not use the enter key to fire some kind of action!
+         */
+//        editorInfo.imeOptions |= EditorInfo.IME_ACTION_NONE;
+<span class="nc" id="L639">        Component txtCmp = Display.getInstance().getCurrent().getFocused();</span>
+<span class="nc bnc" id="L640" title="All 4 branches missed.">        if (txtCmp != null &amp;&amp; txtCmp instanceof TextArea) {</span>
+<span class="nc" id="L641">            TextArea txt = (TextArea) txtCmp;</span>
+<span class="nc bnc" id="L642" title="All 2 branches missed.">            if (txt.isSingleLineTextArea()) {</span>
+<span class="nc" id="L643">                editorInfo.imeOptions |= EditorInfo.IME_ACTION_DONE;</span>
+
+            } else {
+<span class="nc" id="L646">                editorInfo.imeOptions |= EditorInfo.IME_ACTION_NONE;</span>
+            }
+<span class="nc" id="L648">            int inputType = 0;</span>
+<span class="nc" id="L649">            int constraint = txt.getConstraint();</span>
+<span class="nc bnc" id="L650" title="All 2 branches missed.">            if ((constraint &amp; TextArea.PASSWORD) == TextArea.PASSWORD) {</span>
+<span class="nc" id="L651">                constraint = constraint ^ TextArea.PASSWORD;</span>
+            }
+<span class="nc bnc" id="L653" title="All 6 branches missed.">            switch (constraint) {</span>
+                case TextArea.NUMERIC:
+<span class="nc" id="L655">                    inputType = EditorInfo.TYPE_CLASS_NUMBER | EditorInfo.TYPE_NUMBER_FLAG_SIGNED;</span>
+<span class="nc" id="L656">                    break;</span>
+                case TextArea.DECIMAL:
+<span class="nc" id="L658">                    inputType = EditorInfo.TYPE_CLASS_NUMBER | EditorInfo.TYPE_NUMBER_FLAG_DECIMAL;</span>
+<span class="nc" id="L659">                    break;</span>
+                case TextArea.PHONENUMBER:
+<span class="nc" id="L661">                    inputType = EditorInfo.TYPE_CLASS_PHONE;</span>
+<span class="nc" id="L662">                    break;</span>
+                case TextArea.EMAILADDR:
+<span class="nc" id="L664">                    inputType = EditorInfo.TYPE_CLASS_TEXT | EditorInfo.TYPE_TEXT_VARIATION_EMAIL_ADDRESS;</span>
+<span class="nc" id="L665">                    break;</span>
+                case TextArea.URL:
+<span class="nc" id="L667">                    inputType = EditorInfo.TYPE_CLASS_TEXT | EditorInfo.TYPE_TEXT_VARIATION_URI;</span>
+<span class="nc" id="L668">                    break;</span>
+                default:
+<span class="nc" id="L670">                    inputType = EditorInfo.TYPE_CLASS_TEXT;</span>
+                    break;
+
+            }
+
+<span class="nc" id="L675">            editorInfo.inputType = inputType;</span>
+        }
+<span class="nc" id="L677">    }</span>
+
+    
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
