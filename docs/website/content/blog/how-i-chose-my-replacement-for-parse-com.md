@@ -6,7 +6,7 @@ original_url: https://www.codenameone.com/blog/how-i-chose-my-replacement-for-pa
 aliases:
 - /blog/how-i-chose-my-replacement-for-parse-com.html
 date: '2016-07-19'
-author: Shai Almog
+author: Chidi Akwudire
 ---
 
 ![Header Image](/blog/how-i-chose-my-replacement-for-parse-com/parse.com-post-header.jpg)

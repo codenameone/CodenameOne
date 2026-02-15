@@ -24,7 +24,7 @@ Have you ever noticed how iOS apps start almost instantly in comparison to Andro
   
 There is a trick to that. iOS applications have a file traditionally called Default.png that includes a 320×480 pixel image of the first screen of the application. So you are treated to an “illusion” of the application instantly coming to life and filling up with data, this is pretty cool on the surface but is a source to no end of trouble in iOS and becomes a huge hassle. 
 
-Initially this was a pretty clever workaround then Apple introduced the retina display 640×960 so you needed to add a [[email protected]](/cdn-cgi/l/email-protection) file then it added the iPad, iPad Retina and iPhone 5 (which is slightly higher resolution), to make matters worse iPad apps can be launched in landscape mode so that’s two more resolutions for the horizontal orientation iPad. Overall as of this writing (or until Apple adds more resolutions) we need 7 screenshots for a typical iOS app!
+Initially this was a pretty clever workaround then Apple introduced the retina display 640×960 so you needed to add a `Default@2x.png` file then it added the iPad, iPad Retina and iPhone 5 (which is slightly higher resolution), to make matters worse iPad apps can be launched in landscape mode so that’s two more resolutions for the horizontal orientation iPad. Overall as of this writing (or until Apple adds more resolutions) we need 7 screenshots for a typical iOS app!
 
 iOS developers literally run their applications 7 times with blank data to grab these screenshots every time they change something in the first form of their application! 
 
