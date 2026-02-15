@@ -577,6 +577,9 @@
                                             <arg value="${project.build.directory}/generated-sources/project"/>
                                             <arg value="force" />
                                         </java>
+                                        <copy file="${maven.multiModuleProjectDirectory}/CodeNameOneBuildClient.jar"
+                                              tofile="${user.home}/.codenameone/CodeNameOneBuildClient.jar"
+                                              overwrite="true"/>
                                     </target>
                                 </configuration>
                             </execution>
