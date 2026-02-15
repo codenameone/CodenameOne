@@ -72,20 +72,22 @@ jobs:
           WEBSITE_INCLUDE_JAVADOCS: "true"
           WEBSITE_INCLUDE_DEVGUIDE: "true"
 
-      - name: Lint internal links and images
+      - name: Lint markdown links and static images
         run: |
           set -euo pipefail
-          python3 scripts/website/lint_site_links.py \
-            --site-dir docs/website/public \
+          python3 scripts/website/lint_markdown_links.py \
+            --content-root docs/website/content \
+            --static-root docs/website/static \
+            --redirects-file docs/website/static/_redirects \
             --max-log-errors 300 \
-            --report-file docs/website/reports/link-lint-report.txt
+            --report-file docs/website/reports/markdown-link-lint-report.txt
 
-      - name: Upload link lint report
+      - name: Upload markdown link lint report
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: link-lint-report
-          path: docs/website/reports/link-lint-report.txt
+          name: markdown-link-lint-report
+          path: docs/website/reports/markdown-link-lint-report.txt
           if-no-files-found: ignore
 
       - name: Audit source URLs (absolute/WordPress)
