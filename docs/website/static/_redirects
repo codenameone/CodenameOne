@@ -9,6 +9,8 @@
 /files/CN1Libs.xml/ https://raw.githubusercontent.com/codenameone/CodenameOneLibs/refs/heads/master/CN1Libs.xml 302
 /files/cn1libs/:filename.cn1lib https://github.com/codenameone/CodenameOneLibs/raw/refs/heads/master/cn1libs/:filename.cn1lib 302
 /files/CodeNameOneBuildClient.jar https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar 302
+/files/* https://download.codenameone.com/files/:splat 302
+/demos/* https://download.codenameone.com/demos/:splat 302
 
 # Demo URL migrations (legacy WordPress -> current demo-* naming)
 /demo.html/ /demos/ 301!
