@@ -27,20 +27,20 @@ If you read the article about the
 you might have wondered whether you can just supply these screenshots yourself? 
 
 Well, now you can. Our build server will now generate the screenshots only if they don’t already exist in the jar so you will need to create the right png images in the exact resolutions mentioned below:  
-  
-Default.png – 320×480  
-  
-[[email protected]](/cdn-cgi/l/email-protection) – 640×960  
-  
-[[email protected]](/cdn-cgi/l/email-protection) – 630×1136  
-  
-Default-Portrait.png – 768×1024  
-  
-Default-Landscape.png – 1024×768  
-  
-[[email protected]](/cdn-cgi/l/email-protection) – 1536×2048  
-  
-[[email protected]](/cdn-cgi/l/email-protection) – 2048×1536
+
+`Default.png` – 320×480
+
+`Default@2x.png` – 640×960
+
+`Default-568h@2x.png` – 630×1136
+
+`Default-Portrait.png` – 768×1024
+
+`Default-Landscape.png` – 1024×768
+
+`Default-Portrait@2x.png` – 1536×2048
+
+`Default-Landscape@2x.png` – 2048×1536
 
 Notice that the names are case sensitive and the resolutions must match the numbers above.
 

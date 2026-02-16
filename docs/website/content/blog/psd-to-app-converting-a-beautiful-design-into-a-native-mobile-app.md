@@ -302,7 +302,8 @@ While the tech talk was centered around the tutorial, it also provided a forum f
 
 ## Do You Want to Share?
 
-As these webinars will be happening every two weeks, I’d like to make some time for members of the community to talk about things that they’ve been working on. Have you developed something in Codename One that you want to share with the community? Drop me an email ([[email protected]](/cdn-cgi/l/email-protection#80f3f4e5f6e5aee8e1eeeee1e8c0e3efe4e5eee1ede5efeee5aee3efed)) and let me know your idea, and I’ll try to prepare a slot in an upcoming webinar for you to talk about it.
+As these webinars will be happening every two weeks, I’d like to make some time for members of the community to talk about things that they’ve been working on. Have you developed something in Codename One that you want to share with the community? 
+
 ---
 
 ## Archived Comments

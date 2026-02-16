@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **[email protected]** — December 26, 2020 at 2:56 pm ([permalink](/blog/a-junior-software-developers-journey-at-codename-one/#comment-24368))
 
-> [[email protected]](/cdn-cgi/l/email-protection) says:
+> javierantonf says:
 >
 > Looking forward to having an extra hand on CN1, Sergey. Welcome 🙂
 >

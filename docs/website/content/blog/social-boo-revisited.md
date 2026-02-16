@@ -136,18 +136,21 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > Thanks I see the bug. Unfortunately the only workaround I can see for now is to edit the .GUI file by hand and deleting this block:  
-> <custom name=”icons” type=”com.codename1.ui.Image” array=”true” dimensions=”1″>  
-> <str>[[email protected]](/cdn-cgi/l/email-protection)</str>  
-> <str>[[email protected]](/cdn-cgi/l/email-protection)</str>  
-> <str>[[email protected]](/cdn-cgi/l/email-protection)</str>  
-> <str>[[email protected]](/cdn-cgi/l/email-protection)</str>  
-> </custom>  
-> <custom name=”selectedIcons” type=”com.codename1.ui.Image” array=”true” dimensions=”1″>  
-> <str>friends@2x_sel.png</str>  
-> <str>chats@2x_sel.png</str>  
-> <str>send-email@2x_sel.png</str>  
-> <str>settings@2x_sel.png</str>  
-> </custom>
+> 
+```
+<custom name=”icons” type=”com.codename1.ui.Image” array=”true” dimensions=”1″>
+<str>friends@2x.png</str>
+<str>chats@2x.png</str>
+<str>send-email@2x.png</str>
+<str>settings@2x.png</str>
+</custom>
+<custom name=”selectedIcons” type=”com.codename1.ui.Image” array=”true” dimensions=”1″>
+<str>friends@2x_sel.png</str>
+<str>chats@2x_sel.png</str>
+<str>send-email@2x_sel.png</str>
+<str>settings@2x_sel.png</str>
+</custom>
+```
 >
 > We’ve committed a fix for this but because it needs a plugin update it might take a couple of weeks to release it as it’s a longer cycle than the typical library cycle.
 >
