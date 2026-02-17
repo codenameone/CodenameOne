@@ -22,33 +22,21 @@
  */
 package com.codename1.ui.util.xml;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
 
 /**
  * Parsed XML data
  *
  * @author Shai Almog
  */
-@XmlRootElement(name="theme")
-@XmlAccessorType(XmlAccessType.FIELD)
 public class Theme {
-    @XmlAttribute
     private String name;
     
-    @XmlElement
     private Val[] val;
 
-    @XmlElement
     private Gradient[] gradient;
 
-    @XmlElement
     private Font[] font;
 
-    @XmlElement
     private Border[] border;
 
     /**
@@ -84,5 +72,25 @@ public class Theme {
      */
     public Border[] getBorder() {
         return border;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setVal(Val[] val) {
+        this.val = val;
+    }
+
+    public void setGradient(Gradient[] gradient) {
+        this.gradient = gradient;
+    }
+
+    public void setFont(Font[] font) {
+        this.font = font;
+    }
+
+    public void setBorder(Border[] border) {
+        this.border = border;
     }
 }

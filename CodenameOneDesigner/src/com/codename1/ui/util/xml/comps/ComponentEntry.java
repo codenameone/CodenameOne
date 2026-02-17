@@ -24,313 +24,208 @@
 package com.codename1.ui.util.xml.comps;
 
 import java.util.List;
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
 
 /**
  * XML representation for a component in the UI tree
  *
  * @author Shai Almog
  */
-@XmlRootElement(name="component")
-@XmlAccessorType(XmlAccessType.FIELD)
 public class ComponentEntry {
-    @XmlAttribute
     private String name;
 
-    @XmlElement
     private Custom[] custom;
     
-    @XmlElement 
     private LayoutConstraint layoutConstraint;
     
-    @XmlElement 
     private ComponentEntry[] component;
 
-    @XmlElement
     private StringEntry[] stringItem;
     
-    @XmlElement
     private MapItems[] mapItems;
     
-    @XmlAttribute
     private String type;
 
-    @XmlAttribute
     private String baseForm;
 
-    @XmlAttribute
     private String cloudBoundProperty;
 
-    @XmlAttribute
     private String cloudDestinationProperty;
 
-    @XmlAttribute
     private String embed;
 
-    @XmlAttribute
     private String uiid;
 
-    @XmlAttribute
     private Boolean focusable;
 
-    @XmlAttribute
     private Boolean enabled;
 
-    @XmlAttribute
     private Boolean rtl;
 
-    @XmlAttribute
     private Boolean scrollVisible;
 
-    @XmlAttribute
     private Boolean tensileDragEnabled;
 
-    @XmlAttribute
     private Boolean tactileTouch;
 
-    @XmlAttribute
     private Boolean snapToGrid;
 
-    @XmlAttribute
     private Boolean flatten;
 
-    @XmlAttribute
     private Boolean scrollableX;
 
-    @XmlAttribute
     private Boolean scrollableY;
 
-    @XmlAttribute
     private Integer tabPlacement;
 
-    @XmlAttribute
     private Integer tabTextPosition;
 
-    @XmlAttribute
     private String tabTitle;
 
-    @XmlAttribute
     private String layout;
 
-    @XmlAttribute
     private Boolean flowLayoutFillRows;
 
-    @XmlAttribute
     private Integer flowLayoutAlign;
 
-    @XmlAttribute
     private Integer flowLayoutValign;
     
-    @XmlAttribute
     private Boolean borderLayoutAbsoluteCenter;
 
-    @XmlAttribute
     private String borderLayoutSwapNorth;
     
-    @XmlAttribute
     private String borderLayoutSwapEast;
 
-    @XmlAttribute
     private String borderLayoutSwapWest;
 
-    @XmlAttribute
     private String borderLayoutSwapSouth;
 
-    @XmlAttribute
     private String borderLayoutSwapCenter;
 
-    @XmlAttribute
     private Integer gridLayoutRows;
 
-    @XmlAttribute
     private Integer gridLayoutColumns;
 
-    @XmlAttribute
     private String boxLayoutAxis;
 
-    @XmlAttribute
     private Integer tableLayoutRows;
 
-    @XmlAttribute
     private Integer tableLayoutColumns;
 
-    @XmlAttribute
     private String nextForm;
 
-    @XmlAttribute
     private String title;
 
-    @XmlAttribute
     private Boolean cyclicFocus;
 
-    @XmlAttribute
     private String dialogUIID;
 
-    @XmlAttribute
     private Boolean disposeWhenPointerOutOfBounds;
 
-    @XmlAttribute
     private String dialogPosition;
 
-    @XmlElement
     private CommandEntry[] command;
 
-    @XmlAttribute
     private String selectedRenderer;
     
-    @XmlAttribute
     private String unselectedRenderer;
 
-    @XmlAttribute
     private String selectedRendererEven;
 
-    @XmlAttribute
     private String unselectedRendererEven;
 
-    @XmlAttribute
     private String text;
 
-    @XmlAttribute
     private Integer alignment;
 
-    @XmlAttribute
     private String icon;
 
-    @XmlAttribute
     private String rolloverIcon;
     
-    @XmlAttribute
     private String pressedIcon;
     
-    @XmlAttribute
     private String disabledIcon;
 
-    @XmlAttribute
     private Boolean toggle;
 
-    @XmlAttribute
     private Boolean editable;
 
-    @XmlAttribute
     private Boolean infinite;
 
-    @XmlAttribute
     private String thumbImage;
 
-    @XmlAttribute
     private Integer progress;
 
-    @XmlAttribute
     private Boolean vertical;
 
-    @XmlAttribute
     private Integer increments;
 
-    @XmlAttribute
     private Integer maxValue;
 
-    @XmlAttribute
     private Integer minValue;
 
-    @XmlAttribute
     private Boolean renderPercentageOnTop;
 
-    @XmlAttribute
     private String group;
 
-    @XmlAttribute
     private Boolean selected;
 
-    @XmlAttribute
     private Integer gap;
 
-    @XmlAttribute
     private Integer verticalAlignment;
 
-    @XmlAttribute
     private Integer textPosition;
 
-    @XmlAttribute
     private Boolean growByContent;
 
-    @XmlAttribute
     private Integer constraint;
 
-    @XmlAttribute
     private Integer maxSize;
 
-    @XmlAttribute
     private String hint;
 
-    @XmlAttribute
     private String hintIcon;
 
-    @XmlAttribute
     private Integer columns;
 
-    @XmlAttribute
     private Integer rows;
 
-    @XmlAttribute
     private Integer itemGap;
 
-    @XmlAttribute
     private Integer fixedSelection;
 
-    @XmlAttribute
     private Integer orientation;
 
-    @XmlAttribute
     private String labelFor;
     
-    @XmlAttribute
     private String leadComponent;
     
-    @XmlAttribute
     private String nextFocusDown;
     
-    @XmlAttribute
     private String nextFocusUp;
     
-    @XmlAttribute
     private String nextFocusLeft;
     
-    @XmlAttribute
     private String nextFocusRight;
     
     
-    @XmlAttribute
     private String commandName;
     
-    @XmlAttribute
     private String commandIcon;
     
-    @XmlAttribute
     private String commandRolloverIcon;
     
-    @XmlAttribute
     private String commandPressedIcon;
     
-    @XmlAttribute
     private String commandDisabledIcon;
     
-    @XmlAttribute
     private Integer commandId;
     
-    @XmlAttribute
     private String commandAction;
     
-    @XmlAttribute
     private String commandArgument;
     
-    @XmlAttribute
     private Boolean commandBack;
 
-    @XmlAttribute
     private String clientProperties;
     
     /**

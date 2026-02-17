@@ -22,45 +22,29 @@
  */
 package com.codename1.ui.util.xml;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
 
 /**
  * Parsed XML data
  *
  * @author Shai Almog
  */
-@XmlRootElement(name="font")
-@XmlAccessorType(XmlAccessType.FIELD)
 public class Font {
-    @XmlAttribute
     private String key;
 
-    @XmlAttribute
     private String type;
     
-    @XmlAttribute
     private String name;
 
-    @XmlAttribute
     private Integer face;
 
-    @XmlAttribute
     private Integer style;
 
-    @XmlAttribute
     private Integer size;
 
-    @XmlAttribute
     private String family;
 
-    @XmlAttribute
     private Integer sizeSettings;
 
-    @XmlAttribute
     private Float actualSize;
 
     /**
@@ -124,5 +108,41 @@ public class Font {
      */
     public Float getActualSize() {
         return actualSize;
+    }
+
+    public void setKey(String key) {
+        this.key = key;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setFace(Integer face) {
+        this.face = face;
+    }
+
+    public void setStyle(Integer style) {
+        this.style = style;
+    }
+
+    public void setSize(Integer size) {
+        this.size = size;
+    }
+
+    public void setFamily(String family) {
+        this.family = family;
+    }
+
+    public void setSizeSettings(Integer sizeSettings) {
+        this.sizeSettings = sizeSettings;
+    }
+
+    public void setActualSize(Float actualSize) {
+        this.actualSize = actualSize;
     }
 }

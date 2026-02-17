@@ -22,24 +22,15 @@
  */
 package com.codename1.ui.util.xml;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
 
 /**
  * Parsed XML data
  *
  * @author Shai Almog
  */
-@XmlRootElement(name="entry")
-@XmlAccessorType(XmlAccessType.FIELD)
 public class Entry {
-    @XmlAttribute
     private String key;
     
-    @XmlAttribute
     private String value;
 
     /**
@@ -54,5 +45,13 @@ public class Entry {
      */
     public String getValue() {
         return value;
+    }
+
+    public void setKey(String key) {
+        this.key = key;
+    }
+
+    public void setValue(String value) {
+        this.value = value;
     }
 }

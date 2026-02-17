@@ -22,26 +22,17 @@
  */
 package com.codename1.ui.util.xml;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlRootElement;
 
 /**
  * Parsed XML data
  *
  * @author Shai Almog
  */
-@XmlRootElement(name="image")
-@XmlAccessorType(XmlAccessType.FIELD)
 public class Image {
-    @XmlAttribute
     private String name;
 
-    @XmlAttribute
     private String baseUrl;
     
-    @XmlAttribute
     private String type;
 
     /**
@@ -63,5 +54,17 @@ public class Image {
      */
     public String getType() {
         return type;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setBaseUrl(String baseUrl) {
+        this.baseUrl = baseUrl;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 }

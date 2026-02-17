@@ -22,36 +22,23 @@
  */
 package com.codename1.ui.util.xml;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
 
 /**
  * Parsed XML data
  *
  * @author Shai Almog
  */
-@XmlRootElement(name="gradient")
-@XmlAccessorType(XmlAccessType.FIELD)
 public class Gradient {
-    @XmlAttribute
     private String key;
     
-    @XmlAttribute
     private Integer color1;
 
-    @XmlAttribute
     private Integer color2;
 
-    @XmlAttribute
     private Float posX;
     
-    @XmlAttribute
     private Float posY;
 
-    @XmlAttribute
     private Float radius;
 
     /**
@@ -94,5 +81,29 @@ public class Gradient {
      */
     public Float getRadius() {
         return radius;
+    }
+
+    public void setKey(String key) {
+        this.key = key;
+    }
+
+    public void setColor1(Integer color1) {
+        this.color1 = color1;
+    }
+
+    public void setColor2(Integer color2) {
+        this.color2 = color2;
+    }
+
+    public void setPosX(Float posX) {
+        this.posX = posX;
+    }
+
+    public void setPosY(Float posY) {
+        this.posY = posY;
+    }
+
+    public void setRadius(Float radius) {
+        this.radius = radius;
     }
 }

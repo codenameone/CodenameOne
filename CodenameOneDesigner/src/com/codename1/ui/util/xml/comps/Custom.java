@@ -23,53 +23,34 @@
 
 package com.codename1.ui.util.xml.comps;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
 
 /**
  *
  * @author Shai Almog
  */
-@XmlRootElement(name="custom")
-@XmlAccessorType(XmlAccessType.FIELD)
 public class Custom {
-    @XmlAttribute
     private String name;
 
-    @XmlAttribute
     private String type;
 
-    @XmlAttribute
     private int dimensions;
 
-    @XmlAttribute
     private String value;
     
-    @XmlElement
     private StringEntry[] str;
     
-    @XmlElement
     private ArrayEntry[] arr;
     
-    @XmlAttribute
     private String selectedRenderer;
     
-    @XmlAttribute
     private String unselectedRenderer;
 
-    @XmlAttribute
     private String selectedRendererEven;
 
-    @XmlAttribute
     private String unselectedRendererEven;
 
-    @XmlElement
     private MapItems[] mapItems;
 
-    @XmlElement
     private StringEntry[] stringItem;
 
     /**

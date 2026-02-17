@@ -23,44 +23,28 @@
 
 package com.codename1.ui.util.xml.comps;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlValue;
 
 /**
  *
  * @author Shai Almog
  */
-@XmlRootElement(name="command")
-@XmlAccessorType(XmlAccessType.FIELD)
 public class CommandEntry {
-    @XmlAttribute
     private String name;
     
-    @XmlAttribute
     private String icon;
     
-    @XmlAttribute
     private String rolloverIcon;
     
-    @XmlAttribute
     private String pressedIcon;
     
-    @XmlAttribute
     private String disabledIcon;
     
-    @XmlAttribute
     private int id;
     
-    @XmlAttribute
     private String action;
     
-    @XmlAttribute
     private String argument;
     
-    @XmlAttribute
     private boolean backCommand;
 
     /**
