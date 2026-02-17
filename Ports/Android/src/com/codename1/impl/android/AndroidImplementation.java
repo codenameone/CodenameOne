@@ -1569,12 +1569,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public boolean minimizeApplication() {
+        Activity activity = getActivity();
+        if (activity != null) {
+            // Move the app task to background instead of explicitly launching HOME.
+            // Some OEM launchers are no longer exported and can throw SecurityException
+            // when invoked via an ACTION_MAIN/CATEGORY_HOME intent.
+            if (activity.moveTaskToBack(true)) {
+                return true;
+            }
+        }
+
+        // Fallback for edge-cases where there is no active activity/task.
         Intent startMain = new Intent(Intent.ACTION_MAIN);
         startMain.addCategory(Intent.CATEGORY_HOME);
         startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startMain.putExtra("WaitForResult", Boolean.FALSE);
-        getContext().startActivity(startMain);
-        return true;
+        try {
+            getContext().startActivity(startMain);
+            return true;
+        } catch (SecurityException ex) {
+            Log.e("Codename One", "Unable to minimize application", ex);
+            return false;
+        }
     }
 
     @Override
