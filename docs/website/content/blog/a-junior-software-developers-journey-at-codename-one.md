@@ -35,7 +35,7 @@ I barely wrote 100 lines of code (not the best ones). Even worst than that, I fe
 
 ### What Really Helped?
 
-I found the [Codename One developer guide](/developer-guide/) to be the best learning resource. It’s great for learning your way around the tool and understanding its components. 
+I found the [Codename One developer guide](/developer-guide) to be the best learning resource. It’s great for learning your way around the tool and understanding its components. 
 
 In the [How Do I](/how-do-i/) section I found some very helpful video tutorials that also helped a lot with learning common use cases, like the [Layout basics](/how_di_i/how-do-i-positioning-components-using-layout-managers/) video, and the [How to convert a PSD Design into a Native Mobile App](/video/how-to-convert-a-psd-design-into-a-native-mobile-app/). 
 

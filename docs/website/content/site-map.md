@@ -18,7 +18,7 @@ Use this page to quickly navigate the most important parts of the Codename One w
 
 ## Documentation
 
-- [Developer Guide (HTML)](/developer-guide/)
+- [Developer Guide (HTML)](/developer-guide)
 - [Developer Guide (PDF)](/files/developer-guide.pdf)
 - [JavaDocs](/javadoc/)
 - [API Overview](/api/)
