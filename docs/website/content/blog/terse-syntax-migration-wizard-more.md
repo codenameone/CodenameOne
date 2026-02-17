@@ -20,7 +20,7 @@ migration wizard for the new GUI builder & dialog adaptive sizing.
 Codename One is slightly verbose. In part its due to Java’s tradition of verbosity but some of that comes from  
 the fact that we never considered terse to be a virtue. Obviously a lot of developers disagree with that notion  
 and would like shorter syntax, which does have a point…  
-One such small modification of the “why didn’t we do this sooner” variety is new methods we added to container  
+One such small modification of the "why didn’t we do this sooner" variety is new methods we added to container  
 that are shorter (`add` instead of `addComponent`) but also return the `Container`  
 instance thus allowing chaining. E.g. this is taken directly from the KitchenSink’s input demo: 
     
@@ -77,9 +77,9 @@ That’s pretty verbose and ridden with boilerplate code. So we shortened this s
 #### Dialog Adaptive Sizing
 
 Dialogs in Codename One are forms that show the previous form as a background. This causes some confusion  
-since developers often think of them as standard OS “windows” which isn’t the case at all…   
+since developers often think of them as standard OS "windows" which isn’t the case at all…   
 We position the dialog by padding the dialog body from the sides to move it into the right place and for most  
-standard dialogs we “auto calculate” this margin based on the preferred size of the dialogs content. This is  
+standard dialogs we "auto calculate" this margin based on the preferred size of the dialogs content. This is  
 all great until we want to change something with the content of the dialog…. 
 
 We normally try to discourage people from building complex UI’s into a dialogs body but sometimes this is  

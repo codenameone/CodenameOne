@@ -204,7 +204,7 @@ You will notice we mapped auto-increment so we will generally try to map things 
 
 ##### Caching/Collision
 
-As mentioned above, we don’t cache anything and there might be a collision if you select the same object twice you will get two separate instances that might collide if you update both (one will “win”).
+As mentioned above, we don’t cache anything and there might be a collision if you select the same object twice you will get two separate instances that might collide if you update both (one will "win").
 
 That means you need to pay attention to the way you cache objects to avoid a case of a modified version of an object kept with an older version.
 
@@ -279,8 +279,8 @@ We can easily build a UI that would allow us to edit the `Contact` property in m
 __**1** | Notice I use the label of the property which allows better encapsulation  
 ---|---  
 __**2** | We can bind picker seamlessly  
-__**3** | We can bind multiple radio buttons to a single property to allow the user to select the gender, notice that labels and values can be different e.g. “Male” selection will translate to “M” as the value  
-__**4** | Numeric bindings “just work”  
+__**3** | We can bind multiple radio buttons to a single property to allow the user to select the gender, notice that labels and values can be different e.g. "Male" selection will translate to "M" as the value  
+__**4** | Numeric bindings "just work"  
   
 ![Properties form for the contact](/blog/properties-are-amazing/properties-demo-binding.png)
 
@@ -290,19 +290,19 @@ Figure 1. Properties form for the contact
 
 I skipped a couple of fact about the `bind()` method. It has an additional version that accepts a `ComponentAdapter` which allows you to adapt the binding to any custom 3rd party component. That’s a bit advanced for now but I might discuss this later.
 
-However, the big thing I “skipped” was the return value…​ `bind` returns a `UiBinding.Binding` object when performing the bind. This object allows us to manipulate aspects of the binding specifically unbind a component and also manipulate auto commit for a specific binding.
+However, the big thing I "skipped" was the return value…​ `bind` returns a `UiBinding.Binding` object when performing the bind. This object allows us to manipulate aspects of the binding specifically unbind a component and also manipulate auto commit for a specific binding.
 
-Auto commit determines if a property is changed instantly or on `commit`. This is useful for a case where we have an “OK” button and want the changes to the UI to update the properties only when “OK” is pressed (this might not matter if you keep different instances of the object). When auto-commit is on (the default which you can change via `setAutoCommit` in the `UiBinding`) changes reflect instantly, when it’s off you need to explicitly call `commit()` or `rollback()` on the `Binding` class.
+Auto commit determines if a property is changed instantly or on `commit`. This is useful for a case where we have an "OK" button and want the changes to the UI to update the properties only when "OK" is pressed (this might not matter if you keep different instances of the object). When auto-commit is on (the default which you can change via `setAutoCommit` in the `UiBinding`) changes reflect instantly, when it’s off you need to explicitly call `commit()` or `rollback()` on the `Binding` class.
 
-`commit()` applies the changes in the UI to the properties, `rollback()` restores the UI to the values from the properties object (useful for a “reset changes” button).
+`commit()` applies the changes in the UI to the properties, `rollback()` restores the UI to the values from the properties object (useful for a "reset changes" button).
 
-Binding also includes the ability to “unbind” this is important if you have a global object that’s bound to a UI that’s discarded. Binding might hold a hard reference to the UI and the property object might create a memory leak.
+Binding also includes the ability to "unbind" this is important if you have a global object that’s bound to a UI that’s discarded. Binding might hold a hard reference to the UI and the property object might create a memory leak.
 
 By using the `disconnect()` method in `Binding` we can separate the UI from the object and allow the GC to cleanup.
 
 #### UI Generation
 
-Up until now this was pretty cool but if you looked at the UI construction code above you would see that it’s pretty full of boilerplate code. The thing about boilerplate is that it shows where automation can be applied, that’s the exact idea behind the magical “InstantUI” class. This means that the UI above can be generated using this code:
+Up until now this was pretty cool but if you looked at the UI construction code above you would see that it’s pretty full of boilerplate code. The thing about boilerplate is that it shows where automation can be applied, that’s the exact idea behind the magical "InstantUI" class. This means that the UI above can be generated using this code:
     
     
     InstantUI iui = new InstantUI();
@@ -314,7 +314,7 @@ Up until now this was pretty cool but if you looked at the UI construction code 
 __**1** | The id property is useful for database storage but we want to exclude it from the UI  
 ---|---  
 __**2** | This implements the `gender` toggle button selection, we provide a hint to the UI so labels and values differ  
-__**3** | We create the UI from the screenshot above with one line and it’s seamlessly bound to the properties of myContact. The second argument indicates the “auto commit” status.  
+__**3** | We create the UI from the screenshot above with one line and it’s seamlessly bound to the properties of myContact. The second argument indicates the "auto commit" status.  
   
 This still carries most of the flexibilities of the regular binding e.g. I can still get a binding object using:
     
@@ -332,12 +332,12 @@ The picker component implicitly works for date type properties, numeric constrai
 
 But how do we know to use an email constraint for the email property?
 
-We have some special case defaults for some common property names, so if your property is named email it will use an email constraint by default. If it’s named url or password etc. it will do the “right thing” unless you explicitly state otherwise. You can customize the constraint for a specific property using something like:
+We have some special case defaults for some common property names, so if your property is named email it will use an email constraint by default. If it’s named url or password etc. it will do the "right thing" unless you explicitly state otherwise. You can customize the constraint for a specific property using something like:
     
     
     iui.setTextFieldConstraint(contact.email, TextArea.ANY);
 
-This will override the defaults we have in place. The goal of this tool is to have sensible “magical” defaults that “just work” so if you can think of other cases like this that make sense let us know!  
+This will override the defaults we have in place. The goal of this tool is to have sensible "magical" defaults that "just work" so if you can think of other cases like this that make sense let us know!  
 email?
 
 ### The Code & Final Word
@@ -347,7 +347,7 @@ You can check out the code from this article [here](https://github.com/codenameo
 I could go on, last time I discussed parsing (which is also seamless to/from JSON/XML) and there are many other features worth discussing. I can also go deeper into how this is all implemented and some of the history of this feature (it predated LWUIT, I started working on this back in 2005)…​
 
 These will have to wait for another time and post when I can go more thoroughly into them or maybe I’ll do a video covering this. We used properties a lot in the bootcamp and so far I’m very happy that I brought them in.  
-I think we can take this feature much further than what we have above, I think this is the “tip of the iceberg” that can bring Codename One to levels of productivity/RAD that we haven’t seen. I’d love to get feedback on all of these and how we can improve properties so you can leverage them better in your apps!
+I think we can take this feature much further than what we have above, I think this is the "tip of the iceberg" that can bring Codename One to levels of productivity/RAD that we haven’t seen. I’d love to get feedback on all of these and how we can improve properties so you can leverage them better in your apps!
 ---
 
 ## Archived Comments
@@ -375,7 +375,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Sachin Shah says:
 >
-> The UI binding sounds amazing. Do you see this forming the basis of a “reactive” UI within CN1?
+> The UI binding sounds amazing. Do you see this forming the basis of a "reactive" UI within CN1?
 >
 
 
@@ -418,18 +418,18 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thank you for this article. I need some clarification, maybe I don’t understand how Java Generics are used with a Property. I’m in trouble with the Property syntax.
 >
 > Look at these two lines of code:  
-> public final Property<Date, Contact> dateOfBirth = new Property<>(“dateOfBirth”, Date.class);  
-> public final Property<String, Contact> gender = new Property<>(“gender”);
+> public final Property<Date, Contact> dateOfBirth = new Property<>("dateOfBirth", Date.class);  
+> public final Property<String, Contact> gender = new Property<>("gender");
 >
 > My questions:
 >
-> 1\. Why do you need to specify the “Contact” class inside the diamonds? Isn’t obvious that the Property dateOfBirth and the Property gender are referred to the parent class, that is Contact?
+> 1\. Why do you need to specify the "Contact" class inside the diamonds? Isn’t obvious that the Property dateOfBirth and the Property gender are referred to the parent class, that is Contact?
 >
-> 2\. Why do you need to pass “Date.class” in the Property constructor in the first row?
+> 2\. Why do you need to pass "Date.class" in the Property constructor in the first row?
 >
-> 3\. Why do you used Log.p(“My name is: ” + contact.get()); instead of Log.p(“My name is: ” + contact.name.get());?
+> 3\. Why do you used Log.p("My name is: " + contact.get()); instead of Log.p("My name is: " + contact.name.get());?
 >
-> 4\. Have “IntProperty<Contact>” or “Property<Integer,Contact>” the same meaning exactly?
+> 4\. Have "IntProperty<Contact>" or "Property<Integer,Contact>" the same meaning exactly?
 >
 
 
@@ -440,8 +440,8 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I saw the emails but I assumed you deleted the comments. disqus is sometimes annoying, sorry about that.
 >
-> 1\. Unfortunately there is no way to get the “parent” declaring I explained the need for this here: [https://www.codenameone.com…](</blog/properties/>)  
-> The only reason this is needed is for chained set calls e.g. MyObject m = new MyObject().dateOfBirth.set(date).gender.set(“M”);
+> 1\. Unfortunately there is no way to get the "parent" declaring I explained the need for this here: [https://www.codenameone.com…](</blog/properties/>)  
+> The only reason this is needed is for chained set calls e.g. MyObject m = new MyObject().dateOfBirth.set(date).gender.set("M");
 >
 > 2\. Erasure. Generics are syntactic sugar. They are removed during compile and we have no idea what they were during runtime where we might need them e.g. for things like database mapping. The default mapping is string so that works. That’s also why we added DoubleProperty, IntProperty etc.
 >

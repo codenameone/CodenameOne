@@ -141,7 +141,7 @@ Details
 
   * Fixed issue 955 : hamburger menu command not respecting enabled  
 
-  * Added ability to “inject” additional cookies into a connection request  
+  * Added ability to "inject" additional cookies into a connection request  
 
   * Fix for storage file names to be normalized  
 
@@ -203,7 +203,7 @@ Details
 
   * Fix for Issue 917 : Keyboard hide sometimes crashes on Android 4.3 – changed the SurfaceView to TextureView for SDK version > 18  
 
-  * Implementation of RFE 928: Add “Contains” operator for Expression Language Contributed by Eric Coolman  
+  * Implementation of RFE 928: Add "Contains" operator for Expression Language Contributed by Eric Coolman  
 
   * Fix for killAndWait which seems to have violated the EDT since its inception  
 
@@ -243,7 +243,7 @@ Details
 
   * Changed isTablet implementation to better detect tablets  
 
-  * Fixed bug in ImageIO.save() where the image was recycled too soon  
+  * Fixed bug in `ImageIO.save()` where the image was recycled too soon  
 
   * Fixed Capture to save the scaled versions with a .jpg extension to allow the gallery to identify the file and show a preview in the gallery  
 
@@ -257,7 +257,7 @@ Details
 
   * Fixed camera implementation based on issue 913  
 
-  * Updated capture to use the version of the ImageIO.save() method that accepts a file path to prevent out of memory errors  
+  * Updated capture to use the version of the `ImageIO.save()` method that accepts a file path to prevent out of memory errors  
 
   * Added support for non-cyclic flicking of the ImageViewer curtesy of Fabrício Carvalho Cabeça of Pumpop  
 
@@ -271,7 +271,7 @@ Details
 
   * Fixed several crashes related to images and image scaling  
 
-  * Added new Media API’s allowing the developer to pass various hints to the playing media. Currently the first batch of hints allow developers to manipulate the “now playing” screen in iOS  
+  * Added new Media API’s allowing the developer to pass various hints to the playing media. Currently the first batch of hints allow developers to manipulate the "now playing" screen in iOS  
 
   * Improved notify status bar to include hints including the ability for a non-dismissible notice, added the option to dismiss a notice manually  
 
@@ -281,7 +281,7 @@ Details
 
   * Fix for commands, two identical commands with different client properties would resolve as equal and only one of them will get added  
 
-  * Added an OSVer constant to Display.getProperties() to return the OS version  
+  * Added an OSVer constant to `Display.getProperties()` to return the OS version  
 
   * Fixed issue 911 NPE occurs in TextArea constructor when input text is null  
 
@@ -375,7 +375,7 @@ Details
 
   * Implemented RFE 855: Simulate internet connection cases. Simulator can now simulate slow connection and disconnected internet  
 
-  * Fixed issue 827 : disposing a web browser doesn’t “clear” it  
+  * Fixed issue 827 : disposing a web browser doesn’t "clear" it  
 
   * Improved the auto complete documentation and functionality to allow more dynamic data sets and asynchronous fetch  
 
@@ -541,7 +541,7 @@ Details
 
   * Added support for mirroring images to the reverse direction  
 
-  * Added “uncover” transition that is the opposite of the cover transition allowing a form to “slide out” after it covered the screen.  
+  * Added "uncover" transition that is the opposite of the cover transition allowing a form to "slide out" after it covered the screen.  
 
   * Fixed newline parsing in JSON  
 
@@ -553,11 +553,11 @@ Details
 
   * Fixed an encoding bug with Facebook login  
 
-  * Fixed issue 760: Media.getDuration() returning 0 instead of -1 when instance reads mp3 metadata  
+  * Fixed issue 760: `Media.getDuration()` returning 0 instead of -1 when instance reads mp3 metadata  
 
   * Fixed issue 761: Audio implementation for Media interface doesn’t keep the time when paused  
 
-  * Fixed issue 759 : Media.isPlaying() crashed on Android if media buffered the first bytes  
+  * Fixed issue 759 : `Media.isPlaying()` crashed on Android if media buffered the first bytes  
 
   * Border layout now disables scrolling when applied to a component to prevent a common mistake of placing a border layout on a scrollable container  
 
@@ -573,7 +573,7 @@ Details
 
   * Made multiple improvements to working with RSS’s in foreign languages and encodings  
 
-  * Removed synchronization from text area and made non-EDT code fail “gracefully”, this synchronization code is REALLY slow on iOS and since text area is used for multiline labels this was impacting performance  
+  * Removed synchronization from text area and made non-EDT code fail "gracefully", this synchronization code is REALLY slow on iOS and since text area is used for multiline labels this was impacting performance  
 
   * Changed text area to optimize it for scrolling speed, it would constantly revalidate for no reason  
 
@@ -593,7 +593,7 @@ Details
 
   * Fixed major bug in StringUtil’s tokenization feature  
 
-  * Fixed issue 733: NetworkManager.getInstance().killAndWait(request) freezes Device and simulator  
+  * Fixed issue 733: `NetworkManager.getInstance().killAndWait(request)` freezes Device and simulator  
 
   * Fixed issue 740 : NullPointerException in openImageGallery on simulator  
 
@@ -607,7 +607,7 @@ Details
 
   * Added support for Android 4 and iOS 7 dialog buttons which use a thin line to separate plush components  
 
-  * Added a done listener to the TextField as a fix for issue 596 : TextField.addActionListener() should not be called on Back button  
+  * Added a done listener to the TextField as a fix for issue 596 : `TextField.addActionListener()` should not be called on Back button  
 
   * Fixed the contacts to return a sorted list  
 
@@ -655,7 +655,7 @@ Details
 
   * Added a Nokia Asha theme  
 
-  * Fixed action “withText” to show on the ActionBar if there is room on Android devices  
+  * Fixed action "withText" to show on the ActionBar if there is room on Android devices  
 
   * Added ability to string util to tokenize by more than one character  
 

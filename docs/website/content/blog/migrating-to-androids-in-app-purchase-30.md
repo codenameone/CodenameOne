@@ -37,7 +37,7 @@ Important: if you have a project that relies on in-app-purchase and you are abou
 
 The Codename One purchase API remains unchanged and will work in exactly the same way, however due to integration with the way Google handles various things you might need to tune this a bit:
 
-1\. You must have the android.licenseKey build hint set or the build will fail. You can get the license key from the Services & API section in the Google play store.
+1\. You must have the `android.licenseKey` build hint set or the build will fail. You can get the license key from the Services & API section in the Google play store.
 
 2\. In the 3.0 API products are consumable by default, if you want a product to be non-consumable you will need to explicitly declare it either by making the SKU end with the word  
 
@@ -49,20 +49,7 @@ The Codename One purchase API remains unchanged and will work in exactly the sam
   
   
   
-nonconsume (e.g. MySKU001_nonconsume) or by setting the build argument  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-android.nonconsumable=itema,  
-  
-  
-itemb,itemc  
+nonconsume (e.g. MySKU001_nonconsume) or by setting the build argument `android.nonconsumable=itema,itemb,itemc`  
   
   
 Apple explains the difference between consumable/non-consumable products as such: 

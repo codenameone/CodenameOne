@@ -58,12 +58,12 @@ GUI builder to the new GUI builder with as little work as possible (although we 
 #### Code Generation
 
 The new GUI builder will generate code directly into a class representing the UI. So if you have a form called  
-“MyForm” then you will have a Java source file named “MyForm.java” under the “src” hierarchy and an XML file  
-called “res/guibuilder/mypackage/MyForm.gui” under the “res” hierarchy. This “.gui” file will be used to store/load  
+"MyForm" then you will have a Java source file named "`MyForm.java`" under the "src" hierarchy and an XML file  
+called "res/guibuilder/mypackage/MyForm.gui" under the "res" hierarchy. This ".gui" file will be used to store/load  
 the actual state from the GUI builder. The GUI builder ignores the source file almost completely except for the  
 special case of event handling.  
 The code generation will happen thru a new ant task that we already introduced in the build XML. It runs during  
-build and scans the res directory for “.gui” files which it then converts to Java source blocks. The “MyForm.java”  
+build and scans the res directory for ".gui" files which it then converts to Java source blocks. The "`MyForm.java`"  
 will have a special commented section that you aren’t allowed to touch, this is very similar to the NetBeans GUI  
 builder architecture but we probably won’t physically lock these code blocks like NetBeans does. 
 
@@ -73,7 +73,7 @@ We’d like to have a technology preview out for 3.2 but will probably release s
 within the next month (which marks the 5 year anniversary of the launch of the previous GUI builder).  
 We don’t recommend the technology preview for production apps since the new tool might generate invalid  
 code and require that you manually edit the XML files to workaround issues. With the 3.3 release  
-we hope to graduate into beta level where we will start emphasizing this tool as “the gui builder”  
+we hope to graduate into beta level where we will start emphasizing this tool as "the gui builder"  
 for new projects.   
 The initial release won’t include standardized migration tools although we’ll try to add them as soon as possible  
 as this is the best possible way for us to test the tool (by converting existing apps).  
@@ -87,7 +87,7 @@ rely on the statemachine architecture. We will add back navigation to the compat
 will try to include embedded container there too
   * `Toolbar` – the old GUI builder was very flexible in terms of command behavior which effectively made it  
 very limited since it assumed nothing about command behavior. This turned out to be very in-flexible and prevented  
-basic usability features such as “placing a button on the title”. The new designer assumes that the  
+basic usability features such as "placing a button on the title". The new designer assumes that the  
 `Toolbar` class is used and will allow greater control over command placement to facilitate that.
   * Style manipulation/Localization – the existing GUI builder allowed customizing styles directly from the GUI builder UI. Since  
 we are now separating the tools styles & localization won’t be available. You’d still be able to make use of both  
@@ -128,12 +128,12 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > The top guys running FX are no longer on the core platform but were re-assigned. For a while focus shifted to embedded/IoT but the guy who was running this (one of the smartest developers/people I know) got fired with his entire staff because of corporate bureaucracy… Corporate bureaucracy is disabled when dealing with a truly important platform. We tried to get him to come on-board but he decided to go to Google.  
-> No one uses FX despite years of no alternative. The only “real app” usage is in Swing apps that need what is now basic features such as a decent web browser etc. I’ve talked with several top Java consultants and asked them about their FX work, they all concur that this observation is accurate. The few “pure FX” projects are small student works etc.  
-> The world moved in a different direction, FX has many similarities to Flash. In some regards its better but in others its worse. Adobe with all its abilities was unable to get Flash into devices (it even sucked on Android) and on modern desktops its hated. Java currently doesn’t have a “working by default” deployment strategy. Webstart and Applet’s were riddled with bugs and security holes, javafxwrapper is immature and has basic functionality missing.
+> No one uses FX despite years of no alternative. The only "real app" usage is in Swing apps that need what is now basic features such as a decent web browser etc. I’ve talked with several top Java consultants and asked them about their FX work, they all concur that this observation is accurate. The few "pure FX" projects are small student works etc.  
+> The world moved in a different direction, FX has many similarities to Flash. In some regards its better but in others its worse. Adobe with all its abilities was unable to get Flash into devices (it even sucked on Android) and on modern desktops its hated. Java currently doesn’t have a "working by default" deployment strategy. Webstart and Applet’s were riddled with bugs and security holes, javafxwrapper is immature and has basic functionality missing.
 >
 > I agree that Java needs a desktop solution but FX is still far off from that point and needs a lot of effort to get there. Currently Oracle products use web for most of their UI’s and server side Java. E.g. the architecture of MAF which has the architecture diagram that is the very definition of over engineering.
 >
-> Unlike Google that does Spring cleaning, Oracle/Sun never really kill off projects. They just sort of abandon them and don’t invest time in them but everyone knows they are dead. Sun effectively abandoned Swing because it “only” had 30% market share, FX is probably under 1%.
+> Unlike Google that does Spring cleaning, Oracle/Sun never really kill off projects. They just sort of abandon them and don’t invest time in them but everyone knows they are dead. Sun effectively abandoned Swing because it "only" had 30% market share, FX is probably under 1%.
 >
 > I was joking with the NetBeans guys a while back saying that they should rewrite NetBeans in Codename One, I don’t think that’s a joke anymore…
 >
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> FX is already “gone”, but it won’t disappear just like Swing didn’t disappear. The problem with FX will be similar to the problems with Swing, huge gaping bugs that go unfixed for quite a while e.g. file dialog not working on Windows 7 for ages was plaguing us on Swing… Getting DPI to work correctly on Macs with Retina display is a HUGE issue still, we can do basic things like adapt images but other than that…
+> FX is already "gone", but it won’t disappear just like Swing didn’t disappear. The problem with FX will be similar to the problems with Swing, huge gaping bugs that go unfixed for quite a while e.g. file dialog not working on Windows 7 for ages was plaguing us on Swing… Getting DPI to work correctly on Macs with Retina display is a HUGE issue still, we can do basic things like adapt images but other than that…
 >
 > We support all OS’s with the new GUI builder as we always did.
 >

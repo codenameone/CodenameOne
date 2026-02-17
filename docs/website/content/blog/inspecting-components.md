@@ -18,7 +18,7 @@ author: Shai Almog
 ![Picture](/blog/inspecting-components/inspecting-components-1.png)  
 ](/img/blog/old_posts/inspecting-components-large-2.png)
 
-First, let me start with an apology for not blogging as frequently. Its been hectic these past few weeks and I could barely find the time to write this! That’s generally a “good thing(tm)”. 
+First, let me start with an apology for not blogging as frequently. Its been hectic these past few weeks and I could barely find the time to write this! That’s generally a "good thing(tm)". 
 
   
 One of my favorite things about working with Codename One is the GUI builder, it solves a lot of the headaches of handcoding/positioning elements into place especially when coupled with the Codename One LIVE! application. However, not all of us use the GUI builder and even when we do we sometimes end up writing code manually.  

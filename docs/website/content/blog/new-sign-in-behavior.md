@@ -17,7 +17,7 @@ To make the migration easier, we tried to keep the existing login working as muc
 
 If you’re creating a new account, this should be pretty seamless. Just use the product as it is.
 
-If you already have a Codename One account (paid or otherwise) just signup as a new account by pressing **[Login](https://auth.codenameone.com/auth/realms/Realm/protocol/openid-connect/auth?client_id=wordpressauth&scope=openid%20address&redirect_uri=https://www.codenameone.com&response_type=code&state=a2V5Y2xvYWs=)** and clicking register. Make sure to use the email address used for your existing account. You will get a confirmation email which you will need to click. At this point the new account and the old account will be bound. If you’re a paid subscriber things should “just work”.
+If you already have a Codename One account (paid or otherwise) just signup as a new account by pressing **[Login](https://auth.codenameone.com/auth/realms/Realm/protocol/openid-connect/auth?client_id=wordpressauth&scope=openid%20address&redirect_uri=https://www.codenameone.com&response_type=code&state=a2V5Y2xvYWs=)** and clicking register. Make sure to use the email address used for your existing account. You will get a confirmation email which you will need to click. At this point the new account and the old account will be bound. If you’re a paid subscriber things should "just work".
 
 ### **This is the current status our various tools when it comes to the new login:**  
 

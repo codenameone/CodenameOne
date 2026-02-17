@@ -14,7 +14,7 @@ author: Shai Almog
 We just released an updated set of plugins with many bug fixes and enhancement mostly revolving around  
 the new settings UI but also a lot of the functionality required for proper Windows UWP support…​
 
-This has been a very busy week for us although most of the stuff we did was “under the hood” and not as  
+This has been a very busy week for us although most of the stuff we did was "under the hood" and not as  
 visible as some of the previous weeks. We are also fast approaching the 3.5 release due this August  
 so hopefully we can get our ducks in a row to create another compelling release.
 
@@ -27,7 +27,7 @@ lose it’s ability to fetch the image data dynamically.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37980653/background-image-scaled-and-in-center-of-container-codenameone)
 
-### Using “Login with LinkedIn” to log into chat application
+### Using "Login with LinkedIn" to log into chat application
 
 I’d love to have additional standard connectors for Codename One to all the common social networks. It might  
 be worth doing these as cn1libs so they can be maintained by the community.
@@ -49,7 +49,7 @@ becomes a bit more challenging on iOS though…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37957474/how-to-access-codename-one-preferences-from-android-native-code)
 
-### FileSystemStorage.delete() doesn’t delete captured files on ALL android devices?
+### `FileSystemStorage.delete()` doesn’t delete captured files on ALL android devices?
 
 Application isolation is one of the hard concepts to grasp in mobile programming, we just can’t reach/delete  
 files in some places.
@@ -74,7 +74,7 @@ We had some issues with the add skins menu and CDN so developers were looking fo
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37912168/adding-skins-from-git-clone)
 
-### How to write an “indefinitly expanding list” in CodenameOne?
+### How to write an "indefinitly expanding list" in CodenameOne?
 
 That’s really a `Tree` component.
 

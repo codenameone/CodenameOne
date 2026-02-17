@@ -22,7 +22,7 @@ author: Shai Almog
 
 We have a couple of new  
 [  
-“How Do I” videos  
+"How Do I" videos  
 ](/how-do-i.html)  
 covering  
 [  

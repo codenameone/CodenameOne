@@ -23,7 +23,7 @@ author: Shai Almog
 We recently introduced a new Facebook API to allow native integration since Facebook has stated their intention to no longer accept OAuth logins from applications. This is very much work in progress so some things will change as we move along especially related to elevated permissions for posting. 
 
   
-If you just want something in the form of a “share button” we suggest you refer to the builtin share button which uses native sharing on both iOS and Android.  
+If you just want something in the form of a "share button" we suggest you refer to the builtin share button which uses native sharing on both iOS and Android.  
 
   
 The new Facebook API is very simple, in fact as of this writing it includes only 5 methods. Notice that the old Facebook API will still work as expected with the exception of the login aspect which will be handled by the new API.  
@@ -51,14 +51,12 @@ Here you should create your app and make sure to enter the package name of the C
 Once you do that you need to define the build argument facebook.appId to the app ID in the Facebook application (see the red marking at the top of the image).
 
   
-Now when you send a build and invoke FacebookConnect.login() this should work as expected on iOS but it will fail on Android. The reason is that Facebook  
+Now when you send a build and invoke `FacebookConnect.login()` this should work as expected on iOS but it will fail on Android. The reason is that Facebook  
   
 requires a hash from Android developers to identify your app. However, their instructions to generate said hash don’t work… The only way we could find for generating the hash properly is on an Android device.  
   
   
-If you have DDMS you can connect the device to your machine and see the printouts including the hashcode (notice the hashcode will change whenever you send a debug build so make sure to only use Android release builds). You can also get the value of the hashcode from Display.getInstance().getProperty(”  
-  
-facebook_hash”, null);  
+If you have DDMS you can connect the device to your machine and see the printouts including the hashcode (notice the hashcode will change whenever you send a debug build so make sure to only use Android release builds). You can also get the value of the hashcode from `Display.getInstance().getProperty("facebook_hash", null);`  
   
   
 This will return the hash only  
@@ -236,7 +234,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Second entry when googling: “facebook openssl windows”  
+> Second entry when googling: "facebook openssl windows"  
 > [http://stackoverflow.com/qu…](<http://stackoverflow.com/questions/4347924/key-hash-for-facebook-android-sdk>)
 >
 

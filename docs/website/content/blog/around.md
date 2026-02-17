@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Chen Fishbein says:
 >
-> Thanks, the colors are coming from the “Slider” theme entry, just modify the Slider colors on the theme to change the colors
+> Thanks, the colors are coming from the "Slider" theme entry, just modify the Slider colors on the theme to change the colors
 >
 
 

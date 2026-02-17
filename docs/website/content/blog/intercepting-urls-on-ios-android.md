@@ -23,7 +23,7 @@ author: Shai Almog
 **  
 Notice:  
 **  
-the original version of this post incorrectly specified the property as AppArgs instead of AppArg. This is now fixed. For Android you would probably also want to add the build argument android.xactivity=android:exported=”false”.  
+the original version of this post incorrectly specified the property as AppArgs instead of AppArg. This is now fixed. For Android you would probably also want to add the build argument `android.xactivity=android:exported="false"`.  
   
   
   
@@ -38,10 +38,10 @@ This isn’t something we builtin to Codename One, however we did expose enough 
   
   
   
-On Android we need to define an intent filter which we can do using the android.xintent_filter build argument, this accepts the XML to filter whether a request is relevant to our application:  
+On Android we need to define an intent filter which we can do using the `android.xintent_filter` build argument, this accepts the XML to filter whether a request is relevant to our application:  
   
   
-android.xintent_filter=<intent-filter> <action android_name=”android.intent.action.VIEW” /> <category android_name=”android.intent.category.DEFAULT” /> <category android_name=”android.intent.category.BROWSABLE” /> <data android_scheme=”myapp” /> </intent-filter>  
+`android.xintent_filter=<intent-filter> <action android_name="android.intent.action.VIEW" /> <category android_name="android.intent.category.DEFAULT" /> <category android_name="android.intent.category.BROWSABLE" /> <data android_scheme="myapp" /> </intent-filter>`  
   
   
   
@@ -60,12 +60,12 @@ stack overflow question
   
   
   
-So how do you get the “launch arguments”, passed to your application?  
+So how do you get the "launch arguments", passed to your application?  
   
   
   
   
-Display.getInstance().getProperty(“AppArg”) should contain the value of the URL that launched the app or would be null if it was launched via the icon.  
+`Display.getInstance().getProperty("AppArg")` should contain the value of the URL that launched the app or would be null if it was launched via the icon.  
   
   
   
@@ -79,11 +79,15 @@ Display.getInstance().getProperty(“AppArg”) should contain the value of the 
 iOS is practically identical with some small caveats, iOS’s equivalent of the manifest is the plist. So we allow injecting more data into the plist thru the  
   
   
-ios.plistInject build argument.  
+`ios.plistInject` build argument.  
   
   
   
-So the equivalent in the iOS side would be ios.plistInject=<key>CFBundleURLTypes</key> <array> <dict> <key>CFBundleURLName</key> <string>com.yourcompany.myapp</string> </dict> <dict> <key>CFBundleURLSchemes</key> <array> <string>myapp</string> </array> </dict> </array>  
+So the equivalent in the iOS side would be:
+
+```xml
+ios.plistInject=<key>CFBundleURLTypes</key> <array> <dict> <key>CFBundleURLName</key> <string>com.yourcompany.myapp</string> </dict> <dict> <key>CFBundleURLSchemes</key> <array> <string>myapp</string> </array> </dict> </array>
+```
   
 
   
@@ -128,7 +132,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > So, my questions are if this post is still update and if it’s correctly formatted (it’s not clear if the build arguments for Android and iOS are in only one row).
 >
-> I suppose that the build arguments are the ones described in “Sending Arguments To The Build Server”, is it right?  
+> I suppose that the build arguments are the ones described in "Sending Arguments To The Build Server", is it right?  
 > [https://www.codenameone.com…](</manual/advanced-topics/#_sending_arguments_to_the_build_server>)
 >
 > Thank you.
@@ -153,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Francesco Galgani says:
 >
-> At the begging of this post, you wrote: «For Android you would probably also want to add the build argument android.xactivity=android:exported=”false”». Indeed this build hint cannot be used, because it causes that Android cannot start the app, giving the error: “The app is not installed”. The reason is explained here: [https://stackoverflow.com/a…](<https://stackoverflow.com/a/49471457>)
+> At the begging of this post, you wrote: «For Android you would probably also want to add the build argument android.xactivity=android:exported="false"». Indeed this build hint cannot be used, because it causes that Android cannot start the app, giving the error: "The app is not installed". The reason is explained here: [https://stackoverflow.com/a…](<https://stackoverflow.com/a/49471457>)
 >
 
 

@@ -101,7 +101,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Shai Almog** — November 29, 2018 at 7:35 am ([permalink](/blog/bottom-align/#comment-24045))
 
-> This adds the component to the first index in the component list. When I call add(Component) or addComponent(Component) it adds the component at the last offset which in this case will replace the existing “last component”. Here I added it to the top so a new entry will always appear first.
+> This adds the component to the first index in the component list. When I call add(Component) or addComponent(Component) it adds the component at the last offset which in this case will replace the existing "last component". Here I added it to the top so a new entry will always appear first.
 >
 
 
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Francesco Galgani says:
 >
-> Thank you for the quick reply. I’m sorry, my mistake: “disposed” is a false friend in my language, I wrote a thing thinking another. I understood your first reply. My question, in your example, is how to place the new added multibuttons to the bottom of list instead to the top. I mean if it’s possible something like: addComponent(n-2), where n is the number of added components to the container (plus the one we are going to add), n-1 is the Button always in the bottom, n-2 is the place to add a new multibutton. I guess that it’s not possible in this way.
+> Thank you for the quick reply. I’m sorry, my mistake: "disposed" is a false friend in my language, I wrote a thing thinking another. I understood your first reply. My question, in your example, is how to place the new added multibuttons to the bottom of list instead to the top. I mean if it’s possible something like: addComponent(n-2), where n is the number of added components to the container (plus the one we are going to add), n-1 is the Button always in the bottom, n-2 is the place to add a new multibutton. I guess that it’s not possible in this way.
 >
 
 
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> It’s possible to call it that way. I just wanted to keep the code a bit simpler without a “weird” – offset calculation. I think it would be “cmpCount -1” but it might be “cmpCount -2” I don’t recall.
+> It’s possible to call it that way. I just wanted to keep the code a bit simpler without a "weird" – offset calculation. I think it would be "cmpCount -1" but it might be "cmpCount -2" I don’t recall.
 >
 
 

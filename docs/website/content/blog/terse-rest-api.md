@@ -102,9 +102,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > This is nothing but the Rest object is currently missing the .patch(url) method. Would be nice if it could be add in the next release (Furthermore that the RequestBuilder(method, url) constructor is not public so you have to extend it if you want to create a custom one to handle the PATCH method for now….)
 >
 > NOTE: the PATCH method act as a post or put, so, aditionnaly to define it in the Rest object, in the createRequest() method of RequestBuilder you also need to change  
-> req.setPost(method.equalsIgnoreCase(“POST”) || method.equalsIgnoreCase(“PUT”));  
+> req.setPost(method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT"));  
 > to  
-> req.setPost(method.equalsIgnoreCase(“POST”) || method.equalsIgnoreCase(“PUT”) || method.equalsIgnoreCase(“PATCH”));  
+> req.setPost(method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT") || method.equalsIgnoreCase("PATCH"));  
 > to handle it correctly
 >
 
@@ -143,13 +143,13 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > In this post, you wrote:
 >
-> Map<string, object=””> jsonData = Rest.get(myUrl).getAsJsonMap(); but getAsJsonMap() returns a Response<map>.
+> Map<string, object=""> jsonData = Rest.get(myUrl).getAsJsonMap(); but getAsJsonMap() returns a Response<map>.
 >
 > I suppose that you mean:  
 > Response<map> jsonData = Rest.get(myUrl).acceptJson().getAsJsonMap();
 >
 > if (jsonData.getResponseCode() == 200) {  
-> Map<string, object=””> response = jsonData.getResponseData();  
+> Map<string, object=""> response = jsonData.getResponseData();  
 > }
 >
 
@@ -184,28 +184,28 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > to get Data from a firestore database.  
 > The query works and codename one should get:  
 > `{  
-> “name”: “”,  
-> “fields”: {  
-> “1”: {  
-> “stringValue”: “Test One”  
+> "name": "",  
+> "fields": {  
+> "1": {  
+> "stringValue": "Test One"  
 > },  
-> “2”: {  
-> “stringValue”: “Test Two”  
+> "2": {  
+> "stringValue": "Test Two"  
 > },  
-> “3”: {  
-> “stringValue”: “Test Three”  
+> "3": {  
+> "stringValue": "Test Three"  
 > },  
-> “4”: {  
-> “integerValue”: “1234”  
+> "4": {  
+> "integerValue": "1234"  
 > } },  
-> “createTime”: “2019-01-07T21:10:00.621697Z”,  
-> “updateTime”: “2019-01-08T13:09:05.737437Z”  
+> "createTime": "2019-01-07T21:10:00.621697Z",  
+> "updateTime": "2019-01-08T13:09:05.737437Z"  
 > }`
 >
 > But no matter how it try it I can not get the vales out of it.  
 > I thought I should get the value with:  
 > `  
-> jsonData.getResponseData().get(“1”);  
+> jsonData.getResponseData().get("1");  
 > `  
 > @codenameone:disqus Do you know where my thinking error is?
 >
@@ -218,7 +218,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Shouldn’t it be:
 >
-> String value = (String)((Map)jsonData.getResponseData().get(“1”)).get(“stringValue”);
+> String value = (String)((Map)jsonData.getResponseData().get("1")).get("stringValue");
 >
 > Notice you can inspect the returned Map in the debugger…
 >

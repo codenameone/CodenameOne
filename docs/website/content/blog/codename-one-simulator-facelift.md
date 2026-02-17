@@ -23,7 +23,7 @@ The window has four regions (Left, Center, Right, and Bottom), and you are free 
 
 Figure 1. The default simulator window configuration, with component tree on the left, the simulator in the center, and the component details on the bottom.
 
-For example, if you wanted the component tree to appear in the **“right”** region, you could click on the panel menu in the upper right of the `Components` panel.
+For example, if you wanted the component tree to appear in the **"right"** region, you could click on the panel menu in the upper right of the `Components` panel.
 
 ![](/blog/codename-one-simulator-facelift/move-to-right.png)
 
@@ -69,8 +69,8 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > – Components are not selectable on UI with MapContainer. The tree could be expanded, though. Only the root form is selectable.  
 > – Selection of a component in the Components pane should switch to the Component Details tab automatically.  
 > – Rotating a device should automatically increase and decrease in size the Simulator pane to show the whole device.  
-> – “Always on Top” functionality should apply to secondary windows like “Push Simulation” or when I set the Simulator pane to show as a new window, as these windows are hidden behind the main window until it’s unchecked.  
-> – The “Move To” overflow menu appears behind the Simulator until you hover on it.  
+> – "Always on Top" functionality should apply to secondary windows like "Push Simulation" or when I set the Simulator pane to show as a new window, as these windows are hidden behind the main window until it’s unchecked.  
+> – The "Move To" overflow menu appears behind the Simulator until you hover on it.  
 > – Zooming in or out is great, however, zoom in should come with the ability to pan the screen.
 >
 > I’m running the new Simulator on a Linux OS.
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Steve Hannah says:
 >
-> The changes to the simulator shouldn’t have any effect on component sizes in your app. One way to confirm this is to revert the version to 7.0.58. If you change the cn1.version property to 7.0.58 in your project’s pom.xml file, does that “fix” the issue?
+> The changes to the simulator shouldn’t have any effect on component sizes in your app. One way to confirm this is to revert the version to 7.0.58. If you change the cn1.version property to 7.0.58 in your project’s pom.xml file, does that "fix" the issue?
 >
 
 
@@ -163,7 +163,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > > By the way, I lost all my skins and there is no way to upload other skins as it used to be before this update.
 >
-> You can still add skins in exactly the same way that you added skins before. “Skins” > “More”. or “Skins” > “Add New”. This functionality is unchanged.
+> You can still add skins in exactly the same way that you added skins before. "Skins" > "More". or "Skins" > "Add New". This functionality is unchanged.
 >
 > > If I will need to save the css file again after each run, it will compile again. That will fix the problem.
 >

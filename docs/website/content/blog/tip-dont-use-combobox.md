@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/tip-dont-use-combobox/just-the-tip.jpg)
 
 We previously [discussed the problems with List](/blog/avoiding-lists.html) and somewhat neglected  
-`ComboBox` which is a subclass of `List`. `ComboBox` has the dubious “honor” of deriving most of the problems  
+`ComboBox` which is a subclass of `List`. `ComboBox` has the dubious "honor" of deriving most of the problems  
 `List` has and adding a slew of its own problems such as two separate renderers, different behaviors between OS’s  
 etc.
 
@@ -83,7 +83,7 @@ This component is one of my favorites as it allows for complex searches and the 
 
 ### Button (or MultiButton etc.) & Popup
 
-The last one seems like “hard work” but when you look at the alternative of building a cell renderer for a  
+The last one seems like "hard work" but when you look at the alternative of building a cell renderer for a  
 `ComboBox` this is actually really easy and more powerful…​
 
 Instead of using a ComboBox just use a button, you can style it to look like a `ComboBox` and then show a  
@@ -173,9 +173,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > combo_countries = new ComboBox();  
 > try  
 > {  
-> Object rawStringCountries = Storage.getInstance().readObject(“countries.json”);  
+> Object rawStringCountries = Storage.getInstance().readObject("countries.json");  
 > JSONObject j = new JSONObject(rawStringCountries.toString());  
-> JSONArray Arr = (JSONArray) j.get(“data”);
+> JSONArray Arr = (JSONArray) j.get("data");
 >
 > str_countries = new String[Arr.length()];  
 > List<string> listOfString = new ArrayList<>();
@@ -184,8 +184,8 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > {  
 > String p = Arr.getString(i);  
 > JSONObject obj_country = new JSONObject(p);  
-> final String str_id = (String)obj_country .get(“id”);  
-> final String str_title = (String)obj_country .get(“title”);  
+> final String str_id = (String)obj_country .get("id");  
+> final String str_title = (String)obj_country .get("title");  
 > combo_countries.addItem(str_title);  
 > }  
 > combo_inchi.setIncludeSelectCancel(true);  
@@ -234,7 +234,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > The code below, is an example of how I am experimenting with Button and Popup technique, where MultiButtonBox is overriding the Button/MultiButton component!  
 > `  
 > langField = new MultiButtonBox(language, langMap);  
-> validator.addConstraint(langField, new com.codename1.ui.validation.LengthConstraint(2, “errors.invalid”));//validate  
+> validator.addConstraint(langField, new com.codename1.ui.validation.LengthConstraint(2, "errors.invalid"));//validate  
 > `
 >
 

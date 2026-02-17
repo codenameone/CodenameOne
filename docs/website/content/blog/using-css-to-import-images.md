@@ -16,7 +16,7 @@ The Codename One CSS plugin is a handy tool to style your app with CSS. This inc
 __ |  In order to use CSS with your Codename One project, you will need to install [CSS support](https://github.com/shannah/cn1-css) in your project first.   
 ---|---  
   
-I’ll use the [MemeMaker demo](https://github.com/shannah/mememaker) as an example of how to do this. It has a CSS file located at “css/theme.css” within the project directory, and I’ve loaded this CSS file in my app’s init() method using this code:
+I’ll use the [MemeMaker demo](https://github.com/shannah/mememaker) as an example of how to do this. It has a CSS file located at "css/theme.css" within the project directory, and I’ve loaded this CSS file in my app’s init() method using this code:
     
     
     try {
@@ -26,13 +26,13 @@ I’ll use the [MemeMaker demo](https://github.com/shannah/mememaker) as an exam
         Log.e(ex);
     }
 
-I created a little icon, to display in the title area. It is located at “css/MemeIcon-white-100×100.png”.
+I created a little icon, to display in the title area. It is located at "css/MemeIcon-white-100×100.png".
 
 ![The MemeMaker icon](/blog/using-css-to-import-images/MemeIcon-white-100x100.png)
 
 I’d like it to be imported as a multi-image so that it will be rendered at an appropriate size on all devices, regardless of their pixel density.
 
-I can import the image in my CSS file by adding a dummy selector with a `background-image`. I call this selector “Images”, but you can call it anything you like:
+I can import the image in my CSS file by adding a dummy selector with a `background-image`. I call this selector "Images", but you can call it anything you like:
     
     
     Images {
@@ -45,16 +45,16 @@ __ |  This url path is relative to the css file itself. If I had placed the Imag
   
 The above CSS snippet should be mostly self-explanatory. It is creating a selector with my image as a background image. This triggers the CSS processor to import the image into the generated resource file at compile time.
 
-The `cn1-source-dpi` directive is a hint to the CSS plugin as to what the “source dpi” of the image is. It uses this as a reference point for generating the different sizes in the resulting multi-image. Generally I only use one of 2 values here: `160` or `320`. As a reference, a value of 160 means that the image is currently sized correctly for an iPhone 3G (i.e. Non-retina display). A value of 320 means that the image is currently sized correctly for an iPhone 4, 5, or 6 (i.e. a Retina) device. It will then generate appropriately sized versions for all other densities based on this reference point.
+The `cn1-source-dpi` directive is a hint to the CSS plugin as to what the "source dpi" of the image is. It uses this as a reference point for generating the different sizes in the resulting multi-image. Generally I only use one of 2 values here: `160` or `320`. As a reference, a value of 160 means that the image is currently sized correctly for an iPhone 3G (i.e. Non-retina display). A value of 320 means that the image is currently sized correctly for an iPhone 4, 5, or 6 (i.e. a Retina) device. It will then generate appropriately sized versions for all other densities based on this reference point.
 
-In my experience, most PSD theme designs I find on the internet are sized for a retina display, so you’ll usually be using a value of “320” here. If you get it wrong, it will be obvious, and you can experiment with different values easily by just changing it and recompiling.
+In my experience, most PSD theme designs I find on the internet are sized for a retina display, so you’ll usually be using a value of "320" here. If you get it wrong, it will be obvious, and you can experiment with different values easily by just changing it and recompiling.
 
-__ |  When changing the cn1-source-dpi, you may need to delete the old generated “theme.css.res” file (which is saved in your app’s “src” directory) to clear out the old resolutions.   
+__ |  When changing the cn1-source-dpi, you may need to delete the old generated "theme.css.res" file (which is saved in your app’s "src" directory) to clear out the old resolutions.   
 ---|---  
   
 ### Accessing the Images from Code
 
-Using the imported image from code is very easy. If you have a reference to the `Resources` object from loading the “theme.css.res” file, you can simply call `css.getImage("MemeIcon-white-100x100.png")` (i.e. you can load it by its file name).
+Using the imported image from code is very easy. If you have a reference to the `Resources` object from loading the "theme.css.res" file, you can simply call `css.getImage("MemeIcon-white-100x100.png")` (i.e. you can load it by its file name).
 
 ### Loading Multiple Images in a Single Selector
 
@@ -70,7 +70,7 @@ In the example above, I only imported a single image, but you can import multipl
 
 ### Adding Images to UI Constants
 
-Sometimes I find it tedious to keep a reference to my css `Resources` object for the purpose of loading an image. One nice alternative is to add the image to Codename One’s theme constants. The CSS plugin reserves a special selector `#Constants` for defining theme constants (these correspond with the values you see in the “Constants” tab of a theme in the resource editor). Here is an example from the [MemeMaker app](https://github.com/shannah/mememaker):
+Sometimes I find it tedious to keep a reference to my css `Resources` object for the purpose of loading an image. One nice alternative is to add the image to Codename One’s theme constants. The CSS plugin reserves a special selector `#Constants` for defining theme constants (these correspond with the values you see in the "Constants" tab of a theme in the resource editor). Here is an example from the [MemeMaker app](https://github.com/shannah/mememaker):
 
 ***theme.css** :
     
@@ -84,12 +84,12 @@ Sometimes I find it tedious to keep a reference to my css `Resources` object for
         MemeIconImage: "MemeIcon-white-100x100.png";
     }
 
-This creates a theme constant named “MemeIconImage” with my image. I can then access the image from code as follows:
+This creates a theme constant named "MemeIconImage" with my image. I can then access the image from code as follows:
     
     
     UIManager.getInstance().getThemeImageConstant("MemeIconImage")
 
-__ |  Theme constants must follow naming conventions to identify their “type”. Any theme constant that stores an image, must end with “Image”. E.g. “MemeIconImage” is fine. “MemeIconPhoto” is **not**. If you take a look at the constants tab of any theme, you should be able to catch on to the naming convention very quickly.   
+__ |  Theme constants must follow naming conventions to identify their "type". Any theme constant that stores an image, must end with "Image". E.g. "MemeIconImage" is fine. "MemeIconPhoto" is **not**. If you take a look at the constants tab of any theme, you should be able to catch on to the naming convention very quickly.   
 ---|---  
   
 And the result:

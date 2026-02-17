@@ -11,7 +11,7 @@ author: Steve Hannah
 
 ![Header Image](/blog/video-capture-constraints/new-features-2.jpg)
 
-The new video capture constraints API allows you to specify “constraints” when capturing videos. Constraints include:
+The new video capture constraints API allows you to specify "constraints" when capturing videos. Constraints include:
 
   1. Video Quality (High or Low)
 
@@ -21,7 +21,7 @@ The new video capture constraints API allows you to specify “constraints” wh
 
   4. Video Resolution (i.e. width and height).
 
-Support for these constraints vary by platform and device, but the API allows you to check if your constraints are supported at runtime. Essentially, you set your “preferred” constraints, and the API will give you its best attempt at meeting those constraints. This is similar to setting a visual Component’s preferred width and height. The layout manager takes these preferred dimensions under advisement, but ultimately sets the size on its own.
+Support for these constraints vary by platform and device, but the API allows you to check if your constraints are supported at runtime. Essentially, you set your "preferred" constraints, and the API will give you its best attempt at meeting those constraints. This is similar to setting a visual Component’s preferred width and height. The layout manager takes these preferred dimensions under advisement, but ultimately sets the size on its own.
 
 ### Example 1: Capturing a Low-Quality 5-Second Clip
 

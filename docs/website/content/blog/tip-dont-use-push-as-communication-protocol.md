@@ -36,11 +36,11 @@ This is the best approach for networking infrastructure and we recommend most ap
 
   * Push can be disabled by the user which means you literally can’t rely on it working even on supported platforms
 
-  * You need your own servers to handle the push sending and batching anyway so you won’t be able to go “serverless” with push
+  * You need your own servers to handle the push sending and batching anyway so you won’t be able to go "serverless" with push
 
   * Push enforces size limits on messages
 
-  * Push doesn’t “really” work when an app is in the background in iOS. In iOS a push notification that includes a visual payload will show that e.g. an icon, badge, message, sound etc. even in a background app. However, the non-visual payload won’t be delivered to your app if it isn’t running
+  * Push doesn’t "really" work when an app is in the background in iOS. In iOS a push notification that includes a visual payload will show that e.g. an icon, badge, message, sound etc. even in a background app. However, the non-visual payload won’t be delivered to your app if it isn’t running
 
 All things considered push makes sense only for visual notifications and marketing as an addition to your communication protocol not as a replacement.
 

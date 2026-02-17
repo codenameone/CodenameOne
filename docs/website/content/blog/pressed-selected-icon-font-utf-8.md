@@ -47,7 +47,7 @@ E.g.:
 
 ### PSA – Always Use UTF-8
 
-Everyone has their “pet peeve” about Java and mine is the encoding support. In a typical Sun way the Java API  
+Everyone has their "pet peeve" about Java and mine is the encoding support. In a typical Sun way the Java API  
 chose the wrong defaults aligning itself with the system instead of aligning itself with whats right.
 
 UTF-8 works for pretty much everyone and using it universally would solve many of the problems we see frequently.  

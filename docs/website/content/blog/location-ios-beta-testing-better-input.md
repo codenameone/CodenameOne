@@ -78,7 +78,7 @@ ios.locationUsageDescription
 
 Input in iOS is a bit more complex but I’d say somewhat better than Android since it allows you to scroll while editing by default. However, this input mode triggered some regressions for developers especially in cases where the app places a text field component at the bottom of the screen in a non-scrollable area. The default behavior is to fallback to the old editing mode and just scroll up the entire display which carries some issues with it.  
   
-We now have a new API on form ”  
+We now have a new API on form "  
 
   
   
@@ -88,7 +88,7 @@ We now have a new API on form ”
   
   
   
-setFormBottomPaddingEditingMode” which allows you to hint that in such cases you would want to fallback to padding at the bottom of the form rather than shifting the entire screen. This still allows scrolling the screen as expected while editing. Currently this only has an effect on iOS but we’d like to modernize Android’s input to use similar semantics in the future. 
+setFormBottomPaddingEditingMode" which allows you to hint that in such cases you would want to fallback to padding at the bottom of the form rather than shifting the entire screen. This still allows scrolling the screen as expected while editing. Currently this only has an effect on iOS but we’d like to modernize Android’s input to use similar semantics in the future. 
 
 We also exposed the previously private stopEditing  
 
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Thanks, this setFormBottomPaddingEditingMode is a nice feature, but there seams to be a bug – scrolling works well when the next edited field is opened from keyboard native “Next” button, but when a lower field editing is opened by clicking on the field, then the field is not scrolled to make room for the keyboard. Interestingly in this case scrolling happens only after clicking on “Done” button.
+> Thanks, this setFormBottomPaddingEditingMode is a nice feature, but there seams to be a bug – scrolling works well when the next edited field is opened from keyboard native "Next" button, but when a lower field editing is opened by clicking on the field, then the field is not scrolled to make room for the keyboard. Interestingly in this case scrolling happens only after clicking on "Done" button.
 >
 
 

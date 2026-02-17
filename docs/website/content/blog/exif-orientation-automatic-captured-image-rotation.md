@@ -47,7 +47,7 @@ A few remarks:
 
 __**1** | `photoTempPath` is `null` if the user has cancelled the photo capture;  
 ---|---  
-__**2** | in this case, copying the file from the `FileSystemStorage` temporary folder to a “secure” location in `FileSystemStorage` or `Storage` is not strictly necessary, but it is a good habit that in certain circumstances prevents issues;  
+__**2** | in this case, copying the file from the `FileSystemStorage` temporary folder to a "secure" location in `FileSystemStorage` or `Storage` is not strictly necessary, but it is a good habit that in certain circumstances prevents issues;  
 __**3** | it is always preferable to use `EncodedImage` when we want to keep the impact on memory low.  
   
 #### Desired result
@@ -265,7 +265,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Francesco Galgani** — July 5, 2020 at 5:46 am ([permalink](/blog/exif-orientation-automatic-captured-image-rotation/#comment-24285))
 
-> I’m afraid there’s been a misunderstanding. As I wrote: “This method is resistant to network errors and capable of resume the download as soon as network conditions allow and in a completely transparent way for the user. This is regardless of whether the download continues or not when the app goes in background: if the operating system stops the download when the app goes in background, it will automatically resume when the app goes back in foreground, otherwise it will continue in background. More specifically, usually (but not necessarily always) the download will continue in the background on Android, while it will “pause” on iOS. Without this method, when the app goes into the background the download can be “killed” without finish, with this method the download will be restored to where it came from when the app returns to foreground. In this sense, it is normal to expect the download to end when the app is returned to foreground, although in some cases (such as Android) it may continue and complete in the background. Backgroundfetch is therefore not used.
+> I’m afraid there’s been a misunderstanding. As I wrote: "This method is resistant to network errors and capable of resume the download as soon as network conditions allow and in a completely transparent way for the user. This is regardless of whether the download continues or not when the app goes in background: if the operating system stops the download when the app goes in background, it will automatically resume when the app goes back in foreground, otherwise it will continue in background. More specifically, usually (but not necessarily always) the download will continue in the background on Android, while it will "pause" on iOS. Without this method, when the app goes into the background the download can be "killed" without finish, with this method the download will be restored to where it came from when the app returns to foreground. In this sense, it is normal to expect the download to end when the app is returned to foreground, although in some cases (such as Android) it may continue and complete in the background. Backgroundfetch is therefore not used.
 >
 
 
@@ -288,11 +288,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > [Francesco Galgani](https://lh6.googleusercontent.com/-4K0ax_DVJf4/AAAAAAAAAAI/AAAAAAAAAAA/AMZuuckEd1kcni0y8k6NMzNtxwOCEPatQQ/photo.jpg) says:
 >
-> I will try to study this problem to improve this API, the problem is that “background fetch” is not usable for heavy downloads. I quote:
+> I will try to study this problem to improve this API, the problem is that "background fetch" is not usable for heavy downloads. I quote:
 >
-> “You only have seconds to operate when doing a background fetch — the consensus figure is a maximum of 30 seconds, but shorter is better. If you need to download large resources as part of the fetch, this is where you need to use URLSession‘s background transfer service.” fonte: <https://www.raywenderlich.com/5817-background-modes-tutorial-getting-started>
+> "You only have seconds to operate when doing a background fetch — the consensus figure is a maximum of 30 seconds, but shorter is better. If you need to download large resources as part of the fetch, this is where you need to use URLSession‘s background transfer service." fonte: <https://www.raywenderlich.com/5817-background-modes-tutorial-getting-started>
 >
-> I don’t know this “URLSession‘s background transfer service”. Is this something that requires a native interface? Do you have any suggestions for me?
+> I don’t know this "URLSession‘s background transfer service". Is this something that requires a native interface? Do you have any suggestions for me?
 >
 
 

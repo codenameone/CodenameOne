@@ -52,7 +52,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Chen,
 >
-> Under option 1, can you elaborate what you mean by “API’s that are unavailable on Android” when talking about obfuscation?
+> Under option 1, can you elaborate what you mean by "API’s that are unavailable on Android" when talking about obfuscation?
 >
 
 

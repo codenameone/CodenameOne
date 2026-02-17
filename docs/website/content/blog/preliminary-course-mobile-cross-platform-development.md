@@ -18,7 +18,7 @@ Few days ago I published the first version of an Italian free preliminary course
 
 You can start with the course by visiting this page: <https://www.informatica-libera.net/content/sviluppare-app-multipiattaforma-indice-del-corso-introduttivo>
 
-In this course I tried to share my experience. The reader is gradually introduced to the first lines of Java code, that solve a simple math problem. After that, the same problem is used to see how to write the first app with Codename One. Finally, there is a lot of “homework” to learn Codename One.
+In this course I tried to share my experience. The reader is gradually introduced to the first lines of Java code, that solve a simple math problem. After that, the same problem is used to see how to write the first app with Codename One. Finally, there is a lot of "homework" to learn Codename One.
 
 Currently, there are seven articles.
 
@@ -26,7 +26,7 @@ The first is about Codename One, it’s a short introduction: I describe why I c
 
 In the second I discuss why it’s so difficult to find a good learning path in the chaotic and unstable world of software development. I explain why the real challenge is to find good indications that will last over time: about that, I report concrete examples of wrong paths. I indicate JAVA + Codename One + Spring Boot as a good direction.
 
-The third is an introduction to the “algorithm” concept. I discuss what we need to know about the hardware and what are the programmable machines that we use every day (smart-phone, smart-tv, smart-car, etc.). I included an introduction to programming languages, written by me, as downloadable pdf slides. After that, I describe why software debugging is the longest, most difficult and most expensive part of software development. I conclude with the concepts of “device-agnostic”, “IDE-agnostic” and “language-agnostic”.
+The third is an introduction to the "algorithm" concept. I discuss what we need to know about the hardware and what are the programmable machines that we use every day (smart-phone, smart-tv, smart-car, etc.). I included an introduction to programming languages, written by me, as downloadable pdf slides. After that, I describe why software debugging is the longest, most difficult and most expensive part of software development. I conclude with the concepts of "device-agnostic", "IDE-agnostic" and "language-agnostic".
 
 In the fourth I introduce a simple math problem (the linear motion of a car) that I use to describe the first lines of Java code and to show a good way to decompose a problem in algorithms. I suggest to use a Java online compiler to test the code examples. Then I describe why algorithms depend on the tools we have and on the logic of the chosen programming language. I suggest what we can try to do when the chosen programming language doesn’t have the functionality what we need, with examples.
 

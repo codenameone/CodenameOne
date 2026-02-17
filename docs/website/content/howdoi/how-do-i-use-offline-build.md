@@ -42,7 +42,7 @@ You need a standalone version of gradle which is currently 2.11, again check wit
 
 You can install cocoapods and xcodeproj by typing these commands in your command prompt in the Mac OS terminal. Now that we have everything in place lets get started.
 
-In Codename One Settings click on “Offline Builds”. I already have several builders installed but you would probably not. You will notice each builder has a version and date. A builder is a snapshot of our build server logic downloaded at a specific date.
+In Codename One Settings click on "Offline Builds". I already have several builders installed but you would probably not. You will notice each builder has a version and date. A builder is a snapshot of our build server logic downloaded at a specific date.
 
 You can use the Download button to download a new version of the builder, notice that this will do nothing if there is no new version…
 
@@ -65,14 +65,14 @@ We can now launch Android Studio and open the project folder in that location. A
 Notice that I cut this short a little, Android Studio is slow and takes time to load… You will eventually see a gradle compilation error, we need to open the project preferences to fix this.  
 Inside the preferences we need to select the build tools section and pick the current local copy of gradle which I mentioned earlier. Right now we need gradle 2.11 but again this could change so we check with our support if this changes in the future. Once the local gradle is configured you can just press OK and everything will update automatically. You should now be able to run/build for device/emulator natively!
 
-So lets move to iOS where everything should be just as familiar… This time I’ll select “iOS Debug Offline Build”.
+So lets move to iOS where everything should be just as familiar… This time I’ll select "iOS Debug Offline Build".
 
 This takes MUCH longer to complete and runs for minutes sometimes, one of the things it does is run the app multiple times to grab the splash screen screenshots and then it translates the bytecode to C and installs cocoapod libraries if you have such dependencies. Notice that if you depend on cocoapods they might connect to the cocoapods site to download, this is something you should be able to configure in the coacoapods toolchain.  
 Once compilation is done we can look again at the directory.
 
 The directory is again similar to the include source results. Under build/iphone you will see the dist directory where you can open the project. Notice that the file you should open is the xcworkspace file and NOT the xcodeproj file!
 
-Once you do that running and debugging should work but some users experience an odd caveat where the simulator doesn’t launch. You can fix this by selecting “Edit Scheme” then selecting the run entry and making sure your app is selected in the combo box for run. Once all of that is in place everything should work as expected.
+Once you do that running and debugging should work but some users experience an odd caveat where the simulator doesn’t launch. You can fix this by selecting "Edit Scheme" then selecting the run entry and making sure your app is selected in the combo box for run. Once all of that is in place everything should work as expected.
 
 Thanks for watching, I hope you found this helpful
 

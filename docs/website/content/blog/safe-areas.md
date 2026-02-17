@@ -11,13 +11,13 @@ author: Steve Hannah
 
 ![Header Image](/blog/safe-areas/safe-areas.jpg)
 
-Apple is so very clever with its designs. With the iPhone X, they found way to squeeze in a larger screen without increasing the phone dimensions. The screen nearly covers the entire front face of the phone. The “notch”, as it has come to be known, may have been a practical concession (they needed to put the camera and speaker somewhere, after all) or an intentional design choice – or maybe a little of both. However the notch was conceived, it is here to stay, and we developers need to “work around” it.
+Apple is so very clever with its designs. With the iPhone X, they found way to squeeze in a larger screen without increasing the phone dimensions. The screen nearly covers the entire front face of the phone. The "notch", as it has come to be known, may have been a practical concession (they needed to put the camera and speaker somewhere, after all) or an intentional design choice – or maybe a little of both. However the notch was conceived, it is here to stay, and we developers need to "work around" it.
 
-And it’s not only the notch that we have to work around. The iPhone X screen has round corners too. Not the old, boring, right angled corners that we’re used to. And the coup de gras is the task bar that now appears along the bottom of the screen, that allows the user to “swipe up” to minimize the app. This has made it more difficult to use bottom navigation in our apps because we have to make sure that the user doesn’t accidentally close the app when they try to click on one of our app’s buttons at the bottom of the screen.
+And it’s not only the notch that we have to work around. The iPhone X screen has round corners too. Not the old, boring, right angled corners that we’re used to. And the coup de gras is the task bar that now appears along the bottom of the screen, that allows the user to "swipe up" to minimize the app. This has made it more difficult to use bottom navigation in our apps because we have to make sure that the user doesn’t accidentally close the app when they try to click on one of our app’s buttons at the bottom of the screen.
 
-We have recently added an API to help you work around these landmines. We’ve added the method `Form.getSafeArea()`, that will load the “safe” bounds of the current form. If you are drawing components on the screen and want to make sure that they aren’t clipped by “the notch”, the corners, or the task bar, then you can use this API to create a safe play-pen for yourself.
+We have recently added an API to help you work around these landmines. We’ve added the method `Form.getSafeArea()`, that will load the "safe" bounds of the current form. If you are drawing components on the screen and want to make sure that they aren’t clipped by "the notch", the corners, or the task bar, then you can use this API to create a safe play-pen for yourself.
 
-We’ve also added `Container.setSafeArea(boolean)` which you can use to ensure that the container renders its children inside the “Safe” area. The `Tabs` component has been updated to that its tab buttons are rendered inside a “safe area”. When run on the iPhone X, you’ll notice a little bit of extra padding under your tab buttons that appear at the bottom of the screen.
+We’ve also added `Container.setSafeArea(boolean)` which you can use to ensure that the container renders its children inside the "Safe" area. The `Tabs` component has been updated to that its tab buttons are rendered inside a "safe area". When run on the iPhone X, you’ll notice a little bit of extra padding under your tab buttons that appear at the bottom of the screen.
 
 ## Some Examples
     
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Javier Anton says:
 >
-> A bit late to the conversation, but thought I’d share an alternative to this. To have a bit more control over the “padding” one way is to manually detect the notches with the below code from SO
+> A bit late to the conversation, but thought I’d share an alternative to this. To have a bit more control over the "padding" one way is to manually detect the notches with the below code from SO
 >
 > – (BOOL)hasTopNotch{  
 > if (@available(iOS 13.0, *)) {  

@@ -15,7 +15,7 @@ I published two articles on `MapLayout` [here](/blog/map-layout-update/) and [he
 
 Unfortunately the Google API doesn’t let us position components (native or otherwise) accurately as it pans the map. This creates a small delay when panning/zooming as the components try to catch up to the map. The only workaround is to convert the components to images and ask the map to move images within it. Then convert the images back when the map finishes panning. That’s exactly what Steve implemented within the native maps.
 
-For you as a developer this is all seamless. If you use the map API and add components into the map they will “magically” update to the right position & transition between rendering as an image and as a component. If you would like more control over this process you can override the new `toImage()` method of `Component` to tune that behavior.
+For you as a developer this is all seamless. If you use the map API and add components into the map they will "magically" update to the right position & transition between rendering as an image and as a component. If you would like more control over this process you can override the new `toImage()` method of `Component` to tune that behavior.
 
 The new API works just like the regular marker API, you can add a component to the map at a given latitude/longitude position using:
     

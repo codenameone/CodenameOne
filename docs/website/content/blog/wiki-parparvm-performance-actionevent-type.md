@@ -94,7 +94,7 @@ as some checks become unnecessary by the specific code.
 
 We added to `Toolbar` the ability to center the title that was somewhat lost in the move between  
 the old title and the new `Toolbar` class. To the uninitiated it would seem that just styling the  
-“Title” UIID to center should work. It seems to work on the surface but fails when we have uneven element widths  
+"Title" UIID to center should work. It seems to work on the surface but fails when we have uneven element widths  
 to the right & left.   
 E.g. a sidemenu icon on the left with nothing on the right. 
 

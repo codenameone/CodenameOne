@@ -27,7 +27,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Where are some working examples of the javascript port of some apps?
 >
-> Please also note the the link “Developer guide section covering the JavaScript port” in the page “How Do I – Use the Desktop and JavaScript Ports” is broken (the word “manual” in the URL is duplicated).
+> Please also note the the link "Developer guide section covering the JavaScript port" in the page "How Do I – Use the Desktop and JavaScript Ports" is broken (the word "manual" in the URL is duplicated).
 >
 
 
@@ -50,7 +50,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > In my opinion, the user experience needs to be improved, because the user expects to have an hand cursor on clickable elements, but this doesn’t happen. Is it possible?
 >
-> Please note that the PropertyCross demo doesn’t work properly: open the js port and on search write “London”, and then click on Go. You will have a “Searching…” form with an infinitive loop, but nothing more, no results (tested on Chrome and Firefox on Linux and Windows). More over, the Poker demo js port doesn’t work at all: try to open it, you will get a white page (tested on Chrome and Firefox on Linux).
+> Please note that the PropertyCross demo doesn’t work properly: open the js port and on search write "London", and then click on Go. You will have a "Searching…" form with an infinitive loop, but nothing more, no results (tested on Chrome and Firefox on Linux and Windows). More over, the Poker demo js port doesn’t work at all: try to open it, you will get a white page (tested on Chrome and Firefox on Linux).
 >
 > I didn’t tested all the demos, maybe they need a check. At the moment my first impression is not the best, but I hope that all the problems are resolvable.
 >
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I just tried the pocker demo and it worked for me, it took a few seconds to load so maybe some hiccup happened during download on your end?
 >
-> Property cross seems to freeze when accessing the network, we might have an issue in our webserver as we need to proxy server calls to workaround the “same origin” restriction. We’ll have to look into that.
+> Property cross seems to freeze when accessing the network, we might have an issue in our webserver as we need to proxy server calls to workaround the "same origin" restriction. We’ll have to look into that.
 >
 
 

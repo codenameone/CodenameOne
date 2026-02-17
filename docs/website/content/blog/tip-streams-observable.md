@@ -67,7 +67,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The main reason I didn’t port it is that I consider it to be of relatively limited benefit in Codename One. Android has a lot of synchronous IO code that should be serialized. This makes a lot of sense there.
 >
-> Codename One already handles a lot of these things thanks to NetworkManager albeit not as “elegantly” in some cases. So I just didn’t see this as a personal priority but if you need help I’ll be happy to help with that.
+> Codename One already handles a lot of these things thanks to NetworkManager albeit not as "elegantly" in some cases. So I just didn’t see this as a personal priority but if you need help I’ll be happy to help with that.
 >
 
 

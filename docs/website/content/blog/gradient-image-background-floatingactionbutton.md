@@ -16,7 +16,7 @@ design spec but after looking at the design with a solid color I came to the con
 right to use a gradient in this case. Unfortunately we didn’t build that support into the `FloatingActionButton`.
 
 So as part of that work I added a special mode to the `RoundBorder` that uses the parent UIID to draw the background.  
-This sounds like a “no brainer” but there is a catch: the round border needs to be “round”.
+This sounds like a "no brainer" but there is a catch: the round border needs to be "round".
 
 Gradient and image primitives don’t draw within a round shape, so the only solution was  
 [shape clipping](/blog/shape-clipping-bubble-transition.html) which has a performance penalty as well  

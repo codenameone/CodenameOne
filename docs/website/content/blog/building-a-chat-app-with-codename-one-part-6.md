@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/building-a-chat-app-with-codename-one-part-6/chat-app-tutorial-chat-form-5.png)
 
 This will be the last installment of this tutorial which was pretty complete in the previous section already. We might  
-have additional installments mostly for covering enhancements such as “invite a friend” and other similar capabilites  
+have additional installments mostly for covering enhancements such as "invite a friend" and other similar capabilites  
 but this is probably as good a place as any to finish the app and let you try it live.
 
 ### Native Push
@@ -22,7 +22,7 @@ paid option which can also persist messages and offers quite a few additional pe
 However, when the app isn’t running PubNub can’t push anything and in that case we need an OS native push to  
 send the message.
 
-The obvious question would be “why not use OS native push for everything?”.
+The obvious question would be "why not use OS native push for everything?".
 
 Its possible to do so but OS native push isn’t as flexible, portable, fast or reliable as PubNub. Its painful to work with  
 and the user can intentionally or inadvertently break it by disagreeing to an OS prompt etc…​ As you will see from the  
@@ -107,11 +107,11 @@ followed our instructions to create a Google project in part 2 of the tutorial. 
 didn’t need a G+ account login) just make sure to create a new project in the Google API console based on the  
 instructions in part 2.
 
-To generate those just go to <https://developers.google.com/mobile/add> and click “pick a platform”:
+To generate those just go to <https://developers.google.com/mobile/add> and click "pick a platform":
 
 ![click ](/blog/building-a-chat-app-with-codename-one-part-6/chat-app-tutorial-gcm-1.png)
 
-Select “Android App”
+Select "Android App"
 
 ![Select ](/blog/building-a-chat-app-with-codename-one-part-6/chat-app-tutorial-gcm-2.png)
 
@@ -119,7 +119,7 @@ Enter the details for the app and the package
 
 ![Enter the details for the app and the package](/blog/building-a-chat-app-with-codename-one-part-6/chat-app-tutorial-gcm-3.png)
 
-Click the “Cloud Messaging” option then click the “Enable Google Cloud Messaging” button
+Click the "Cloud Messaging" option then click the "Enable Google Cloud Messaging" button
 
 ![Click the ](/blog/building-a-chat-app-with-codename-one-part-6/chat-app-tutorial-gcm-4.png)
 
@@ -133,7 +133,7 @@ We just go thru the certificate wizard and check the flag to enable push:
 
 ![Enable push in the wizard](https://www.codenameone.com/img/blog/chat-app-tutorial-apns-1.png)
 
-Once you finish that wizard and check the enable push flag make sure that the iOS section also has the “Include Push”  
+Once you finish that wizard and check the enable push flag make sure that the iOS section also has the "Include Push"  
 flag checked. There is a bug in the current plugin where it isn’t enabled automatically.
 
 You should receive instructions to include push by email which should include links that you can just paste into place  
@@ -211,7 +211,7 @@ We do it this way to let the UI appear first.
 
 Previously in the `showChatForm` method we just sent a message thru PubNub, now we want there to be a fallback  
 that will send the message via push. To do that we need to know that the message wasn’t received by the other  
-side. To discover that we now add a back message in PubNub called “ACK” which will acknowledge the receipt  
+side. To discover that we now add a back message in PubNub called "ACK" which will acknowledge the receipt  
 of a message, if an ACK isn’t received that means the message should be sent thru native push…​ To do that we add  
 the class field:
     
@@ -320,7 +320,7 @@ Login via Google/Facebook etc. was probably the most painful part of the app and
 within the set of pains. While it is much simpler than it used to be and is simpler than the native/web versions I  
 think the main problem is in the networks opacity and desire to keep the developers close. The pain is less on  
 our side and more on the tedium of creating apps and passing values to Facebook/Google. The APK hash key  
-is just painful, there were things such as “invite a friend” which I just avoided because of the tedium.
+is just painful, there were things such as "invite a friend" which I just avoided because of the tedium.
 
 I might do a rewrite with those thoughts in mind but I’m more inclined to redo this as a cn1lib rather than an app.  
 The main motivation being end user support for apps, so developers can communicate with users over issues by integrating  
@@ -540,7 +540,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Ayushi Gupta says:
 >
-> i fixed it …but now when i press signin with google after asking my e-mail and password it goes to codenameone page and says PAGE NOT FOUND and when i press signin with facebook it says “Can’t Load URL: The domain of this URL isn’t included in the app’s domains. To be able to load this URL, add all domains and subdomains of your app to the App Domains field in your app settings”  
+> i fixed it …but now when i press signin with google after asking my e-mail and password it goes to codenameone page and says PAGE NOT FOUND and when i press signin with facebook it says "Can’t Load URL: The domain of this URL isn’t included in the app’s domains. To be able to load this URL, add all domains and subdomains of your app to the App Domains field in your app settings"  
 > Pllzzz let me know how to fix it
 >
 

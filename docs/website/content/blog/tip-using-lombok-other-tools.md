@@ -49,11 +49,11 @@ As mentioned in the [answer](https://stackoverflow.com/a/46130018/756809) adding
 
   * In the `build.xml` replace `compiler="modern"` with `compiler="extJavac"`
 
-  * Add the path to lombok.jar to the classpath in the `build.xml` (this might not be necessary in NetBeans)
+  * Add the path to `lombok.jar` to the classpath in the `build.xml` (this might not be necessary in NetBeans)
 
 ### Doing this for Other Things
 
-Lombok is just one of a huge set of bytecode manipulation tools that work statically. I’m sure there are many other tools like that in the wild that would “just work” and we never got around to test them.
+Lombok is just one of a huge set of bytecode manipulation tools that work statically. I’m sure there are many other tools like that in the wild that would "just work" and we never got around to test them.
 
 If you have a pet tool in your toolbox check it out and see if it works with Codename One. You might be surprised.
 ---

@@ -62,7 +62,7 @@ grievances
   
 and I’ve come to the conclusion that it isn’t a matter of native vs. cross platform or even HTML. Its a frustration issue, driven by unintuitive apps (hidden gestures etc.) and slow performance.  
   
-The slow performance bit is the most misunderstood, there is a “feeling” of sluggishness that people complain about but when users complain about performance its usually not related to that but rather something far more mundane… When users complain about performance its often over the infinite rotating wheel covering the entire UI (InfiniteProgress dialog in Codename One), which makes them stand around like idiots waiting for their phone to let them touch it again! 
+The slow performance bit is the most misunderstood, there is a "feeling" of sluggishness that people complain about but when users complain about performance its usually not related to that but rather something far more mundane… When users complain about performance its often over the infinite rotating wheel covering the entire UI (InfiniteProgress dialog in Codename One), which makes them stand around like idiots waiting for their phone to let them touch it again! 
 
 This is annoying, frustrating and I can name quite a few native apps that do this for routine data! 
 
@@ -95,7 +95,7 @@ URLImage
 ](http://www.codenameone.com/3/post/2014/03/image-from-url-made-easy.html)  
 and ImageDownloadService can become very handy since they seamlessly handle such cases. 
 
-You can display a “stale” indicator on top of a component to show that you are in offline mode or that the component contains changes that weren’t yet synchronized to the server, a trick we sometimes do is to place an InfiniteScroll on top of a component to indicate that it is being synchronized. Its important not to overdo this since the InfiniteScroll triggers repaints that will slow the responsiveness of your application!  
+You can display a "stale" indicator on top of a component to show that you are in offline mode or that the component contains changes that weren’t yet synchronized to the server, a trick we sometimes do is to place an InfiniteScroll on top of a component to indicate that it is being synchronized. Its important not to overdo this since the InfiniteScroll triggers repaints that will slow the responsiveness of your application!  
   
 E.g:  
   

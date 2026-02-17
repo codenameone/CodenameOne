@@ -62,9 +62,9 @@ But this is not enough, I want an end to end full stack application from mobile 
 
 ### Building an App from Scratch to Production
 
-When I told Chen about my plan to do a 4 week bootcamp and build a full production app as part of it he had his doubts. I’m paraphrasing here but this is the gist of what he said: “you don’t really think you can build a full production grade app in 4 weeks?”.
+When I told Chen about my plan to do a 4 week bootcamp and build a full production app as part of it he had his doubts. I’m paraphrasing here but this is the gist of what he said: "you don’t really think you can build a full production grade app in 4 weeks?".
 
-My answer was: “no, I will build the app and server in two weeks!”
+My answer was: "no, I will build the app and server in two weeks!"
 
 That’s ambitious but that’s exactly what a bootcamp is, it’s a startup for all intents and purposes. Building a full fledged well designed and architected app is something all of you can do within 2-4 weeks when using Java/Codename One.
 
@@ -180,7 +180,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Thanks for the feedback. I’m somewhat conflicted between simple tomcat, Java EE or Spring in terms of backend. My goal is to spend as little time as possible configuring stuff and make the solution as simple as possible so people can adapt this easily to their “real world” setups.
+> Thanks for the feedback. I’m somewhat conflicted between simple tomcat, Java EE or Spring in terms of backend. My goal is to spend as little time as possible configuring stuff and make the solution as simple as possible so people can adapt this easily to their "real world" setups.
 >
 > I don’t want to use something too exotic though, so I won’t go into some of the newer microservice style frameworks. My main focus by a huge margin is on the client, there are great Java EE/Spring etc. courses out there and I don’t think I can improve on them. What I want to do is show how all this ties together to a single cohesive product.
 >

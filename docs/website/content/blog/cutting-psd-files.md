@@ -24,7 +24,7 @@ Tope
 ![Picture](/blog/cutting-psd-files/cutting-psd-files-1.png)  
 ](/img/blog/old_posts/cutting-psd-files-large-4.png)
 
-This post assumes you have a recent version of Photoshop installed and assumes you don’t know anything about Photoshop. So we start by opening the PSD file in Photoshop, this file is composed of layers. A single “component” is usually composed of multiple layers which you can show/hide by pressing the “eye” button in the layer view. 
+This post assumes you have a recent version of Photoshop installed and assumes you don’t know anything about Photoshop. So we start by opening the PSD file in Photoshop, this file is composed of layers. A single "component" is usually composed of multiple layers which you can show/hide by pressing the "eye" button in the layer view. 
 
   
   
@@ -33,7 +33,7 @@ You can see the layer view by selecting Windows->Layers from the photoshop menu,
   
 A common paradigm designers use is to create multiple screens/forms in a singled PSD  
   
-and thus represent a “screen” (Form) of its own within the design.  
+and thus represent a "screen" (Form) of its own within the design.  
   
   
 So in order to see the other forms for those cases you can just hide/show each layer, in order to show individual components you can  
@@ -41,7 +41,7 @@ So in order to see the other forms for those cases you can just hide/show each l
 use the eye icon to get a specific component.
 
   
-Now our goal is to find a specific set of layers relevant to us and “hide” everything else so we can get the particular component we need in isolation.  
+Now our goal is to find a specific set of layers relevant to us and "hide" everything else so we can get the particular component we need in isolation.  
   
   
 This is pretty easy when the design is small, but just locating the right layer becomes a HUGE hassle as the design gets complicated and deeply nested.  
@@ -56,7 +56,7 @@ This is pretty easy when the design is small, but just locating the right layer 
 ![Picture](/blog/cutting-psd-files/cutting-psd-files-2.png)  
 ](/img/blog/old_posts/cutting-psd-files-large-5.png)
 
-To find the layer matching a specific component we select the “Move Tool” from the toolbar and check the auto select option in the toolbar above, we then pick the “Layer” entry instead of group.  
+To find the layer matching a specific component we select the "Move Tool" from the toolbar and check the auto select option in the toolbar above, we then pick the "Layer" entry instead of group.  
   
   
 Now when we click an area on the screen the layer corresponding to this specific entry will be selected in the layer view and we could manipulate it. Notice that a component is often composed of multiple layers… We usually would want to hide things such as the text layers etc. for cases such as buttons where we would want to get the button alone so we can cut it into a 9-piece border, but we would want other layers.  

@@ -11,8 +11,8 @@ author: Shai Almog
 
 ![Header Image](/blog/increase-your-build-quotas/generic-java-2.jpg)
 
-The most common question we get about Codename One is: “Is Codename One Free”. The direct answer is “Yes” but we don’t want to mislead. You can work with the open source code, which is just as free as any other project. But it’s not for the faint of heart…​  
-The build servers have quotas so we won’t go out of business. This is perceived by developers as “not free” but since no one else offers build servers I have an issue with that perception. To battle that perception we’re increasing the build quotas.
+The most common question we get about Codename One is: "Is Codename One Free". The direct answer is "Yes" but we don’t want to mislead. You can work with the open source code, which is just as free as any other project. But it’s not for the faint of heart…​  
+The build servers have quotas so we won’t go out of business. This is perceived by developers as "not free" but since no one else offers build servers I have an issue with that perception. To battle that perception we’re increasing the build quotas.
 
 Sort of…​
 

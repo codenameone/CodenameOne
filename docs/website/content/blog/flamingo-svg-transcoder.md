@@ -13,7 +13,7 @@ author: Shai Almog
 
 SVG (Scalable Vector Graphics) is an XML based image format that represents an image as vectors instead of pixels (raster). An SVG file is represented by the set of lines & shapes that make it and can thus be rendered at any resolution without quality degradation due to scaling. It has some other neat tricks up its sleeve but I’m only going to discuss that specific feature today.
 
-There was a time where everyone believed SVG will take the world by storm. It found a niche but never really created the revolution everyone expected. Still it’s a pretty valuable tool but unfortunately mobile device support is “spotty” at best…​
+There was a time where everyone believed SVG will take the world by storm. It found a niche but never really created the revolution everyone expected. Still it’s a pretty valuable tool but unfortunately mobile device support is "spotty" at best…​
 
 All mobile devices support SVG in the browser since it is a web standard. However, in the native layer SVG doesn’t work because of too many nuances related to the web that make it really hard to support the full spec in a native app. Android has partial SVG support where it can convert an SVG file to a native drawable during development time and that’s actually a pretty good idea as it removes the overhead of parsing SVG and the need to support the full spec.
 
@@ -318,7 +318,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Angelo says:
 >
-> If I understand, the utility converts an SVG file that uses a reduced set of features to real Java code. Is it possible just to create a XML file to be loaded from resources with curves, lines, moves and so on? You could create a class like ImageFromSVGSubset and instances would be created with sort of new ImageFromSVGSubset(“id”). The xml has not to be an official format, just used by developers in Codename One that want to use the transcoder and that know what they are doing. I think it should take just one hour of development for you, starting from the current fork.
+> If I understand, the utility converts an SVG file that uses a reduced set of features to real Java code. Is it possible just to create a XML file to be loaded from resources with curves, lines, moves and so on? You could create a class like ImageFromSVGSubset and instances would be created with sort of new ImageFromSVGSubset("id"). The xml has not to be an official format, just used by developers in Codename One that want to use the transcoder and that know what they are doing. I think it should take just one hour of development for you, starting from the current fork.
 >
 
 
@@ -416,9 +416,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > The arguments should be the current directory followed by package name. So something like:  
-> “`  
+> "`  
 > . com.mypackage.svg  
-> “`
+> "`
 >
 
 

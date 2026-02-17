@@ -52,7 +52,7 @@ ios.mopubId=Your ad unit here
   
 ios.mopubTabletId=Leaderboard ad unit for a tablet  
   
-android.mopubId=Your ad unit here
+`android.mopubId=Your ad unit here`
 
   
 And you will get banners like the one in the picture.  

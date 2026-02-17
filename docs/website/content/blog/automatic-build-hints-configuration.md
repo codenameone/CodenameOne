@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/automatic-build-hints-configuration/new-features-4.jpg)
 
-We try to make Codename One “seamless”, this expresses itself in many small details such as the automatic detection of permissions on Android etc. The build servers go a long way in setting up the environment as intuitive. But it’s not enough, build hints are often confusing and obscure. It’s just hard to abstract the mess that is native mobile OS’s and the odd policies from Apple/Google…​
+We try to make Codename One "seamless", this expresses itself in many small details such as the automatic detection of permissions on Android etc. The build servers go a long way in setting up the environment as intuitive. But it’s not enough, build hints are often confusing and obscure. It’s just hard to abstract the mess that is native mobile OS’s and the odd policies from Apple/Google…​
 
 E.g. a common problem developers face is location code that doesn’t work in iOS. This is due to the `ios.locationUsageDescription` build hint that’s required. The reason we added that build hint was a requirement by Apple to provide a description for every app that uses the location service.
 

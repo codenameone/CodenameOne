@@ -25,10 +25,10 @@ Todays update doesn’t include anything exceptional just a couple of new featur
 but this is somewhat misleading…​ Which is why you must always ask with your intention.
 
 At first I thought he meant the standard return key so my answer reflected that, newline isn’t on by default  
-with `TextField`. But it seems he was looking for a “done” key which you can determine for Android using the  
+with `TextField`. But it seems he was looking for a "done" key which you can determine for Android using the  
 client properties to pass a hint to the text field.
 
-__ |  Another wrong path here was the mixed terminology of “key”. In Codename One keys refer to physical  
+__ |  Another wrong path here was the mixed terminology of "key". In Codename One keys refer to physical  
 keys and not virtual keys   
 ---|---  
   

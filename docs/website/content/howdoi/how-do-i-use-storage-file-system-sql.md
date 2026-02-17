@@ -38,7 +38,7 @@ Notice that cleanup is crucial as the GC might be invoked if we don’t clean up
 
 A very common case is including an initial sql database that ships with your app. This allows you to include some initial data within the JAR or download initial data from a server.
 
-You can “install” the database into place by using the getDatabasePath method and using the standard file system API to copy the data into the place where the database should be.
+You can "install" the database into place by using the getDatabasePath method and using the standard file system API to copy the data into the place where the database should be.
 
 Here are a few tips and best practices when working with storage. The first is pretty crucial, you need to understand mobile app isolation as I discussed initially. Mobile apps don’t have desktop concepts like file open or file save dialogs since there is no concept of shared file system. That’s something you need to get used to as a mobile developer. The standard Storage should be the default mode you use. The other options are harder and less portable so pick them up only if you actually need them.  
 When porting code we have some helper classes in the io package that you should notice. This is true for File, URL and other classes. Check the JavaDoc as many classes might not be in the same place but the functionality should still be there… Always use app home when working with filesystem unless there is a real special case in which case consider the fact you will be writing code that isn’t as portable.  

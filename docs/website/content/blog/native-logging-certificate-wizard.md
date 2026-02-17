@@ -33,7 +33,7 @@ As usual producing the book is taking way longer than planned but I’m getting 
 
 On a related subject we also need to update Codename One to run on newer JDK’s 9/10/11 all of which broke so many **documented** features in the JDK that we depend on. This is crucial as JDK 8 will EoL in 2019.
 
-With those two things in mind we decided to postpone Codename One 5.0 to September instead of its current July target. This will give us time to address these issues and give me a bit of time to do some “actual work” that doesn’t revolve around the book.
+With those two things in mind we decided to postpone Codename One 5.0 to September instead of its current July target. This will give us time to address these issues and give me a bit of time to do some "actual work" that doesn’t revolve around the book.
 ---
 
 ## Archived Comments

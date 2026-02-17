@@ -38,7 +38,7 @@ To integrate with any CI solution just use our standard Ant targets such as
 build-for-android-device  
   
   
-, build-for-iphone-device etc. Normally, this would be a problem since the build is sent but since it isn’t blocking you wouldn’t get the build result and wouldn’t be able to determine if the build passed or failed. To enable this just edit the build XML and add the attribute automated=”true” to the codeNameOne tag in the appropriate targets. This will deliver a result.zip file under the dist folder containing the binaries of a successful build. It will also block until the build is completed. This should be pretty easy to integrate with any CI system together with our  
+, build-for-iphone-device etc. Normally, this would be a problem since the build is sent but since it isn’t blocking you wouldn’t get the build result and wouldn’t be able to determine if the build passed or failed. To enable this just edit the build XML and add the attribute automated="true" to the codeNameOne tag in the appropriate targets. This will deliver a result.zip file under the dist folder containing the binaries of a successful build. It will also block until the build is completed. This should be pretty easy to integrate with any CI system together with our  
 [  
 automated testing solutions  
 ](http://www.codenameone.com/blog/test-it)  

@@ -15,7 +15,7 @@ I hoped to finish migrating all of the material from the original bootcamp to th
 
 If you haven’t kept up I added a lot of modules over the past few weeks covering a very wide set of subjects such as animations, tablet support, cloud server setup and much more.
 
-One of the big additions to the [Deep Dive into Mobile Development with Codename One](https://codenameone.teachable.com/p/deep-dive-into-mobile-development-with-codename-one) is a new segment from Chidi Okwudire who is the author of [parse4cn1](https://github.com/sidiabale/parse4cn1) and the perfect person to teach it…​ This segment covers parse from the level of “I don’t know what parse is” to the level of adapting the app to the cloud server which is pretty cool!
+One of the big additions to the [Deep Dive into Mobile Development with Codename One](https://codenameone.teachable.com/p/deep-dive-into-mobile-development-with-codename-one) is a new segment from Chidi Okwudire who is the author of [parse4cn1](https://github.com/sidiabale/parse4cn1) and the perfect person to teach it…​ This segment covers parse from the level of "I don’t know what parse is" to the level of adapting the app to the cloud server which is pretty cool!
 
 ### Next in Line
 

@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/seamless-storage-encryption/new-features-6.jpg)
 
 We had support for bouncy castle encryption for quite a while but it is not as intuitive as we’d like it to be. This makes  
-securing/encrypting your app painful and so we procrastinate and eventually skip that “feature” altogether.  
+securing/encrypting your app painful and so we procrastinate and eventually skip that "feature" altogether.  
 Frankly, I hate working on encryption it’s painful…​ That’s why we procrastinated on this feature until today!
 
 We now support full encryption of the `Storage` (notice the distinction, `Storage` is not `FileSystemStorage`).  

@@ -18,7 +18,7 @@ are inherent but over the past year or so we’ve been thinking more and more ab
 
 As part of that train of thought I filed [this issue](https://github.com/codenameone/CodenameOne/issues/1758)  
 with a few suggestions about working around some of those limitations. I think these approaches would work really  
-well on iOS which from my experience is more “amiable” to such hacks. Android is a different beast though.  
+well on iOS which from my experience is more "amiable" to such hacks. Android is a different beast though.  
 Android’s rendering logic is a weird hackish nightmare filled with bugs and lore…​
 
 So naturally I picked Android first to experiment with and as you can see from the screenshot above, the button  

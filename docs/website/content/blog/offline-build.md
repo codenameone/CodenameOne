@@ -179,7 +179,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Gareth Murfin** — August 10, 2016 at 4:14 pm ([permalink](/blog/offline-build/#comment-22683))
 
-> Wow!!! This is amazing! One question, and I know the answer I think 🙂 But would it be possible to get this working using a mac in the cloud? I guess it would actually, if you simply install all the stuff on that mac, for building, and code locally then pull the code on the mac. Fantastic idea, also silences a lot of the people who say “no way im doing cloud builds”.. Can’t wait to try it.
+> Wow!!! This is amazing! One question, and I know the answer I think 🙂 But would it be possible to get this working using a mac in the cloud? I guess it would actually, if you simply install all the stuff on that mac, for building, and code locally then pull the code on the mac. Fantastic idea, also silences a lot of the people who say "no way im doing cloud builds".. Can’t wait to try it.
 >
 
 

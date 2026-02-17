@@ -20,7 +20,7 @@ author: Shai Almog
   
   
 
-One of our enterprise developers started complaining about the performance of our Android port, which forced us to take a closer look at our rendering pipeline on Android. It seems that Google’s hardware acceleration broke pretty much all the best practices of the Android 2.x era and what we had wasn’t taking full advantage of “project butter” the codename for Google’s new Android rendering layer.  
+One of our enterprise developers started complaining about the performance of our Android port, which forced us to take a closer look at our rendering pipeline on Android. It seems that Google’s hardware acceleration broke pretty much all the best practices of the Android 2.x era and what we had wasn’t taking full advantage of "project butter" the codename for Google’s new Android rendering layer.  
   
   
   
@@ -34,14 +34,14 @@ This took a lot of effort to adapt and the effort is still ongoing but we wrote 
   
   
   
-If you want to play with it just use the build argument android.asyncPaint=true  
+If you want to play with it just use the build argument `android.asyncPaint=true`  
   
   
   
   
   
   
-In this mode all paint graphics operations are added to a “task” pipeline and rendered asynchronously which allows better utilization of the device GPU for some use cases. Because of that this mode returns false from Display.areMutableImagesFast() this allows us to optimize rendering to avoid double buffering paradigms where possible (e.g. within the MapComponent).  
+In this mode all paint graphics operations are added to a "task" pipeline and rendered asynchronously which allows better utilization of the device GPU for some use cases. Because of that this mode returns false from `Display.areMutableImagesFast()` this allows us to optimize rendering to avoid double buffering paradigms where possible (e.g. within the MapComponent).  
   
   
   

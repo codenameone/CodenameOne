@@ -34,7 +34,7 @@ Lets go over the claims made both on Twitter and in the article.
 Using a title like this is misleading, clickbait & antagonistic.  
 I don’t think Oracle made any friends with the lawsuit, overall the vibe in the Java community is that  
 this was a mistake that didn’t help anyone. The thing is that OpenJDK is GPL and so Oracle doesn’t really  
-“own” it and doesn’t really gain much except in maybe some “respect”. 
+"own" it and doesn’t really gain much except in maybe some "respect". 
 
 OpenJDK is GPL+CPE so Google can use it without paying Oracle a dime (just like Linux distros do). It also  
 features a patent grant which means that if Google passes the TCK’s (meaning they are Java compatible which  
@@ -170,7 +170,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks.
 >
-> It was actually fun debating him since he is a good debater (and REALLY smart). I just really can’t stand debating with “catch phrases”. Technical debates require proof and context which is problematic in twitter.
+> It was actually fun debating him since he is a good debater (and REALLY smart). I just really can’t stand debating with "catch phrases". Technical debates require proof and context which is problematic in twitter.
 >
 
 
@@ -179,7 +179,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Chad says:
 >
-> IMO phrases like “Java has amazing TCK’s that check compatibility” and “It has quite a few separate compliant VM’s” are disingenuous. This is what killed Harmony in the first place, they couldn’t get a TCK because Oracle didn’t like their license. I would love to make my own open source compatible JVM, but I will never see the TCK. I think it’s harmful to pretend it’s a “good thing(tm)” that implementations have to pass a hidden test suite whose keyholders may make demands of your software. Sure it means I can’t call my JVM “Java”, but that’s the problem here. There is only one open-source compliant JVM implementation base that I am aware of, and that is a bad thing.
+> IMO phrases like "Java has amazing TCK’s that check compatibility" and "It has quite a few separate compliant VM’s" are disingenuous. This is what killed Harmony in the first place, they couldn’t get a TCK because Oracle didn’t like their license. I would love to make my own open source compatible JVM, but I will never see the TCK. I think it’s harmful to pretend it’s a "good thing(tm)" that implementations have to pass a hidden test suite whose keyholders may make demands of your software. Sure it means I can’t call my JVM "Java", but that’s the problem here. There is only one open-source compliant JVM implementation base that I am aware of, and that is a bad thing.
 >
 
 
@@ -197,7 +197,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We make our own VM too (ParparVM) so obviously to be compliant we also need to pass the TCK now (see my previous analysis on the subject) which might also be a problem. If you use OpenJDK and its license you can probably apply to access for that as I’m sure Google has. Since they are/were a Java licensee I think they might already have that access.
 >
-> For a small VM (like us) this is more problematic so I totally agree that the opaqueness of the TCK process is a problem. FYI I did “see” and worked a lot with the TCK on older versions of Java to get our VM’s thru compliance. For Sun’s VM’s it was mostly trivial since the JIT/VM was reused but there are a lot of weird edge cases tested by the TCK.
+> For a small VM (like us) this is more problematic so I totally agree that the opaqueness of the TCK process is a problem. FYI I did "see" and worked a lot with the TCK on older versions of Java to get our VM’s thru compliance. For Sun’s VM’s it was mostly trivial since the JIT/VM was reused but there are a lot of weird edge cases tested by the TCK.
 >
 
 

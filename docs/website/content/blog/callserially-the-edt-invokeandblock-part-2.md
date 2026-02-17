@@ -58,7 +58,7 @@ doOperationB();
   
 doOperationC();
 
-Unfortunately, this means that operation C will happen in parallel to operation C which might be a problem… E.g. instead of using operation names lets use a more “real world” example:  
+Unfortunately, this means that operation C will happen in parallel to operation C which might be a problem… E.g. instead of using operation names lets use a more "real world" example:  
   
 updateUIToLoadingStatus();  
   
@@ -70,61 +70,49 @@ Notice that the first and last operations must be conducted on the EDT but the m
   
 Since updateUIWithContentOfFile needs readAndParseFile to be before it doing the new thread won’t be enough. Our automatic approach is to do something like this:  
   
-updateUIToLoadingStatus();  
-  
-new Thread() {  
-  
-public void run() {  
-  
-readAndParseFile();  
-  
-updateUIWithContentOfFile();  
-  
-}  
-  
-}).start();
+```java
+updateUIToLoadingStatus();
+
+new Thread() {
+    public void run() {
+        readAndParseFile();
+        updateUIWithContentOfFile();
+    }
+}.start();
+```
 
 But updateUIWithContentOfFile should be executed on the EDT and not on a random thread. So the right way to do this would be something like this:
 
-updateUIToLoadingStatus();  
-  
-new Thread() {  
-  
-public void run() {  
-  
-readAndParseFile();  
-  
-Display.getInstance().callSerially(new Runnable() {  
-  
-public void run() {  
-  
-updateUIWithContentOfFile();  
-  
-}  
-  
-});  
-  
-}  
-  
-}).start();
+```java
+updateUIToLoadingStatus();
+
+new Thread() {
+    public void run() {
+        readAndParseFile();
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                updateUIWithContentOfFile();
+            }
+        });
+    }
+}.start();
+```
 
 This is perfectly legal and would work reasonably well, however it gets complicated as we add more and more features that need to be chained serially after all these are just 3 methods!
 
 Invoke and block solves this in a unique way you can get almost the exact same behavior by using this:  
   
-updateUIToLoadingStatus();  
-  
-Display.getInstance().invokeAndBlock(new Runnable() {  
-  
-public void run() {  
-  
-readAndParseFile();  
-  
-}  
-  
-});  
-  
+```java
+updateUIToLoadingStatus();
+
+Display.getInstance().invokeAndBlock(new Runnable() {
+    public void run() {
+        readAndParseFile();
+    }
+});
+
 updateUIWithContentOfFile();
+```
 
 Invoke and block effectively blocks the current EDT in a legal way. It spawns a separate thread that runs the run() method and when that run method completes it goes back to the EDT. All events and EDT behavior still works while invokeAndBlock is running, this is because invokeAndBlock() keeps calling the main thread loop internally.
 
@@ -144,7 +132,7 @@ However, it does make some sense and we can explain that using an example. E.g. 
   
 3\. The button repaints a release animation as its being released.
 
-However, this might cause a problem if the first event that we handle (the dialog) might cause an issue to the following events. E.g. a dialog will block the EDT (using invokeAndBlock), events will keep happening but since the event we are in “already happened” the button repaint and the framework logging won’t occur. This might also happen if we show a form which might trigger logic that relies on the current form still being present.
+However, this might cause a problem if the first event that we handle (the dialog) might cause an issue to the following events. E.g. a dialog will block the EDT (using invokeAndBlock), events will keep happening but since the event we are in "already happened" the button repaint and the framework logging won’t occur. This might also happen if we show a form which might trigger logic that relies on the current form still being present.
 
 One of the solutions to this problem is to just wrap the action listeners body with a callSerially. In this case the callSerially will postpone the event to the next cycle (loop) of the EDT and let the other events in the chain complete. Notice that you shouldn’t use this normally since it includes an overhead and complicates application flow, however when you run into issues in event processing I suggest trying this to see if its the cause.  
   
@@ -173,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Its here: 
 >
-> “Unfortunately, this means that operation C will happen in parallel to operation C which might be a problem…” 
+> "Unfortunately, this means that operation C will happen in parallel to operation C which might be a problem…" 
 >
 > I think one of the C should be B 
 >

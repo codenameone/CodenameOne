@@ -122,7 +122,7 @@ It is quite often the case that native code needs to call back into Codename One
 
 Native code will have access to both the Codename One API and any native APIs in your app, but on some platforms, accessing the Codename One API may be a little tricky. E.g. on iOS you’ll be calling from Objective-C back into Java which requires knowledge of Codename One’s java-to-objective C conversion process. In general, I have found that the easiest way to facilitate callbacks is to provide abstractions that involve static java methods (in Codename One space) that accept and return primitive types.
 
-In the case of our `Mobihelp` class, the following method hints at the need to have a “callback plan”:
+In the case of our `Mobihelp` class, the following method hints at the need to have a "callback plan":
     
     
     public static final void getUnreadCountAsync (Context context, UnreadUpdatesCallback callback)
@@ -187,7 +187,7 @@ For the second issue, we’ll create a static method that can take the token gen
 
 ### Initialization
 
-Most Native SDKs include some sort of initialization method where you pass your developer and application credentials to the API. When I filled in FreshDesk’s web-based form to create a new application, it generated an application ID, an app “secret”, and a “domain”. The SDK requires me to pass all three of these values to its `init()` method via the `MobihelpConfig` class.
+Most Native SDKs include some sort of initialization method where you pass your developer and application credentials to the API. When I filled in FreshDesk’s web-based form to create a new application, it generated an application ID, an app "secret", and a "domain". The SDK requires me to pass all three of these values to its `init()` method via the `MobihelpConfig` class.
 
 Note, however, that FreshDesk (and most other service provides that have native SDKs) requires me to create different Apps for each platform. This means that my App ID and App secret will be different on iOS than they will be on Android.
 

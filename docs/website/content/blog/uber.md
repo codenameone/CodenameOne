@@ -19,7 +19,7 @@ E.g. this is the login form for the native Uber app on my Android device next to
 
 Figure 1. Images of the native Android Uber app and my clone code
 
-Notice that I didn’t even go for “pixel perfect” as that would mean the code would be a bit more complicated and I want the code to be simple. One of the things I like about Uber is how similar the app looks on iOS and Android. That validates a lot of what we have been saying all along: you need your own branding. Not Apples or Googles.
+Notice that I didn’t even go for "pixel perfect" as that would mean the code would be a bit more complicated and I want the code to be simple. One of the things I like about Uber is how similar the app looks on iOS and Android. That validates a lot of what we have been saying all along: you need your own branding. Not Apples or Googles.
 ---
 
 ## Archived Comments

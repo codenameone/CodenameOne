@@ -38,7 +38,7 @@ We would now write:
     
     public final IntProperty<MyObject> myNumber = new IntProperty<>("myNumber");
 
-The main motivation for this is erasure. Parsing code that accesses `myNumber` wouldn’t know the generic type since that is removed during compilation. However, we can know the type of `IntProperty` & thus implicitly convert numeric types during parsing. This isn’t as “generic” but since `NumericProperty` is a common base class for all number properties and derives from `Property` we can write common code relatively easily.
+The main motivation for this is erasure. Parsing code that accesses `myNumber` wouldn’t know the generic type since that is removed during compilation. However, we can know the type of `IntProperty` & thus implicitly convert numeric types during parsing. This isn’t as "generic" but since `NumericProperty` is a common base class for all number properties and derives from `Property` we can write common code relatively easily.
 
 The `NumericProperty` also introduces support for non-nullable elements in this case which will fail if you try to set a null value and thus work better with auto-boxed values.
 ---

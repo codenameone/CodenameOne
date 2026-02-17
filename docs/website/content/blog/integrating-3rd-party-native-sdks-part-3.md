@@ -17,7 +17,7 @@ This is the third and final instalment in a series on integrating 3rd party nati
 
 Part 1 of this tutorial focused on the Android native integration. Now we’ll shift our focus to the iOS implementation.
 
-After selecting “Generate Native Interfaces” for our “MobihelpNative” class, you’ll find a `native/ios` directory in your project with the following files:
+After selecting "Generate Native Interfaces" for our "MobihelpNative" class, you’ll find a `native/ios` directory in your project with the following files:
 
   1. [`com_codename1_freshdesk_MobihelpNativeImpl.h`](https://github.com/shannah/cn1-freshdesk/blob/master/cn1-freshdesk-demo/native/ios/com_codename1_freshdesk_MobihelpNativeImpl.h)
 
@@ -88,9 +88,9 @@ Now that we have implemented our iOS native interface, we need to bundle the Mob
 
   4. The SDK includes `.framework` files. This is a bit tricker as Codename One doesn’t support simply copying the `.framework` files inside your project. In this case you need to perform the following:
 
-  5. Right click on the `.framework` file (if you are using OS X) and select “Show Package Contents”.
+  5. Right click on the `.framework` file (if you are using OS X) and select "Show Package Contents".
 
-  6. Find the “binary” file within the framework, and copy it into your `native/ios` directory – but rename it `libXXX.a` (where XXX is the name of the binary).
+  6. Find the "binary" file within the framework, and copy it into your `native/ios` directory – but rename it `libXXX.a` (where XXX is the name of the binary).
 
   7. Copy all `.h` files from the framework into your `native/ios` directory.
 
@@ -100,7 +100,7 @@ The FreshDesk SDK doesn’t include any `.framework` files, so we don’t need t
 
 ## Troubleshooting iOS
 
-If you run into problems with the build, you can select “Include Sources” in the build server to download the resulting Xcode Project. You can then debug the Xcode project locally, make changes to your iOS native implementation files, and copy them back into your project once it is building properly.
+If you run into problems with the build, you can select "Include Sources" in the build server to download the resulting Xcode Project. You can then debug the Xcode project locally, make changes to your iOS native implementation files, and copy them back into your project once it is building properly.
 
 ## Adding Required Core Libraries and Frameworks
 
@@ -112,7 +112,7 @@ We can add these dependencies to our project using the `ios.add_libs` build hint
 
 ![65e31df8 620c 11e5 87ff 6b926a3f2090](/blog/integrating-3rd-party-native-sdks-part-3/65e31df8-620c-11e5-87ff-6b926a3f2090.png)
 
-I.e. we just list the framework names separated by semicolons. Notice that my list in the above image doesn’t include all of the frameworks that they list because many of the frameworks are already included by default (I obtained the default list by simply building the project with “include sources” checked, then looked at the frameworks that were included).
+I.e. we just list the framework names separated by semicolons. Notice that my list in the above image doesn’t include all of the frameworks that they list because many of the frameworks are already included by default (I obtained the default list by simply building the project with "include sources" checked, then looked at the frameworks that were included).
 
 # Part 3 : Packaging as a .cn1lib
 

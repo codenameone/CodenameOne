@@ -29,7 +29,7 @@ in fact for many developers it symbolizes the failure of the layout manager conc
   
 Last week I had a very interesting conversation with a very prominent Swing developer  
   
-and he asked me whether we had gridbag support. I answered that we do not and repeated the regular “no one likes it” line, turns out he does like it and has a lot of Swing code that uses GridBag!  
+and he asked me whether we had gridbag support. I answered that we do not and repeated the regular "no one likes it" line, turns out he does like it and has a lot of Swing code that uses GridBag!  
   
   
   

@@ -20,7 +20,7 @@ for your convenience we also embedded the video below but the transcript is only
 
 ### Videos Moving Forward
 
-While we still have some work to do on the written docs we now consider them to be “done” in terms of base level  
+While we still have some work to do on the written docs we now consider them to be "done" in terms of base level  
 quality which means we need to update our aging set of videos. We started with the hello world videos because  
 they serve as the first impression a developer gets from Codename One and should be sublime.
 

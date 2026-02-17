@@ -50,7 +50,7 @@ although later versions of xcode allow you to circumvent that slightly.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39248820/generating-certificate-for-ios-using-codename-one-certificate-wizard)
 
-### “Unrecognized Selector Sent to Instance” error in iOS native code
+### "Unrecognized Selector Sent to Instance" error in iOS native code
 
 Two really confusing things for developers new to Objective-C that had me stumped too:
 
@@ -64,7 +64,7 @@ a compiled language
 ### Error=13, Permission denied when adding event in CodenameOne
 
 The old designer is bound to the IDE in a problematic way so if more than one IDE instance exists or if the IDE  
-installation isn’t standard things can get “weird”. This only exists in NetBeans as we found more elegant  
+installation isn’t standard things can get "weird". This only exists in NetBeans as we found more elegant  
 ways of addressing this binding in other IDE’s.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39212609/error-13-permission-denied-when-adding-event-in-codenameone)

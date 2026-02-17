@@ -81,7 +81,7 @@ have:
                     add(BorderLayout.EAST, joinMailingList));
 
 __**1** | The `addComps` method just adds all the components to a dynamically changing input. You can  
-use this method almost “as is” to get the effect above  
+use this method almost "as is" to get the effect above  
 ---|---  
 __**2** | In tablets/desktops we always use the table mode so the box layout only applies in portrait phones and  
 nowhere else  

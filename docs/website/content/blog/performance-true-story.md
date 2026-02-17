@@ -71,7 +71,7 @@ To hasten the loading of contacts we load them all without images. We then launc
 
 This performed well in the simulator but didn’t do too well even on powerful mobile phones. We assumed this wouldn’t be a problem because we used `Util.sleep()` to yield CPU time but that wasn’t enough.
 
-Often when we see performance penalty the response is: “move it to a separate thread”. The problem is that this separate thread needs to compete for the same system resources and merge its changes back into the EDT. When we perform something intensive we need to make sure that the CPU isn’t needed right now…​
+Often when we see performance penalty the response is: "move it to a separate thread". The problem is that this separate thread needs to compete for the same system resources and merge its changes back into the EDT. When we perform something intensive we need to make sure that the CPU isn’t needed right now…​
 
 In this and past cases we solved this using a class member indicating the last time a user interacted with the UI.  
 Here we defined:

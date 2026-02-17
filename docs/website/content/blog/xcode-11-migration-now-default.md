@@ -16,7 +16,7 @@ We announced a couple of weeks ago that we’re moving our build servers to use 
 
 This has been in the cloud servers for a while and is now the default when sending new builds. For most of you this should be seamless…​
 
-Everything should “just work”. But for some edge cases things might fail or behave differently. This is especially true if you rely on native libraries but also if you rely on some functionality that we missed in our testing.
+Everything should "just work". But for some edge cases things might fail or behave differently. This is especially true if you rely on native libraries but also if you rely on some functionality that we missed in our testing.
 
 If you run into such a problem first verify it by testing against xcode 10.1 using the build hint: `ios.xcode_version=10.1`.
 

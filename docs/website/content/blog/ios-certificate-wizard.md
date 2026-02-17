@@ -11,7 +11,7 @@ author: Steve Hannah
 
 ![Header Image](/blog/ios-certificate-wizard/ios-cert-wizard-blog-post-header.png)
 
-So you have finished your app and tested it on the simulator. Everything looks good. You’re now ready to proceed with testing on your iPhone. You select the “Send iOS Debug Build” menu item and wait for the build server to work its magic, but then you’re faced with a notice that iOS builds require a valid certificate and provisioning profile. What a hassle!
+So you have finished your app and tested it on the simulator. Everything looks good. You’re now ready to proceed with testing on your iPhone. You select the "Send iOS Debug Build" menu item and wait for the build server to work its magic, but then you’re faced with a notice that iOS builds require a valid certificate and provisioning profile. What a hassle!
 
 If you’ve done any iOS development (not just Codename One) I’m sure you’ve hit this speed-bump before. You can’t **just** test your app on your iPhone. You have to jump through a series of hoops imposed by Apple before you get the privilege of testing your app on your phone. You need to create an App ID with the necessary permissions, generate a certificate signing request, download your certificates, generate mobile provisioning profiles to register your iPhone to be able to test your app. And finally, you have to export your certificates into a format that can be used in Codename One. If you have a Mac, this process is annoying at best. If you don’t, then this process might be your show-stopper.
 
@@ -19,15 +19,15 @@ Personally, I find the iOS certificate process to be the single most painful par
 
 ## How it works
 
-To generate your certificates and profiles, simply open your project’s properties, and click on “iOS” in the left menu. This will show the “iOS Signing” panel that includes fields to select your certificates and mobile provisioning profiles.
+To generate your certificates and profiles, simply open your project’s properties, and click on "iOS" in the left menu. This will show the "iOS Signing" panel that includes fields to select your certificates and mobile provisioning profiles.
 
 ![Netbeans iOS Signing properties panel](/blog/ios-certificate-wizard/ios-cert-wizard-1-signing.png)
 
-If you already have valid certificates and profiles, you can just enter their locations here. If you don’t, then you can use the new wizard by clicking the “Generate” button in the lower part of the form.
+If you already have valid certificates and profiles, you can just enter their locations here. If you don’t, then you can use the new wizard by clicking the "Generate" button in the lower part of the form.
 
 ### Logging into the Wizard
 
-After clicking “Generate” you’ll be shown a login form. Log into this form using your **iTunes Connect** user ID and password. **NOT YOUR CODENAME ONE LOGIN**.
+After clicking "Generate" you’ll be shown a login form. Log into this form using your **iTunes Connect** user ID and password. **NOT YOUR CODENAME ONE LOGIN**.
 
 image::/img/blog/ios-cert-wizard-2-login.png[Wizard login form]
 
@@ -41,17 +41,17 @@ Select the ones that you want to include in your provisioning profile and click 
 
 ![After selecting devices](/blog/ios-certificate-wizard/ios-cert-wizard-4-devices-selected.png)
 
-If you don’t have any devices registered yet, you can click the “Add New Device” button, which will prompt you to enter the UDID for your device.
+If you don’t have any devices registered yet, you can click the "Add New Device" button, which will prompt you to enter the UDID for your device.
 
 ### Decisions & Edge Cases
 
-After you click “Next” on the device form, the wizard checks to see if you already have a valid certificate. If your project already has a valid certificate and it matches the one that is currently active in your apple developer account, then it will just use the same certificate. If the certificate doesn’t match the currently-active one, or you haven’t provided a certificate, you will be prompted to overwrite the old certificate with a new one.
+After you click "Next" on the device form, the wizard checks to see if you already have a valid certificate. If your project already has a valid certificate and it matches the one that is currently active in your apple developer account, then it will just use the same certificate. If the certificate doesn’t match the currently-active one, or you haven’t provided a certificate, you will be prompted to overwrite the old certificate with a new one.
 
 ![Prompt to overwrite existing certificate](/blog/ios-certificate-wizard/ios-cert-wizard-4.1-overwrite-cert.png)
 
 ![Prompt to overwrite other certificate](/blog/ios-certificate-wizard/ios-cert-wizard-4.2-overwrite-cert.png)
 
-The same “decisions” need to be made twice: Once for the development certificate, and once for the Apptore certificate.
+The same "decisions" need to be made twice: Once for the development certificate, and once for the Apptore certificate.
 
 ### App IDs and Provisioning Profiles
 
@@ -61,7 +61,7 @@ The next form in the wizard asks for your app’s bundle ID. This should have be
 
 ### Installing Files Locally
 
-Once the wizard is finished generating your provisioning profiles, you should click “Install Locally”, which will open a file dialog for you to navigate to a folder in which to store the generated files.
+Once the wizard is finished generating your provisioning profiles, you should click "Install Locally", which will open a file dialog for you to navigate to a folder in which to store the generated files.
 
 ![Install files locally](/blog/ios-certificate-wizard/ios-cert-wizard-6-install-now.png)
 
@@ -71,7 +71,7 @@ Once the wizard is finished generating your provisioning profiles, you should cl
 
 ### Building Your App
 
-After selecting your local install location, and closing the wizard, you should see the fields of the “iOS Signing” properties panel filled in correctly. You should now be able to send iOS debug or Appstore builds without the usual hassles.
+After selecting your local install location, and closing the wizard, you should see the fields of the "iOS Signing" properties panel filled in correctly. You should now be able to send iOS debug or Appstore builds without the usual hassles.
 
 ![Filled in signing panel after wizard complete](/blog/ios-certificate-wizard/ios-cert-wizard-9-signing-panel.png)
 
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **shannah78** — July 23, 2015 at 1:17 pm ([permalink](/blog/ios-certificate-wizard/#comment-22401))
 
-> Not sure yet what would cause that. If you log into your Apple developer account are there any pending agreements that you have to agree to? Are you able to access the “create certificate form” in your apple developer account? Also, does your account have multiple teams? (i.e. when you log into apple developer to you need to select a team?)
+> Not sure yet what would cause that. If you log into your Apple developer account are there any pending agreements that you have to agree to? Are you able to access the "create certificate form" in your apple developer account? Also, does your account have multiple teams? (i.e. when you log into apple developer to you need to select a team?)
 
 
 ### **shannah78** — July 23, 2015 at 3:38 pm ([permalink](/blog/ios-certificate-wizard/#comment-22194))
@@ -230,7 +230,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Yngve Moe says:
 >
-> I can’t see any login dialog. When i press Generate, I just get the message “This feature requires you to be logged in.” This happens on a fresh install of NetBeans with Codename One plugin, both on Mac and Windows. Am i doing something wrong?
+> I can’t see any login dialog. When i press Generate, I just get the message "This feature requires you to be logged in." This happens on a fresh install of NetBeans with Codename One plugin, both on Mac and Windows. Am i doing something wrong?
 
 
 ### **Shai Almog** — November 15, 2015 at 4:12 am ([permalink](/blog/ios-certificate-wizard/#comment-22488))
@@ -301,14 +301,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Provisioning profiles are done per-app so when you run the wizard on a new app just tell it NO when it asks to generate the certificates and point the UI to the P12 files you generated last!
 >
-> Now this is the point where it gets hard… When doing push you DO need new P12 files that are specific to the app, they are totally unrelated to signing/building and are only used for push. So if you check the “push” checkbox you will need to generate those. You will get an automatic email message with instructions when you check that flag.
+> Now this is the point where it gets hard… When doing push you DO need new P12 files that are specific to the app, they are totally unrelated to signing/building and are only used for push. So if you check the "push" checkbox you will need to generate those. You will get an automatic email message with instructions when you check that flag.
 
 
 ### **Paul Willworth** — January 25, 2016 at 6:06 am ([permalink](/blog/ios-certificate-wizard/#comment-21492))
 
 > Paul Willworth says:
 >
-> This is a great feature. The one thing I don’t understand is where it gets the certificate passwords from. I can complete the wizard process successfully, but when I’m done I find that it has used the value “password” for my certificate passwords. I don’t want it to use that, how do I specify what password the wizard should use for my certificates? I am using Eclipse. I saw some talk in another thread about setting some project level password but I don’t see that.
+> This is a great feature. The one thing I don’t understand is where it gets the certificate passwords from. I can complete the wizard process successfully, but when I’m done I find that it has used the value "password" for my certificate passwords. I don’t want it to use that, how do I specify what password the wizard should use for my certificates? I am using Eclipse. I saw some talk in another thread about setting some project level password but I don’t see that.
 
 
 ### **Shai Almog** — January 26, 2016 at 3:16 am ([permalink](/blog/ios-certificate-wizard/#comment-22516))
@@ -322,7 +322,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > James Mason says:
 >
-> When I run the iOS Certificate Wizard, a window pops up saying “Select Team”. But no teams are listed and there is no response to the Next button either. How do I get beyond this?
+> When I run the iOS Certificate Wizard, a window pops up saying "Select Team". But no teams are listed and there is no response to the Next button either. How do I get beyond this?
 
 
 ### **Shai Almog** — May 25, 2016 at 5:57 am ([permalink](/blog/ios-certificate-wizard/#comment-22643))
@@ -332,7 +332,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > If you navigate to [http://developer.apple.com/…](<http://developer.apple.com/ios/manage/provisioningprofiles/index.action>) do you see teams or something like that?  
 > Do you have the ability to create a new certificate/provisioning profile?
 >
-> Is there something “special” about your account? (Enterprise, University etc.)
+> Is there something "special" about your account? (Enterprise, University etc.)
 
 
 ### **James Mason** — May 25, 2016 at 4:03 pm ([permalink](/blog/ios-certificate-wizard/#comment-22869))
@@ -346,7 +346,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > 3lix says:
 >
-> Hello I am getting the following error “could not create development profile. No matching provisioning profile was found” when I try to generate the certificated.  
+> Hello I am getting the following error "could not create development profile. No matching provisioning profile was found" when I try to generate the certificated.  
 > I do have a developer account which I use to login with. (this step is successful)  
 > Selecting device step is also successful as I see the newly added device on my developer’s account.  
 > I would appreciate any help.
@@ -356,7 +356,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Ian says:
 >
-> Hi. I’m trying to use the wizard to generate a certificate. It worked fine previously but now, it isn’t working. It asks me for the devices, I select them, it asks if I want to overwrite existing iOS certificate and I say “Yes”.
+> Hi. I’m trying to use the wizard to generate a certificate. It worked fine previously but now, it isn’t working. It asks me for the devices, I select them, it asks if I want to overwrite existing iOS certificate and I say "Yes".
 >
 > But then it doesn’t generate any certificate. Any idea why? I don’t get any error message.
 
@@ -365,7 +365,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > 3lix says:
 >
-> Also I noticed that my “Certificates” screen shows up with “Enable Push Pro Feature only” at the bottom.  
+> Also I noticed that my "Certificates" screen shows up with "Enable Push Pro Feature only" at the bottom.  
 > I am not sure if this is causing any issues?
 
 
@@ -491,7 +491,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Kai says:
 >
-> No, I used the tool for the whole process. It shows that the AppStore certificate was not generated, after setting App Name (you should add validation that no special characters are allowed) & App ID, it runs into an error “Could not create appstore profile. No matching provisioning profile was found”. Then it returns to the view where App name and ID are set. Then I tried to download the files from [developer.apple.com](<http://developer.apple.com>), because I couldn’t find any generated/downloaded file on my system, neither are any paths/settings set in the Codenameone ios signature settings.  
+> No, I used the tool for the whole process. It shows that the AppStore certificate was not generated, after setting App Name (you should add validation that no special characters are allowed) & App ID, it runs into an error "Could not create appstore profile. No matching provisioning profile was found". Then it returns to the view where App name and ID are set. Then I tried to download the files from [developer.apple.com](<http://developer.apple.com>), because I couldn’t find any generated/downloaded file on my system, neither are any paths/settings set in the Codenameone ios signature settings.  
 > In my case I managed to create the .p12 file and build iOS debug-app, but I could not use the wizard at all.
 >
 
@@ -521,7 +521,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Tommy Mogaka says:
 >
 > Got the issue! I had not selected the correct Bundle ID under General information of the app in the developer portal. Now I am getting this error:  
-> ERROR ITMS-90168: “The binary you uploaded was invalid”  
+> ERROR ITMS-90168: "The binary you uploaded was invalid"  
 > Looks like I have to start over… will clean out the portal of any id, certs and profiles and try again.
 >
 
@@ -559,7 +559,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > beck says:
 >
-> “I’m happy to announce that the next version of the Codename One plugin will include a wizard that generates all of these things for you with just a few mouse clicks.” Has it happened yet?
+> "I’m happy to announce that the next version of the Codename One plugin will include a wizard that generates all of these things for you with just a few mouse clicks." Has it happened yet?
 >
 
 

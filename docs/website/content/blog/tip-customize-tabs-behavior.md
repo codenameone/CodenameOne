@@ -59,7 +59,7 @@ Most developers are oblivious to this capability which is a shame, it is indeed 
 __**1** | This method can return any arbitrary component to use as a `Tab`, by default `Tabs` uses `RadioButton` but you can use anything e.g. here we used `SpanButton`  
 ---|---  
 __**2** | We added this in the latest version in git, that method still isn’t available but will be this Friday  
-__**3** | This method works well when we have a `RadioButton` tab at which point it can make it “selected” however in this case I would just set the UIID to something other than the default for the selected tab. Since I didn’t want to get into it I left it blank.  
+__**3** | This method works well when we have a `RadioButton` tab at which point it can make it "selected" however in this case I would just set the UIID to something other than the default for the selected tab. Since I didn’t want to get into it I left it blank.  
 __**4** | By default tabs are scrollable which prevents them from breaking lines. This code must reside after adding the tabs otherwise scrollability will be enabled implicitly.  
   
 The result looks pretty much like a standard tabs only it allows line breaks and when we have enough space uses it intelligently.

@@ -22,16 +22,16 @@ In [my last post](/blog/intro-to-in-app-purchase/) we looked at one-off in-app p
 
 Non-renewable subscriptions are really the same as consumable products, except that they are shareable across all of a user’s devices. Auto-renewable subscriptions, on the other hand, will continue as long as the user doesn’t cancel it. They will be re-billed automatically by the appropriate app-store when the chosen period expires, and all management of the subscription is handled by the the app-store itself.
 
-__ |  The concept of an “Non-renewable” subscription is an invention of the iTunes store. There is no formal equivalent in Google play. In order to create a non-renewable subscription SKU that behaves the same in your iOS and Android apps you would create it as a regular product in Google play, and a Non-renewable subscription in the iTunes store. We’ll learn more about that in a later post when we go into the specifics of app store setup.   
+__ |  The concept of an "Non-renewable" subscription is an invention of the iTunes store. There is no formal equivalent in Google play. In order to create a non-renewable subscription SKU that behaves the same in your iOS and Android apps you would create it as a regular product in Google play, and a Non-renewable subscription in the iTunes store. We’ll learn more about that in a later post when we go into the specifics of app store setup.   
 ---|---  
   
 ## The Server-Side
 
-Since a subscription purchased on one user device **needs** to be available across all of the user’s devices (Apple’s rules for non-renewable subscriptions), our app will need to have a server-component. In this post, we’ll gloss over that requirement and just “mock” the server interface. We’ll go into the specifics of the server-side in a later post.
+Since a subscription purchased on one user device **needs** to be available across all of the user’s devices (Apple’s rules for non-renewable subscriptions), our app will need to have a server-component. In this post, we’ll gloss over that requirement and just "mock" the server interface. We’ll go into the specifics of the server-side in a later post.
 
 ### The Receipts API
 
-Subscriptions, in Codename One are handled using a new “Receipts” API. It is up to you to register a receipt store with the In-App purchase instance, which allows Codename one to load receipts (presumably from your server), and submit new receipts (presumably to your server). A `Receipt` includes information such as:
+Subscriptions, in Codename One are handled using a new "Receipts" API. It is up to you to register a receipt store with the In-App purchase instance, which allows Codename one to load receipts (presumably from your server), and submit new receipts (presumably to your server). A `Receipt` includes information such as:
 
   1. Store code (since you may be dealing with receipts from multiple stores)
 
@@ -61,9 +61,9 @@ In order for any of this to work, you must implement the `ReceiptStore` interfac
 
   2. `submitReceipt(Receipt receipt, SuccessCallback<Boolean> callback)` – Submits a receipt to your receipt store. This gives you an opportunity to add additional details to the receipt such as an expiry date.
 
-## The “Hello World” of Non-Renewable Subscriptions
+## The "Hello World" of Non-Renewable Subscriptions
 
-We’ll expand on the theme of “Buying” the world for this app, except, this time we will just “Rent” the world for a period of time. We’ll have two products:
+We’ll expand on the theme of "Buying" the world for this app, except, this time we will just "Rent" the world for a period of time. We’ll have two products:
 
   1. A 1 month subscription
 
@@ -79,9 +79,9 @@ We’ll expand on the theme of “Buying” the world for this app, except, this
             SKU_WORLD_1_YEAR
         };
 
-Notice that we create two separate SKUs for the 1 month and 1 year subscription. **Each subscription period must have its own SKU**. I have created an array (`PRODUCTS`) that contains both of the SKUs. This is handy, as you’ll see in the examples ahead, because all of the APIs for checking status and expiry date of a subscription take all of the SKUs in a “subscription group” as input. This is
+Notice that we create two separate SKUs for the 1 month and 1 year subscription. **Each subscription period must have its own SKU**. I have created an array (`PRODUCTS`) that contains both of the SKUs. This is handy, as you’ll see in the examples ahead, because all of the APIs for checking status and expiry date of a subscription take all of the SKUs in a "subscription group" as input. This is
 
-__ |  Multiple SKUs that sell the same service/product but for different periods form a “subscription group”. Conceptually, customers are not subscribing to a particular SKU, they are subscribing to the subscription group of which that SKU is a member. As an example, if a user purchases a 1 month subscription to “the world”, they are actually just subscribing to “the world” subscription group.   
+__ |  Multiple SKUs that sell the same service/product but for different periods form a "subscription group". Conceptually, customers are not subscribing to a particular SKU, they are subscribing to the subscription group of which that SKU is a member. As an example, if a user purchases a 1 month subscription to "the world", they are actually just subscribing to "the world" subscription group.   
 ---|---  
   
 It is up to you to know how your SKUs are grouped together, and any methods in the `Purchase` class that check subscription status or expiry date of a SKU should be passed **all** SKUs of that subscription group. E.g. If you want to know if the user is subscribed to the `SKU_WORLD_1_MONTH` subscription, it would not be sufficient to call `iap.isSubscribed(SKU_WORLD_1_MONTH)`, because that wouldn’t take into account if the user had purchased a 1 year subscription. The correct way is to always call `iap.isSubscribed(SKU_WORLD_1_MONTH, SKU_WORLD_1_YEAR)`, or simply `iap.isSubscribed(PRODUCTS)` since I have placed both SKUs into my PRODUCTS array.
@@ -299,7 +299,7 @@ In the hello world app we’ll use this information in a few different places. O
 
 You should now have all of the background required to implement the Hello World Subscription app. So we’ll return to the code and see how the user purchases a subscription.
 
-In the main form, I want two buttons to subscribe to the “World”, for one month and one year respectively. They look like:
+In the main form, I want two buttons to subscribe to the "World", for one month and one year respectively. They look like:
     
     
             Purchase iap = Purchase.getInAppPurchase();
@@ -386,7 +386,7 @@ Notice that, in `itemPurchased()` we don’t need to explicitly create any recei
 
 ## Summary
 
-This post demonstrated how to set up an app to use non-renewable subscriptions using in-app purchase. Non-renewable subscriptions are the same as regular consumable products except for the fact that they are shared by all of the user’s devices, and thus, require a server component. The app store has no knowledge of the duration of your non-renewable subscriptions. It is up to you to specify the expiry date of purchased subscriptions on their receipts when they are submitted. Google play doesn’t formally have a “non-renewable” subscription product type. To implement them in Google play, you would just set up a regular product. It is how you handle it internally that makes it a subscription, and not just a regular product.
+This post demonstrated how to set up an app to use non-renewable subscriptions using in-app purchase. Non-renewable subscriptions are the same as regular consumable products except for the fact that they are shared by all of the user’s devices, and thus, require a server component. The app store has no knowledge of the duration of your non-renewable subscriptions. It is up to you to specify the expiry date of purchased subscriptions on their receipts when they are submitted. Google play doesn’t formally have a "non-renewable" subscription product type. To implement them in Google play, you would just set up a regular product. It is how you handle it internally that makes it a subscription, and not just a regular product.
 
 Codename One uses the `Receipt` class as the foundation for its subscriptions infrastructure. You, as the developer, are responsible for implementing the `ReceiptStore` interface to provide the receipts. The `Purchase` instance will load receipts from your ReceiptStore, and use them to determine whether the user is currently subscribed to a subscription, and when the subscription expires.
 

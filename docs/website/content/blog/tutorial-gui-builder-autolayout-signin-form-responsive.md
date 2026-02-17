@@ -11,7 +11,7 @@ author: Steve Hannah
 
 ![Header Image](/blog/tutorial-gui-builder-autolayout-signin-form-responsive/uidesign.jpg)
 
-Hopefully by now, most of you have had a chance to try out the new GUI Builder – specifically the new “auto layout” mode that allows you to position components with much greater precision than before. For this blog post, I have prepared a couple of video tutorials to walk you through the creation of a Sign In form using the GUI Builder. I have taken the existing Sign In demo project as a basis, but I’m re-doing the UI, which was originally hand-coded, using the GUI Builder.
+Hopefully by now, most of you have had a chance to try out the new GUI Builder – specifically the new "auto layout" mode that allows you to position components with much greater precision than before. For this blog post, I have prepared a couple of video tutorials to walk you through the creation of a Sign In form using the GUI Builder. I have taken the existing Sign In demo project as a basis, but I’m re-doing the UI, which was originally hand-coded, using the GUI Builder.
 
 The finished result will look like this :
 
@@ -29,23 +29,23 @@ If you want to follow along, you’ll need to do the following :
 
 For this video tutorial, I skipped directly to the blank canvas in the GUI builder. I skipped the part where I create a new GUIForm in Netbeans, and open it in the GUI builder. If you want to begin at the same point, you would perform the following steps :
 
-  1. Right click on the `com.codename1.demos.signin` package in the project explorer, and select “Other…​” from the context menu.
+  1. Right click on the `com.codename1.demos.signin` package in the project explorer, and select "Other…​" from the context menu.
 
 ![Context menu](/blog/tutorial-gui-builder-autolayout-signin-form-responsive/signin-form-new-context-menu.png)
 
-  2. Select “Codename One” → “GUI Builder Form”
+  2. Select "Codename One" → "GUI Builder Form"
 
 ![New dialog](/blog/tutorial-gui-builder-autolayout-signin-form-responsive/signin-form-new-dialog.png)
 
-  3. In the next form, enter “SignInFormGB” for the name, and keep “Form” selected, and “Auto Layout” checked.
+  3. In the next form, enter "SignInFormGB" for the name, and keep "Form" selected, and "Auto Layout" checked.
 
 ![GUI Component wizard](/blog/tutorial-gui-builder-autolayout-signin-form-responsive/signin-form-gui-component-wizard.png)
 
-  4. Click “Finish”.
+  4. Click "Finish".
 
-This will create a java class named “SignInFormGB.java” in your `com.codename1.demos.signin` package.
+This will create a java class named "`SignInFormGB.java`" in your `com.codename1.demos.signin` package.
 
-Right-click on this class in the project explorer, and select “Gui Builder” in the context menu to open up the blank form in the GUI Builder.
+Right-click on this class in the project explorer, and select "Gui Builder" in the context menu to open up the blank form in the GUI Builder.
 
 Now you’re ready to begin.
 
@@ -55,13 +55,13 @@ Now you’re ready to begin.
 
 In this video I lay out the key elements of the sign-in form. I begin by dragging an empty label onto the canvas which I intend to use as a guide. This is a little trick that can be used in the GUI builder to assist in aligning elements together.
 
-Next I drag the logo onto the canvas. For this I use a “Label” element. I set the “Icon” of this label using the property editor, and I remove the text.
+Next I drag the logo onto the canvas. For this I use a "Label" element. I set the "Icon" of this label using the property editor, and I remove the text.
 
 I then drag a text field onto the canvas to be used as the username field. This is positioned below the logo, and its top inset is linked to the logo. The left and right insets are linked to the left and right insets of the guide that we added at the beginning.
 
 I use copy/paste on the username field to add a password textfield below it. Then I drag a button onto the canvas, and position it below the password field.
 
-Finally, I add the buttons to be used for Google and Facebook login. For these buttons, I set their icons to images (which are already in the resource file), and I change their UIIDs to “Label” so that they don’t acquire the normal blue border that regular buttons get. These buttons are positioned at the bottom of the canvas, centered horizontally.
+Finally, I add the buttons to be used for Google and Facebook login. For these buttons, I set their icons to images (which are already in the resource file), and I change their UIIDs to "Label" so that they don’t acquire the normal blue border that regular buttons get. These buttons are positioned at the bottom of the canvas, centered horizontally.
 
 **Key Features Demonstrated In this Video**
 
@@ -121,9 +121,9 @@ There are many solutions to this problem, but the solution I demonstrate in this
 __**1** | We get a reference to the `LayeredLayout` for the form. When Auto-Layout mode is enabled, the GUI Builder always uses LayeredLayout.  
 ---|---  
 __**2** | In portrait mode we make the logo visible.  
-__**3** | In portrait mode, the top inset of the username field is linked to the bottom of the logo. The third parameter `1f`, indicates the “oppositeness” of this link – because the **top** inset (of username) is linked to the **bottom** edge of the reference component (logo).  
+__**3** | In portrait mode, the top inset of the username field is linked to the bottom of the logo. The third parameter `1f`, indicates the "oppositeness" of this link – because the **top** inset (of username) is linked to the **bottom** edge of the reference component (logo).  
 __**4** | In landscape mode, we hide the logo.  
-__**5** | With the logo hidden, we still need to slide up the username field. We do this by linking it to the top of the form instead of the logo. The 2nd parameter of `setReferenceComponentTop()` = `null` indicates that the top inset of username isn’t linked to any other component on the form. Then it defaults to the top edge of the form. The third parameter, `0f` in this context indicates the “same-ness” of the side of the inset with the edge of the reference. I.e. the **top** inset is linked to the **top** edge of the form. Hence the `0f` value.  
+__**5** | With the logo hidden, we still need to slide up the username field. We do this by linking it to the top of the form instead of the logo. The 2nd parameter of `setReferenceComponentTop()` = `null` indicates that the top inset of username isn’t linked to any other component on the form. Then it defaults to the top edge of the form. The third parameter, `0f` in this context indicates the "same-ness" of the side of the inset with the edge of the reference. I.e. the **top** inset is linked to the **top** edge of the form. Hence the `0f` value.  
   
 __ |  The `layoutContainer()` method is called whenever the form needs to be re-laid out.   
 ---|---  
@@ -199,7 +199,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > super.layoutContainer();  
 > }
 >
-> I’ve checked the parent class which instantiated the form and couldnt find any declaration of a form being of type “FlowLayout”.
+> I’ve checked the parent class which instantiated the form and couldnt find any declaration of a form being of type "FlowLayout".
 >
 > Any ideas where this casting is set? thanks in advance!
 >
@@ -208,7 +208,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Shai Almog** — September 3, 2017 at 4:13 am ([permalink](/blog/tutorial-gui-builder-autolayout-signin-form-responsive/#comment-23530))
 
-> Make sure your plugin is at the latest version and open the project properties then press “OK” it should update the internal jar that should fix this.
+> Make sure your plugin is at the latest version and open the project properties then press "OK" it should update the internal jar that should fix this.
 >
 
 

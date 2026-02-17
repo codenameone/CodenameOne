@@ -38,26 +38,26 @@ To aid in this process, I’ve created a fully-functional in-app purchase demo p
 
 ### Setting up the Client Project
 
-  1. Create a new Codename One project in Netbeans, and choose the “Bare-bones Hello World Template”. You should make your package name something unique so that you are able to create real corresponding apps in both Google Play and iTunes connect.
+  1. Create a new Codename One project in Netbeans, and choose the "Bare-bones Hello World Template". You should make your package name something unique so that you are able to create real corresponding apps in both Google Play and iTunes connect.
 
   2. Once the project is created, copy [this source file](https://gist.github.com/shannah/b61b9b6b35ea0eac923a54163f5d4deb) contents into your main class file. Then change the package name, and class name in the file to match your project settings. E.g. change `package ca.weblite.iapdemo;` to `package <your.package.name.here>;` and `class IAPDemo implements PurchaseCallback` to `class YourClassName implements PurchaseCallback`.
 
-  3. Add the [Generic Web Service Client](https://github.com/shannah/cn1-generic-webservice-client) library to your project by going to “Codename Settings” > “Extensions”, finding that library, and click “Download”. Then “Refresh CN1 libs” as it suggests.
+  3. Add the [Generic Web Service Client](https://github.com/shannah/cn1-generic-webservice-client) library to your project by going to "Codename Settings" > "Extensions", finding that library, and click "Download". Then "Refresh CN1 libs" as it suggests.
 
-  4. Change the `localHost` property to point to your local machine’s network address. Using “http://localhost” is not going to cut it here because when the app is running on a phone, it needs to be able to connect to your web server over the network. This address will be your local network address (e.g. 192.168.0.9, or something like that).
+  4. Change the `localHost` property to point to your local machine’s network address. Using "http://localhost" is not going to cut it here because when the app is running on a phone, it needs to be able to connect to your web server over the network. This address will be your local network address (e.g. 192.168.0.9, or something like that).
          
          private static final String localHost = "http://10.0.1.32";
 
-  5. Add the `ios.plistInject` build hint to your project with the value “<key>NSAppTransportSecurity</key> <dict> <key>NSAllowsArbitraryLoads</key> <true/> </dict>”. This is so that we can use http urls in iOS. Since we don’t intend to full publish this app, we can cut corners like this. If you were creating a real app, you would use proper secure URLs.
+  5. Add the `ios.plistInject` build hint to your project with the value `<key>NSAppTransportSecurity</key> <dict> <key>NSAllowsArbitraryLoads</key> <true/> </dict>`. This is so that we can use http urls in iOS. Since we don’t intend to full publish this app, we can cut corners like this. If you were creating a real app, you would use proper secure URLs.
 
 __ |  In the client project, you’ll notice some places where we use `Purchase.purchase(sku)` for purchasing a product, and other places where we use `Purchase.subscribe(sku)`. The correct method will depend on how you have set up the product in the Google Play store. If the product is set up as a subscription, you **must** use `subscribe()`. Otherwise, you should use `purchase()`.   
 ---|---  
   
 ### Setting up the Server Project
 
-Download the CN1-IAP-Server demo project from Github, and run its “install-deps” ANT task in order to download and install its dependencies to your local Maven repo.
+Download the CN1-IAP-Server demo project from Github, and run its "install-deps" ANT task in order to download and install its dependencies to your local Maven repo.
 
-__ |  For the following commands to work, make sure you have “ant”, “mvn”, and “git” in your environment PATH.   
+__ |  For the following commands to work, make sure you have "ant", "mvn", and "git" in your environment PATH.   
 ---|---  
       
     
@@ -71,7 +71,7 @@ Open the project in Netbeans
 
   1. Create a new database in your preferred DBMS. Call it anything you like.
 
-  2. Create a new table named “RECEIPTS” in this database with the following structure:
+  2. Create a new table named "RECEIPTS" in this database with the following structure:
          
          create TABLE RECEIPTS
          (
@@ -87,7 +87,7 @@ Open the project in Netbeans
          	primary key (TRANSACTION_ID, STORE_CODE)
          )
 
-  3. Open the “persistence.xml” file in the server netbeans project.
+  3. Open the "`persistence.xml`" file in the server netbeans project.
 
 ![Persistence File](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-persistence-file.png)
 
@@ -111,22 +111,22 @@ When the app first opens you’ll see a screen as follows:
 
 This screen is for testing consumable products, so we won’t be making use of this right now.
 
-Open the hamburger menu and select “Subscriptions”. You should see something like this:
+Open the hamburger menu and select "Subscriptions". You should see something like this:
 
 ![Subscriptions form](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-subscriptions-form.png)
 
-Click on the “Subscribe 1 Month No Ads” button. You will be prompted to accept the purchase:
+Click on the "Subscribe 1 Month No Ads" button. You will be prompted to accept the purchase:
 
 ![Approve purchase dialog](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-approve-purchase.png)
 
-Upon completion, the app will submit the purchase to your server, and if all went well, it will retrieve the updated list of receipts from your server also, and update the label on this form to say “No Ads. Expires <some date>”:
+Upon completion, the app will submit the purchase to your server, and if all went well, it will retrieve the updated list of receipts from your server also, and update the label on this form to say "No Ads. Expires `<some date>`":
 
 ![After successful purchase](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-successful-purchase.png)
 
 __ |  This project is set up to use an expedited expiry date schedule for purchases from the simulator. 1 month = 5 minutes. 3 months = 15 minutes. This helps for testing. That is why your expiry date may be different than expected.   
 ---|---  
   
-Just to verify that the receipt was inserted correctly, you should check the contents of your “RECEIPTS” table in your database. In Netbeans, I can do this easily from the “Services” pane. Expand the database connection down to the RECEIPTS table, right click “RECEIPTS” and select “View Data”. This will open a data table similar the the following:
+Just to verify that the receipt was inserted correctly, you should check the contents of your "RECEIPTS" table in your database. In Netbeans, I can do this easily from the "Services" pane. Expand the database connection down to the RECEIPTS table, right click "RECEIPTS" and select "View Data". This will open a data table similar the the following:
 
 ![Receipts table after insertion](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-view-table-data.png)
 
@@ -134,15 +134,15 @@ Just to verify that the receipt was inserted correctly, you should check the con
 
 A few things to mention here:
 
-  1. The “username” was provided by the client. It is hard-coded to “admin”, but the idea is that you would have the user log in and you would have access to their real username.
+  1. The "username" was provided by the client. It is hard-coded to "admin", but the idea is that you would have the user log in and you would have access to their real username.
 
   2. All dates are stored as unix timestamps in milliseconds.
 
-If you delete the receipt from your database, then press the “Synchronize Receipts” button in your app, the app will again say “No subscriptions.” Similarly if you wait 5 minutes and hit “Synchronize receipts” the app will say no subscriptions found, and the “ads” will be back.
+If you delete the receipt from your database, then press the "Synchronize Receipts" button in your app, the app will again say "No subscriptions." Similarly if you wait 5 minutes and hit "Synchronize receipts" the app will say no subscriptions found, and the "ads" will be back.
 
 #### Troubleshooting
 
-Let’s not pretend that everything worked for you on the first try. There’s a lot that could go wrong here. If you make a purchase and nothing appears to happen, the first thing you should do is check the Network Monitor in the simulator (“Simulate” > “Network” > “Network Monitor”). You should see a list of network requests. Some will be GET requests and there will be at least one POST request. Check the response of these requests to see if they succeeded.
+Let’s not pretend that everything worked for you on the first try. There’s a lot that could go wrong here. If you make a purchase and nothing appears to happen, the first thing you should do is check the Network Monitor in the simulator ("Simulate" > "Network" > "Network Monitor"). You should see a list of network requests. Some will be GET requests and there will be at least one POST request. Check the response of these requests to see if they succeeded.
 
 Also check the Glassfish server log to see if there is an exception.
 
@@ -281,7 +281,7 @@ The magic happens inside that `validateAndSaveReceipt()` method, which I’ll co
 
 #### Notifications
 
-It is important to note that you will not be notified by apple or google when changes are made to subscriptions. It is up to you to periodically “poll” their web service to find if any changes have been made. Changes we would be interested in are primarily renewals and cancellations. In order to deal with this, set up a method to run periodically (once-per day might be enough). For testing, I actually set it up to run once per minute as shown below:
+It is important to note that you will not be notified by apple or google when changes are made to subscriptions. It is up to you to periodically "poll" their web service to find if any changes have been made. Changes we would be interested in are primarily renewals and cancellations. In order to deal with this, set up a method to run periodically (once-per day might be enough). For testing, I actually set it up to run once per minute as shown below:
     
     
         private static final long ONE_DAY = 24 * 60 * 60 * 1000;
@@ -337,7 +337,7 @@ The general usage is as follows:
 
 As you can see from this snippet, the complexity of receipt validation has been reduced to entering three configuration strings:
 
-  1. `APPLE_SECRET` – This is a “secret” string that you will get from iTunes connect when you set up your in-app products.
+  1. `APPLE_SECRET` – This is a "secret" string that you will get from iTunes connect when you set up your in-app products.
 
   2. `GOOGLE_DEVELOPER_API_CLIENT_ID` – A client ID that you’ll get from the google developer API console when you set up your API service credentials.
 
@@ -481,10 +481,10 @@ You are now ready to see the full magic of the `validateAndSaveReceipt()` method
         }
 
 __**1** | We need to handle the case where the app is being used in the CN1 simulator. We’ll treat this  
-as a non-renewable receipt, and we’ll calculate the expiry date using an “accelerated” clock to assist in testing.  
+as a non-renewable receipt, and we’ll calculate the expiry date using an "accelerated" clock to assist in testing.  
 ---|---  
   
-__ |  In many of the code snippets for the Server-side code, you’ll see references to both a `Receipts` class and a `Receipt` class. I know this is slightly confusing. The `Receipts` class is a JPA entity the encapsulates a row from the “receipts” table of our SQL database. The `Receipt` class is `com.codename1.payment.Receipt`. It is used to interface with the IAP validation library.   
+__ |  In many of the code snippets for the Server-side code, you’ll see references to both a `Receipts` class and a `Receipt` class. I know this is slightly confusing. The `Receipts` class is a JPA entity the encapsulates a row from the "receipts" table of our SQL database. The `Receipt` class is `com.codename1.payment.Receipt`. It is used to interface with the IAP validation library.   
 ---|---  
   
 ## Google Play Setup
@@ -499,7 +499,7 @@ In order to test out in-app purchase on an Android device, you’ll need to crea
 
 #### Graphics, Icons, etc..
 
-You are required to upload some screenshots and feature graphics. Don’t waste time making these perfect. For the screenshots, you can just use the “Screenshot” option in the simulator. (Use the Nexus 5 skin). For the feature graphics, I used [this site](https://www.norio.be/android-feature-graphic-generator/) that will generate the graphics in the correct dimensions for Google Play. You can also just leave the icon as the default Codename One icon.
+You are required to upload some screenshots and feature graphics. Don’t waste time making these perfect. For the screenshots, you can just use the "Screenshot" option in the simulator. (Use the Nexus 5 skin). For the feature graphics, I used [this site](https://www.norio.be/android-feature-graphic-generator/) that will generate the graphics in the correct dimensions for Google Play. You can also just leave the icon as the default Codename One icon.
 
 #### Creating Test Accounts
 
@@ -510,7 +510,7 @@ In order to test your app, you need to set up a test account. A test account mus
 
 The full process for testing in-app billing can be found in [this google document](https://developer.android.com/google/play/billing/billing_testing.html). However, I personally found this documentation difficult to follow.
 
-For your purposes, you’ll need to set up a tester list in Google Play. Choose “Settings” > “Tester Lists”. Then create a list with all of the email address that you want to have treated as test accounts. Any purchases made by these email addresses will be treated as “Sandbox” purchases, and won’t require real money to change hands.
+For your purposes, you’ll need to set up a tester list in Google Play. Choose "Settings" > "Tester Lists". Then create a list with all of the email address that you want to have treated as test accounts. Any purchases made by these email addresses will be treated as "Sandbox" purchases, and won’t require real money to change hands.
 
 #### Alpha Channel Distribution
 
@@ -518,7 +518,7 @@ In order to test in-app purchase on Android, you **must** first publish your app
 
 For more information about setting up alpha testing on Google play see [this Google support document on the subject](https://support.google.com/googleplay/android-developer/answer/3131213?hl=en).
 
-Once you have set your app up for alpha testing, you can send an invite link to your test accounts. You can find the link in the Google Play console under the APK section, under the “Alpha” tab (and assuming you’ve enabled alpha testing.
+Once you have set your app up for alpha testing, you can send an invite link to your test accounts. You can find the link in the Google Play console under the APK section, under the "Alpha" tab (and assuming you’ve enabled alpha testing.
 
 ![Alpha testing tab in google play](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-alpha-testing-tab.png)
 
@@ -537,16 +537,16 @@ After you have published your APK to the alpha channel, you can create the produ
 
   2. **iapdemo.noads.3month.auto** – The 3 month subscription.
 
-__ |  Since we will be adding products as “Subscriptions” in the pay store, your app **must** use the `Purchase.subscribe(sku)` method for initiating a purchase on these products, and **not** the `Purchase.purchase(sku)` method. If you accidentally use `purchase()` to purchase a subscription on Android, the payment will go through, but your purchase callback will receive an error.   
+__ |  Since we will be adding products as "Subscriptions" in the pay store, your app **must** use the `Purchase.subscribe(sku)` method for initiating a purchase on these products, and **not** the `Purchase.purchase(sku)` method. If you accidentally use `purchase()` to purchase a subscription on Android, the payment will go through, but your purchase callback will receive an error.   
 ---|---  
   
 **Adding 1 month Subscription**
 
   1. Open Google Play Developer Console, and navigate to your app.
 
-  2. Click on “In-app Products” in the menu. Then click the “Add New Product” button.
+  2. Click on "In-app Products" in the menu. Then click the "Add New Product" button.
 
-  3. Select “Subscription”, and enter “iapdemo.noads.month.auto” for the Product ID. Then click “Continue”
+  3. Select "Subscription", and enter "iapdemo.noads.month.auto" for the Product ID. Then click "Continue"
 
 ![Add new product dialog](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-play-add-new-product.png)
 
@@ -556,17 +556,17 @@ Now fill in the form. You can choose your own price and name for the product. Th
 
 **Adding 3 month Subscription**
 
-Follow the same process as for the 1 month subscription except use “iapdemo.noads.3month.auto” for the product ID, and select “3 months” for the billing period instead of “Monthly”.
+Follow the same process as for the 1 month subscription except use "iapdemo.noads.3month.auto" for the product ID, and select "3 months" for the billing period instead of "Monthly".
 
 ### Testing The App
 
 At this point we should be ready to test our app. Assuming you’ve installed the app using the invite link you sent yourself from Google play, **as a test account that is listed on your testers list** , you should be good to go.
 
-Open the app, click on “Subscriptions”, and try to purchase a 1-month subscription. If all goes well, it should insert the subscription into your database. But with no expiry date, since we haven’t yet implemented receipt validation yet. We’ll do that next.
+Open the app, click on "Subscriptions", and try to purchase a 1-month subscription. If all goes well, it should insert the subscription into your database. But with no expiry date, since we haven’t yet implemented receipt validation yet. We’ll do that next.
 
 ### Creating Google Play Receipt Validation Credentials
 
-Google play receipt validation is accomplished via the [android-publisher Purchases: get API](https://developers.google.com/android-publisher/api-ref/purchases/subscriptions/get). The CN1-IAP-Validation library shields you from most of the complexities of using this API, but you still need to obtain a “private key” and a “client id” to access this API. Both of these are provided when you set up an [OAuth2 Service Account](https://developers.google.com/identity/protocols/OAuth2ServiceAccount) for your app.
+Google play receipt validation is accomplished via the [android-publisher Purchases: get API](https://developers.google.com/android-publisher/api-ref/purchases/subscriptions/get). The CN1-IAP-Validation library shields you from most of the complexities of using this API, but you still need to obtain a "private key" and a "client id" to access this API. Both of these are provided when you set up an [OAuth2 Service Account](https://developers.google.com/identity/protocols/OAuth2ServiceAccount) for your app.
 
 __ |  The following steps assume that you have already created your app in Google play and have published it to at least the alpha channel. See my previous post on this topic here (Link to be provided).   
 ---|---  
@@ -575,29 +575,29 @@ Steps:
 
   1. Open the [Google API Developer Console](https://console.developers.google.com/apis), and select your App from the the menu.
 
-  2. Click on the “Library” menu item in the left menu, and then click the “Google Play Developer API” link.
+  2. Click on the "Library" menu item in the left menu, and then click the "Google Play Developer API" link.
 
 ![Google Play Developer API Link](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-play-developer-api-link.png)
 
-  3. Click on the button that says “Enable”. (If you already have it enabled, then just proceed to the next step).
+  3. Click on the button that says "Enable". (If you already have it enabled, then just proceed to the next step).
 
 ![Enable API button](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-enable-api.png)
 
-  4. Click on the “Credentials” menu item in the left menu.
+  4. Click on the "Credentials" menu item in the left menu.
 
-  5. In the “Credentials” drop-down menu, select the “Service Account Key” option.
+  5. In the "Credentials" drop-down menu, select the "Service Account Key" option.
 
 ![Credentials dropdown](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-credentials-dropdown.png)
 
-  6. You will be presented with a new form. In the “Service Account” drop-down, select “New Service Account”. This will give you some additional options.
+  6. You will be presented with a new form. In the "Service Account" drop-down, select "New Service Account". This will give you some additional options.
 
 ![Create service account key](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-create-service-account-key.png)
 
-  7. Enter anything you like for the “Service account name”. For the role, we’ll select “Project” > “Owner” for now just so we don’t run into permissions issues. You’ll probably want to investigate further to fine a more limited role that only allows receipt verification, but for now, I don’t want any unnecessary road blocks for getting this to work. We’re probably going to run into “permission denied” errors at first anyways, so the fewer reasons for this, the better.
+  7. Enter anything you like for the "Service account name". For the role, we’ll select "Project" > "Owner" for now just so we don’t run into permissions issues. You’ll probably want to investigate further to fine a more limited role that only allows receipt verification, but for now, I don’t want any unnecessary road blocks for getting this to work. We’re probably going to run into "permission denied" errors at first anyways, so the fewer reasons for this, the better.
 
   8. It will auto-generate an account ID for you.
 
-  9. Finally, for the “Key type”, select “JSON”. Then click the “Create” button.
+  9. Finally, for the "Key type", select "JSON". Then click the "Create" button.
 
 This should prompt the download of a JSON file that will have contents similar to the following:
     
@@ -615,9 +615,9 @@ This should prompt the download of a JSON file that will have contents similar t
       "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/iapdemo%40iapdemo-152500.iam.gserviceaccount.com"
     }
 
-This is where we get the information we’re looking for. The “client_email” is what we’ll use for your `googleClientId`, and the “private_key” is what we’ll use for the `googlePrivateKey`.
+This is where we get the information we’re looking for. The "client_email" is what we’ll use for your `googleClientId`, and the "private_key" is what we’ll use for the `googlePrivateKey`.
 
-__ |  Use the “client_email” value as our client ID, not the “client_id” value as you might be tempted to do.   
+__ |  Use the "client_email" value as our client ID, not the "client_id" value as you might be tempted to do.   
 ---|---  
   
 We’ll set these in our constants:
@@ -637,21 +637,21 @@ Before we can use these credentials to verify receipts for our app, we need to l
 
 Steps:
 
-  1. Open the [Google Play Developer Console](https://play.google.com/apps/publish/), then click on “Settings” > “API Access”.
+  1. Open the [Google Play Developer Console](https://play.google.com/apps/publish/), then click on "Settings" > "API Access".
 
-  2. You should see your app listed on this page. Click the “Link” button next to your app.
+  2. You should see your app listed on this page. Click the "Link" button next to your app.
 
 ![Link to API](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-link-to-api.png)
 
-  3. This should reveal some more options on the page. You should see a “Service Accounts” section with a list of all of the service accounts that you have created. Find the one we just created, and click the “Grant Access” button in its row.
+  3. This should reveal some more options on the page. You should see a "Service Accounts" section with a list of all of the service accounts that you have created. Find the one we just created, and click the "Grant Access" button in its row.
 
 ![Grant access](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-grant-access.png)
 
-  4. This will open a dialog titled “Add New User”. Leave everything default, except change the “Role” to “Administrator”. This provides “ALL” permissions to this account, which probably isn’t a good idea for production. Later on, after everything is working, you can circle back and try to refine permissions. For the purpose of this tutorial, I just want to pull out all of the potential road blocks.
+  4. This will open a dialog titled "Add New User". Leave everything default, except change the "Role" to "Administrator". This provides "ALL" permissions to this account, which probably isn’t a good idea for production. Later on, after everything is working, you can circle back and try to refine permissions. For the purpose of this tutorial, I just want to pull out all of the potential road blocks.
 
 ![New User](/blog/autorenewing-subscriptions-in-ios-and-android/iap3-new-user.png)
 
-  5. Press the “Add User” button.
+  5. Press the "Add User" button.
 
 At this point, the service account **should** be active so we can try to validate receipts.
 
@@ -669,13 +669,13 @@ Then build and run the server app. The `validateSubscriptionsCron()` method is s
 __ |  I’m assuming you’ve already added a receipt in the previous test that we did. If necessary, you should purchase the subscription again in your app.   
 ---|---  
   
-After a minute or so, you should see “———– VALIDATING RECEIPTS ———” written in the Glassfish log, and it will validate your receipts. If it works, your receipt’s expiry date will get populated in the database, and you can press “Synchronize Receipts” in your app to see this reflected. If it fails, there will like be a big ugly stack trace and exception readout with some clues about what went wrong.
+After a minute or so, you should see "———– VALIDATING RECEIPTS ———" written in the Glassfish log, and it will validate your receipts. If it works, your receipt’s expiry date will get populated in the database, and you can press "Synchronize Receipts" in your app to see this reflected. If it fails, there will like be a big ugly stack trace and exception readout with some clues about what went wrong.
 
 Realistically, your first attempt will fail for some reason. Use the error codes and stack traces to help lead you to the problem. And feel free to post questions here.
 
 ## iTunes Connect Setup
 
-The process for setting up and testing your app on iOS is much simpler than on Android (IMHO). It took me a couple hours to get the iTunes version working, vs a couple days on the Google Play side of things. One notable difference that makes things simpler is that you don’t need to actually upload your app to the store to test in-app purchase. You can just use your debug build on your device. It is also **much** easier to roll a bunch of test accounts than on Google Play. You don’t need to set up an alpha program, you just create a few “test accounts” (and this is easy to do) in your iTunes connect account, and then make sure to use one of these accounts when making a purchase. You can easily switch accounts on your device from the “Settings” app, where you can just log out of the iTunes store – which will cause you to be prompted in your app the next time you make a purchase.
+The process for setting up and testing your app on iOS is much simpler than on Android (IMHO). It took me a couple hours to get the iTunes version working, vs a couple days on the Google Play side of things. One notable difference that makes things simpler is that you don’t need to actually upload your app to the store to test in-app purchase. You can just use your debug build on your device. It is also **much** easier to roll a bunch of test accounts than on Google Play. You don’t need to set up an alpha program, you just create a few "test accounts" (and this is easy to do) in your iTunes connect account, and then make sure to use one of these accounts when making a purchase. You can easily switch accounts on your device from the "Settings" app, where you can just log out of the iTunes store – which will cause you to be prompted in your app the next time you make a purchase.
 
 ### Setting up In-App Products
 
@@ -719,7 +719,7 @@ And enable iTunes store validation:
 
 Change this to `false`.
 
-If you rebuild and run the server project, and wait for the `validateSubscriptionsCron()` method to run, it should validate the receipt. After about a minute (or less), you’ll see the text “———– VALIDATING RECEIPTS ———” written to the Glassfish log file, followed by some output from connecting to the iTunes validation service. If all went well, you should see your receipt expiration date updated in the database. If not, you’ll likely see some exception stack traces in the Glassfish log.
+If you rebuild and run the server project, and wait for the `validateSubscriptionsCron()` method to run, it should validate the receipt. After about a minute (or less), you’ll see the text "———– VALIDATING RECEIPTS ———" written to the Glassfish log file, followed by some output from connecting to the iTunes validation service. If all went well, you should see your receipt expiration date updated in the database. If not, you’ll likely see some exception stack traces in the Glassfish log.
 
 __ |  Sandbox receipts in the iTunes store are set to run on an accelerated schedule. A 1 month subscription is actually 5 minutes, 3 months is 15 minutes etc…​ Also sandbox subscriptions don’t seem to persist in perpetuity until the user has cancelled it. I have found that they usually renew only 4 or 5 times before they are allowed to lapse by Apple.   
 ---|---  
@@ -805,7 +805,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Hey Steve – no matter what I seem to do, when trying to ant-install deps I get the error:
 >
-> Cannot run program “mvn” (in directory …”): CreateProcess error=2, The system cannot find the file specified
+> Cannot run program "mvn" (in directory …"): CreateProcess error=2, The system cannot find the file specified
 >
 > I have installed maven, and added it to my path, as well as adding maven_home, m2_home, java_home environment variables. I can run mvn -version fine, so I’m at a loss for why I’m getting the error. Any ideas?
 >
@@ -814,7 +814,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Shai Almog** — November 27, 2019 at 2:59 am ([permalink](/blog/autorenewing-subscriptions-in-ios-and-android/#comment-24267))
 
-> If you added it to the path in Windows GUI it might not impact the currently open shell. If you’re using windows shell this might conflict with spaces you have in the path so make sure you use quotes e.g. `set PATH=”PATH TO MAVEN”;%PATH%`
+> If you added it to the path in Windows GUI it might not impact the currently open shell. If you’re using windows shell this might conflict with spaces you have in the path so make sure you use quotes e.g. `set PATH="PATH TO MAVEN";%PATH%`
 >
 > If this doesn’t help try to provide more details about your environment so we can help.
 >

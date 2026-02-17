@@ -26,7 +26,7 @@ __ |  Devices prior to iPad Air & iPhone 5s were 32 bit devices so iPhone 5s won
 
   * Make sure the device isn’t locked for installing 3rd party apps. I’ve had this when trying to install on my kids tablet which I configured to be child safe. This is configured in the settings as parental controls
 
-  * Check that you “own” the package name. E.g. if you previously installed an app with the same package name but a different certificate a new install will fail (this is true for Android too). So if you installed the kitchen sink from the store then built one of your own and installed it there will be a collision.  
+  * Check that you "own" the package name. E.g. if you previously installed an app with the same package name but a different certificate a new install will fail (this is true for Android too). So if you installed the kitchen sink from the store then built one of your own and installed it there will be a collision.  
 Notice that this might be problematic if you use overly generic package names as someone else might have used them which is why you must always use your own domain
 
   * Make sure the device has a modern enough version of iOS for the dependencies. I think the current minimum for hello world is 6.0.1 but some apps might require a newer version e.g. Intercom requires OS 8 or newer

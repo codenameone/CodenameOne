@@ -61,7 +61,7 @@ There are several issues with the code but the null pointer is the least of them
 
 ### Two AutoCompleteTextField in same form
 
-Filter for an autocomplete should be “smart” and cache data as much as possible
+Filter for an autocomplete should be "smart" and cache data as much as possible
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39711095/two-autocompletetextfield-in-same-form)
 
@@ -73,7 +73,7 @@ iOS etc. don’t provide access to low level details such as IMSI
 
 ### keyboard issue in iOS – codenameone
 
-It’s hard to get the VKB to act “just right” so we need accurate test cases where we can reproduce all the odd edge cases
+It’s hard to get the VKB to act "just right" so we need accurate test cases where we can reproduce all the odd edge cases
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39698878/keyboard-issue-in-ios-codenameone)
 
@@ -104,7 +104,7 @@ size
 
 ### Rebuild list of containers without scrolling the list
 
-This is a bit problematic due to code that tries to “do the right thing”
+This is a bit problematic due to code that tries to "do the right thing"
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39675988/rebuild-list-of-containers-without-scrolling-the-list)
 

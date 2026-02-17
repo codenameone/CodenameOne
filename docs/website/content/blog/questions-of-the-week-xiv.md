@@ -12,8 +12,8 @@ author: Shai Almog
 ![Header Image](/blog/questions-of-the-week-xiv/qanda-friday.jpg)
 
 With the pending release and some important issues we decide to make a minor update to the plugin today  
-to introduce some improvements. We want the GUI builder to stabilize so we can finally crown it as “the” GUI  
-builder rather than as “the new” GUI builder. To do that we need you guys to use it and submit issues, we also  
+to introduce some improvements. We want the GUI builder to stabilize so we can finally crown it as "the" GUI  
+builder rather than as "the new" GUI builder. To do that we need you guys to use it and submit issues, we also  
 need you to use the latest version…​
 
 With this release we added a lot of bug fixes and a few minor cosmetic improvements that should help narrow  
@@ -58,7 +58,7 @@ You need to set it to empty if you don’t want a border…​
 
 ### Math class functionality in cn1
 
-A lot of the Codename One functionality is within com.codename1 packages to avoid the complexity of re-implementing/testing  
+A lot of the Codename One functionality is within `com.codename1` packages to avoid the complexity of re-implementing/testing  
 for every VM we support.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38357636/math-class-functionality-in-cn1)
@@ -155,7 +155,7 @@ value returned.
 ### Text not showing using Roboto or Keep Calm Medium font on iOS
 
 Fonts work very differently between Android/iOS and we make a great deal of effort trying to make them behave  
-“seamlessly”. This seamlessness works when we have control (e.g. the theme) but is somewhat broken in the lower  
+"seamlessly". This seamlessness works when we have control (e.g. the theme) but is somewhat broken in the lower  
 level API’s.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38253008/codename-one-text-not-showing-using-roboto-or-keep-calm-medium-font-on-ios)

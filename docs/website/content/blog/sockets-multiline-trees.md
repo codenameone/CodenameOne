@@ -32,7 +32,7 @@ which is pretty cool and very timely since we are just about to release our own 
   
   
   
-At the moment we only support TCP sockets, we support server socket (listen/accept) on Android but not on iOS. You can check if Sockets are supported using the Socket.isSupported() and whether server sockets are supported using Socket.  
+At the moment we only support TCP sockets, we support server socket (listen/accept) on Android but not on iOS. You can check if Sockets are supported using the `Socket.isSupported()` and whether server sockets are supported using Socket.  
   
   
 isServerSocketSupported().  
@@ -167,7 +167,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> In case this helps someone else: It appears that my property window was not expanding all the way to reveal the “Update Project libs” button. The end to a frusterating hunt.
+> In case this helps someone else: It appears that my property window was not expanding all the way to reveal the "Update Project libs" button. The end to a frusterating hunt.
 >
 
 

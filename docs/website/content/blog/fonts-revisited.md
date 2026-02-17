@@ -22,7 +22,7 @@ Fonts are were a painful subject in Codename One, historically devices supported
 
 The new font API is limited to Android & iOS, we were considering Blackberry support too but it seems that the font support on Blackberry is too limited for our needs (feel free to correct me if I’m wrong here), on the other platforms a standard system font will be used where fonts aren’t supported.
 
-In order to use a font just add the ttf file into the src directory, notice that the file must have the “.ttf” extension otherwise the build server won’t be able to recognize the file as a font and set it up accordingly (devices need fonts to be defined in very specific ways). Once you do that you can use the font from code or from the theme.
+In order to use a font just add the ttf file into the src directory, notice that the file must have the ".ttf" extension otherwise the build server won’t be able to recognize the file as a font and set it up accordingly (devices need fonts to be defined in very specific ways). Once you do that you can use the font from code or from the theme.
 
 In the theme section of the Codename One designer you now have the option to define the font like this: 
 
@@ -43,15 +43,13 @@ Millimeters & pixels will size the fonts appropriately using the numeric field.
 
 To use fonts from code just use:  
   
-if(Font.isTrueTypeFileSupported()) {  
-  
-Font myFont = Font.createTrueTypeFont(fontName, fontFileName);  
-  
-myFont = myFont.derive(sizeInPixels, Font.STYLE_PLAIN);  
-  
-// do something with the font  
-  
-}  
+```java
+if (Font.isTrueTypeFileSupported()) {
+    Font myFont = Font.createTrueTypeFont(fontName, fontFileName);
+    myFont = myFont.derive(sizeInPixels, Font.STYLE_PLAIN);
+    // do something with the font
+}
+```
   
 Notice that in code only pixel sizes are supported so its up to you to decide how to convert that. You also need to derive the font with the proper size unless you want a 0 sized font which probably isn’t very useful.  
   

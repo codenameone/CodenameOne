@@ -38,9 +38,9 @@ In order to create the project in this tutorial, you only need one thing:
 
 ### Project Setup
 
-For this tutorial, we’ll create a basic Codename One project, and we’ll add the “CodeRAD” and “RADChatRoom” cn1libs as dependencies. I’ll use NetBeans in this tutorial, but you can use your preferred IDE (IntelliJ or Eclipse).
+For this tutorial, we’ll create a basic Codename One project, and we’ll add the "CodeRAD" and "RADChatRoom" cn1libs as dependencies. I’ll use NetBeans in this tutorial, but you can use your preferred IDE (IntelliJ or Eclipse).
 
-For the sake of this tutorial, I’m going to name the project CN1Chat, and my package will be “com.codename1.cn1chat”. I’ll be using the “Hello World” bare-bones project template.
+For the sake of this tutorial, I’m going to name the project CN1Chat, and my package will be "`com.codename1.cn1chat`". I’ll be using the "Hello World" bare-bones project template.
 
 ![New project dialog in NetBeans](/blog/rad-chatroom-part-1/rad-chat-room-2.png)
 
@@ -70,7 +70,7 @@ If you haven’t activated any cn1libs before in your Codename One projects, see
 
 ### Step 4: Create Application Controller
 
-We’ll be using MVC for this app. The CodeRAD cn1lib includes a set of controller classes that help with the structure of such apps. We’ll begin by modifying our app’s main application class (CN1Chat.java) so that it extends `ApplicationController`, and we’ll replace the class contents with the following:
+We’ll be using MVC for this app. The CodeRAD cn1lib includes a set of controller classes that help with the structure of such apps. We’ll begin by modifying our app’s main application class (`CN1Chat.java`) so that it extends `ApplicationController`, and we’ll replace the class contents with the following:
     
     
     package com.codename1.cn1chat;
@@ -157,7 +157,7 @@ Figure 4. Chat participants listed in title bar in finished version of the app
 
 This is absent because we didn’t add any participants to the chat model.
 
-In addition, there is no “Send” button, in this version, so there is no apparent way to send messages in this chat.
+In addition, there is no "Send" button, in this version, so there is no apparent way to send messages in this chat.
 
 We’ll correct both of these omissions, and add some other features over the course of this tutorial.
 

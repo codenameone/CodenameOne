@@ -13,7 +13,7 @@ author: Shai Almog
 
 With today’s update we’re releasing a design overhaul for the settings (preferences) application. This overhaul will improve the look and reliability/consistency of this app which is core to Codename One. During this transition period we also have the ability to go back to the legacy UI for 100% compatibility but it will be removed.
 
-Common important features such as “Update Client Libs” are now available in the menu on the top right of the UI. The currently logged in user isn’t listed in the UI only in the about dialog. For most of the UI it doesn’t matter as much since we don’t change as much as we used to. E.g. we now let everyone create a push certificate. This is a pre-cursor to enabling push for everyone with a very low quota for free/basic users.
+Common important features such as "Update Client Libs" are now available in the menu on the top right of the UI. The currently logged in user isn’t listed in the UI only in the about dialog. For most of the UI it doesn’t matter as much since we don’t change as much as we used to. E.g. we now let everyone create a push certificate. This is a pre-cursor to enabling push for everyone with a very low quota for free/basic users.
 
 __ |  This isn’t available yet in the servers and I’m not sure when we’ll have that out   
 ---|---  
@@ -48,7 +48,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Francesco Galgani** — July 24, 2020 at 10:06 am ([permalink](/blog/new-settings-ui/#comment-24301))
 
-> Now I notice the “File” menu from which you can change the size of the text, menu we talked about on Github.
+> Now I notice the "File" menu from which you can change the size of the text, menu we talked about on Github.
 >
 > My feedback is that the text is too little contrasted: it’s hard for me to read a light grey text on a white background, I would prefer a black text on a white background. I also find dark mode tiring for the eyes.
 >

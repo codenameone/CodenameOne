@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/uber-book-release-date/create-uber-clone-book-promo-1024.png)
 
-I’ve been working on the new “Create an Uber Clone in 7 Days” book for ages. After so much work this is finally almost done!  
+I’ve been working on the new "Create an Uber Clone in 7 Days" book for ages. After so much work this is finally almost done!  
 We have a release date: August 16th (yes 2018!). You can already pre-order the kindle edition but you’d get it for free if you buy the print edition which for some inexplicable reason can’t be pre-ordered.
 
 **UPDATE:** Since writing this I’ve added a dedicated book site, I’d rather you share that instead of the link to this post. It’s available here: <https://uber.cn1.co/>
@@ -28,7 +28,7 @@ I’m publishing them in the PDF format which was developed for the print book. 
 
 If you like what you read, the print book will be available for purchase on August 16th. Notice that the digital/kindle book has different formatting which is very noticeable in the source code listings.
 
-This PDF is based on the print version, as a result it has asymmetric padding and layout. This allows elements to “bleed” to the edge of the page and provides a pleasant browsing experience when reading the printed documentation.
+This PDF is based on the print version, as a result it has asymmetric padding and layout. This allows elements to "bleed" to the edge of the page and provides a pleasant browsing experience when reading the printed documentation.
 
 The first two chapters and appendices can be downloaded from [here](https://www.codenameone.com/files/uber-book/create-an-uberclone-in-7-days-free.pdf).
 

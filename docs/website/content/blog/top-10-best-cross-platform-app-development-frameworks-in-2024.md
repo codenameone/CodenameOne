@@ -66,7 +66,7 @@ Here are some of the upsides of cross-platform app development frameworks.
 
 ## Code Reusability
 
-Possibly the biggest upside of cross-platform app development frameworks is code reusability. Developers just need to code once and that codebase can be reused to deploy the app to multiple platforms. This concept is commonly referred to as ****“Write Once Run Anywhere”**** or WORA.
+Possibly the biggest upside of cross-platform app development frameworks is code reusability. Developers just need to code once and that codebase can be reused to deploy the app to multiple platforms. This concept is commonly referred to as ****"Write Once Run Anywhere"**** or WORA.
 
 WORA eliminates repetition, and in turn, saves operational costs. A shared codebase also allows you to add another platform at a later point without too much effort.
 
@@ -196,7 +196,7 @@ Xamarin integrates with Visual Studio which is a Microsoft’s IDE for the .NET 
 
 | Xamarin Pros | Xamarin Cons |
 | --- | --- |
-| Allows sharing up to 90% of your code across platforms for “Write Once, Run Anywhere”. | Depending on complexity, Xamarin apps are typically larger in size than native ones. |
+| Allows sharing up to 90% of your code across platforms for "Write Once, Run Anywhere". | Depending on complexity, Xamarin apps are typically larger in size than native ones. |
 | Platform-specific UI elements with Xamarin.Forms delivers consistent look across different OS. | Xamarin is not recommended for apps that demand rich graphics. A UX/UI-heavy app is advised to be implemented natively. |
 | Xamarin supports linking with native libraries and uses platform-specific APIs. | Xamarin has limited access to certain important open source libraries. |
 | Xamarin has a strong community of over 60,000 contributors from more than 3,700 companies. | Xamarin is free for individuals and startups. However, enterprises are required to buy a license for Microsoft’s Visual Studio. |

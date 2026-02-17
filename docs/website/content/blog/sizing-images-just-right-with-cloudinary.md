@@ -31,13 +31,13 @@ Replicating this UI in Codename One is pretty straight forward:
 
   1. Use the [ToolBar](http://www.codenameone.com/blog/toolbar.html) for the top bar, and a BoxLayout Y_AXIS for the contents.
 
-  2. Use [multi-images](http://www.codenameone.com/how-do-i---fetch-an-image-from-the-resource-file---add-a-multiimage.html) for the icons so that they come out to the correct “real” size on every device.
+  2. Use [multi-images](http://www.codenameone.com/how-do-i---fetch-an-image-from-the-resource-file---add-a-multiimage.html) for the icons so that they come out to the correct "real" size on every device.
 
-The main photo is a bit more challenging though. The design calls for us to span the entire width of the device. If we just use a multi-image we can get it to size approximately to this space. But not exactly. We could set a multi-image as a background image for a container, and specify that it “scale to fill” the space. In fact this solution will work perfectly, if we are able to store the image in our resource file.
+The main photo is a bit more challenging though. The design calls for us to span the entire width of the device. If we just use a multi-image we can get it to size approximately to this space. But not exactly. We could set a multi-image as a background image for a container, and specify that it "scale to fill" the space. In fact this solution will work perfectly, if we are able to store the image in our resource file.
 
-Unfortunately, it looks like this app is some sort of news app, where articles are loaded from a server, and each article comes with its own photo. Hence, there could be thousands or millions of photos that need to be sized this way in this app. Using the “multi-image” solution won’t scale well, since multi-images need to be stored inside the resource file, and you can’t realistically store thousands or millions of images in the resource file.
+Unfortunately, it looks like this app is some sort of news app, where articles are loaded from a server, and each article comes with its own photo. Hence, there could be thousands or millions of photos that need to be sized this way in this app. Using the "multi-image" solution won’t scale well, since multi-images need to be stored inside the resource file, and you can’t realistically store thousands or millions of images in the resource file.
 
-Loading images over the network isn’t a problem. You can just use the URLImage class with a “scale to fill” filter. The PropertyCross demo actually uses a hybrid solution with URLImage to load images of housing properties, multi-images serving as the placeholder image so that the image will scale to the right size. This approach, while workable still has fairly major problem:
+Loading images over the network isn’t a problem. You can just use the URLImage class with a "scale to fill" filter. The PropertyCross demo actually uses a hybrid solution with URLImage to load images of housing properties, multi-images serving as the placeholder image so that the image will scale to the right size. This approach, while workable still has fairly major problem:
 
 How do we resize the image to be the correct size on all devices, **and** maintain quality. E.g. On the iPhone 3G, we need an image to be 320 px wide to span the width of the screen, whereas on the iPhone 6+, the image needs to be 1080 px. If we download a 320px image from the network, and resize it on device, it will look great on the 3G but horrible on the 6+. If we instead download a 1080px image, it will look great on the 6+ but quite poor on the 3G. In addition, this will waste a lot of unnecessary bandwidth for 3G users, downloading hi-res images that they don’t need.
 
@@ -160,7 +160,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Is there a way to detect if an image URL is already in queue and instead of sending another request, it waits for that to finish and use it?
 >
 > As a note to anyone using this library: Cloudinary changes spaces in filenames to underscores automatically.  
-> To avoid 404 error, Do “.image(encImage, StringUtil.replaceAll(yourImageName, ” “, “_”));”.
+> To avoid 404 error, Do ".image(encImage, StringUtil.replaceAll(yourImageName, " ", "_"));".
 >
 
 
@@ -249,7 +249,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I found the Image.fill(width, height) method at last. It is very useful one.  
 > Another question,  
 > First, is there any possibility to drive iOS and Android fingerprint authentication?  
-> Second, I would like to make the Windows and Mac forms to be “alwaysOnTop” and “Non-focusable” ? It is possible in Java swing, but I couldn’t find the way in this codename1. if no way, any other way to use native libraries?  
+> Second, I would like to make the Windows and Mac forms to be "alwaysOnTop" and "Non-focusable" ? It is possible in Java swing, but I couldn’t find the way in this codename1. if no way, any other way to use native libraries?  
 > Best regards.
 >
 
@@ -261,7 +261,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You will need native interfaces for that, I don’t think it will be hard but haven’t tried it myself.
 >
-> When you generate native interfaces it also generates one for Java SE which will execute in the desktop port and the simulator. You can implement “always on top” there. I would check the isDesktop method from Desktop to prevent that code from executing in the simulator.
+> When you generate native interfaces it also generates one for Java SE which will execute in the desktop port and the simulator. You can implement "always on top" there. I would check the isDesktop method from Desktop to prevent that code from executing in the simulator.
 >
 
 
@@ -273,7 +273,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi, Shai, I was very impressed to your rapid reply.  
 > Just hope your business grow the best.
 >
-> Still I have question. I studied native interface, but I couldn’t find the way to make the Desktop form to “AlwaysOnTop”.  
+> Still I have question. I studied native interface, but I couldn’t find the way to make the Desktop form to "AlwaysOnTop".  
 > First of all, I couldn’t pass the Form value as parameter for native methods, even I don;t know this way is right for always on top.  
 > Please guide me how to implement alwaysontop feature using native interface.  
 > All the best.

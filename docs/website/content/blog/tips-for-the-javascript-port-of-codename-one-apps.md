@@ -21,7 +21,7 @@ You want to send a message from your Codename One app to the webpage that contai
 
 ## Solution
 
-You can use CN.postMessage(), in Codename One to send the message. The message will be dispatched to Javascript event listeners in the outside webpage that register to receive cn1outbox events.
+You can use `CN.postMessage()`, in Codename One to send the message. The message will be dispatched to Javascript event listeners in the outside webpage that register to receive cn1outbox events.
 
 ## Sending a message from Codename One to the outside webpage:
 
@@ -55,7 +55,7 @@ window.addEventListener('cn1outbox', function(evt) {
 
 ## Discussion
 
-The CN.postMessage() method allows you to send a message to the native platform. When deploying as a Javascript app, these messages are converted to custom DOM events and dispatched on the window object. The event name is “cn1outbox”, so you can receive events like this from the “javascript” side by registering an event listener for these types of events on the window object.
+The `CN.postMessage()` method allows you to send a message to the native platform. When deploying as a Javascript app, these messages are converted to custom DOM events and dispatched on the window object. The event name is "cn1outbox", so you can receive events like this from the "javascript" side by registering an event listener for these types of events on the window object.
 
 ### Receiving Messages from the Outside Webpage
 
@@ -65,7 +65,7 @@ You want to send messages from Javascript (i.e. the page containing the app) to 
 
 ## Solution
 
-From Javascript, you can dispatch a custom event named ‘cn1inbox’ on the window object. You can receive these events in Codename One using the CN.addMessageListener() method.
+From Javascript, you can dispatch a custom event named ‘cn1inbox’ on the window object. You can receive these events in Codename One using the `CN.addMessageListener()` method.
 
 ## Sending Message from Javascript that can be received inside Codename One app:
 
@@ -94,7 +94,7 @@ CN.addMessageListener(evt->{
 
 ## Discussion
 
-The CN.addMessageListener() and CN.removeMessageListener() methods allow you to register listeners to receive messages from the native platform. When the app is deployed as a Javascript app, the webpage can target these listeners using a custom DOM event named ‘cn1inbox’. The Codename One app will receive all events of this type, and dispatch them to the listeners that were registered using CN.addMessageListener().
+The `CN.addMessageListener()` and `CN.removeMessageListener()` methods allow you to register listeners to receive messages from the native platform. When the app is deployed as a Javascript app, the webpage can target these listeners using a custom DOM event named ‘cn1inbox’. The Codename One app will receive all events of this type, and dispatch them to the listeners that were registered using `CN.addMessageListener()`.
 
 ### Notify Webpage When App is Started
 
@@ -139,7 +139,7 @@ In addition to these DOM events, you can also check window.cn1Initialized and wi
 
 ## Problem
 
-You want to deploy your app inside a webpage “headlessly”. i.e. You don’t want the user to see the app. This might be useful if you just want to use your app as a javascript library.
+You want to deploy your app inside a webpage "headlessly". i.e. You don’t want the user to see the app. This might be useful if you just want to use your app as a javascript library.
 
 ## Solution
 
@@ -165,26 +165,26 @@ Embed the app inside a 1-pixel iframe.
 
 ## Discussion
 
-If you are deploying your app as a headless app, then you are likely expecting to be able to communicate between the webpage and your app. You will also need to be notified of lifecycle events in your app so you know when it has finished loading. Be aware of CORS (cross-origin-resource-sharing) browser policies if the page containing the <iframe> is loaded from a different domain than your app.
+If you are deploying your app as a headless app, then you are likely expecting to be able to communicate between the webpage and your app. You will also need to be notified of lifecycle events in your app so you know when it has finished loading. Be aware of CORS (cross-origin-resource-sharing) browser policies if the page containing the `<iframe>` is loaded from a different domain than your app.
 
 ## CORS Checklist
 
-If the app (inside the iframe) is hosted at a different domain than the parent page (the page with the <iframe> tag), then you need to jump through some hoops to get things working.
+If the app (inside the iframe) is hosted at a different domain than the parent page (the page with the `<iframe>` tag), then you need to jump through some hoops to get things working.
   
   
 1. Make sure that you are not sending the [X-Frame-Options](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options) response header with your app. This header prevents your page from being displayed inside an iframe. Many web hosts add this header automatically.
   
   
-2. If you want to use features like “camera” and “microphone”, you’ll need to add the “allow” attribute to your iframe tag. e.g. <iframe allow=”camera;microphone” …​/>. For more information about this attribute, see [This article](https://sites.google.com/a/chromium.org/dev/Home/chromium-security/deprecating-permissions-in-cross-origin-iframes).
+2. If you want to use features like "camera" and "microphone", you’ll need to add the "allow" attribute to your iframe tag. e.g. <iframe allow="camera;microphone" …​/>. For more information about this attribute, see [This article](https://sites.google.com/a/chromium.org/dev/Home/chromium-security/deprecating-permissions-in-cross-origin-iframes).
   
   
-3. If you need to communicate between the parent window and the iframe document (i.e. the window with your app, you’ll need to use [Window.postMessage()](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage). You can access the iframe’s “window” object using myIframe.contentWindow.
+3. If you need to communicate between the parent window and the iframe document (i.e. the window with your app, you’ll need to use [Window.postMessage()](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage). You can access the iframe’s "window" object using myIframe.contentWindow.
 
 ### Playing Audio in a Headless App
 
 ## Problem
 
-In some cases Codename One apps may be deployed as “headless” apps. This can be achieved by simply embedding the app inside an iframe and positioning the iframe outside the main view port (e.g. x=-1000, y=-1000). If you are deploying the app this way, you may run into cases where the app requires user interaction.
+In some cases Codename One apps may be deployed as "headless" apps. This can be achieved by simply embedding the app inside an iframe and positioning the iframe outside the main view port (e.g. x=-1000, y=-1000). If you are deploying the app this way, you may run into cases where the app requires user interaction.
 For example, if you try to play audio in the app, and you are running on iOS, then the app may require some user interaction in order for Safari to allow the audio. Codename One apps deal with this situation by prompting the user to play the audio. However, if the app is off screen, the user won’t see this prompt, so the audio will just not play.
 
 ## NOTE:
@@ -193,9 +193,9 @@ For example, if you try to play audio in the app, and you are running on iOS, th
 
 ## Solution
 
-Codename One broadcasts a custom DOM event named “cn1userprompt” when a prompt is displayed that the user needs to interact with. You can register an event listener in the outside webpage to listen for this event, and display the iframe in such cases.
+Codename One broadcasts a custom DOM event named "cn1userprompt" when a prompt is displayed that the user needs to interact with. You can register an event listener in the outside webpage to listen for this event, and display the iframe in such cases.
 
-The “cn1userpromptresponse” custom DOM event will be dispatched after the user has finished the interaction.
+The "cn1userpromptresponse" custom DOM event will be dispatched after the user has finished the interaction.
 
 ```javascript
 				
@@ -214,7 +214,7 @@ myIframe.contentWindow.addEventListener('cn1userpromptresponse', function(evt) {
 
 ## Background
 
-On some browsers (e.g. Safari), your app can only play audio as a direct response to user interaction. e.g. The user needs to actually click on the screen to initiate audio play. This is only required for the first audio clip that your app plays. If the app is ever denied permission to play an audio clip by the browser, it will display a prompt to the user saying “Audio Ready”, with a “Play Now” button. When the user presses that button, the audio will begin to play.
+On some browsers (e.g. Safari), your app can only play audio as a direct response to user interaction. e.g. The user needs to actually click on the screen to initiate audio play. This is only required for the first audio clip that your app plays. If the app is ever denied permission to play an audio clip by the browser, it will display a prompt to the user saying "Audio Ready", with a "Play Now" button. When the user presses that button, the audio will begin to play.
 
 ## Problem
 
@@ -222,7 +222,7 @@ You want to customize the dialog prompt that is displayed to ask the user for pe
 
 ## Solution
 
-Register a message listener using CN.addMessageListener(), and call isPromptForAudioPlayer() on the received MessageEvent object to see if it is a prompt to play audio.
+Register a message listener using `CN.addMessageListener()`, and call isPromptForAudioPlayer() on the received MessageEvent object to see if it is a prompt to play audio.
   
   
 If isPromptForAudioPlayer() returns true, then you can consume() the event to signal that you’ll be displaying a custom dialog, and then you can display your own dialog as shown in the example below.
@@ -267,7 +267,7 @@ complete(true) indicates that the user decided to play the audio. complete(false
 1. isPromptForAudioPlayer() tells us that this event is a prompt to play audio.
   
   
-2. Important: You must call evt.consume() to let Codename One know that you are going to handle this prompt. Otherwise, the default permission prompt will still be shown.
+2. Important: You must call `evt.consume()` to let Codename One know that you are going to handle this prompt. Otherwise, the default permission prompt will still be shown.
   
   
 3. Because we are using a modal dialog which will block the event dispatch, we wrap the dialog in callSerially() so this event dispatch won’t be blocked. This is not absolutely necessary, but it will make it easier to follow the app’s logic, as these prompts are designed to by asynchronous.
@@ -276,7 +276,7 @@ complete(true) indicates that the user decided to play the audio. complete(false
 4. Obtain the PromptPromise from the event which we will use to convey the user’s response back to the app. YOU MUST call the complete() on this promise no matter what, or the app will lock up.
   
   
-5. If the user elected to “Play” the audio, then call res.complete(true) on the promise.
+5. If the user elected to "Play" the audio, then call res.complete(true) on the promise.
   
   
 6. If the user elected not to play the audio, then call res.complete(false) on the promise.
@@ -307,7 +307,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Francesco Galgani says:
 >
-> This is just a theoretical curiosity of mine: in which real use cases could a Codename One project like «”Headless” Javascript App» be useful? Could you give some concrete examples?
+> This is just a theoretical curiosity of mine: in which real use cases could a Codename One project like «"Headless" Javascript App» be useful? Could you give some concrete examples?
 >
 
 

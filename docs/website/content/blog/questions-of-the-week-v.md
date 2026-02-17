@@ -62,7 +62,7 @@ I’m reminded on how good we have it thanks to lightweight architecture.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37117122/date-time-picker-issue-in-codename-one)
 
-### Set path to look for java.exe in the intellij codename plugin
+### Set path to look for `java.exe` in the intellij codename plugin
 
 This is a weird IntelliJ IDEA behavior, some oddities still exist in the plugin for IntelliJ in part because the rewrite  
 is so new and in part because of our restrictions to project structure.

@@ -143,7 +143,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > error, the first one is import  
 > com.codename1.components.FloatingActionButton; the FloatingActinButton  
 > seems not to be in the list of component, how can i fix that? (that  
-> error is in the file “[ProfileForm.java](<http://ProfileForm.java>) line 22″) , The second error is  
+> error is in the file "[ProfileForm.java](<http://ProfileForm.java>) line 22″) , The second error is  
 > in the file [SideMenuBaseForm.java](<http://SideMenuBaseForm.java>) from line 66 where we have  
 > getToolbar().addMaterialCommandToSideMenu, how can i fix these two  
 > errors, FWI i have create a new project then i copy one by one the files  

@@ -28,11 +28,11 @@ please do so now! We are still short of 30 entries in order to get better logo p
   
 It would help us greatly if you would convince your friends to fill this out as well. Thanks. 
 
-Finishing the work on the new VM is taking longer than we originally estimated (as all engineering tasks do) but its getting along well. To give you a sense of scale, converting the Kitchen Sink to C with the old VM took 1,851,249 lines of code where is with the new VM its a “svelte” 1,001,317 with the current implementation. The old XMVM implementation produced 4,220 source files to do that whereis the new implementation produces “only” 1,474 files.  
+Finishing the work on the new VM is taking longer than we originally estimated (as all engineering tasks do) but its getting along well. To give you a sense of scale, converting the Kitchen Sink to C with the old VM took 1,851,249 lines of code where is with the new VM its a "svelte" 1,001,317 with the current implementation. The old XMVM implementation produced 4,220 source files to do that whereis the new implementation produces "only" 1,474 files.  
   
 Ideally we’d like this to shrink significantly since one of the main motivations here is smaller size and faster builds.
 
-However, the new VM will be naturally very verbose since bytecode by definition is more verbose than Dalvik which the existing XMLVM implementation relies on. We also embed the GC logic directly into the C code using an ARC like GC architecture (emphasis on the word “like” ARC isn’t a GC) which would also enlarge the VM a bit. 
+However, the new VM will be naturally very verbose since bytecode by definition is more verbose than Dalvik which the existing XMLVM implementation relies on. We also embed the GC logic directly into the C code using an ARC like GC architecture (emphasis on the word "like" ARC isn’t a GC) which would also enlarge the VM a bit. 
 
 One of the hard goals with the new VM is to be mostly source level compatible with XMLVM but as we are moving forward this is something we are starting to reconsider. We already broke one major compatibility aspect with method signatures. E.g. with XMLVM a class such as this:  
   

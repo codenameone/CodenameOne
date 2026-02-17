@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/live-streaming-wowza/wowza.jpg)
 
-Two months ago I published the CN1Lib “Wowza Live Streaming Events”, as usual you can install that by the Extension Manager.  
+Two months ago I published the CN1Lib "Wowza Live Streaming Events", as usual you can install that by the Extension Manager.  
 The purpose of this CN1Lib is to add live streaming capabilities to iOS and Android Codename One apps, hiding all the complexities and reducing the effort.
 
 __ |  The Wowza cn1lib has been deprecated since the publication of this post   

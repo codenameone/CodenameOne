@@ -23,7 +23,7 @@ Last week I ended the post with this set of tasks:
 
 All of these can be solved by adding a new component type that will replace the problematic `FloatingHint` hack. One of the mistakes we made with Codename One was following the conventions of Swing where the label and component are separate. However, this isn’t really the case and theming can have a deep impact on this. E.g. the label on Android should be above the text field and float into place while the label in iOS should be next to it.
 
-This means we need a new API that will encapsulate the text component and the label next to it. This new API should be consistent, elegant and most importantly: “seamless”…​
+This means we need a new API that will encapsulate the text component and the label next to it. This new API should be consistent, elegant and most importantly: "seamless"…​
 
 ### TextComponent & TextModeLayout
 
@@ -56,7 +56,7 @@ Besides being verbose this looked bad on iOS:
 
 ![Not horrible but not exactly ](/blog/pixel-perfect-text-input-part-2/pixel-perfect-text-field-android-on-ios.png)
 
-Figure 2. Not horrible but not exactly “iOS”
+Figure 2. Not horrible but not exactly "iOS"
 
 So we need something better…​ This code produces the exact same look on Android (more on that soon) but it does that while producing a good looking result on iOS too:
     
@@ -79,13 +79,13 @@ So we need something better…​ This code produces the exact same look on Andr
 
 ![An iOS native ](/blog/pixel-perfect-text-input-part-2/pixel-perfect-text-field-reasonable-on-ios.png)
 
-Figure 3. An iOS native “feel” with the exact same code
+Figure 3. An iOS native "feel" with the exact same code
 
 #### Why a New Layout?
 
-As you can see from the code and samples above there is a lot going on under the hood. On Android we want a layout that’s similar to `TableLayout` so we can “pack” the entries. On iOS we want a box layout Y type of layout but we also want the labels/text to align properly…​
+As you can see from the code and samples above there is a lot going on under the hood. On Android we want a layout that’s similar to `TableLayout` so we can "pack" the entries. On iOS we want a box layout Y type of layout but we also want the labels/text to align properly…​
 
-The new `TextModeLayout` isn’t really a layout as much as it is a delegate. When running in the Android mode (which we refer to as the “on top” mode) the layout is almost an exact synonym of `TableLayout` and in fact delegates to an underlying table layout. In fact there is a `public final` table instance within the layout that you “can” refer to directly…​
+The new `TextModeLayout` isn’t really a layout as much as it is a delegate. When running in the Android mode (which we refer to as the "on top" mode) the layout is almost an exact synonym of `TableLayout` and in fact delegates to an underlying table layout. In fact there is a `public final` table instance within the layout that you "can" refer to directly…​
 
 There is one small difference between the `TextModeLayout` and the underlying `TableLayout` and that’s our choice to default to align entries to `TOP` with this mode. It’s important for error handling which I’ll cover below.
 
@@ -108,7 +108,7 @@ We also added some pretty spiffy new features to address the points above…​
 
 ### Error Handling
 
-I’ve added support to the validator class for text component and it should “just work”. But the cool thing is that it uses the material design convention for error handling!
+I’ve added support to the validator class for text component and it should "just work". But the cool thing is that it uses the material design convention for error handling!
 
 So if we change the sample above to use the validator class:
     

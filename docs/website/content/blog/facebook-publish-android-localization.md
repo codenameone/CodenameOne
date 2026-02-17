@@ -42,7 +42,7 @@ On a different subject, localization is a pretty easy task in Codename One thank
 [  
 i18n support  
 ](/how-do-i---localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app.html)  
-builtin to our tools. Our i18n tools are unique since they don’t require you to implement anything in the code and you can instantly start localizing without wide sweeping changes. However, the Android APK doesn’t detect our localization as part of your application and might incorrectly assume the APK contains a single language. To combat that we are introducing the build argument: android.locales=local;local;locale  
+builtin to our tools. Our i18n tools are unique since they don’t require you to implement anything in the code and you can instantly start localizing without wide sweeping changes. However, the Android APK doesn’t detect our localization as part of your application and might incorrectly assume the APK contains a single language. To combat that we are introducing the build argument: `android.locales=local;local;locale`  
   
   
 Where you can specify the supported languages for the APK, locale can be any 2 letter language code such as fr for French, en for English etc. Notice that these are standard combinations based on an iso standard.  

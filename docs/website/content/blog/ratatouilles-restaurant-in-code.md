@@ -102,7 +102,7 @@ This class is slightly larger so we’ll break it down to obvious pieces of code
 That’s pretty much the whole application. You’ll notice that commands are added to the side menu with icon  
 fonts, that demo predated our new Material design icons and new native fonts so it uses neither. Newer  
 code would be smaller and simpler.  
-The “rat” label above shows the rounded version of the logo on the side menu that slides out as such: 
+The "rat" label above shows the rounded version of the logo on the side menu that slides out as such: 
 
 ![Sidemenu](/blog/ratatouilles-restaurant-in-code/slide-2.png)
 
@@ -223,7 +223,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > unreachable code after return statement classes.js:7384:18  
 > InvalidStateError fontmetrics.js:501:0  
-> “Google Maps API warning: InvalidKey: [https://developers.google.c…](<https://developers.google.com/maps/documentation/javascript/error-messages>)” util.js:30:57  
+> "Google Maps API warning: InvalidKey: [https://developers.google.c…](<https://developers.google.com/maps/documentation/javascript/error-messages>)" util.js:30:57  
 > TypeError: $t is null classes.js:1940:16  
 > uncaught exception: [object DOMError]  
 > —————————–  
@@ -271,7 +271,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > bryan says:
 >
-> I think I’ve got some weirdness my end. On my development system, it still does not work, but on another system (same OS version, same FF version) it works. Ahh… just found the “problem”. On my devel system I always use “Private Browsing” with ‘Tracking Protection” turned on. With a regular browser window it works fine. Sorry for confusion.
+> I think I’ve got some weirdness my end. On my development system, it still does not work, but on another system (same OS version, same FF version) it works. Ahh… just found the "problem". On my devel system I always use "Private Browsing" with ‘Tracking Protection" turned on. With a regular browser window it works fine. Sorry for confusion.
 >
 
 

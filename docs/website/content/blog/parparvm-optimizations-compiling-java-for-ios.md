@@ -21,11 +21,11 @@ In the beginning, Codename One used XMLVM to build apps for iOS. It worked by co
 
 ### Why Didn’t We Choose Avian or RoboVM?
 
-At the time it may have seemed like a logical choice to go with RoboVM, but this was deemed not an option because it was extremely important that we be able to use Apple’s official tool-chain for building apps. That would ensure that we wouldn’t hit a dead end. A key requirement of ParparVM was to produce **actual** X-code projects that could be built using Apple’s tool-chain. This had several benefits. In addition to “future-proofing” us in the case that Apple might start rejecting apps that didn’t use the official tools, it provided the ability to use Apple’s mature tools for profiling and debugging if needed.
+At the time it may have seemed like a logical choice to go with RoboVM, but this was deemed not an option because it was extremely important that we be able to use Apple’s official tool-chain for building apps. That would ensure that we wouldn’t hit a dead end. A key requirement of ParparVM was to produce **actual** X-code projects that could be built using Apple’s tool-chain. This had several benefits. In addition to "future-proofing" us in the case that Apple might start rejecting apps that didn’t use the official tools, it provided the ability to use Apple’s mature tools for profiling and debugging if needed.
 
 ### In the Beginning: A Stack-Based VM in C
 
-In the beginning ParparVM generated a faithful representation of java’s stack-based virtual machine in C-code. This made it very easy to verify the correctness of the code. Using our own stack also enabled us to implement a highly efficient, concurrent garbage collector that would avoid pauses. XMLVM had used the Boehm conservative garbage collector that would need to “stop the world” to collect garbage. ParparVM, in contrast, uses its own concurrent Mark-sweep garbage collector that very nearly eliminates all such pauses.
+In the beginning ParparVM generated a faithful representation of java’s stack-based virtual machine in C-code. This made it very easy to verify the correctness of the code. Using our own stack also enabled us to implement a highly efficient, concurrent garbage collector that would avoid pauses. XMLVM had used the Boehm conservative garbage collector that would need to "stop the world" to collect garbage. ParparVM, in contrast, uses its own concurrent Mark-sweep garbage collector that very nearly eliminates all such pauses.
 
 Once this was stable, we started introducing a few optimizations for common sequences of stack instructions. E.g. A statement like:
     
@@ -34,9 +34,9 @@ Once this was stable, we started introducing a few optimizations for common sequ
 
 in Java would produce bytecodes to:
 
-  1. Add “1” to the stack.
+  1. Add "1" to the stack.
 
-  2. Pop “1” off the stack and return it.
+  2. Pop "1" off the stack and return it.
 
 Clearly, it would be better for the resulting C code to simply return 1, just like the Java code, so ParparVM would optimize cases like this to do just that.
 
@@ -51,7 +51,7 @@ Things like this would cause ParparVM to perform poorly in some micro benchmarks
 
 ### Implementing Key Methods in Native C
 
-Once ParparVM was stable, we started optimizing common use cases by implementing “important” methods in native code. Many Math, String, and StringBuilder methods were implemented in native C since those are core to many applications. As users presented use cases that didn’t perform well (usually in crunching large amounts of data), we would profile and ease the bottlenecks by implementing more things natively.
+Once ParparVM was stable, we started optimizing common use cases by implementing "important" methods in native code. Many Math, String, and StringBuilder methods were implemented in native C since those are core to many applications. As users presented use cases that didn’t perform well (usually in crunching large amounts of data), we would profile and ease the bottlenecks by implementing more things natively.
 
 By the time Codename One 3.4 was released, general performance had improved dramatically. Native implementations of String methods made the most common data tasks (parsing JSON and XML) almost on par with native code. If an app needed additional performance for certain tasks, they could always use native interfaces to get a boost.
 
@@ -68,7 +68,7 @@ The use case that we were provided with included hundreds method invocations to 
 
 The resulting C-code for each of these would be over 20 lines of code. It would add the shape and each of the numbers to the stack, then call the function which would unwind the stack.
 
-I was able to reduce this down to the point where the C-code was pretty much identical to the Java code (disregarding method naming conventions), and lines of code in the method were reduced by 80%. This solved Clang “hanging” problem, and improved performance.
+I was able to reduce this down to the point where the C-code was pretty much identical to the Java code (disregarding method naming conventions), and lines of code in the method were reduced by 80%. This solved Clang "hanging" problem, and improved performance.
 
 ### Let’s do ALL the Optimizations!
 

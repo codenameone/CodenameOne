@@ -18,7 +18,7 @@ author: Shai Almog
 ![Picture](/blog/why-oracle-wont-issue-java-for-ios-anytime-soon/why-oracle-wont-issue-java-for-ios-anytime-soon-1.jpg)  
 ](/img/blog/old_posts/why-oracle-wont-issue-java-for-ios-anytime-soon-large-2.jpg)
 
-They say that today all companies are software companies. In less than 5 years all companies will be mobile companies. So why isn’t Oracle “getting it”, why aren’t they on the iPhone, on Android and even Windows Phone? 
+They say that today all companies are software companies. In less than 5 years all companies will be mobile companies. So why isn’t Oracle "getting it", why aren’t they on the iPhone, on Android and even Windows Phone? 
 
 This  
 [  
@@ -40,7 +40,7 @@ With Sun we used to go to customers/trade shows and show the cool stuff we had t
   
 Don’t they know already?
 
-Oracle is the exact opposite, they NEVER show something that isn’t a product or won’t be a product very soon. This is actually quite clever, people aren’t aware of lots of the stuff that’s available and if you talk about your pipe dream (which is cool) there is no “action item” to download a try it. You need people’s attention focused on what they can buy (obvious why Oracle was profiting while Sun was losing).
+Oracle is the exact opposite, they NEVER show something that isn’t a product or won’t be a product very soon. This is actually quite clever, people aren’t aware of lots of the stuff that’s available and if you talk about your pipe dream (which is cool) there is no "action item" to download a try it. You need people’s attention focused on what they can buy (obvious why Oracle was profiting while Sun was losing).
 
 So Oracle’s removing of the JavaFX on iOS talks from Java One is simply a matter of them not having a concrete product in the pipeline (update: just to clarify, this is an educated guess not a statement of fact).
 
@@ -67,7 +67,7 @@ Frankly, I understand Apple here. Documenting the GPU on the level Adobe needs i
   
 Java FX can’t use Core Animation (just like Adobe can’t) and will run into the exact same problems Adobe hit. I have a great deal of respect for the engineers on the Java FX team, they are pretty clever. But that’s not good enough.  
   
-We don’t run into those pitfalls since we are pretty used to device limitations, we pre-render everything important as raster images (which is what most mobile developers do anyway). This might not have the same “cool” graphics geek sheik, but it actually provides amazing looks because prerendering often looks better. Sure there are compromises about what you can do, but you will find pre-rendered graphics in most of the leading iOS apps despite the availability of vector graphics. Its easier, faster and flexible enough. 
+We don’t run into those pitfalls since we are pretty used to device limitations, we pre-render everything important as raster images (which is what most mobile developers do anyway). This might not have the same "cool" graphics geek sheik, but it actually provides amazing looks because prerendering often looks better. Sure there are compromises about what you can do, but you will find pre-rendered graphics in most of the leading iOS apps despite the availability of vector graphics. Its easier, faster and flexible enough. 
 
 So if you are looking for JavaFX on iOS, Android or Windows Phone then sorry. Just won’t happen.  
   

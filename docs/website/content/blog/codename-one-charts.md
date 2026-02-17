@@ -28,7 +28,7 @@ Steve Hannah
 ](http://sjhannah.com/)  
 , one of the newest additions to the Codename One team and a long time community contributor. 
 
-The upcoming update to Codename One will include a new package (com.codename1.charts) for rendering charts in your applications. This includes models and renderers for many common classes of charts including many flavours of bar charts, line charts, scatter charts, and pie charts.
+The upcoming update to Codename One will include a new package (`com.codename1.charts`) for rendering charts in your applications. This includes models and renderers for many common classes of charts including many flavours of bar charts, line charts, scatter charts, and pie charts.
 
 **  
 Goals  
@@ -136,7 +136,7 @@ Panning Support – The ChartComponent class includes optional support for panni
 Chart Types  
 **  
   
-The com.codename1.charts package includes models and renderers for many different types of charts. It is also extensible so that you can add your own chart types if required. The following screen shots demonstrate a small sampling of the types of charts that can be created.  
+The `com.codename1.charts` package includes models and renderers for many different types of charts. It is also extensible so that you can add your own chart types if required. The following screen shots demonstrate a small sampling of the types of charts that can be created.  
   
 
 * * *
@@ -211,7 +211,7 @@ Adding a chart to your app involves four steps:
 **  
 Build the model  
 **  
-. You can construct a model (aka data set) for the chart using one of the existing model classes in the com.codename1.charts.models package. Essentially, this is just where you add the data that you want to display.  
+. You can construct a model (aka data set) for the chart using one of the existing model classes in the `com.codename1.charts.models` package. Essentially, this is just where you add the data that you want to display.  
   
   
   
@@ -220,7 +220,7 @@ Build the model
 **  
 Set up a renderer  
 **  
-. You can create a renderer for your chart using one of the existing renderer classes in the com.codename1.charts.renderers package. The renderer allows you to specify how the chart should look. E.g. the colors, fonts, styles, to use.  
+. You can create a renderer for your chart using one of the existing renderer classes in the `com.codename1.charts.renderers` package. The renderer allows you to specify how the chart should look. E.g. the colors, fonts, styles, to use.  
   
   
   
@@ -229,7 +229,7 @@ Set up a renderer
 **  
 Create the Chart View  
 **  
-. Use one of the existing view classes in the com.codename1.charts.views package.  
+. Use one of the existing view classes in the `com.codename1.charts.views` package.  
   
   
   
@@ -295,7 +295,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> The new charts API is part of the codename one core. No need for libraries. The old chart engine libraries will work in IntelliJ also. Yes just place the cn1lib files in your lib directory and select “Refresh libs”.
+> The new charts API is part of the codename one core. No need for libraries. The old chart engine libraries will work in IntelliJ also. Yes just place the cn1lib files in your lib directory and select "Refresh libs".
 >
 
 
@@ -436,7 +436,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Jared Ruplinger says:
 >
-> For those who are having trouble following the examples in the demo linked from this post, you might want to check out the “newer” demo from the post at [https://www.codenameone.com…](</blog/charts-demo-revisited/>)
+> For those who are having trouble following the examples in the demo linked from this post, you might want to check out the "newer" demo from the post at [https://www.codenameone.com…](</blog/charts-demo-revisited/>)
 >
 > It is a smidge simpler. That aside, however, there are a lot of moving pieces to the charts functionality and it would sure be nice to have some more thorough documentation.
 >
@@ -447,7 +447,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Yes, I agree. We need simpler charts. We added some simpler code into the kitchen sink under the sales demo. It tries to demonstrate a more “real world” use case.
+> Yes, I agree. We need simpler charts. We added some simpler code into the kitchen sink under the sales demo. It tries to demonstrate a more "real world" use case.
 >
 
 

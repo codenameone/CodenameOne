@@ -89,14 +89,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Is there a way to accomplish this? According to what I’ve read in this article, changing the preferences location should have the desired effect, but I cannot figure out how. Putting the following snippet into the init method of a generated project always (even after restarting the app) results in NULL being returned by Preferences.get():
 >
 > // before login  
-> Preferences.setPreferencesLocation(“SomeOtherLocation”);  
-> Preferences.get(“Key”, null); // This always returns null
+> Preferences.setPreferencesLocation("SomeOtherLocation");  
+> Preferences.get("Key", null); // This always returns null
 >
 > // login  
-> EncryptedStorage.install(“Secret”);
+> EncryptedStorage.install("Secret");
 >
 > // after login  
-> Preferences.set(“Key”, “Value”);
+> Preferences.set("Key", "Value");
 >
 > The invocation of the Preferences.get() method during the first launch just returns NULL, during the second launch also an EOFException is logged to the console before the NULL value is returned.
 >
@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The idea is to keep two preferences files, one encrypted and one unencrypted and call set preferences location AFTER encrypting so one doesn’t break the other.
 >
-> You obviously can’t share a key between those two so if you need a key to exist in both you will need to transfer it thru a variable in memory as once encryption is on everything is “gone”.
+> You obviously can’t share a key between those two so if you need a key to exist in both you will need to transfer it thru a variable in memory as once encryption is on everything is "gone".
 >
 
 
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > To make my question more comprehensive, here’s my situation: I need to store the password hash of the user somehow unencrypted to check during login. The same password is used during login to decrypt the storage. Now, while still logged in, the user may change his password. The hash of this new password then needs to be stored for the next login.
 >
-> If I got your answer right, there is no built-in way to accomplish this, using only the Storage/EncryptedStorage and Preferences APIs. As there is no “EncryptedStorage.uninstall” method, one cannot write plaintext data to storage after EncryptedStorage.install was called.
+> If I got your answer right, there is no built-in way to accomplish this, using only the Storage/EncryptedStorage and Preferences APIs. As there is no "EncryptedStorage.uninstall" method, one cannot write plaintext data to storage after EncryptedStorage.install was called.
 >
 > Based on your experience, what solution would you recommend, especially in terms of portability? Would using e.g. Properties and FileSystemStorage directly be a good idea or are there better alternatives?
 >

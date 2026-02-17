@@ -116,7 +116,7 @@ liquid robotics
 ](http://liquidr.com/)  
 . They have amazing visualization tools for controlling these robots which I’m sure will really benefit from Codename One… I promised him that if he accepts my invitation I will personally port everything to Codename One and give him a great tablet UI to play with the robots. 
 
-Gosling told the story of the NetBeans acquisition, having worked at Sun I can pretty much attest to the mindset behind it. The gist of the story is that Sun at some point decided they want a “big play” on development tools and didn’t have anything good (because they kept killing internal projects so as not to compete with Borland et. al.). So they were looking for a billion dollar acquisition and came across Forte which was making mainframe tools (totally unrelated), Gosling tried to convince management to buy NetBeans but they decided that the price was too low so its not a “big play”. Eventually the compromise was to buy both (he put it as: the price for NetBeans was a rounding error on the Forte deal).  
+Gosling told the story of the NetBeans acquisition, having worked at Sun I can pretty much attest to the mindset behind it. The gist of the story is that Sun at some point decided they want a "big play" on development tools and didn’t have anything good (because they kept killing internal projects so as not to compete with Borland et. al.). So they were looking for a billion dollar acquisition and came across Forte which was making mainframe tools (totally unrelated), Gosling tried to convince management to buy NetBeans but they decided that the price was too low so its not a "big play". Eventually the compromise was to buy both (he put it as: the price for NetBeans was a rounding error on the Forte deal).  
   
 Years later Forte is effectively nothing and NetBeans has 1.4m active users.
 
@@ -137,7 +137,7 @@ In the middle of the NetBeans day we left for the keynote (in Moscone again whic
 
 The keynote talked about what a great year this was for Java, I understand the need to get people enthusiastic and excited in a keynote (and be positive) but ignoring the security issues and NSA warnings etc. (within the keynote) is a bit much.  
   
-The thing is Oracle actually has a security track in JavaOne now and is doing a lot of things to fix the problems we saw this year, I’d much rather hear “we had a tough year on this front but here is how we are fixing it”. The keynote was mostly anemic talking a lot about the embedded effort which is very interesting (the internet of “things”), but there was very little content there that was interesting to me personally as a mobile developer that isn’t a mobile HTML developer or an embedded developer.
+The thing is Oracle actually has a security track in JavaOne now and is doing a lot of things to fix the problems we saw this year, I’d much rather hear "we had a tough year on this front but here is how we are fixing it". The keynote was mostly anemic talking a lot about the embedded effort which is very interesting (the internet of "things"), but there was very little content there that was interesting to me personally as a mobile developer that isn’t a mobile HTML developer or an embedded developer.
 
 The day ended with a BoF about contribution to the JDK narrated by Daniel Sachse and Helio Frota, I came because of the description of the BoF which was pretty in line with Daniel’s presentation. However, it seems the committee that approved the BoF unified two separate and unrelated talks into one causing some frustration in the audience most of whom came for the description which was taken from Daniels talk.  
   
@@ -200,7 +200,7 @@ I then rushed to the JCP party on the roof of the Hilton, it had nice food and s
 [  
 Tinuola Awopetu  
 ](https://oracleus.activeevents.com/2013/connect/speakerDetail.ww?PERSON_ID=5B887663459DE248B1E37D23F1023BA5&tclass=popup)  
-who does the marketing for the NetBeans team, we started chatting and it turns out she had her own panel BoF starting just then titled: “So You Want to Be a Published Technical Author?”.  
+who does the marketing for the NetBeans team, we started chatting and it turns out she had her own panel BoF starting just then titled: "So You Want to Be a Published Technical Author?".  
   
   
 A friend from Sun and one of the best technical writers I know  
@@ -273,7 +273,7 @@ Just goes to show that you should always be open at Java One.
   
 The next day started by touring the exhibition floor, I was on a tight schedule running around to very specific booths of interest. Last year I was so busy I didn’t get to see the pavilion even once, so I was very careful and methodological this year. There were many interesting booths from IBM, RedHat, ARM etc. but the startups were more bold. CloudBees literally dressed all their personnel as bees, including head of marketing and (male) CEO. Amusing, but I think I’m too dry to do something like that.
 
-“Practical Pros and Cons of Replacing Swing with JavaFX in Existing Applications” was the title of a surprisingly interesting session. I added it to my list because it was lead by  
+"Practical Pros and Cons of Replacing Swing with JavaFX in Existing Applications" was the title of a surprisingly interesting session. I added it to my list because it was lead by  
 [  
 Geertjan  
 ](http://twitter.com/GeertjanW)  
@@ -306,7 +306,7 @@ Lynden
 ](http://www.lynden.com/)  
 which is a major shipping company. They are using FX to make the UI’s of their rather elaborate tables more visually appealing and usable. 
 
-I then went to watch “Play Framework Versus Grails Smackdown” which was delivered by two brilliant speakers:  
+I then went to watch "Play Framework Versus Grails Smackdown" which was delivered by two brilliant speakers:  
 [  
 James Ward  
 ](https://twitter.com/_JamesWard)  
@@ -314,11 +314,11 @@ James Ward
 [  
 Matt Raible  
 ](https://twitter.com/mraible)  
-. The talk was great however they gave a member of the audience in the front seat a really loud bell (or gong) and whenever one of them “delivered a smackdown” he rang the bell really loudly. I was in the back and had a headache 20 minutes into the talk. Left to the speaker room next door where the bell was also heard only softly.  
+. The talk was great however they gave a member of the audience in the front seat a really loud bell (or gong) and whenever one of them "delivered a smackdown" he rang the bell really loudly. I was in the back and had a headache 20 minutes into the talk. Left to the speaker room next door where the bell was also heard only softly.  
   
   
   
-There are two reasons I went to the BoF “Teaching Java with Minecraft, Greenfoot, and Scratch”,  
+There are two reasons I went to the BoF "Teaching Java with Minecraft, Greenfoot, and Scratch",  
 [  
 Daniel Green  
 ](https://twitter.com/dangjavageek)  
@@ -326,7 +326,7 @@ Daniel Green
 [  
 Arun Gupta  
 ](https://twitter.com/arungupta)  
-. My daughter is still a bit too young for programming I’ll probably have to start next year when she is 4. The session was fun and engaging, but the real kicker came later… All thru the session Arun dropped references to teaching his son to work on the Minecraft source code. In the general session his son (Aditya) got on stage and stole the entire JavaOne show, he launched Eclipse and went into a compelling demo (and anyone who ever demoed source code modification on stage knows this is HARD and BORING). The kid had the audience eating out of the palm of his keyboard, it was one of the best demos I saw on the JavaOne stage and the audience was totally with him as he complained about Eclipse or lamented on a method needing to be overriden “not sure why”. James Gosling followed him noting that now he wants to become a minecraft hacker!  
+. My daughter is still a bit too young for programming I’ll probably have to start next year when she is 4. The session was fun and engaging, but the real kicker came later… All thru the session Arun dropped references to teaching his son to work on the Minecraft source code. In the general session his son (Aditya) got on stage and stole the entire JavaOne show, he launched Eclipse and went into a compelling demo (and anyone who ever demoed source code modification on stage knows this is HARD and BORING). The kid had the audience eating out of the palm of his keyboard, it was one of the best demos I saw on the JavaOne stage and the audience was totally with him as he complained about Eclipse or lamented on a method needing to be overriden "not sure why". James Gosling followed him noting that now he wants to become a minecraft hacker!  
   
   
   
@@ -357,7 +357,7 @@ Kevin is a great guy, we spent quite a while talking before and after his sessio
 Jaroslav Tulach  
   
 
-A bit later I attended a great session “The Chuck Norris Experiment: Running Java in Any Browser Without a Plug-in” which was given by  
+A bit later I attended a great session "The Chuck Norris Experiment: Running Java in Any Browser Without a Plug-in" which was given by  
 [  
 Jaroslav Tulach  
 ](https://twitter.com/JaroslavTulach)  
@@ -469,7 +469,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> I’m afraid I’m going to sound like a broken record, but thank you so much for this detailed report, it’s almost like being there! Do you know if/when the session videos will be available for viewing, like they did for 2012? Keynotes can only tell you so much… Also, I’m very intrigued by your JavaFX comment “It was a very interesting conversation but there is no point of going into details at this point in time.” We’ll stay tuned, I guess 😉 Congrats on the 21 millions devices! Love the ticker!
+> I’m afraid I’m going to sound like a broken record, but thank you so much for this detailed report, it’s almost like being there! Do you know if/when the session videos will be available for viewing, like they did for 2012? Keynotes can only tell you so much… Also, I’m very intrigued by your JavaFX comment "It was a very interesting conversation but there is no point of going into details at this point in time." We’ll stay tuned, I guess 😉 Congrats on the 21 millions devices! Love the ticker!
 >
 
 

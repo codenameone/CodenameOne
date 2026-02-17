@@ -16,7 +16,7 @@ In the latest plugin update, we’ve added a Build-Hints Editor that accessible 
 
 ![codename one - build hint editor](/blog/build-hints-editor/cn1-build-hint-editor-1024x536.jpg)
 
-Unlike the existing mechanisms for editing build hints (in Codename One Settings, or directly editing the codenameone_settings.properties file), this editor can integrate the requirements of installed cn1libs to help guide you through their configuration.
+Unlike the existing mechanisms for editing build hints (in Codename One Settings, or directly editing the `codenameone_settings.properties` file), this editor can integrate the requirements of installed cn1libs to help guide you through their configuration.
 
 > The latest release of the Google Maps cn1lib is the first module to make use of the build-hint editor. If you are developing a cn1lib that requires users to set specific build hints for its proper functioning, then you should follow the instructions in this article to integrate your library into the build hints editor. 
 
@@ -42,7 +42,7 @@ One nice feature of this editor vs using Codename One settings is that some buil
 
 It includes a text field for entering the build hint, some help text to let you know what this build hint is for and some example input to show you the proper format.
 
-In this case it also includes a “Get Key” button that will open the webpage for creating an API key.
+In this case it also includes a "Get Key" button that will open the webpage for creating an API key.
 
 The old way to set up Google maps was to follow the [README](https://github.com/codenameone/codenameone-google-maps#readme), and look manually walk through the required steps.
 
@@ -160,15 +160,15 @@ Some example input for this build hint.
 
 ## link
 
-An optional link to learn more about this build hint, or perform an associated action. This will be rendered as a button next to the help text for the build hint. You can optionally include a label for this button after the URL by leaving a “space” between them. E.g. “http://example.com/foobar Go to Foobar”
+An optional link to learn more about this build hint, or perform an associated action. This will be rendered as a button next to the help text for the build hint. You can optionally include a label for this button after the URL by leaving a "space" between them. E.g. "http://example.com/foobar Go to Foobar"
 
 ## type
 
-The widget type to use for editing this build hint. Supported values include “textfield”, “textarea”, “checkbox”, and “select”
+The widget type to use for editing this build hint. Supported values include "textfield", "textarea", "checkbox", and "select"
 
 ## values
 
-A list of options to use when the  _type_ property is “select”. Values should be delimited by a character, and the delimiter is defined by the trailing character. E.g. `red, green, blue,` or `red; green; blue;`. The import part is that the delimiter is included at the  _end_ as the build-hints editor will check the last character to find out what the delimiter is.
+A list of options to use when the  _type_ property is "select". Values should be delimited by a character, and the delimiter is defined by the trailing character. E.g. `red, green, blue,` or `red; green; blue;`. The import part is that the delimiter is included at the  _end_ as the build-hints editor will check the last character to find out what the delimiter is.
 
 With this in mind, let’s take a look at the `ios.afterFinishLaunching` field settings:
     
@@ -201,7 +201,7 @@ With this in mind, let’s take a look at the `ios.afterFinishLaunching` field s
 
 ### Configuring Custom Tabs
 
-Notice that the Google maps build hints are all rendered inside a nice “Google Maps” tab. This is accomplished by defining a “googlemaps” group, and then assigning each property to that group. The portion that defines the “googlemaps” group is shown below:
+Notice that the Google maps build hints are all rendered inside a nice "Google Maps" tab. This is accomplished by defining a "googlemaps" group, and then assigning each property to that group. The portion that defines the "googlemaps" group is shown below:
     
     
     				
@@ -216,7 +216,7 @@ Notice that the Google maps build hints are all rendered inside a nice “Google
     				
     			
 
-The property name follows the same syntax as for regular properties: “codename1.arg.{{ @GROUP_NAME }}.PROPERTY_NAME”, except that the `GROUP_NAME` here must be prefixed with `@`. This signifies that the property pertains to the group as a whole rather than a particular build hint.
+The property name follows the same syntax as for regular properties: "codename1.arg.{{ @GROUP_NAME }}.PROPERTY_NAME", except that the `GROUP_NAME` here must be prefixed with `@`. This signifies that the property pertains to the group as a whole rather than a particular build hint.
 
 The second part of ensuring that properties render in the  _googlemaps_ group is that the build hint name needs to be prefixed with `GROUPNAME`. In this case it would be `googlemaps`.
 

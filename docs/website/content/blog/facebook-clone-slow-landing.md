@@ -15,11 +15,11 @@ I mentioned before that I’m really behind on the Facebook Clone module but at 
 
 The new Facebook Clone is similar to the Uber clone in some regards and also very different:
 
-  * I didn’t do a “pixel perfect” clone – Facebook is too messy to clone properly
+  * I didn’t do a "pixel perfect" clone – Facebook is too messy to clone properly
 
   * I used CSS instead of the designer tool – it’s easier to tech CSS as I can go over code instead of screenshots
 
-  * I put more logic in the server and tried to make the app more “real”
+  * I put more logic in the server and tried to make the app more "real"
 
 The things I kept in place are:
 

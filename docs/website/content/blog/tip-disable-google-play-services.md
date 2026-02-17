@@ -14,7 +14,7 @@ author: Shai Almog
 Google Play Services is a proprietary set of tools that Google licenses to vendors under limited conditions.  
 In recent years more and more features go into Google Play Services making it harder to build an app without it.
 
-In our effort to “do the right thing” we include some of the Google Play Services tools into applications to remain  
+In our effort to "do the right thing" we include some of the Google Play Services tools into applications to remain  
 compatible with code that requires these libraries. This also makes some features (such as location) work better.  
 However,if you don’t use: Ads, Push, Maps or Location then you might not need Google Play Services at all…​
 

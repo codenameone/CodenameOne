@@ -22,7 +22,7 @@ Table of Contents
     * Step Two: Create the GeoVizComponent
     * Implementing a Custom Painter
 
-I attended a tutorial at OSCON last year on HTML5 graphics where I was introduced to some cool data-visualization technologies. One thing that left an impression was the in [GeoJSON format](http://geojson.org/), which we used to generate some maps inside the browser using the D3 library and SVG. This was around the time that I was working on the new Codename One graphics pipeline, so at each step of the tutorial my inner commentator was whispering “we could do this in Codename One without too much difficulty”.
+I attended a tutorial at OSCON last year on HTML5 graphics where I was introduced to some cool data-visualization technologies. One thing that left an impression was the in [GeoJSON format](http://geojson.org/), which we used to generate some maps inside the browser using the D3 library and SVG. This was around the time that I was working on the new Codename One graphics pipeline, so at each step of the tutorial my inner commentator was whispering "we could do this in Codename One without too much difficulty".
 
 Fast forward 6 months, and the new graphics pipeline is complete, so I thought, why not try implementing some of those cool GeoViz features in Codename One. We have all the pieces in place? So I present the [Codename One GeoViz library](https://github.com/shannah/CN1GeoViz).
 
@@ -34,7 +34,7 @@ The GeoViz library allows you to load geographic data in [GeoJSON format](http:/
 
 ### What is GeoJSON?
 
-GeoJSON is a standard format for storing geographic data in JSON format. A GeoJSON file may store a number of “features” which may include shape coordinates as well as information associated with the feature. For example, in the USA Map example, each state is a “feature” that includes shape coordinates for its contour, as well as property information such as the state name.
+GeoJSON is a standard format for storing geographic data in JSON format. A GeoJSON file may store a number of "features" which may include shape coordinates as well as information associated with the feature. For example, in the USA Map example, each state is a "feature" that includes shape coordinates for its contour, as well as property information such as the state name.
 
 One of the nice things about [GeoJSON](http://geojson.org/) is that it is already widely used and there are lots of existing free data sources (e.g. [this GitHub Repo](https://github.com/johan/world.geo.json/tree/master/countries)) where you can obtain state, country, city, etc…​ outlines that can now be easily included in your applications.
 
@@ -42,7 +42,7 @@ One of the nice things about [GeoJSON](http://geojson.org/) is that it is alread
 
 Codename One already had two mechanisms for displaying maps: the MapComponent and the Native Maps library. Their purpose is different than the GeoVizComponent. Some key differences include:
 
-  1. The MapComponent uses a “tile”-based approach where it downloads tile images from a map server (e.g. Open Streetmaps or Google Maps). The [GeoVizComponent](https://rawgit.com/shannah/CN1GeoViz/master/dist/javadoc/com/codename1/geoviz/GeoVizComponent.html) renders geographic “shapes” that are stored as vectors so they can be rendered at any size, and transformed in any way you like without pixelization.
+  1. The MapComponent uses a "tile"-based approach where it downloads tile images from a map server (e.g. Open Streetmaps or Google Maps). The [GeoVizComponent](https://rawgit.com/shannah/CN1GeoViz/master/dist/javadoc/com/codename1/geoviz/GeoVizComponent.html) renders geographic "shapes" that are stored as vectors so they can be rendered at any size, and transformed in any way you like without pixelization.
 
   2. The MapComponent displays only maps as they are provided by the specified Map server. The [GeoVizComponent](https://rawgit.com/shannah/CN1GeoViz/master/dist/javadoc/com/codename1/geoviz/GeoVizComponent.html) will render any geographic information that can be expressed in a GeoJSON file. This might include a map of a building only, or a sparse map that only includes some key landmarks, or anything else you like.
 
@@ -190,7 +190,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > shannah78 says:
 >
-> I’m not sure the best way to do this. It depends on what data you already have about your floor plan. E.g. Do you have the lat/lng coordinates of all office spaces? How big is the floor plan? If you don’t have the coordinates, it might be just as easy to create some sort of “hot” map to make certain areas clickable. There might be specific tools for doing a job like this, but in the worst case, I might just open my floor plan in photoshop, then create a new layer for each clickable office space and draw a rectangle of some sort on that layer over the corresponding office space. You could probably then export the layers in a way that you could feed into your app.
+> I’m not sure the best way to do this. It depends on what data you already have about your floor plan. E.g. Do you have the lat/lng coordinates of all office spaces? How big is the floor plan? If you don’t have the coordinates, it might be just as easy to create some sort of "hot" map to make certain areas clickable. There might be specific tools for doing a job like this, but in the worst case, I might just open my floor plan in photoshop, then create a new layer for each clickable office space and draw a rectangle of some sort on that layer over the corresponding office space. You could probably then export the layers in a way that you could feed into your app.
 >
 > I’ve never had to perform this task though so there may be better ways.
 >

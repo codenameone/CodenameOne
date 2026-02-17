@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/codename-one-4-0-taxi-live/codenameone-4-0-release-image-taxi.jpg)
 
-We are thrilled to announce the release of [Codename One](https://www.codenameone.com/) 4.0 – Taxi. Codename One is an open source “Write Once Run Anywhere” mobile solution for Java & Kotlin developers!  
+We are thrilled to announce the release of [Codename One](https://www.codenameone.com/) 4.0 – Taxi. Codename One is an open source "Write Once Run Anywhere" mobile solution for Java & Kotlin developers!  
 This new release overhauled the way Codename One is updated, added support for Progressive Web Apps (PWA’s), overhauled device skins & updated the backend iOS build tools. A major focus of this release is better support for peer (native) components, stability, unit testing and continuous integration.
 
 Codename One is the only platform that…​
@@ -96,7 +96,7 @@ We should have the new social app tutorial in the [Codename One Academy](https:/
 
 Check out our [survey results](/blog/survey-results-2018/) to see the future apps we’ll release into the academy. Even if you never plan to signup to the academy this should be interesting as it gives you a good notion of what can be built with Codename One.
 
-Other than that we’ll try to launch better docs and designs. We’ve put a lot of effort into improving our design capabilities and one of the big things we’d like to pick up again is app templates. In the past we released a few free themes as Codename One stubs. We’d like to do that again so developers can start from “something”.
+Other than that we’ll try to launch better docs and designs. We’ve put a lot of effort into improving our design capabilities and one of the big things we’d like to pick up again is app templates. In the past we released a few free themes as Codename One stubs. We’d like to do that again so developers can start from "something".
 
 ### We Need your Help
 

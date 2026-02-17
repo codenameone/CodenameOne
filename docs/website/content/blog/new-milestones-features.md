@@ -14,7 +14,7 @@ author: Shai Almog
 We will enter code freeze for Codename One 3.8 next week and have a lot of things to clear off the table in order to get there!  
 The first order of business is that there will be no Codename One 3.9…​ Instead we will go right to 4.0 and switch to major version number update scheme only.
 
-This will align us better with industry standards. We spent ages in 3.x and far less in 1.x or 2.x numbering. That doesn’t make sense. It’s hard to tell what feature is big enough for a “major version number update” and it doesn’t indicate as much with the fast pace of releases. So switching to major version numbers in terms of milestones will simplify and give a better indication of the work we put in.
+This will align us better with industry standards. We spent ages in 3.x and far less in 1.x or 2.x numbering. That doesn’t make sense. It’s hard to tell what feature is big enough for a "major version number update" and it doesn’t indicate as much with the fast pace of releases. So switching to major version numbers in terms of milestones will simplify and give a better indication of the work we put in.
 
 We will enter code freeze next week on the 7th of November with release of 3.8 scheduled for the 14th.
 

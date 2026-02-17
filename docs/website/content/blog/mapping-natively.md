@@ -267,7 +267,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Right click the project, select preferences. In the Codename One section you should see a “Build Hints” tab and there you can add keys/values.
+> Right click the project, select preferences. In the Codename One section you should see a "Build Hints" tab and there you can add keys/values.
 >
 
 
@@ -314,7 +314,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Post Part:  
 > Coord coord = new Coord(geoMapDataModel.getLatitude(), geoMapDataModel.getLongitude());  
 > cnt.setCameraPosition(coord);  
-> cnt.addMarker(null, coord, “test”, “”, null);
+> cnt.addMarker(null, coord, "test", "", null);
 >
 
 
@@ -387,7 +387,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > youssef abdeen says:
 >
-> i did what you said and the application worked, but i did not use the google map API key, i got the API key but i don’t know where to put it. and sorry i didn’t understand the part you said about the “build hints”.  
+> i did what you said and the application worked, but i did not use the google map API key, i got the API key but i don’t know where to put it. and sorry i didn’t understand the part you said about the "build hints".  
 > thank you
 >
 
@@ -419,8 +419,8 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hello Shai,  
 > I need your help again 🙂
 >
-> We get the following build errors after sending a debug ios build -> fatal error: “GoogleMaps.h” file not found  
-> #import “GoogleMaps.h”
+> We get the following build errors after sending a debug ios build -> fatal error: "GoogleMaps.h" file not found  
+> #import "GoogleMaps.h"
 >
 > Our native Android apps works flawlessly.
 >
@@ -454,7 +454,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > We have looked at the Git guide -> [https://github.com/codename…](<https://github.com/codenameone/codenameone-google-maps>)
 >
 > For our understanding:  
-> This build hint -> ios.glAppDelegateHeader = #import “GoogleMaps / GoogleMaps.h” is automatically set by the extension.  
+> This build hint -> ios.glAppDelegateHeader = #import "GoogleMaps / GoogleMaps.h" is automatically set by the extension.  
 > We can not delete it, because it is always re-created.  
 > The build hint is also not in your example?  
 > Our build hints are included as screenshot.
@@ -506,7 +506,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Stephen Michael says:
 >
-> Is there any work in progress to update the native mapping library to utilize V3 of the Google Maps API? I am looking to integrate the “unlimited/free” access via Android and IOS native maps API’s, and am wondering about the accessibility of V3 Google Maps API’s via CodenameOne. Thoughts?
+> Is there any work in progress to update the native mapping library to utilize V3 of the Google Maps API? I am looking to integrate the "unlimited/free" access via Android and IOS native maps API’s, and am wondering about the accessibility of V3 Google Maps API’s via CodenameOne. Thoughts?
 >
 
 
@@ -533,7 +533,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > is giving the error
 >
-> “The import com.codename1.googlemaps cannot be resolved [GoogleMapsTestApp.java/Goog…](<http://GoogleMapsTestApp.java/GoogleMapsTestApp/src/com/codename1/test/googlemaps>) line 3″
+> "The import com.codename1.googlemaps cannot be resolved [GoogleMapsTestApp.java/Goog…](<http://GoogleMapsTestApp.java/GoogleMapsTestApp/src/com/codename1/test/googlemaps>) line 3″
 >
 > Is this because GoogleMaps.cn1lib is not a jar file? What am I doing wrong?
 >

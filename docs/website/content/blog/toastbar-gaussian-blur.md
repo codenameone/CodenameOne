@@ -96,11 +96,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > shannah78 says:
 >
-> “Can ToastBars be cascaded?”
+> "Can ToastBars be cascaded?"
 >
-> You can add multiple statuses. When a status is cleared or expires, it will show the next status in line. If you want to “bring a status to the front”, you can just call “show()” on that status again and it will be brought to the front.
+> You can add multiple statuses. When a status is cleared or expires, it will show the next status in line. If you want to "bring a status to the front", you can just call "show()" on that status again and it will be brought to the front.
 >
-> “Can we add a button the toast bar?”
+> "Can we add a button the toast bar?"
 >
 > Not right now. If this is something that is useful, it wouldn’t be hard to add though.
 

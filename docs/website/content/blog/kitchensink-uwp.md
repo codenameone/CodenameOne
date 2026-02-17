@@ -22,7 +22,7 @@ demo on a Windows 10 device or desktop from [here](https://www.microsoft.com/en-
 
 We made a lot of fixed for the UWP port over the past few days so if you were having issues they might have been  
 resolved by now. There are still some pieces of functionality missing which we hope to get to during the 3.6  
-line but realistically a production release of UWP that is “feature complete” might wait to 3.7.
+line but realistically a production release of UWP that is "feature complete" might wait to 3.7.
 
 Notice that the version of the kitchen sink that is currently in the store (2.01) predates some of the latest fixes,  
 we’ve submitted updates to the versions in all the stores but naturally the update process takes time for approval  
@@ -42,11 +42,11 @@ a previous post & I think this bares repeating in a post:
 That’s great feedback, you can do this to help us find these cases that are unclear:
 
 Go to the sources that aren’t clear, press the edit icon on the top right and just insert your comments or even  
-“can you explain this?” comments.
+"can you explain this?" comments.
 
 Once you are done with the change just click the pull request button.
 
-We will merge the pull request and then fix the “explain this” comments. You don’t even need to check out the project.
+We will merge the pull request and then fix the "explain this" comments. You don’t even need to check out the project.
 
 This doesn’t just apply to the kitchen sink!
 

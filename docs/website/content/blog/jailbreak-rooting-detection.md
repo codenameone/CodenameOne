@@ -15,7 +15,7 @@ iOS & Android are walled gardens which is both a blessing and a curse. Looking a
 
 This isn’t true for jailbroken or rooted devices. In these devices security has been compromised often with good intentions (opening up the ecosystem) but it can also be used as a step in a serious attack on an application!
 
-For obvious reasons it’s really hard to accurately detect a jailbroken or rooted device but when possible if you have a high security app you might want to block the functionality or even raise a “silent alarm” in such a case. To detect this we are introducing a new method:
+For obvious reasons it’s really hard to accurately detect a jailbroken or rooted device but when possible if you have a high security app you might want to block the functionality or even raise a "silent alarm" in such a case. To detect this we are introducing a new method:
     
     
     if(Display.getInstance().isJailbrokenDevice()) {
@@ -24,7 +24,7 @@ For obvious reasons it’s really hard to accurately detect a jailbroken or root
        // probably not
     }
 
-Notice that this is all “probably”, we can’t be 100% sure as there are no official ways to detect that. That is why it’s crucial to encrypt everything and assume the device was compromised to begin with when dealing with very sensitive data. Still it’s worthwhile to use these API’s to make the life of an attacker just a little bit harder.
+Notice that this is all "probably", we can’t be 100% sure as there are no official ways to detect that. That is why it’s crucial to encrypt everything and assume the device was compromised to begin with when dealing with very sensitive data. Still it’s worthwhile to use these API’s to make the life of an attacker just a little bit harder.
 
 ---
 

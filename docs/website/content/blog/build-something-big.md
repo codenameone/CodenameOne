@@ -14,25 +14,25 @@ author: Shai Almog
 __ |  It’s LIVE! Check out the bootcamp signup [here](https://codenameone.teachable.com/p/full-stack-java-mobile-app-bootcamp/).   
 ---|---  
   
-I’m going to build a new mobile startup within 2 weeks and teach some of you how that is done while doing that. Most people might assume I’m talking about one of those “MVP” cardboard startups…​ This isn’t the case!  
+I’m going to build a new mobile startup within 2 weeks and teach some of you how that is done while doing that. Most people might assume I’m talking about one of those "MVP" cardboard startups…​ This isn’t the case!  
 We’ll build a real ground breaking app with a server component that handles storage, push and a few other things you wouldn’t expect and I plan to fit the whole thing in a two week time frame.
 
 This is essentially what I said in the [last two](/blog/full-stack-java-bootcamp/) posts [in this series](/blog/spring-template-more-about-bootcamp/). We’ll build the **full stack** of a real world startup from the ground up to server and client production within 2 weeks of hard work!
 
 Famous last words?
 
-Over the past 20+ years I worked for startups, major software/hardware companies, operators, banks and much more…​ I founded 4 companies during this time and every time I did it the process became easier. Codename One is a huge product so it’s not something I would compare to “an app”. However, the basic product we launched as beta took 3 months to build and we spent too much of that debating the “launch slide deck”.
+Over the past 20+ years I worked for startups, major software/hardware companies, operators, banks and much more…​ I founded 4 companies during this time and every time I did it the process became easier. Codename One is a huge product so it’s not something I would compare to "an app". However, the basic product we launched as beta took 3 months to build and we spent too much of that debating the "launch slide deck".
 
 Unlike that effort, building an app is almost trivial when you know how…​ The server side will be relatively simple as it won’t include the web interface portions that are always a pain. Just very basic storage, push and simple management.
 
 The big effort that will take most of the time is making the apps look good and applying a compelling design.
 
 With this bootcamp I want you to see how easy it is to build a startup and a complex mobile app. But the bigger goal is to flip a switch within you that would hopefully be as transformational for you as it would be for me. I want to recreate the startup experience as part of the bootcamp, that’s something you can’t do in a course.  
-Every startup I worked at even as a consultant had affected me on an emotional level and I hope this will leave you in a similar energized state and motivated to “take on the world”.
+Every startup I worked at even as a consultant had affected me on an emotional level and I hope this will leave you in a similar energized state and motivated to "take on the world".
 
 ### How will this Work?
 
-At a birds eye view the bootcamp will include a short “getting ready” period for those unfamiliar with Codename One followed by 1 week of basics, 2 weeks of app building hack race and 1 week of finishing, loose ends and cleanup so we are all at the finish line together.
+At a birds eye view the bootcamp will include a short "getting ready" period for those unfamiliar with Codename One followed by 1 week of basics, 2 weeks of app building hack race and 1 week of finishing, loose ends and cleanup so we are all at the finish line together.
 
 The whole bootcamp will last 4 work weeks (5 day weeks). The 4 weeks will be divided into 2 week batches so we’ll have 2 intensive weeks followed by a week and a half off to regroup and the second part.
 
@@ -48,7 +48,7 @@ The course will include:
 
   * Most of the material will be passed as a combination of video and/or webinars. I’ll determine the ratio of video to webinar based on participation and what works for the group
 
-  * Tasks delivered daily – to make best use of the bootcamp I’ll send out individual daily “missions”, those will fit into the puzzle as we continue learning. If an individual mission is too challenging use the chat to get help.
+  * Tasks delivered daily – to make best use of the bootcamp I’ll send out individual daily "missions", those will fit into the puzzle as we continue learning. If an individual mission is too challenging use the chat to get help.
 
   * We’ll have group chat and a Facebook group for questions/collaboration
 
@@ -179,7 +179,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks.  
 > The times are flexible as we might not have live sessions and even if we do they will be recorded so you can watch them at your convenience. I like live sessions but they might not be practical, I did webinars with some audiences where this worked great and some where it didn’t. It’s hard to know what will work for the group as a whole.
 >
-> Normally I like pricing upfront so I get where you are coming from. The opacity here is a “hack” from a friend. He explained it so beautifully, I hope I’m not murdering his explanation as I’m not a marketing guy:
+> Normally I like pricing upfront so I get where you are coming from. The opacity here is a "hack" from a friend. He explained it so beautifully, I hope I’m not murdering his explanation as I’m not a marketing guy:
 >
 > Say you have a price up front. People will view everything in your offering in light of your price. E.g a 500 dollar product is clearly inferior to a 5000 dollar product. Even if we KNOW better it’s one of those deeply held mind biases: expensive is more valuable.
 >

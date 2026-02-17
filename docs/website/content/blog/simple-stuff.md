@@ -34,7 +34,7 @@ LTS lecture
 Sometimes the most important features we can add are really simple things that we just procrastinated on forever. Case in point: multi-line labels. 
 
   
-For years we have been explaining to people over and over again: “Just use TextArea and invoke setUIID(“Label”)”.  
+For years we have been explaining to people over and over again: "Just use TextArea and invoke setUIID("Label")".  
 
   
 This has three major  
@@ -55,7 +55,7 @@ When we
 [  
 localize  
 ](/how-do-i.html)  
-an app the labels/buttons etc. (buttons derive from labels) are localized seamlessly. However, TextArea’s are not localized since we assume they will contain data which you normally don’t localize (user data is already in the right language). The problem is that in this case we do want to localize the label since this is really “a label”.  
+an app the labels/buttons etc. (buttons derive from labels) are localized seamlessly. However, TextArea’s are not localized since we assume they will contain data which you normally don’t localize (user data is already in the right language). The problem is that in this case we do want to localize the label since this is really "a label".  
 
   
 So I broke down, climbed down from the tree and added a SpanLabel class which is  

@@ -49,7 +49,7 @@ the client libraries are open source.
 
 ### Get all file names in src folder, codenameone project
 
-“Files” in the source directory aren’t really “files” in the typical sense. Sometimes they can be a part of an APK  
+"Files" in the source directory aren’t really "files" in the typical sense. Sometimes they can be a part of an APK  
 which isn’t exactly like a jar. Other times they can be a part of an app bundle which is a bit more complex with some  
 odd restrictions…​
 
@@ -147,7 +147,7 @@ The title is misleading, the real issue relates to the different style objects f
 
 ### How to handle a button pressed when it’s in a list cell
 
-The short answer is “don’t”. Use a `Container` as we explain in the [List JavaDocs](/javadoc/com/codename1/ui/List/)…​d
+The short answer is "don’t". Use a `Container` as we explain in the [List JavaDocs](/javadoc/com/codename1/ui/List/)…​d
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38773910/how-to-handle-a-button-pressed-when-its-in-a-list-cell)
 

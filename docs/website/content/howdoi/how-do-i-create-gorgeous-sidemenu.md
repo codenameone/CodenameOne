@@ -23,7 +23,7 @@ We’ll start by creating a simple hello world style application with no frills.
 
 As you can see there isn’t much here. We’ll add new entries into the toolbar for the different pieces of the side menu.  
 Now I’m going to use add material command to the side menu which adds command text and an icon from the standard material design icons built into Codename One. That will give us something to work with, it’s mostly basic stuff you can use whatever you want in terms of commands. The styling isn’t mentioned it’s only the icons and the text.  
-Now we’ll open the theme file and try to make the styling “look good”. First I’ll open the side menu in the preview section. This makes the entries for side component and side panel appear in the combo box.
+Now we’ll open the theme file and try to make the styling "look good". First I’ll open the side menu in the preview section. This makes the entries for side component and side panel appear in the combo box.
 
 I’ll start with the side navigation panel which is pretty easy, I’m using a white background that’s completely opaque. I press OK to save this.
 

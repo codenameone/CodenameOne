@@ -20,7 +20,7 @@ In this video I’ll discuss native interfaces, it’s a big subject so I’ll c
 
 You can just add a native interface to your app or to a cn1lib which is a standalone library. One of the cool things in cn1libs is that they support native interfaces and thus work seamlessly. You can wrap complex native logic and hide that from the user of the cn1lib.
 
-When we say native in Codename One we mean something that’s technically very different from the standard Java definition of native. We mean “use the platforms natural language” when we say native.
+When we say native in Codename One we mean something that’s technically very different from the standard Java definition of native. We mean "use the platforms natural language" when we say native.
 
 So when we are on Android and we invoke a native interface we will go into Java code. But it will be separate code where we can use the full Android API and 3rd party libraries. That code will only execute on Android so you can just use anything you want including the Native Development Kit which allows you to get all the way into C code.
 

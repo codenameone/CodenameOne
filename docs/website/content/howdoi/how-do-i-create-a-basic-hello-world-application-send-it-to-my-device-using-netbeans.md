@@ -26,12 +26,12 @@ In this short video we’ll walk you thru the very basics of Codename One.
 
 Codename One allows Java developers to write native mobile apps for all devices easily. It’s open source, free and works with all IDE’s.
 
-We can install Codename One by going to the plugin update center, typing in “Codename” and following the installation wizard.  
-We can now create a new project, we need to select Codename One and once we do so we are faced with the “New Project Dialog”.
+We can install Codename One by going to the plugin update center, typing in "Codename" and following the installation wizard.  
+We can now create a new project, we need to select Codename One and once we do so we are faced with the "New Project Dialog".
 
 In this dialog we must first define the package name, you must pick a correct package name as changing this later is challenging.  
 Next we can pick one of the builtin themes. If you want something very bare bones go with native, I will use red for this demo.  
-Last but not least we need to pick the app type, I recommend checking out the getting started app. However, for simplicity’s sake I’m picking the “Bare Bones” hand coded application as it contains the least amount of code.
+Last but not least we need to pick the app type, I recommend checking out the getting started app. However, for simplicity’s sake I’m picking the "Bare Bones" hand coded application as it contains the least amount of code.
 
 When we press the finish button the new app is created in the IDE. You will notice two major files, the theme resource file and the main source file. Let’s look at the generated code.  
 In the main file we have four life cycle methods: init, start, stop and destroy.

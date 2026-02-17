@@ -27,7 +27,7 @@ On stack overflow things were as usual:
 
 ### Codename One wasPurchased() method : Is it supported on Android devices?
 
-There is a bit of a “weird” item naming convention required for Android IAP
+There is a bit of a "weird" item naming convention required for Android IAP
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40510326/codename-one-waspurchased-method-is-it-supported-on-android-devices)
 
@@ -105,7 +105,7 @@ Netbeans doesn’t keep historical versions of the plugin to my knowledge
 
 ### Custom toolbar issues
 
-Getting alignment/spacing “just right” is sometimes a delicate balance
+Getting alignment/spacing "just right" is sometimes a delicate balance
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40434729/custom-toolbar-issues)
 
@@ -118,7 +118,7 @@ in iOS/Android/Windows
 
 ### Exemplary code for payment
 
-We need a better In-App-Purchase sample for developers as a “real” app
+We need a better In-App-Purchase sample for developers as a "real" app
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40420165/exemplary-code-for-payment)
 
@@ -142,7 +142,7 @@ There are several reasons why an app will work on one device and won’t install
 
 ### http proxy when using ConnectionRequest
 
-This should “just work” for the most part and use the system proxy when possible
+This should "just work" for the most part and use the system proxy when possible
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40395268/http-proxy-when-using-connectionrequest)
 

@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/codename-one-3-8-live/codenameone-3-8.jpg)
 
-We are thrilled to announce the release of [Codename One](https://www.codenameone.com/) 3.8. Codename One is an open source “Write Once Run Anywhere” mobile solution for Java developers!  
+We are thrilled to announce the release of [Codename One](https://www.codenameone.com/) 3.8. Codename One is an open source "Write Once Run Anywhere" mobile solution for Java developers!  
 This new release significantly refines the native look and feel of Codename One, it brings the GUI builder to a new level with styling support. It finally adds Mac OS appstore distribution support which means all the major appstores are now supported targets for Codename One applications.
 
 Codename One is the only platform that…​
@@ -72,7 +72,7 @@ As we always do with a release we’d like to shine a spotlight on the things th
 
   * Improved default themes & material design – we made huge strides in this area but we are still way behind and our demos still don’t reflect the progress we made. Hopefully by the time 4.0 rolls around we’ll be in a different place entirely
 
-  * Theme & Localization – Steve added some better theming to the new GUI builder. We think we can improve on this further and generally improve theming. Localization is something that regressed a bit from the old GUI builder which allowed for great automatic localization. We need something more “seamless” in this department
+  * Theme & Localization – Steve added some better theming to the new GUI builder. We think we can improve on this further and generally improve theming. Localization is something that regressed a bit from the old GUI builder which allowed for great automatic localization. We need something more "seamless" in this department
 
 ### Onwards to 4.0
 
@@ -90,7 +90,7 @@ We’ve already laid some ground work for the Uber style app and we plan to push
 
   * Better docs
 
-  * More “ready made templates”
+  * More "ready made templates"
 
 Another big focus which we’ll see in 4.0 is quality and continuous integration. Our QA process is now open as part of our continuous integration support. We are now running automated tests of all our commits on device farms which should make future versions of Codename One far more stable.
 
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Francesco Galgani** — November 15, 2017 at 1:58 pm ([permalink](/blog/codename-one-3-8-live/#comment-23876))
 
-> What’s code you used to generate the “Figure 2. After: Codename One 3.8 text Input (on Android)”? Is it an Instant UI generated using Properties?
+> What’s code you used to generate the "Figure 2. After: Codename One 3.8 text Input (on Android)"? Is it an Instant UI generated using Properties?
 >
 
 

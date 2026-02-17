@@ -27,7 +27,7 @@ rest you can use this method to exclude it from the lead component behavior whil
 This should have no effect if the component isn’t a part of a lead component.
 
 Other than that we also added to `Accordion` some methods that allow us to mutate it’s state:  
-</javadoc/com/codename1/components/Accordion/#removeContent-com.codename1.ui.Component-> [removeContent]  
+[removeContent](/javadoc/com/codename1/components/Accordion/#removeContent-com.codename1.ui.Component-)  
 & two variations of  
 [setHeader](/javadoc/com/codename1/components/Accordion/#setHeader-com.codename1.ui.Component-com.codename1.ui.Component-).
 

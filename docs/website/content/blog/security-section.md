@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/security-section/security.jpg)
 
-We’ve had a lot of security related posts in the past few months as we refined many edge cases with some customers. These posts are difficult to comb through as they are all over the place, and it’s hard to get a glance of “what’s available.”
+We’ve had a lot of security related posts in the past few months as we refined many edge cases with some customers. These posts are difficult to comb through as they are all over the place, and it’s hard to get a glance of "what’s available."
 
 So we added a new [security section](/developer-guide#_security) to the developer guide which adds some general information about Codename One security and includes most of the details about what you can do in terms of security.
 
@@ -21,7 +21,7 @@ If this isn’t something you know how to fix please feel free to comment below 
 
 ### What’s Next?
 
-The big thing on my personal “wish list” for the next update of the developer guide is a cn1libs section that will cover some of the top Codename One libraries. This isn’t included yet but if you have a cn1lib that you’d like to feature in the developer guide you can just edit the [wiki section for cn1libs](https://github.com/codenameone/CodenameOne/wiki/cn1libs) and add your own.
+The big thing on my personal "wish list" for the next update of the developer guide is a cn1libs section that will cover some of the top Codename One libraries. This isn’t included yet but if you have a cn1lib that you’d like to feature in the developer guide you can just edit the [wiki section for cn1libs](https://github.com/codenameone/CodenameOne/wiki/cn1libs) and add your own.
 
 I hope to have some of our big cn1libs out there as reference and when I do that I’ll post about it again so 3rd party library authors can align.
 

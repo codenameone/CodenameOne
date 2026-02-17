@@ -39,11 +39,11 @@ to bundle as an enterprise only solution.
 
 #### Policy
 
-Since offline builds will in effect be a component that is “installed locally” we think that the right thing to do is  
-to treat this as “shrinkwrap software”. So once you download a version of the offline build tool from our servers  
+Since offline builds will in effect be a component that is "installed locally" we think that the right thing to do is  
+to treat this as "shrinkwrap software". So once you download a version of the offline build tool from our servers  
 this version will be there until you delete it.
 
-It will not “dial home” or perform any such tests but it will be locked to your development machine.  
+It will not "dial home" or perform any such tests but it will be locked to your development machine.  
 You will be allowed to keep using it based on the terms of the license. So you can keep shipping/building  
 apps after canceling an enterprise subscription but you won’t be able to update to the latest Codename One  
 version as it will include newer features.

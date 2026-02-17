@@ -13,9 +13,9 @@ author: Shai Almog
 
 When we initially designed the cn1lib file format we looked at jar files as a starting point. We wanted a way to distribute binary libraries that support the native code access, restrictions and ideally code completion.
 
-One of the big failures of Jar files as a standard is bad support for code completion. This requires IDE’s to specify a JavaDoc (or source) directory so the completion logic can refer to that for hints. However, we wanted to keep the “binary” aspects of jars…​
+One of the big failures of Jar files as a standard is bad support for code completion. This requires IDE’s to specify a JavaDoc (or source) directory so the completion logic can refer to that for hints. However, we wanted to keep the "binary" aspects of jars…​
 
-Our solution was simple, we used a special “doclet” to generate stub files representing the source files in the cn1lib thus providing a source classpath that included all the javadoc comments. Since these sources are stubs you can distribute binary cn1libs without too much of an IP concern (no more than typical Java jars).
+Our solution was simple, we used a special "doclet" to generate stub files representing the source files in the cn1lib thus providing a source classpath that included all the javadoc comments. Since these sources are stubs you can distribute binary cn1libs without too much of an IP concern (no more than typical Java jars).
 
 At this time, all (or almost all?) cn1libs are open source. This makes that effort somewhat redundant for those libraries where the advantage of peeking at the source code can be preserved…​
 

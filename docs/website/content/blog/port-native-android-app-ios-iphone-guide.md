@@ -46,7 +46,7 @@ Notice this is implicitly Marshmallow compatible as well, so permission prompts 
 
 In Android developers build user interfaces in XML by nesting layout views and view elements one within  
 another (you can write Android apps in code but that isn’t as common). These elements are translated by the  
-compiler and in order to bind code to them you need to “find” them by their ID to use them. Codename One  
+compiler and in order to bind code to them you need to "find" them by their ID to use them. Codename One  
 differs in several ways:
 
   * You can build Codename One applications either via the GUI builder which uses a more traditional code generator  
@@ -113,12 +113,12 @@ You can execute arbitrary URL’s to launch external applications when necessary
 don’t have anything remotely close to activities.
 
 Codename One has two different classes that match the activity. `Form` is the top level component that you  
-can “show” & transition. The main class for Codename One itself gets lifecycle events similar to the `Activity`  
+can "show" & transition. The main class for Codename One itself gets lifecycle events similar to the `Activity`  
 lifecycle events.
 
 #### Android Specific Features
 
-You can invoke “native” Android code from Codename One without breaking the portability of Codename One.  
+You can invoke "native" Android code from Codename One without breaking the portability of Codename One.  
 Follow the native code section in the developer guide to understand how this can be accomplished, you can  
 also see the  
 [how do I video tutorial on the subject](/how-do-i---access-native-device-functionality-invoke-native-interfaces.html).  
@@ -132,7 +132,7 @@ scaffolds the new Codename One project from an Android project without really du
 converting the code.
 
 We can obviously improve this tool significantly but to do so we need to gauge community interest which so  
-far has been “underwhelming”. I will start by using this tool as it is now to get started quickly and then port the  
+far has been "underwhelming". I will start by using this tool as it is now to get started quickly and then port the  
 code.
 
 #### The Application
@@ -141,7 +141,7 @@ I chose to port a really trivial application so it will be easy to follow. Speci
 [Swiftnotes](https://play.google.com/store/apps/details?id=com.moonpi.swiftnotes) whose source code is  
 available [here](https://github.com/adrianchifor/Swiftnotes).
 
-I chose this application because it is simple. Making the application “pretty” isn’t a goal of this tutorial although  
+I chose this application because it is simple. Making the application "pretty" isn’t a goal of this tutorial although  
 I tried to make the application look reasonably good while trying to stay loyal to the original design.
 
 To give you a sense of where we are heading I’ve published the end result to  
@@ -212,7 +212,7 @@ The first argument is the resource directory for the original Android project. F
 
 This placed the localization bundles and imported the images, it also generated the GUI XML files.
 
-To generate the GUI sources right click the project and select “build” this will generate GUI source files for  
+To generate the GUI sources right click the project and select "build" this will generate GUI source files for  
 all the XML files.
 
 ##### Step 3: Bind Localization Code
@@ -242,7 +242,7 @@ and select the localization section.
 
 ##### Interlude: The GUI Builder
 
-The wizard generates GUI builder XML files that are “hidden” under the `res/guibuilder` directory and must  
+The wizard generates GUI builder XML files that are "hidden" under the `res/guibuilder` directory and must  
 correspond to Java source files. They carry the `.gui` extension and use a relatively simple format of hierarchy/layout.
 
 You can edit the XML files but if you remove the java files they will be regenerated. You need to remove/move  
@@ -425,7 +425,7 @@ We style the UI using the designer tool, there are other options such as
 and more consistent.
 
 To launch the designer double click the theme.res file in the src root. Select the Theme entry and press the  
-Add button in the bottom of the theme. In the Combo Box at the top of the Add dialog type “Toolbar”.
+Add button in the bottom of the theme. In the Combo Box at the top of the Add dialog type "Toolbar".
 
 Select the Color tab.
 
@@ -445,7 +445,7 @@ Figure 7. Setup of the Toolbar UIID
 Next we setup the foreground colors and fonts for the title elements, for brevity I will summerize the elements  
 that need changing.
 
-Add a “Title” entry with the following properties:
+Add a "Title" entry with the following properties:
 
   * Foreground Color ffffff
 
@@ -472,7 +472,7 @@ Figure 8. After styling the title
 
 The other UI elements are too simple and often inconsistent so we’ll just delete the corresponding `.gui` & `.java`  
 files representing those other widgets and implement them dynamically. This is especially crucial since the original  
-app has some “androidisms” embedded into it making the code conversion challenging.
+app has some "androidisms" embedded into it making the code conversion challenging.
 
 E.g. the original app didn’t include a `Note` business object abstraction which is pretty basic so we added that  
 to get started:
@@ -854,7 +854,7 @@ Lets start with add/create note which is one of the trickier methods here:
     }
 
 __**1** | A note entry in the main screen is a lead component. A lead component is a unique concept to Codename One.  
-In it a component (in this case the title button) takes the “lead” over the `Container` hierarchy so all clicks within that  
+In it a component (in this case the title button) takes the "lead" over the `Container` hierarchy so all clicks within that  
 specific hierarchy, state changes etc. map to the button and its events. This means that clicking the text area below  
 the button will act as if we clicked the button.  
 ---|---  
@@ -863,7 +863,7 @@ component hierarchy so it can be toggled independently.
 __**3** | The body of the note can be hidden in which case we will have two states the font size of the body can  
 be enlarged which is another special case we check here  
 __**4** | The background is set in the Container to allow the whole thing to take up the selected color. I could have  
-used a “round rect” background to look similar to the original but that design is somewhat outdated and I chose to  
+used a "round rect" background to look similar to the original but that design is somewhat outdated and I chose to  
 go with the swipe container which works better with full row (it would look awkward with round borders).  
 __**5** | We wrap everything in a `SwipeableContainer` to allow the user to swipe the UI and see the delete button.  
 The original UI had a long press action for delete which is probably a bit outdated design wise.  
@@ -902,7 +902,7 @@ We then animate the layout to move the components into place…​
 
 ##### Minor Tunings for the Final Result
 
-Since the overflow menu is overly “Android oriented” I decided to move everything into the title bar area which  
+Since the overflow menu is overly "Android oriented" I decided to move everything into the title bar area which  
 makes the app look better everywhere as there is space available there.
 
 I also added a `colors.xml` file to allow native Android styling to use the theme colors, I just placed this file under  
@@ -942,7 +942,7 @@ Steve has done we will invest time and effort to match your time & effort!
 This should make future iterations of this tutorial even simpler and produce far more satisfying initial results.
 
 I’ve compared the native app side by side with the Codename One app and with the exception of the overflow  
-menu which could use some work, our app looks just as “native” on an Android phone.
+menu which could use some work, our app looks just as "native" on an Android phone.
 
 With one simpler, shorter code base I was able to reach iOS, Android, Windows & JavaScript not to mention  
 desktop targets…​

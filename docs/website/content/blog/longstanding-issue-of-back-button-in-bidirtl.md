@@ -24,11 +24,11 @@ We’ve had a long standing annoyance with Codename One’s RTL (Right To Left l
   
 This was REALLY annoying to such a great extent that up until recently we recommended that people don’t use RTL on iOS devices. 
 
-Well we finally fixed it, what took us so long was the desire to “do it right” but we couldn’t figure out what the right thing was?
+Well we finally fixed it, what took us so long was the desire to "do it right" but we couldn’t figure out what the right thing was?
 
 Basically the iOS 6 back button is broken since it has a very specific direction and angle it can’t be cut as a 9-piece border and has to actually appear as a horizontal image border. My initial thoughts were to allow a component to define an RTL specific style attribute (in this case border), however doing something like this would be painful and just the thought of going back and editing all the themes seemed excessive. 
 
-So I added a method into the image class called mirror() which you can now invoke to get an exact mirror image of the given image. and into the border class we added the ability to get an RTL border, this is only implemented for horizontal image borders which is the source of this specific problem. This isn’t generic but it works rather well and seamlessly! The back button will “just reverse” on RTL regardless of the theme you use and will act as you would expect starting with the upcoming update.  
+So I added a method into the image class called mirror() which you can now invoke to get an exact mirror image of the given image. and into the border class we added the ability to get an RTL border, this is only implemented for horizontal image borders which is the source of this specific problem. This isn’t generic but it works rather well and seamlessly! The back button will "just reverse" on RTL regardless of the theme you use and will act as you would expect starting with the upcoming update.  
 
 * * *
 

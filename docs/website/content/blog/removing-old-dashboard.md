@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > [Carlos Verdier](https://lh3.googleusercontent.com/-y-v_mMAwszk/AAAAAAAAAAI/AAAAAAAAAAA/AMZuucmcoea9nf4P3gRHGzB7T7jxG98R1w/photo.jpg) says:
 >
-> For some reason, the “Install on device” and other links don’t work properly on my iPad (13.7). I need to repeatedly tap on the link and eventually it works.
+> For some reason, the "Install on device" and other links don’t work properly on my iPad (13.7). I need to repeatedly tap on the link and eventually it works.
 >
 
 

@@ -11,10 +11,10 @@ author: Shai Almog
 
 ![Header Image](/blog/thats-great-looking-app/java-for-mobile-devices1024.jpg)
 
-I talk to a lot of mobile developers or those who are starting out in the field and by far the number one problem is getting a refined sublime app. There are too many difficulties and pitfalls along the way and the end result is often “sub par” in terms of the UI you want to achieve.  
-We too bare responsibility for that. We focus too much on the technology and too little on making “gorgeous” easy. I want you to join me in changing that narrative…​
+I talk to a lot of mobile developers or those who are starting out in the field and by far the number one problem is getting a refined sublime app. There are too many difficulties and pitfalls along the way and the end result is often "sub par" in terms of the UI you want to achieve.  
+We too bare responsibility for that. We focus too much on the technology and too little on making "gorgeous" easy. I want you to join me in changing that narrative…​
 
-The narrative is very common: “you can’t have it all”. You will pay for cross platform by sub par UX or UI. You will “write once debug everywhere”.
+The narrative is very common: "you can’t have it all". You will pay for cross platform by sub par UX or UI. You will "write once debug everywhere".
 
 Sometimes, that narrative is true. However, when you wield the tools effectively you can get better results than any other approach…​ You can design your app once and instantly adapt it to all OS’s with native feel. You can debug & optimize your app once and have a more stable/faster app across all OS’s.  
 It’s not a magic bullet though. You need to learn how to wield these tools just like any tool within your toolbox and that’s where we failed you.
@@ -43,7 +43,7 @@ So here are the questions:
 
 **What sort of UI or functionality are you aiming at but can’t get right?**
 
-I want this material to be “driven” by your real world needs, not by my guessing. So please help me out with some suggestions.
+I want this material to be "driven" by your real world needs, not by my guessing. So please help me out with some suggestions.
 
 I’ve got something going and will write more about it during the week. We also have the code freeze for 3.7 which is just around the corner and we have some pretty huge surprises there!
 ---
@@ -333,7 +333,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > bryan says:
 >
-> In terms of the whole UI/theme thing, I think you really should make it more clear to new users that the “native theme” is NOT actually native components, but a CN1 generated “look a like”. (I know you can call native, but that’s a slightly different animal). Personally, I _like_ the fact that I can have a UI design that is invariant across platforms – I don’t really understand why people perceive that Google’s L&F of the month or Apple’s is the “one right way”, and people think that CN1 leads to a “lowest common denominator”, which it doesn’t because all the widgets are light weight anyway.
+> In terms of the whole UI/theme thing, I think you really should make it more clear to new users that the "native theme" is NOT actually native components, but a CN1 generated "look a like". (I know you can call native, but that’s a slightly different animal). Personally, I _like_ the fact that I can have a UI design that is invariant across platforms – I don’t really understand why people perceive that Google’s L&F of the month or Apple’s is the "one right way", and people think that CN1 leads to a "lowest common denominator", which it doesn’t because all the widgets are light weight anyway.
 >
 
 
@@ -354,7 +354,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks, we try to be clear with messaging but it gets too nuanced really quickly.  
 > If we say we’re not native that isn’t true because we use native themes. If we say we don’t use native widgets that’s also not true because we support embedding native widgets e.g. text edit, browser, maps, video etc. It’s really hard to explain this in a way that isn’t confusing without going into inaccurate generalizations.
 >
-> I used to refer to our approach as a “highest common denominator” where we can do stuff that’s kind of difficult to do in the regular native platform e.g. control every pixel in the screen. But that doesn’t really explain anything.
+> I used to refer to our approach as a "highest common denominator" where we can do stuff that’s kind of difficult to do in the regular native platform e.g. control every pixel in the screen. But that doesn’t really explain anything.
 >
 > I think we need to seriously overhaul our native themes and this is indeed a high priority moving forward.
 >
@@ -563,7 +563,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > –  
 > The integration with Google Maps does not yet reproduce the most useful  
-> features of that api such as Clustering, setMaxzoom, etc. Personally, I consider that CN1 has “a little bit of everything” but does not end up tackling an issue in its entirety. The interaction with Maps is very important and I consider that it  
+> features of that api such as Clustering, setMaxzoom, etc. Personally, I consider that CN1 has "a little bit of everything" but does not end up tackling an issue in its entirety. The interaction with Maps is very important and I consider that it  
 > does not contain all the functionalities that are necessary to develop a  
 > complete application.
 >
@@ -610,7 +610,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We have a lot of legacy there so the UX is awful. Select one of the native fonts and select millimeter size.
 >
-> – I’m not sure I follow the issue with the “proportions”. Are you referring to multi image, background image behaviors, scale behavior or layout. There are some nuances and they are partially mixed with legacy. We’re trying to simplify that.
+> – I’m not sure I follow the issue with the "proportions". Are you referring to multi image, background image behaviors, scale behavior or layout. There are some nuances and they are partially mixed with legacy. We’re trying to simplify that.
 >
 > – I don’t understand the point about Bluetooth LE – that cn1lib has some issues. I think it was a mistake leaving the code too close to the original Cordova implementation as it has some issues. It’s also problematic because it doesn’t work in the simulator.
 >

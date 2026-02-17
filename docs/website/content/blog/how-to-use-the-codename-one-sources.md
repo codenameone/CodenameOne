@@ -28,7 +28,7 @@ I felt the need to write this opening paragraph due to a highly visible source c
 company. We have no intentions, plans, thoughts or wavers in that direction. Furthermore, we consider  
 contributions to be the least important benefits of Open Source Software. 
 
-Codename One is “more” open source than most projects, e.g. OpenJDK is OSS but its pretty hard to change  
+Codename One is "more" open source than most projects, e.g. OpenJDK is OSS but its pretty hard to change  
 code within it. Its even hard to contribute these changes!  
 You can use/change most of our code using a trivial process. You don’t need a complex compiler toolchain  
 for changing or debugging Codename One. Most importantly: 99% of the code is in Java so you should feel  
@@ -36,7 +36,7 @@ right at home!
 
 #### Using The Source
 
-We already have an old tutorial called “[use the source](/blog/use-the-source.html)”  
+We already have an old tutorial called "[use the source](/blog/use-the-source.html)"  
 but its pretty old by now. It still points at the old SVN and didn’t really go into details, so re-doing that and reminding  
 you that this can be done seems in order.  
 When you debug your app with our source code you can place breakpoints deep within Codename One and  
@@ -61,7 +61,7 @@ cn1-binaries, CodenameOne and codenameone-skins are within the same parent direc
 with the CodenameOne/CodenameOne project. Replace the runtime libraries with the  
 CodenameOne/Ports/JavaSEPort project.
 
-**Update August 10, 2018** – You will need to build the codenameone-skins project using the build.xml file in its root directory in order to generate some skins that are required to build the JavaSE project.
+**Update August 10, 2018** – You will need to build the codenameone-skins project using the `build.xml` file in its root directory in order to generate some skins that are required to build the JavaSE project.
 
 This allows you to run the existing Codename One project with our source code and debug into Codename One.  
 You can now also commit, push and send a pull request with the changes. 
@@ -126,7 +126,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > AMDP AMDP says:
 >
-> “Most importantly: 99% of the code is in Java so you should feel right at home!”
+> "Most importantly: 99% of the code is in Java so you should feel right at home!"
 >
 > Just curious about the 1%. Can you describe what language and why?
 >

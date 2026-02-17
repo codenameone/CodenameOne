@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/clarifying-our-support/support-channels.jpg)
 
-For years we treated support with a “we’ll meet our developers where they are” attitude which is problematic  
+For years we treated support with a "we’ll meet our developers where they are" attitude which is problematic  
 now that we have more than 6 free support channels!
 
 Notice that we didn’t include the email/phone support for pro/enterprise users in the list of 6 channels…​
@@ -33,8 +33,8 @@ a last resort. We prefer stack overflow but we still provide support there
 
   * Intercom – You can chat with our moderately technical support team live by clicking the chat button at the bottom  
 right side of the screen. If you have problems with the site, your account or similar issues/requests please send  
-them thru there. Notice that it’s not a good place for technical questions about programming e.g. “how  
-do I do X” in Codename One
+them thru there. Notice that it’s not a good place for technical questions about programming e.g. "how  
+do I do X" in Codename One
 
   * [Facebook](http://facebook.com/CodenameOne), [Twitter](http://twitter.com/Codename_One) &  
 [LinkedIn](https://www.linkedin.com/company/codename-one) – While you can ask some things in these channels  
@@ -177,7 +177,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Emmanuel Njoku says:
 >
 > This is an error:  
-> java.net.URISyntaxException: Illegal character in path at index 9: showForm(“Main”, null)  
+> java.net.URISyntaxException: Illegal character in path at index 9: showForm("Main", null)  
 > at java.net.URI$[Parser.fail](<http://Parser.fail)([URI.java](http://URI.java)>:2848)  
 > at java.net.URI$Parser.checkChars([URI.java](<http://URI.java>):3021)  
 > at java.net.URI$Parser.parseHierarchical([URI.java](<http://URI.java>):3105)  
@@ -207,7 +207,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> It looks like you set the “execute” value in the GUI builder command to something that isn’t a URL.
+> It looks like you set the "execute" value in the GUI builder command to something that isn’t a URL.
 >
 
 
@@ -217,7 +217,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Raghu vasa says:
 >
 > Hi,  
-> I am loading html pages using Codenameone BrowserComponent. And My app is already in play store and installed in android device. Now i want to open play store with my appid as Installed. But it is opening play store in browser with “Install ” option. If I click on Install option it is asking for my account credentials. Now if I sign in it is opening play store with “Installed” option.
+> I am loading html pages using Codenameone BrowserComponent. And My app is already in play store and installed in android device. Now i want to open play store with my appid as Installed. But it is opening play store in browser with "Install " option. If I click on Install option it is asking for my account credentials. Now if I sign in it is opening play store with "Installed" option.
 >
 > Why it is asking again for sign in. I want to open the play store with Installed option. How Can I achieve this functionality.
 >

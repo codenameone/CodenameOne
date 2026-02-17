@@ -26,7 +26,7 @@ under the project hierarchy:
 [Pubnub-CodeNameOne-3.7.4.cn1lib](/files/Pubnub-CodeNameOne-3.7.4.cn1lib) &  
 [json.cn1lib](/files/json.cn1lib).
 
-Once you placed the files into the lib directory right click the project and select “Codename One→Refresh Libs”.  
+Once you placed the files into the lib directory right click the project and select "Codename One→Refresh Libs".  
 This will install the libraries into your classpath and allow you to use them while enjoying features such as code  
 completion etc.
 
@@ -517,7 +517,7 @@ or race conditions since pretty much everything is on the EDT.
         return roundedHimOrHerImage;
     }
 
-We mentioned this method much earlier, its relatively simple so I glossed over it. Its roughly identical to the “me picture”  
+We mentioned this method much earlier, its relatively simple so I glossed over it. Its roughly identical to the "me picture"  
 we had in the previous posts just applied to pictures of friends.
     
     
@@ -633,7 +633,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is what I get from the DDMS log when I run SocialChat.
 >
-> Initially after installing the app I get google login asking me to allow SocialChat to access my google account. Then I get transfered to the initial screen and stay on the login form without opening the contact form. The When I try to click again on the google login it tells me the “Unfortunately, SocialChat has stopped”. This is what I get when I try to do the google login again while connected my device through USB and use the DDMS tool:
+> Initially after installing the app I get google login asking me to allow SocialChat to access my google account. Then I get transfered to the initial screen and stay on the login form without opening the contact form. The When I try to click again on the google login it tells me the "Unfortunately, SocialChat has stopped". This is what I get when I try to do the google login again while connected my device through USB and use the DDMS tool:
 >
 > 11-21 22:29:15.822: E/AndroidRuntime(27804): at com.codename1.social.GoogleImpl$a.a([GoogleImpl.java](<http://GoogleImpl.java>):187)  
 > 11-21 22:29:15.822: E/AndroidRuntime(27804): at com.codename1.social.GoogleImpl$a.doInBackground([GoogleImpl.java](<http://GoogleImpl.java>):179)

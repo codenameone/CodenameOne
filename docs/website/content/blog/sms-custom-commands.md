@@ -74,11 +74,11 @@ Customizing Commands In Runtime
   
 Commands are abstracted so we can integrate deeply into the native platform. E.g. the default behavior on Android is to add commands to the action bar which is what we would assume in the case of Android.  
   
-If commands are drawn by us and not native (e.g. if you use the side menu bar or running on iOS etc.) you can easily customize the style of the commands using the “TouchCommand” and “Command” UIID’s. However, what happens when you want one command to have a different style (e.g. for a delete command). There are many ways to solve this especially with the SideMenuBar where you can use a custom component or quite a few other features. However, none of them are trivial.
+If commands are drawn by us and not native (e.g. if you use the side menu bar or running on iOS etc.) you can easily customize the style of the commands using the "TouchCommand" and "Command" UIID’s. However, what happens when you want one command to have a different style (e.g. for a delete command). There are many ways to solve this especially with the SideMenuBar where you can use a custom component or quite a few other features. However, none of them are trivial.
 
 To solve that we added the ability to assign a UIID to a command which will be applied to the element if applicable, just use:  
   
-form.getMenuBar().setCommandUIID(cmd, “MyUIID”);
+`form.getMenuBar().setCommandUIID(cmd, "MyUIID");`
 
 This will work in runtime and should implicitly refresh the UI.  
   

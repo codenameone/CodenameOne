@@ -49,7 +49,7 @@ pull to refresh
 functionality was a bit uncustomizable up until now, this all changed with the latest release and should now be far more customizable. To replace the icon you can define the theme constant pullToRefreshImage to the right image. To customize the appearance of the text etc. you can now use the PullToRefresh UIID and to customize the text just define the following constants in the localization bundle:  
   
   
-pull.release (defaults to “Release to refresh…”) & pull.down (defaults to “Pull down do refresh…”).  
+pull.release (defaults to "Release to refresh…") & pull.down (defaults to "Pull down do refresh…").  
   
   
   

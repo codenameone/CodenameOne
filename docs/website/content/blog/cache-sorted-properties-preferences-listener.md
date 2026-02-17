@@ -15,7 +15,7 @@ We’ve had quite a few interesting features land last week and didn’t get a c
 access to the OS’s caches directory where you can store files that you don’t really need as cache. Both iOS &  
 Android have such a directory and files stored there might be purged without notice if the OS runs out of space.
 
-This is a good place to store files you don’t really need such as images or downloads you just need for “right now”.
+This is a good place to store files you don’t really need such as images or downloads you just need for "right now".
 
 To use this we added two new API’s to `FileSystemStorage`:
     
@@ -42,7 +42,7 @@ remains that way when checking the file into version control.
 Fixing this for our application only would solve our problem but I’m guessing the jumbled properties that you need  
 to sort thru every time doesn’t make sense for any application ever…​  
 This way you can have a consistent human understandable order for machine saved properties. Notice this is a  
-“write only” feature so you don’t need to sort your properties for parsing to work.
+"write only" feature so you don’t need to sort your properties for parsing to work.
 
 ### Preferences Listener
 
@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > So should use something like:
 >
-> FileSystemStorage.getInstance().openOutputStream(FileSystemStorage.getInstance().getChacheDir() + “/ ” + fname);
+> FileSystemStorage.getInstance().openOutputStream(FileSystemStorage.getInstance().getChacheDir() + "/ " + fname);
 >
 
 
@@ -84,9 +84,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > private String getCacheFileName() {  
 > String root;  
 > if(FileSystemStorage.getInstance().hasCachesDir()) {  
-> root = FileSystemStorage.getInstance().getCachesDir() + “cn1ConCache/”;  
+> root = FileSystemStorage.getInstance().getCachesDir() + "cn1ConCache/";  
 > } else {  
-> root = FileSystemStorage.getInstance().getAppHomePath()+ “cn1ConCache/”;  
+> root = FileSystemStorage.getInstance().getAppHomePath()+ "cn1ConCache/";  
 > }  
 > FileSystemStorage.getInstance().mkdir(root);  
 > return root + Base64.encodeNoNewline(createRequestURL().getBytes()).replace(‘/’, ‘-‘).replace(‘+’, ‘_’);  
@@ -94,7 +94,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This will use the caches dir if it’s available but fallback to normal if not.
 >
-> Also notice that directories in Codename One should always end with the / character so the + “/” is redundant.
+> Also notice that directories in Codename One should always end with the / character so the + "/" is redundant.
 >
 
 

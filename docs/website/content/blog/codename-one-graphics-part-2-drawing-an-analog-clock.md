@@ -92,23 +92,19 @@ Note: scale() and rotate() methods are only available on platforms that support 
 Device Support  
 **  
   
-You can check if a particular Graphics context supports rotation and scaling using the isAffineSupported() method.  
-  
-e.g.  
-  
-public void paint(Graphics g) {  
-  
-if ( g.isAffineSupported() ){  
-  
-// Do something that requires rotation and scaling  
-  
-} else {  
-  
-// Fallback behaviour here  
-  
-}  
-  
+You can check if a particular Graphics context supports rotation and scaling using the `isAffineSupported()` method.
+
+e.g.
+
+```java
+public void paint(Graphics g) {
+    if (g.isAffineSupported()) {
+        // Do something that requires rotation and scaling
+    } else {
+        // Fallback behaviour here
+    }
 }
+```
 
 **  
 Example:  
@@ -125,13 +121,13 @@ Using the GeneralPath class for drawing arbitrary shapes.
   
 
   2.   
-Using Graphics.translate() to translate our drawing position by an offset. 
+Using `Graphics.translate()` to translate our drawing position by an offset. 
 
   
   
 
   3.   
-Using Graphics.rotate() to rotate our drawing position. 
+Using `Graphics.rotate()` to rotate our drawing position. 
 
   
   
@@ -250,7 +246,7 @@ At this point our clock should include a series of tick marks orbiting a blank c
 Drawing the Numbers  
 **  
   
-I have seen clocks before that don’t include any actual numbers, but these are far too advanced for my rudimentary clock-reading skills. I want my clock to have numbers on it. Nothing fancy. Just “1” through “12” labelling the appropriate tick marks. 
+I have seen clocks before that don’t include any actual numbers, but these are far too advanced for my rudimentary clock-reading skills. I want my clock to have numbers on it. Nothing fancy. Just "1" through "12" labelling the appropriate tick marks. 
 
 The Graphics.drawString(str, x, y) method allows you to draw text at any point of a component. The tricky part here is calculating the correct x and y values for each string so that the number appears in the correct location.
 
@@ -279,7 +275,7 @@ Invert the translation performed in step 1.
 **  
 Note:  
 **  
-This example is, admittedly, a little contrived to allow for a demonstration of the Graphics.translate() method. We could have just as easily passed the exact location of the number to drawString() rather than draw at the clock center and translate to the correct location. 
+This example is, admittedly, a little contrived to allow for a demonstration of the `Graphics.translate()` method. We could have just as easily passed the exact location of the number to drawString() rather than draw at the clock center and translate to the correct location. 
 
 Now, we should have a clock with tick marks and numbers as shown below:  
   
@@ -318,7 +314,7 @@ Rotate the hand at the appropriate angle for the current time, using the clock c
 Drawing the Second Hand  
 **  
   
-For the “second” hand, I will just use a simple line from the clock center to the inside edge of the medium tick mark at the 12 o’clock position.
+For the "second" hand, I will just use a simple line from the clock center to the inside edge of the medium tick mark at the 12 o’clock position.
 
 GeneralPath secondHand = new GeneralPath();  
   
@@ -403,7 +399,7 @@ here
 Animating the Clock  
 **  
   
-The current clock component is cool, but it is static. It just displays the time at the point the clock was created. Next time we’ll improve on this by adding animation support so that the clock will “tick” and keep the correct time – just like a real clock.
+The current clock component is cool, but it is static. It just displays the time at the point the clock was created. Next time we’ll improve on this by adding animation support so that the clock will "tick" and keep the correct time – just like a real clock.
 
 Notice: This post was automatically converted using a script from an older blogging system. Some elements might not have come out as intended…. If that is the case please let us know via the comments section below.
 ---
@@ -428,7 +424,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > As an FYI I created the original properties project that inspired JavaFX properties: [https://java.net/projects/b…](<https://java.net/projects/bean-properties/>) 
 >
-> This predated my LWUIT work but we didn’t take it into LWUIT due to size concerns… Adding “proper” properties to Codename One is something that has been on my wishlist for quite some time, but to do this properly I would want the VM to support this internally so properties would have zero overhead compared to fields. That would take some effort…
+> This predated my LWUIT work but we didn’t take it into LWUIT due to size concerns… Adding "proper" properties to Codename One is something that has been on my wishlist for quite some time, but to do this properly I would want the VM to support this internally so properties would have zero overhead compared to fields. That would take some effort…
 >
 
 
@@ -437,7 +433,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> I can blame you ! LOL. I have to admit having used Swing, LWUIT etc for a very long time, then coming to FX with it’s extensive use of binding was quite a shock and hard on my tired old brain – but then when see code like the clock I mentioned, where the binding makes it “just work” with almost no code, you can really see the power of the concept.
+> I can blame you ! LOL. I have to admit having used Swing, LWUIT etc for a very long time, then coming to FX with it’s extensive use of binding was quite a shock and hard on my tired old brain – but then when see code like the clock I mentioned, where the binding makes it "just work" with almost no code, you can really see the power of the concept.
 >
 
 
@@ -450,7 +446,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > In case some one struggles with showing the clock.. just set the form layout to GridLayout like this: 
 >
-> Form f = new Form(“”); 
+> Form f = new Form(""); 
 >
 > f.setLayout(new GridLayout(1, 1)); 
 >
@@ -509,7 +505,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > No, juste:
 >
-> tb.addCommandToSideMenu(new Command(“Clock2”, theme.getImage(“teams_icn_badgeage_48x48.png”)) {  
+> tb.addCommandToSideMenu(new Command("Clock2", theme.getImage("teams_icn_badgeage_48x48.png")) {  
 > @Override  
 > public void actionPerformed(ActionEvent evt) {  
 > Form fm = new Form(new BoxLayout(BoxLayout.Y_AXIS));  

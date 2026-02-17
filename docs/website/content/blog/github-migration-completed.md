@@ -31,7 +31,7 @@ server locations on codenameone.com now.
 
 Another big change is the removal of all the jar, zip and other dependencies that might be required for the  
 project build. These were major size contributors and allowed us to bring the project size down to a very manageable  
-size. Right now we are still mapping the files that are “really needed” vs. the ones that just should never  
+size. Right now we are still mapping the files that are "really needed" vs. the ones that just should never  
 have been committed.  
 We created a new project called  
 [cn1-binaries](https://github.com/codenameone/cn1-binaries) that contains  

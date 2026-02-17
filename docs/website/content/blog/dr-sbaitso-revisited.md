@@ -19,7 +19,7 @@ camera, rounds them, does dynamic search with a chat like bubble interface…​
 
 But the coolest part is the speech synthesis…​
 
-It uses native interfaces to access the text-to-speech capabilities of the device and “says” what the “doctor” is  
+It uses native interfaces to access the text-to-speech capabilities of the device and "says" what the "doctor" is  
 saying. This both demonstrates native access and the rather cool TTS functionality.
 
 ### What’s to Improve?
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi,  
 > You can insert emojiis on the device today and it should work fine for this and other apps.  
-> However, what you are talking about is called a “rich edit component” we have a cn1lib that supports that somewhere (Steve did it) thru a web browser UI. The problem is that Android and iOS have rather bad support for that concept and it’s rather different between the OS’s.  
+> However, what you are talking about is called a "rich edit component" we have a cn1lib that supports that somewhere (Steve did it) thru a web browser UI. The problem is that Android and iOS have rather bad support for that concept and it’s rather different between the OS’s.  
 > It’s something we wanted to integrate a while back but we didn’t have any actionable user demand which is really needed for such a problematic task.
 >
 

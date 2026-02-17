@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thank You Shai. I have the PDF in my default package of the src folder of CN1 package. I want to open the PDf on click of a button.I’m using the following code –  
 > FileSystemStorage fs = FileSystemStorage.getInstance();  
 > final String homePath = fs.getAppHomePath();  
-> String fileName = homePath + “abc.pdf”;  
+> String fileName = homePath + "abc.pdf";  
 > Util.copy(fs.openInputStream(fileName), fs.openOutputStream(fileName));  
 > Display.getInstance().execute(fileName);
 >
@@ -122,7 +122,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Util.copy(Display.getInstance().getResourceAsStream(getClass(), “/abc.pdf”, fs.openOutputStream(fileName));
+> Util.copy(Display.getInstance().getResourceAsStream(getClass(), "/abc.pdf", fs.openOutputStream(fileName));
 >
 > But I suggest first checking if the file already exists or maybe even a version.
 

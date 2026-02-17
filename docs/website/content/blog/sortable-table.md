@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/sortable-table/new-features-5.jpg)
 
-Sometimes I get a question on stack overflow that triggers a “yes this should be easy” reflex. I got such a question a couple of weeks ago when I implemented the [animated gif support cn1lib](/blog/animated-gif-support.html) and I had [another one last week](https://stackoverflow.com/questions/45330419/codename-one-sort-table-with-data-from-sql-database/45341816) which asked about sorting tables.
+Sometimes I get a question on stack overflow that triggers a "yes this should be easy" reflex. I got such a question a couple of weeks ago when I implemented the [animated gif support cn1lib](/blog/animated-gif-support.html) and I had [another one last week](https://stackoverflow.com/questions/45330419/codename-one-sort-table-with-data-from-sql-database/45341816) which asked about sorting tables.
 
 This is actually pretty easy to do but it’s just something we didn’t get around to. So I just implemented it and decided this would make a lot of sense in the core API. Sortable tables make a lot of sense and ideally should be the default.
 

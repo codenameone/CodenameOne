@@ -27,10 +27,10 @@ One of the things we’ve been working on with Maker is getting the new GUI buil
   
 In Maker we intend to fix that, by providing  
   
-the UI you see in the video and the image. Essentially when you spin the spinner the layout changes automatically and animates the components into place giving a clear indication of the change between positions (if they “jump” its harder to notice differences in some cases).
+the UI you see in the video and the image. Essentially when you spin the spinner the layout changes automatically and animates the components into place giving a clear indication of the change between positions (if they "jump" its harder to notice differences in some cases).
 
   
-The problem is that a “normal” dialog doesn’t allow for this UI, it doesn’t allow an “always on top” window and it doesn’t really allow the underlying form to “animate”. If you will study the code the reasoning for that will become crystal clear: a dialog is really a Form that takes up the entire screen and just “draws” the previous form behind. Since the previous form is “deinitialize” it just won’t run most of the animations (to preserve CPU). This was done ages ago with a very specific set of use cases in mind and its generally very efficient but we just can’t implement something like this using this approach.  
+The problem is that a "normal" dialog doesn’t allow for this UI, it doesn’t allow an "always on top" window and it doesn’t really allow the underlying form to "animate". If you will study the code the reasoning for that will become crystal clear: a dialog is really a Form that takes up the entire screen and just "draws" the previous form behind. Since the previous form is "deinitialize" it just won’t run most of the animations (to preserve CPU). This was done ages ago with a very specific set of use cases in mind and its generally very efficient but we just can’t implement something like this using this approach.  
 
   
   
@@ -49,7 +49,7 @@ The LayeredLayout allows placing components one on top of the other. So we creat
 
 * * *
 
-As you can see the “Dialog” is just a container with the right UIID and some additional components faking the title and content pane.  
+As you can see the "Dialog" is just a container with the right UIID and some additional components faking the title and content pane.  
   
   
 We place it in the correct location by using a layout  

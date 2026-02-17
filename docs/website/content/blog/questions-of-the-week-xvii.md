@@ -90,7 +90,7 @@ and we don’t have the resources…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38673149/how-to-hash-data-with-custom-key-using-sha1digest-algorithm-in-codenameone)
 
-### Why is my Codename One Project “not a visual project type”?
+### Why is my Codename One Project "not a visual project type"?
 
 These are some of the reasons we are migrating to the new GUI builder. The old GUI builder was very confusing  
 to developers that are new to Codename One.
@@ -112,7 +112,7 @@ Another example of the problematic nature of the overflow menu list…​
 
 ### Annotation Processing
 
-I think we need a better “unified” approach for what is typically handled via reflection/bytecode manipulation  
+I think we need a better "unified" approach for what is typically handled via reflection/bytecode manipulation  
 etc.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38667201/codename-one-annotation-processing)

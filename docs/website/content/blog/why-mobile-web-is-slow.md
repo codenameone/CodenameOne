@@ -67,13 +67,13 @@ People refer to performance in many ways, but generally most of us think of perf
   
 In fact JavaScript can’t technically perform slowly since it is for most intents and purposes single threaded (ignoring the joke that is web workers), so long running JavaScript code that will take 50 seconds just won’t happen (you will get constant browser warnings). Its all just UI stalls or what w  
   
-e call “perceived performance”.  
+e call "perceived performance".  
 
   
 Perceived performance is pretty hard to measure but its pretty easy to see why it sucks on web UI’s: DOM.  
 
   
-To understand this you need to understand how DOM works: every element within the page is a box whose size/flow can be determined via content manipulation and style manipulation. Normally this could be very efficient since the browser could potentially optimize the living hell out of rendering this data. However, JavaScript allows us to change DOM on the fly and actually requires that to create most UI’s. The problem is that “reflow” is a really difficult concept, when you have a small amount of data or simple layout the browsers amazing rendering engines can do wonders. However, when dependencies become complex and the JavaScript changes a root at a “problematic” point it might trigger deep reflow calculations that can appear very slow. This gets worse since the logic is so deep in the browser and its performance overhead you can end up with a performance penalty that’s browser specific and really hard to track.  
+To understand this you need to understand how DOM works: every element within the page is a box whose size/flow can be determined via content manipulation and style manipulation. Normally this could be very efficient since the browser could potentially optimize the living hell out of rendering this data. However, JavaScript allows us to change DOM on the fly and actually requires that to create most UI’s. The problem is that "reflow" is a really difficult concept, when you have a small amount of data or simple layout the browsers amazing rendering engines can do wonders. However, when dependencies become complex and the JavaScript changes a root at a "problematic" point it might trigger deep reflow calculations that can appear very slow. This gets worse since the logic is so deep in the browser and its performance overhead you can end up with a performance penalty that’s browser specific and really hard to track.  
 
   
   
@@ -164,15 +164,15 @@ Yes they have a cost, no its not a big deal.
   
   
   
-ARC is an Apple “workaround” for their awful GC.  
+ARC is an Apple "workaround" for their awful GC.  
   
   
-Writing a GC is painful for a language like Objective-C which inherits the “problematic” structure of C pointers (pointer arithmetic’s and  
+Writing a GC is painful for a language like Objective-C which inherits the "problematic" structure of C pointers (pointer arithmetic’s and  
   
 memory manipulation) and adds to it plenty of complexities of its own. I’m not saying a GC is trivial in a managed language like Java but it is a panacea by comparison.
 
   
-The problem with GC is in its unpredictable nature. A gc might suddenly “decide” it needs to stop the world and literally trash your framerate, this is problematic for games and smooth UI’s. However, there is a very simple solution: Don’t allocate when you need fast performance. This is good practice regardless of whether you are using a GC since allocation/deallocation of memory are slow operations (in fact game programmers NEVER allocate during game level execution).  
+The problem with GC is in its unpredictable nature. A gc might suddenly "decide" it needs to stop the world and literally trash your framerate, this is problematic for games and smooth UI’s. However, there is a very simple solution: Don’t allocate when you need fast performance. This is good practice regardless of whether you are using a GC since allocation/deallocation of memory are slow operations (in fact game programmers NEVER allocate during game level execution).  
 
   
 This isn’t really hard, you just make sure that while you are performing an animation or within a game level you don’t make any allocations. The GC is unlikely to kick in and your performance will be predictable and fast. ARC on the other hand doesn’t allow you to do that since ARC instantly deallocates an object you finished working with (just to clarify: reference counting is used and instantly means when the ref count reaches 0). While its faster than a full GC cycle or manual reference counting its still pretty slow  
@@ -186,7 +186,7 @@ The article also mentions desktop GCs being optimized for larger heap spaces and
 [  
 a study from 2005  
 ](http://www-cs.canisius.edu/~hertzm/gcmalloc-oopsla-2005.pdf)  
-that “proves it”. This is true for desktop GCs but isn’t true for mobile GCs, e.g. Monty (Sun’s VM) had the ability to GC the actual compiled machine code. So effectively if your app was JITed and took too much space in RAM for an execution path you no longer use much, Monty could just collect that memory (the desktop JIT to my knowledge was never this aggressive).  
+that "proves it". This is true for desktop GCs but isn’t true for mobile GCs, e.g. Monty (Sun’s VM) had the ability to GC the actual compiled machine code. So effectively if your app was JITed and took too much space in RAM for an execution path you no longer use much, Monty could just collect that memory (the desktop JIT to my knowledge was never this aggressive).  
   
 A proper GC optimized for mobile devices and smaller heap overhead will be slower than some of the better desktop GCs but it can actually reduce memory usage compared to native code (by removing unused code paths). Just so we can talk scales, our code performed really well on a 2mb 240×320 Nokia device and weaker devices than that. It ran smoothly animations and everything, including GC.  
   
@@ -215,7 +215,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The number one thing I’m seeing here is that you have absolutely no data to back you up whatsoever. For example, 
 >
-> “A JIT can (and does) produce faster method invocations than a static compiler since it can perform dynamic binding and even virtual method inlining e.g. removing a setter/getter overhead!” 
+> "A JIT can (and does) produce faster method invocations than a static compiler since it can perform dynamic binding and even virtual method inlining e.g. removing a setter/getter overhead!" 
 >
 > Nice theory. Here’s another theory. Since JITs have to run side by side with the application, and every cycle a JIT spends optimizing, the application can’t spend executing, a JIT can never match a static compiler. Not to mention, congratulations on inlining your shitty unnecessary getters and setters- in other languages, they wouldn’t be written in the first place. 
 >
@@ -230,13 +230,13 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Your unconditional statements are simply incorrect 
 >
-> “in fact game programmers NEVER allocate during game level execution” 
+> "in fact game programmers NEVER allocate during game level execution" 
 >
 > That’s simply not true. Complicated games might use pooling memory managers, but from the point of actual code, it’s freeing and allocating data allright. On some operating systems using pooling memory might just not be needed for a fast execution, because normal allocators can cope with the task. 
 >
-> “So yet you can hand code faster memory management code in C and get better performance in that way, however for very complex applications (…) you will end up with crashes. To avoid your crashes you add checks and safeties which go against the basic performance penalties you are trying to counter.” 
+> "So yet you can hand code faster memory management code in C and get better performance in that way, however for very complex applications (…) you will end up with crashes. To avoid your crashes you add checks and safeties which go against the basic performance penalties you are trying to counter." 
 >
-> You are assuming the only ways to use manage memory is either raw C or fully GCed Java. How exactly is “pretty slow” for ARC we’re talking about? You seem to forget that deterministic destruction does exactly mean we can destruct when it’s convenient, not when the GC chooses so. As for crashes, I think you simply lack knowledge about alternatives to the extreme ends of the scale.
+> You are assuming the only ways to use manage memory is either raw C or fully GCed Java. How exactly is "pretty slow" for ARC we’re talking about? You seem to forget that deterministic destruction does exactly mean we can destruct when it’s convenient, not when the GC chooses so. As for crashes, I think you simply lack knowledge about alternatives to the extreme ends of the scale.
 >
 
 
@@ -255,7 +255,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > JIT’s do have an overhead, however since every application spends most of its time doing nothing there is plenty of time for a JIT to optimize. Unless a JIT is a caching JIT you will notice some overhead on startup (unless its a caching JIT). 
 >
-> Notice that I don’t think this can be “proved”, perceived performance is too difficult to measure properly and the JIT overhead is a flaky hard to measure property. I would prefer that people understand the difference between “soft facts” and “hard facts” e.g. JavaScript as it is now is hard to optimize is a hard fact. JIT/GC’s are inherently slow is debateable (and I take the position that they are not).
+> Notice that I don’t think this can be "proved", perceived performance is too difficult to measure properly and the JIT overhead is a flaky hard to measure property. I would prefer that people understand the difference between "soft facts" and "hard facts" e.g. JavaScript as it is now is hard to optimize is a hard fact. JIT/GC’s are inherently slow is debateable (and I take the position that they are not).
 >
 
 
@@ -279,7 +279,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> ARC does not “Immediately dealloc” the object unless you specifically gave it a weak (Auto zeroing) reference. A strong referenced object will be held onto until you zero it out yourself so if there’s a specifc reason not to dealloc an object while you’re executing then just *don’t* until you’re done doing whatever Uber important process. Now this is almost never an issue however I bring it up in reply to your equally unlikely case of specific object dealloc actually slowing something down. Also lets keep in mind you can jump in and out of C at any time so if you have some really low level stuff just write it in C, use the correct tool for the Job OR .. Why we don’t use JS to do jobs that C should be used for and don’t use C to do jobs JS should be used for. Got it? Kthx Bye.
+> ARC does not "Immediately dealloc" the object unless you specifically gave it a weak (Auto zeroing) reference. A strong referenced object will be held onto until you zero it out yourself so if there’s a specifc reason not to dealloc an object while you’re executing then just *don’t* until you’re done doing whatever Uber important process. Now this is almost never an issue however I bring it up in reply to your equally unlikely case of specific object dealloc actually slowing something down. Also lets keep in mind you can jump in and out of C at any time so if you have some really low level stuff just write it in C, use the correct tool for the Job OR .. Why we don’t use JS to do jobs that C should be used for and don’t use C to do jobs JS should be used for. Got it? Kthx Bye.
 >
 
 
@@ -344,7 +344,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> “ARC on the other hand doesn’t allow you to do that since ARC instantly deallocates an object you finished working with.”
+> "ARC on the other hand doesn’t allow you to do that since ARC instantly deallocates an object you finished working with."
 >
 
 
@@ -368,7 +368,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I just want to offer an alternate take on the paper cited ([http://www-cs.canisius.edu/…](<http://www-cs.canisius.edu/~hertzm/gcmalloc-oopsla-2005.pdf>)) regarding performance vs heap-size of garbage collectors. 
 >
-> If you focus on the “best” garbage collection algorithm they used in their experiments (GenMS) the performance hit is only about 1.75x with a heap size of twice the minimum required footprint. By the time you reach available memory of 3 to 4 times, the size, performance reaches about parity with manual memory management. 
+> If you focus on the "best" garbage collection algorithm they used in their experiments (GenMS) the performance hit is only about 1.75x with a heap size of twice the minimum required footprint. By the time you reach available memory of 3 to 4 times, the size, performance reaches about parity with manual memory management. 
 >
 > Given that this study was done in 2005, and assuming that GC architects are aware of these results, I think it is fair to assume that modern day garbage collectors will perform at least as well as the best algorithms in this study. 
 >
@@ -392,7 +392,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Finally a comment I can answer with “fixed that”.
+> Finally a comment I can answer with "fixed that".
 >
 
 
@@ -401,7 +401,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Terms like “perceived performance” and “speed” are too vague. Think: thoughput,latency and the jitter on them. Android does have at least one enormous problem relative to iOS, and it’s latency/jitter; which is really obvious when making real-time audio apps (ie: audio responds to finger movements within 5ms latency and jitter). Most of the Android devices I have used exhibit high latency in the user interface for everything, including the web browser. A lot of IOS apps use very little Objective-C and are mostly in C for the exact reasons you mentioned; to have the app stop doing alloc/free while the app runs (some places you have no control, like with touches coming in from the OS, etc). It’s really unfortunate that none of the popular operating systems are based on real-time operating systems, and none of the common languages are appropriate for making real-time applications; and actually kind of ironic given that mobile devices fit the profile of embeded devices doing signal processing (phone signals, accelerometers, audio, camera, etc).
+> Terms like "perceived performance" and "speed" are too vague. Think: thoughput,latency and the jitter on them. Android does have at least one enormous problem relative to iOS, and it’s latency/jitter; which is really obvious when making real-time audio apps (ie: audio responds to finger movements within 5ms latency and jitter). Most of the Android devices I have used exhibit high latency in the user interface for everything, including the web browser. A lot of IOS apps use very little Objective-C and are mostly in C for the exact reasons you mentioned; to have the app stop doing alloc/free while the app runs (some places you have no control, like with touches coming in from the OS, etc). It’s really unfortunate that none of the popular operating systems are based on real-time operating systems, and none of the common languages are appropriate for making real-time applications; and actually kind of ironic given that mobile devices fit the profile of embeded devices doing signal processing (phone signals, accelerometers, audio, camera, etc).
 >
 
 
@@ -421,7 +421,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> “[…] congratulations on inlining your shitty unnecessary getters and setters- in other languages, they wouldn’t be written in the first place” 
+> "[…] congratulations on inlining your shitty unnecessary getters and setters- in other languages, they wouldn’t be written in the first place" 
 >
 > Ignoring the tone of your post for second, are you saying that C++ for example does not have getters/setters ? Besides inlining in the JVM goes beyond getters and setters. 
 >
@@ -440,7 +440,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > In my opinion, this discussion really boils down to memory management, since (outside the DOM, as Shai noted) execution speed differences don’t add up to enough to matter for probably 99% of apps. If you’re writing heavy numerical calculations etc., then you’re probably invoking a native library for that part. 
 >
-> The goal is not to run out your project’s budget due to being a perfectionist: “real artists ship.”
+> The goal is not to run out your project’s budget due to being a perfectionist: "real artists ship."
 >
 
 
@@ -458,7 +458,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> The “Class 3” argument from scripting language people assumes that the hardware is underutilized – like a big desktop machine. 
+> The "Class 3" argument from scripting language people assumes that the hardware is underutilized – like a big desktop machine. 
 >
 > If each instruction expands into 10 for the sake of it being in FooScript, and you run it at 100% utilization on your desktop… then port it to C and it runs at 10% utilization…but they might complete in roughly the same time because the C code spends 90% of its time waiting on devices and network responses. And here it looks like there was no justification for porting it to C. 
 >
@@ -485,7 +485,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > What really matters at the end is what is perceived by the user. 
 >
-> As far as I know the best Android devices are getting better – and cost as much as Apple ones -, though they don’t feel as fast as iOS ones, even “old” phones like iPhone 3GS or 4 (I have a 4 and even heavy games are pretty fast). 
+> As far as I know the best Android devices are getting better – and cost as much as Apple ones -, though they don’t feel as fast as iOS ones, even "old" phones like iPhone 3GS or 4 (I have a 4 and even heavy games are pretty fast). 
 >
 > The problem would be the that most Android phones are in the cheap market, using old Android versions, with poor hardware. In that niche, maybe Firefox OS could do a better job. 
 >
@@ -511,7 +511,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> “So yet you can hand code faster memory management code in C and get better performance in that way, however for very complex applications (and UI is pretty complex not to mention the management of native peers) you will end up with crashes. To avoid your crashes you add checks and safeties which go against the basic performance penalties you are trying to counter.” 
+> "So yet you can hand code faster memory management code in C and get better performance in that way, however for very complex applications (and UI is pretty complex not to mention the management of native peers) you will end up with crashes. To avoid your crashes you add checks and safeties which go against the basic performance penalties you are trying to counter." 
 >
 > False dichotomy. 
 >
@@ -532,7 +532,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> “ARC on the other hand doesn’t allow you to do that since ARC instantly deallocates an object you finished working with.” 
+> "ARC on the other hand doesn’t allow you to do that since ARC instantly deallocates an object you finished working with." 
 >
 > >instantly
 >
@@ -578,7 +578,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> “doesn’t guarantee memory safety [hello java.lang.NullPointerException!]” 
+> "doesn’t guarantee memory safety [hello java.lang.NullPointerException!]" 
 >
 > Actually a null pointer exception is an example of memory safety in action. In unmanaged languages, if you try to access uninitialized memory, you don’t get a null pointer exception. You just get access to the memory containing who knows what. This is the source of most serious software security exploits.
 >
@@ -595,7 +595,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > He gave some hypotheses for why it is slow, but the hypotheses are less important than the claim. 
 >
-> You have taken his point to ignore the issue of Javascript performance and launch another round of “rah rah Java is awesome; Objective C sux”. It’s your blog, you’re entitled to do that. But don’t be surprised when people who read this post and hope for something as informed as Drew’s post are disappointed to see yet another damn content-free argumentative post of the sort we’ve all read a million times in our lives.
+> You have taken his point to ignore the issue of Javascript performance and launch another round of "rah rah Java is awesome; Objective C sux". It’s your blog, you’re entitled to do that. But don’t be surprised when people who read this post and hope for something as informed as Drew’s post are disappointed to see yet another damn content-free argumentative post of the sort we’ve all read a million times in our lives.
 >
 
 
@@ -619,17 +619,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Actually, it depends on the definition you’re using: 
 >
-> “Memory safety is a crucial and desirable property for any piece of software. Its absence is a major source for software bugs which can lead to abrupt termination of software execution, but also, and sometimes even more dangerous, can be turned into a malicious tool: most of the recent security vulnerabilities are due to memory safety violations. ” 
+> "Memory safety is a crucial and desirable property for any piece of software. Its absence is a major source for software bugs which can lead to abrupt termination of software execution, but also, and sometimes even more dangerous, can be turned into a malicious tool: most of the recent security vulnerabilities are due to memory safety violations. " 
 >
 > Source: [http://dl.acm.org/citation….](<http://dl.acm.org/citation.cfm?id=1690881>) 
 >
-> Yes, in the Java world the second part is usually assumed the sole focus (and it’s granted that it can be “even more dangerous” to access memory this way, I don’t think anyone disputes that), but that doesn’t mean the first part (abrupt execution termination) is not a problem. It’s certainly a problem for the end-user, who in practice doesn’t care whether the software crashed because of a segmentation fault of a C program or an unhandled java.lang.NullPointerException in a Java program. 
+> Yes, in the Java world the second part is usually assumed the sole focus (and it’s granted that it can be "even more dangerous" to access memory this way, I don’t think anyone disputes that), but that doesn’t mean the first part (abrupt execution termination) is not a problem. It’s certainly a problem for the end-user, who in practice doesn’t care whether the software crashed because of a segmentation fault of a C program or an unhandled java.lang.NullPointerException in a Java program. 
 >
 > And GC is not enough to guarantee that — it’s worth noting that this is the official stance taken in the draft JSR-302 Safety Critical Java (SCJ) specification: 
 >
 > [http://dl.acm.org/citation….](<http://dl.acm.org/citation.cfm?id=2402685>) 
 >
-> So, in fact, SCJ has stronger memory safety guarantees while dropping GC (would you call it “unmanaged”? :]). 
+> So, in fact, SCJ has stronger memory safety guarantees while dropping GC (would you call it "unmanaged"? :]). 
 >
 > Similarly, modern programming languages also offer stronger memory safety guarantees while dropping GC (see above). 
 >
@@ -646,9 +646,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 1) The jazz about DOM is absolutely true. JavaScript can affect any element in a DOM tree and changing elements within the DOM tree forces a web-engine to perform relayout, which just plain sucks. Additionally, all open source web engines (Gecko, any WebKit flavor ad Blink) have that their rendering stack is entirely imperative. The punchline is this: imperative rendering is fine for CPU’s but horror slow for GPU’s. Most WebKit flavors essentially do all drawing to offscreen buffers with the -CPU- and then instruct the GPU to perform compositing of those buffers to the screen. Sadly, the way that WebKit works, this is the best path. Indeed, if one were to use GL backed SKIA (or for that matter a GL backed QPainter for QtWebKit), performance is often SLOWER than with the CPU backed rendering (this is the case for mobile strongly at times). Needless to say, web rendering is much, much slower than it should be. 
 >
-> 2) When folks say keep all allocations out of one’s main loops to make sure GC does not activate, I cringe inside. What that means is this: for games all objects and memory must be allocated at start up. The result is that the game then make it’s own “object/memory” manager to make sure the GC does not kick in. The net effect is that then such games in reality end up doing manual memory management anyways. For UI’s it sucks. It sucks because then a developer needs to *somehow* make a user event driven program that somehow delays allocating until after it display the response to an event.. that means that objects needs to be pre-allocating before the event, and that after the screen is updated, the application generates it’s own event to itself to perform the next pre-allocation and one must home that the user does not send another event too fast if the GC gets invoked. So that just plain sucks. 
+> 2) When folks say keep all allocations out of one’s main loops to make sure GC does not activate, I cringe inside. What that means is this: for games all objects and memory must be allocated at start up. The result is that the game then make it’s own "object/memory" manager to make sure the GC does not kick in. The net effect is that then such games in reality end up doing manual memory management anyways. For UI’s it sucks. It sucks because then a developer needs to *somehow* make a user event driven program that somehow delays allocating until after it display the response to an event.. that means that objects needs to be pre-allocating before the event, and that after the screen is updated, the application generates it’s own event to itself to perform the next pre-allocation and one must home that the user does not send another event too fast if the GC gets invoked. So that just plain sucks. 
 >
-> 3) On the subject of GC and graphics. In an application that uses hardware to render (for example uses OpenGL, JS woubd be WebGL), an application will need to -by hand- make the necessary GL calls to release graphics resources. So all the graphic stuff, needs to be freed manually. The up shot is that in a GC environment, one then needs to make sure that all the objects using the release graphics resource and “not in use”, just as the case for manual memory allocation. 
+> 3) On the subject of GC and graphics. In an application that uses hardware to render (for example uses OpenGL, JS woubd be WebGL), an application will need to -by hand- make the necessary GL calls to release graphics resources. So all the graphic stuff, needs to be freed manually. The up shot is that in a GC environment, one then needs to make sure that all the objects using the release graphics resource and "not in use", just as the case for manual memory allocation. 
 >
 > That GC to perform well requires something like 2-6 times the actual memory used (depending on what one references) can be a major show stopper. Additionally, that GC is not deterministic can also me a major show stopper. 
 >
@@ -695,7 +695,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I don’t think I changed the subject, I said that reflows are the problems most people perceive when they see slow web performance which is the one thing he didin’t discuss and is very widely documented online. Then I discussed my personal experience (and gave some relevance) links where the situation he describes isn’t black and white where JIT/GC == slow. 
 >
-> I did flamebait Objective-C that’s true. But I’m kind of tired of Objective-C developers calling themselves “native” when it really isn’t C. You pay a price for Objective-C that you don’t pay even in Java for messages, so deriding slow performance of all managed code in the world and while being an iOS developer is something that needs to be taken down a notch. 
+> I did flamebait Objective-C that’s true. But I’m kind of tired of Objective-C developers calling themselves "native" when it really isn’t C. You pay a price for Objective-C that you don’t pay even in Java for messages, so deriding slow performance of all managed code in the world and while being an iOS developer is something that needs to be taken down a notch. 
 >
 > I’m surprised by the animosity from some people who seem to actually agree with most of my points?
 >
@@ -749,7 +749,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The heavy lifting is done by the GPU but want to keep the CPU in low utilization to feed the GPU so this doesn’t really negate anything. Furthermore, with mobile system on a chip design the separation of CPU/GPU isn’t as clean as it is on the desktop. 
 >
-> Hopefully you will be less “anti” and more proactive.
+> Hopefully you will be less "anti" and more proactive.
 >
 
 
@@ -771,7 +771,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> “This is only true for high rendering FPS games where you code in OGL anyway” 
+> "This is only true for high rendering FPS games where you code in OGL anyway" 
 >
 > That statement does not really make any sense: OGL is an API, that API has bindings to multiple languages where the languages spread across compiled, interpreted, managed and unmanaged. On the subject of managed language, the whole point of GC is so that a a developer does not need to devote the time, and hence the skill investment, to do manual memory management. Once you have something OGL where graphics resources need to be allocated and deallocated by using the API, a developer needs to do it. The terrible catch is this: if a developer has not done this a great deal and does not have the skill to do it, they are hosed. 
 >
@@ -840,7 +840,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Where did I make a wild claim that contradicted something? DOM reflow having an overhead? Google it. Pretty obvious. Objective-C messages being slow (linked in the comments), memory allocation/dealocation being expensive (pretty easy fact). GC has an overhead but its manageable? 
 >
-> Science also includes interpretation for the data, the facts here are still in the flexible stage where they can fit many different theories otherwise we would all be programming with the “best language” and “best OS”.
+> Science also includes interpretation for the data, the facts here are still in the flexible stage where they can fit many different theories otherwise we would all be programming with the "best language" and "best OS".
 >
 
 
@@ -858,9 +858,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> “Are GCs Expensive 
+> "Are GCs Expensive 
 >
-> Yes they have a cost, no its not a big deal.” 
+> Yes they have a cost, no its not a big deal." 
 >
 > I think this is the best example ever of what i meant !! 
 >
@@ -873,7 +873,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Actually the article Drew linked to showed that GC’s perform REALLY well they only take up too much memory (that’s in 2005). Embedded GC’s used in J2ME have no such overhead (e.g. Nokia devices with less than 2mb of RAM performing really well). Problem is that you can’t really test those GC’s against “no GC at all”. 
+> Actually the article Drew linked to showed that GC’s perform REALLY well they only take up too much memory (that’s in 2005). Embedded GC’s used in J2ME have no such overhead (e.g. Nokia devices with less than 2mb of RAM performing really well). Problem is that you can’t really test those GC’s against "no GC at all". 
 >
 > However, my claim isn’t about that. If you are writing an FPS heavy game (for which C is still the best, not Objective-C or Java) or a quick animation within your app you would do anything to avoid GC and GC aware allocations (just pre-allocate the memory). This isn’t hard to do. 
 >
@@ -971,7 +971,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> @Cristi, I’m not sure that Obj-C’s message passing is faster than Dalvik’s method invocation, after run through the Android JIT compiler. Obj-C is sort of its own animal, and you can’t compare it to other languages under the assumption that it’s exactly equivalent to C/C++. Performance sensitive Obj-C apps regularly drop into C or C++, just like performance sensitive Android Dalvik/”Java” apps do. It’s a bit easier to do that from Obj-C, but at that point it wouldn’t typically be referred to as Obj-C anymore. (Question of semantics, I suppose.)
+> @Cristi, I’m not sure that Obj-C’s message passing is faster than Dalvik’s method invocation, after run through the Android JIT compiler. Obj-C is sort of its own animal, and you can’t compare it to other languages under the assumption that it’s exactly equivalent to C/C++. Performance sensitive Obj-C apps regularly drop into C or C++, just like performance sensitive Android Dalvik/"Java" apps do. It’s a bit easier to do that from Obj-C, but at that point it wouldn’t typically be referred to as Obj-C anymore. (Question of semantics, I suppose.)
 >
 
 
@@ -991,7 +991,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Apple says that method calls are cached as they are used, after a while it becomes almost as a function call. You can also find the IMP and call it directly. 
 >
-> “To speed the messaging process, the runtime system caches the selectors and addresses of methods as they are used. There’s a separate cache for each class, and it can contain selectors for inherited methods as well as for methods defined in the class. Before searching the dispatch tables, the messaging routine first checks the cache of the receiving object’s class (on the theory that a method that was used once may likely be used again). If the method selector is in the cache, messaging is only slightly slower than a function call. Once a program has been running long enough to “warm up” its caches, almost all the messages it sends find a cached method. Caches grow dynamically to accommodate new messages as the program runs.”
+> "To speed the messaging process, the runtime system caches the selectors and addresses of methods as they are used. There’s a separate cache for each class, and it can contain selectors for inherited methods as well as for methods defined in the class. Before searching the dispatch tables, the messaging routine first checks the cache of the receiving object’s class (on the theory that a method that was used once may likely be used again). If the method selector is in the cache, messaging is only slightly slower than a function call. Once a program has been running long enough to "warm up" its caches, almost all the messages it sends find a cached method. Caches grow dynamically to accommodate new messages as the program runs."
 >
 
 
@@ -1055,7 +1055,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Funny 🙂 
 >
-> Most modern (managed) languages use a GC and everyone using those seem perfectly fine with how they work (including me). So I can conclude, from asking for a half baked solution, that you indeed lack that “developer skill” to work with it properly.
+> Most modern (managed) languages use a GC and everyone using those seem perfectly fine with how they work (including me). So I can conclude, from asking for a half baked solution, that you indeed lack that "developer skill" to work with it properly.
 >
 
 
@@ -1077,7 +1077,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> “Note that the title of this post is not [written in] proper English.”
+> "Note that the title of this post is not [written in] proper English."
 >
 
 

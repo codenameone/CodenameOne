@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Francesco Galgani says:
 >
-> Thank you Shai for this article, the server redirect is a great idea to circumvent the “impossible to click” links with a custom protocol in Gmail. Some email providers allow to click any link with any custom protocol, others block any custom protocol. I circumvented this issue to send an activation link with a completely different approach, however your redirect solution is very good 😉
+> Thank you Shai for this article, the server redirect is a great idea to circumvent the "impossible to click" links with a custom protocol in Gmail. Some email providers allow to click any link with any custom protocol, others block any custom protocol. I circumvented this issue to send an activation link with a completely different approach, however your redirect solution is very good 😉
 >
 
 

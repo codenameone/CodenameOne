@@ -28,7 +28,7 @@ In some of the newer web UI’s such as Tumblr and Twitter the data is fetched d
   
 My initial thought was to create a Container subclass or even add support for this into Container itself, but eventually I came to the conclusion that this is really unnecessary and we can accomplish something like this without modifying the internal code. For this purpose we created the  
   
-InfiniteScrollAdapter which is a really simple class that binds to a container and gives you the ability to add components to it. The API is remarkably simple you just invoke the static method InfiniteScrollAdapter.createInfiniteScroll() with an empty container then wait for it to invoke the runnable you submit to it.  
+InfiniteScrollAdapter which is a really simple class that binds to a container and gives you the ability to add components to it. The API is remarkably simple you just invoke the static method `InfiniteScrollAdapter.createInfiniteScroll()` with an empty container then wait for it to invoke the runnable you submit to it.  
   
   
 The runnable will be invoked on the EDT so be sure not to block it (unless you use an AndWait or invokeAndBlock method), in it you can fetch data and once you are done add any set of components you like using the  

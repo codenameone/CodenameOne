@@ -59,7 +59,7 @@ is two new scale modes in Style: Scale to fit and Scale to fill. When you set a 
 Scale to fit scales the image so it will fit on the component while maintaining its aspect ratio. It will leave the background in the bgColor if transparency is defined as expected.  
 
   *   
-Scale to fill scales the image so it will fill the entire component while maintaining aspect ratio, in this case the image will usually “flow” out of the screen in one of its edges.  
+Scale to fill scales the image so it will fill the entire component while maintaining aspect ratio, in this case the image will usually "flow" out of the screen in one of its edges.  
   
 
 This is easier to explain with an example (in order scaled, scale to fit, scale to fill):  
@@ -87,18 +87,18 @@ As part of this work we also added a flag to image download service allowing it 
   
 Other than that we  
   
-added a simple ability to create/delete contacts, this is rather basic but can help for many common use cases you can delete a contact using its “id” as: Display.getInstance().deleteContact(id);
+added a simple ability to create/delete contacts, this is rather basic but can help for many common use cases you can delete a contact using its "id" as: `Display.getInstance().deleteContact(id);`
 
   
 You can also create a basic contact using:  
   
   
-Display.getInstance().createContact(firstName, familyName, officePhone, homePhone, cellPhone, email);
+`Display.getInstance().createContact(firstName, familyName, officePhone, homePhone, cellPhone, email);`
 
   
 We made some enhancements to our Facebook support as well but one  
   
-of the more interesting ones is the ability to sign in to an App without a user visible OAuth process. This will grant you the ability to access public information on Facebook (e.g. pages, public posts/profiles etc.) but since no user will be logged in this won’t provide an “identity”. Note that you will still need to create a Facebook App to associate with the requests, then you can just login using:  
+of the more interesting ones is the ability to sign in to an App without a user visible OAuth process. This will grant you the ability to access public information on Facebook (e.g. pages, public posts/profiles etc.) but since no user will be logged in this won’t provide an "identity". Note that you will still need to create a Facebook App to associate with the requests, then you can just login using:  
   
   
   

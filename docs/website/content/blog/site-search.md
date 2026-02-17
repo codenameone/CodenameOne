@@ -15,7 +15,7 @@ Just a couple of weeks ago I was offering tips on how to search the website in l
 
 This is a compromise, search works on the server instead of using the fact that the site is statically generated. As a result it is far from ideal but it’s still pretty comprehensive and finds the right answers for most of the stuff we threw at it.
 
-One of the features we added as an “afterthought” is probably the most important feature: the alternative search buttons…​
+One of the features we added as an "afterthought" is probably the most important feature: the alternative search buttons…​
 
 When you search for something e.g. <https://www.codenameone.com/search?q=floating+action+button>
 

@@ -38,11 +38,11 @@ We are doing quite a bit of work for our enterprise customers, we already comple
 [  
 issue  
 ](http://code.google.com/p/codenameone/issues/detail?id=361)  
-which we tried to resolve in the past and deemed it to be impossible to fix. Well… Few things are impossible when an enterprise customer makes a formal request so we spent quite a few days trying to resolve this, after the next server update you should be able to see the fruits of this labor by defining the build argument ios.keyboardOpen=true which will keep the keyboard always open when you start editing unless you press the “Done” button.  
+which we tried to resolve in the past and deemed it to be impossible to fix. Well… Few things are impossible when an enterprise customer makes a formal request so we spent quite a few days trying to resolve this, after the next server update you should be able to see the fruits of this labor by defining the build argument ios.keyboardOpen=true which will keep the keyboard always open when you start editing unless you press the "Done" button.  
   
 As part of this work we also added a feature to text area that allows it to grow up to a limit so using textArea.setGrowLimit(int) will limit the amount of rows to which the text area grows based on user input.
 
-Another enterprise developer needed to detect a disconnect of headphones which is pretty niche but we added that as well. Starting with the next server update you should be able to define the build arguments ios.headphoneCallback=true and android.headphoneCallback=true  
+Another enterprise developer needed to detect a disconnect of headphones which is pretty niche but we added that as well. Starting with the next server update you should be able to define the build arguments `ios.headphoneCallback=true` and `android.headphoneCallback=true`  
   
 Once those are defined you should also define the callback methods with these signatures in your main class:  
   

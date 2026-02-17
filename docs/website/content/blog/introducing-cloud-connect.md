@@ -23,7 +23,7 @@ Check out the new [How Do I video](/how-do-i/how-do-i-use-cloud-connect/) that c
 
 This is a remarkably useful feature as it allows us to instantly see the nuanced impact of choices we make within the GUI builder. Small alignment or boundary choices within the tool can have a significant impact when you’re running on the device. Fonts and styles can look very different on the physical device than they do within the GUI builder.
 
-But even more importantly, scrolling behavior and editing is impacted by design choices. E.g. in the video I made the login form scrollable. This isn’t something I thought I needed initially, but as I played with the UI on smaller devices it became apparent that this form must be scrollable. Using cloud connect saved me from the frustration of “compile → deploy → repeat”.
+But even more importantly, scrolling behavior and editing is impacted by design choices. E.g. in the video I made the login form scrollable. This isn’t something I thought I needed initially, but as I played with the UI on smaller devices it became apparent that this form must be scrollable. Using cloud connect saved me from the frustration of "compile → deploy → repeat".
 ---
 
 ## Archived Comments

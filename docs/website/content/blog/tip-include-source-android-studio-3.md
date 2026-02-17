@@ -27,7 +27,7 @@ __ |  If you submit an APK to Google play with a newer SDK version they will no 
   
 Once the automatic update is done you will need to update a few files and settings.
 
-### gradle.properties
+### `gradle.properties`
 
 In this file you just need to add the line:
     

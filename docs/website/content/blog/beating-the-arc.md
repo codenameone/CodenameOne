@@ -32,13 +32,13 @@ Unlike C, we can make a lot of assumptions in a Java application thanks to the t
 
 while(true) {  
   
-System.out.println(‘WHeee”);  
+System.out.println(‘WHeee");  
   
 }
 
-It would block our new GC from running unless you add a Thread.yield/sleep or wait() call (besides draining the CPU/battery). This might be considered a flaw but we mitigated that to some degree by incorporating a reference counting collector as well (similar to ARC) which deals with the “low hanging garbage” thus making the actual GC process far less important so our GC sweeps don’t need to be very fast. 
+It would block our new GC from running unless you add a Thread.yield/sleep or wait() call (besides draining the CPU/battery). This might be considered a flaw but we mitigated that to some degree by incorporating a reference counting collector as well (similar to ARC) which deals with the "low hanging garbage" thus making the actual GC process far less important so our GC sweeps don’t need to be very fast. 
 
-But this post is titled “beating the ARC”… How can we be faster than ARC?  
+But this post is titled "beating the ARC"… How can we be faster than ARC?  
   
 Simple, we don’t de-allocate. All objects that our reference counter deems to be garbage are sent to the garbage heap and finalized/deleted on the GC thread (as is custom in Java) hence we get the benefit of multi-core parallel cleanup logic on top of the fast performance. 
 

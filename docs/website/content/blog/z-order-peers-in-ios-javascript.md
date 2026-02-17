@@ -15,13 +15,13 @@ Just last week [I mentioned](/blog/html-maps-z-order-peer-properties-update.html
 
 What this means is that peer components (e.g. maps, videos, browser etc.) can reside below a component in the Codename One hierarchy and won’t **always** be on top as it is now. This opens up Codename One for a huge set of use cases and makes building some types of apps (e.g. Maps) **much** easier!
 
-The implementation on iOS is very different from Android. Z-Ordering on Android was “relatively” simple as it allowed us to place components pretty much within their place in the hierarchy. However, on iOS and other platforms this is impractical as it might cause an issue with some complex components. Our initial solution was to define two layers, everything that paints below the peer and everything that paints above the peer.
+The implementation on iOS is very different from Android. Z-Ordering on Android was "relatively" simple as it allowed us to place components pretty much within their place in the hierarchy. However, on iOS and other platforms this is impractical as it might cause an issue with some complex components. Our initial solution was to define two layers, everything that paints below the peer and everything that paints above the peer.
 
 This would have meant that if you had two peers in a Form they would both be in the same Z location and won’t be mixed.
 
-However, we found a better way using a “clear” operation where each peer component will clear the elements below it and paint in the right location. That way peers are always painted at the bottom but have a special clear graphics function to remove anything that should be underneath. This does mean that peers should be opaque though…​
+However, we found a better way using a "clear" operation where each peer component will clear the elements below it and paint in the right location. That way peers are always painted at the bottom but have a special clear graphics function to remove anything that should be underneath. This does mean that peers should be opaque though…​
 
-The “clear” approach is the one we took in the JavaScript port and it will carry those tradeoffs.
+The "clear" approach is the one we took in the JavaScript port and it will carry those tradeoffs.
 
 This is a HUGE change so if your app relies on peers (Maps, Video, Browser etc.) I suggest testing it extensively and letting us know at once if you run into any regressions!
 

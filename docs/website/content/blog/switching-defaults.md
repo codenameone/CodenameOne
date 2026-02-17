@@ -30,7 +30,7 @@ however the default was still set to the legacy support first. Today we are depl
   
   
   
-We are also updating the plugin to default to iOS 7 skins and adding the old iOS 6 related skins under the “more” menu in the device section, this will allow you to target existing devices more effectively.  
+We are also updating the plugin to default to iOS 7 skins and adding the old iOS 6 related skins under the "more" menu in the device section, this will allow you to target existing devices more effectively.  
   
   
   

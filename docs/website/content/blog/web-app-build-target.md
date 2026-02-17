@@ -32,7 +32,7 @@ bck2brwsr
 
 That’s where we can step in… We would like to sponsor Jaroslav in his efforts which will allow us to do something grand!
 
-We will allow you to just right click a project and select “Build a web app”. You will get a self contained app that doesn’t need a server side and would be implemented entirely in JavaScript… You would still be able to use threads and most of the standard things Codename One has to offer, some limitations might apply but you should be able to create a completely portable app!  
+We will allow you to just right click a project and select "Build a web app". You will get a self contained app that doesn’t need a server side and would be implemented entirely in JavaScript… You would still be able to use threads and most of the standard things Codename One has to offer, some limitations might apply but you should be able to create a completely portable app!  
   
 One of the nice things is that due to the architecture of Codename One we belive it would be faster than typical HTML5 framworks since it won’t be suseptible to the reflow problems that typical HTML5 code is suseptible to.
 
@@ -88,7 +88,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Codename One works well with non-touch and we already have a desktop target which pro users are using. Since desktop apps are moving to look more like tablet apps this isn’t a big leap. 
 >
-> The main use case is enterprise requirements, sometimes just having a webapp is a starting point and if you don’t have it then its a problem. This can also provide support for niche platforms like Windows Phone, Firefox OS, tizen, Jolla etc. and allow governments/agencies that are required to support “everyone” to claim that they do.
+> The main use case is enterprise requirements, sometimes just having a webapp is a starting point and if you don’t have it then its a problem. This can also provide support for niche platforms like Windows Phone, Firefox OS, tizen, Jolla etc. and allow governments/agencies that are required to support "everyone" to claim that they do.
 >
 
 
@@ -135,7 +135,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Like Maaike, I can’t justify an enterprise account, but would be prepared to tip in for new features. If you got 50 people contributing, say, $100, that very nearly covers your goal. Maybe you need a “Make a Donation” button so people can make a one-off contribution that can be used however you see fit.
+> Like Maaike, I can’t justify an enterprise account, but would be prepared to tip in for new features. If you got 50 people contributing, say, $100, that very nearly covers your goal. Maybe you need a "Make a Donation" button so people can make a one-off contribution that can be used however you see fit.
 >
 
 
@@ -146,7 +146,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Organizing something like that is just not feasible without a platform like kickstarter and doing it in those platforms isn’t viable. 
 >
-> I understand the cost issue, having reviewed the financials I can’t see any other way we can “make this work” other than bolstering our enterprise developers. We need more personnel to maintain more platforms and a one time expense just isn’t enough. Having more enterprise developers will allow us to hire more employees and thus maintain this (and other ports).
+> I understand the cost issue, having reviewed the financials I can’t see any other way we can "make this work" other than bolstering our enterprise developers. We need more personnel to maintain more platforms and a one time expense just isn’t enough. Having more enterprise developers will allow us to hire more employees and thus maintain this (and other ports).
 >
 
 

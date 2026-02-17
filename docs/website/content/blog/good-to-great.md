@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/good-to-great/deep-dive-into-mobile.jpg)
 
-Thanks for all the great feedback on my [last post](/blog/thats-great-looking-app.html), I got some wonderful app suggestions from some of you and some interesting questions. Overall, there were more than 100 comments and emails so I apologize if I took too long to answer some of you. I already mentioned the focus of these coming courses is to let you create apps in a more practical form: “cook book” style.  
+Thanks for all the great feedback on my [last post](/blog/thats-great-looking-app.html), I got some wonderful app suggestions from some of you and some interesting questions. Overall, there were more than 100 comments and emails so I apologize if I took too long to answer some of you. I already mentioned the focus of these coming courses is to let you create apps in a more practical form: "cook book" style.  
 But while I talked a bit about the narrative and the course I didn’t explain exactly how or why this will work effectively.
 
 One of the core capabilities of Codename One is control over every pixel in the screen. It’s a huge benefit and also a double edged sword…​
@@ -26,7 +26,7 @@ After my last post I received a lot of questions & suggestions that I’d like t
 
 **Do I need to Know Anything?**
 
-You need to know Java to a reasonable degree. You don’t need prior knowledge in Codename One though. I’d love to add an “introduction to Java” course to the mix but that might be stepping outside of my personal comfort zone.
+You need to know Java to a reasonable degree. You don’t need prior knowledge in Codename One though. I’d love to add an "introduction to Java" course to the mix but that might be stepping outside of my personal comfort zone.
 
 **Will you use Youtube?**
 
@@ -36,11 +36,11 @@ I’ll use the teachable platform which allows me to structure course material a
 
 **What sort of material will be covered?**
 
-We will [launch with the restaurant and the “app builder”](/blog/restaurant-app-builder.html) as part of the initial launch material. This is some of the material I developed for the bootcamp “remastered” to a more refined flow.
+We will [launch with the restaurant and the "app builder"](/blog/restaurant-app-builder.html) as part of the initial launch material. This is some of the material I developed for the bootcamp "remastered" to a more refined flow.
 
 A major focus of the material is refining the look of the application, working with themes and design. But this is just a tip of the iceberg as the material covers everything that you need to bring an app to production. From security, to application architecture, native interfaces, sql, ORM, backend VPS setup and everything in between.
 
-Notice I’ve made a specific distinction for “launch material”, for the next two years at least we will add a new module every month. Guaranteed!
+Notice I’ve made a specific distinction for "launch material", for the next two years at least we will add a new module every month. Guaranteed!
 
 **Shouldn’t Codename One be Good Looking by Default?**
 
@@ -52,7 +52,7 @@ This material would still be valuable even as we improve the basic look, everyth
 
 ### Real Apps
 
-I’ve mentioned the importance of “real world” apps in my last post and asked for some feedback to get a sense of what sort of apps you are building. You really came through with a lot of great suggestions!
+I’ve mentioned the importance of "real world" apps in my last post and asked for some feedback to get a sense of what sort of apps you are building. You really came through with a lot of great suggestions!
 
 I worked on them a bit to unify some of the ideas that are similar and came up with a set of initial suggestions:
 
@@ -104,7 +104,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Dalvik says:
 >
-> Do we get an “I voted” badge on our account 😉
+> Do we get an "I voted" badge on our account 😉
 >
 > +1 for the Uber demo.  
 > Downloading 3.7 RC right now!
@@ -360,7 +360,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> That’s pretty much decided by the numbers already so it will be an Uber clone. I’m not going to do complex backend logic. I’ll keep it relatively simple in the backend. I think a lot of startups fail because they try to “build to scale” before they learn to walk…
+> That’s pretty much decided by the numbers already so it will be an Uber clone. I’m not going to do complex backend logic. I’ll keep it relatively simple in the backend. I think a lot of startups fail because they try to "build to scale" before they learn to walk…
 >
 > My goal is to show how off the shelf stuff can be used to make something like that, but obviously on the server side once you start to scale you would also scale that architecture.
 >

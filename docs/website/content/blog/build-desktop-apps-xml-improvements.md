@@ -35,7 +35,7 @@ The end result should be pretty similar to what you get in the simulator, I assu
   
 We also added support for XML user interface elements in the designer, if you activate team mode in the designer and save the resource file you will now notice that we generate a UI file for every form (as well as a file with no extension which is a binary file). Currently the UI file is write only to prevent issues with this approach from breaking existing usage. However, if you want to move to a more XML based file format right now you would be able to edit your top level XML file and set  
   
-useXmlUI=”false”.  
+useXmlUI="false".  
   
   
 Once you change that all changes to the .ui files will be incorporated when  

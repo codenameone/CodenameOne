@@ -27,7 +27,7 @@ We should have taken the hint that MS isn’t serious about Windows Phone back t
 for support with a port to Windows Phone 8. This port used the official API’s but they weren’t very suitable for a tool  
 like Codename One and this performed really badly, it had horrible bugs to boot.  
 The third attempt which is now live uses Sun’s Pisces framework to abstract graphics which is a real hack, it  
-“works” but is pretty limited and still performs poorly. 
+"works" but is pretty limited and still performs poorly. 
 
 We were thinking about a complete rewrite on top of DirectX for quite some time, however such an effort would require  
 a huge expense in time and resources on something that none of our enterprise customers considered crucial.  

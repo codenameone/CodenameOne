@@ -19,10 +19,10 @@ horrible service/support. This will also allow us to finally support many long s
 push API’s etc. since we will no longer be held back by App Engines limitations. 
 
 In fact our choice to leave App Engine completely was sealed last month as our App Engine expenses skyrocketed…  
-The App Engine console simply stated a cryptic “datastore reads” number that was very high/expensive. We normally cache  
+The App Engine console simply stated a cryptic "datastore reads" number that was very high/expensive. We normally cache  
 everything in memcache but still it seems that the number was really high. Unfortunately, this was the only number we had!  
 Google doesn’t provide any way of knowing which of our queries was responsible for the large number and to this day we have  
-no idea what is the actual trigger for this. When we opened a service call they decided that this was a “justified” charge without  
+no idea what is the actual trigger for this. When we opened a service call they decided that this was a "justified" charge without  
 providing us with any itemized listing detailing what we are charged for. 
 
 Due to all of that we decided to start a migration process even before the last announcement, this means a lot  
@@ -50,7 +50,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Isn’t is just the Files API for Google Cloud Storage and the Blobstore that is deprecated? I know this may still effect things, but just clarifying before people get the idea that Google Cloud Storage is going away. A solution I was thinking of doing was calling blobstoreService.createUploadUrl server side and uploading files server side, abstracting away that side of thing from the client.
 >
-> “The Files API feature used here to write files to Blobstore has been deprecated and is going to be removed at some time in the future, in favor of writing files to Google Cloud Storage and using Blobstore to serve them.” – [https://cloud.google.com/ap…](<https://cloud.google.com/appengine/docs/java/blobstore/#Java_Writing_files_to_the_Blobstore>)
+> "The Files API feature used here to write files to Blobstore has been deprecated and is going to be removed at some time in the future, in favor of writing files to Google Cloud Storage and using Blobstore to serve them." – [https://cloud.google.com/ap…](<https://cloud.google.com/appengine/docs/java/blobstore/#Java_Writing_files_to_the_Blobstore>)
 >
 
 
@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Its not 100% clear. In my last “civil” talk with guys from Google they stressed that we should migrate away from Blobstore (naturally pushing for cloud storage which is even worse).
+> Its not 100% clear. In my last "civil" talk with guys from Google they stressed that we should migrate away from Blobstore (naturally pushing for cloud storage which is even worse).
 >
 > We had a few regressions with it in the past which demonstrate that Google doesn’t really do much QA for that API. The basic blobstore API is pretty opaque and we had some issues that we had no way of debugging. Because there is quite literally, no one to talk to at Google the safe thing to do is migrate away ASAP. We can’t take any risks with this since a failure in this API will cause builds to fail.
 >

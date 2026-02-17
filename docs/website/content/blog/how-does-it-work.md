@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/how-does-it-work/build-real-world-full-stack-mobile-apps-in-java.jpg)
 
-You know that feeling before going on stage to talk or perform. It’s a knot in your stomach but also an exhilarating sense of excitement about what’s to come…​ I’ve got that fidgety feeling of “can’t wait to get it out” and yet I feel there is so much more to do.
+You know that feeling before going on stage to talk or perform. It’s a knot in your stomach but also an exhilarating sense of excitement about what’s to come…​ I’ve got that fidgety feeling of "can’t wait to get it out" and yet I feel there is so much more to do.
 
 Thanks for all the comments, questions, suggestions & votes for the [last couple of posts](/blog/good-to-great.html). Those always help tremendously!  
 One of our bootcamp participants mentioned the length of my videos in the bootcamp and my response at the time was that I can’t possibly make the videos shorter as it would be far more work…​
@@ -28,7 +28,7 @@ Segmenting the material allows more structure and ideally more people reaching t
 
 The courses will be:
 
-  * **Java for Mobile Devices** – This is the “learn Codename One” course. It covers the basics that all Codename One developers should know
+  * **Java for Mobile Devices** – This is the "learn Codename One" course. It covers the basics that all Codename One developers should know
 
   * **Deep Dive into Mobile** – This course goes into all of the complex features of Codename One and builds a non-trivial application. In fact it builds the [restaurant app](/blog/restaurant-app-builder.html)
 
@@ -84,7 +84,7 @@ Yes. This is material that’s built specifically for these courses. Some of the
 ### Is there any time commitment like we had in the bootcamp?
 
 No. This is a standard course and you can take it at your leasure. Access to the course isn’t time limited.  
-Teachable (who we use for our new course materials) used the term perpetual which I personally find “problematic” as I’m pretty sure access will not survive the Sun going supernova.
+Teachable (who we use for our new course materials) used the term perpetual which I personally find "problematic" as I’m pretty sure access will not survive the Sun going supernova.
 
 Having said that, we plan to keep the course online as long as possible and ideally as long as it’s useful. We also guarantee new materials will be added to the courses over the next 2 years at least!
 
@@ -122,15 +122,15 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Happy to see that CN1 is on the good way and you are really listening to customers 🙂
 >
 > I would like to inform you one major difficulty I had, when I start working with codenameone : project architecture.  
-> As you know, few years ago, principle of CN1 was StateMachine class, in which we could find ALL the code. It was pretty difficult to organize my code. I’ve tried to apply a pseudo MVC architecture to my project but it was a bit difficult with this “StateMachine” class. So I’ve decided to handcoded all my form (and erase all from GuiBuilder). In addition, you have changed the manner form was build with the new gui builder. We have now one class for one form. What I didn’t like much was that everything was in a form class : UI construction as well as event management. I can now tell you my architecture :  
-> – “controller” for pure calcul  
-> – “dao” for database access  
-> – “model”  
-> – “service” for interfacing dao  
-> – “view” with all my form, dialog and components  
-> – “viewController” which contains all the event management and controllers invocation
+> As you know, few years ago, principle of CN1 was StateMachine class, in which we could find ALL the code. It was pretty difficult to organize my code. I’ve tried to apply a pseudo MVC architecture to my project but it was a bit difficult with this "StateMachine" class. So I’ve decided to handcoded all my form (and erase all from GuiBuilder). In addition, you have changed the manner form was build with the new gui builder. We have now one class for one form. What I didn’t like much was that everything was in a form class : UI construction as well as event management. I can now tell you my architecture :  
+> – "controller" for pure calcul  
+> – "dao" for database access  
+> – "model"  
+> – "service" for interfacing dao  
+> – "view" with all my form, dialog and components  
+> – "viewController" which contains all the event management and controllers invocation
 >
-> About view and viewController : each classes in viewController have a maching view (Form, Dialog or Container). Every main classes of my view are manage by a class : “ComponentManager”. Same as for viewController : “ComponentControllerManager”. All of my views and controller’s view are singleton and could be recreate by manager.
+> About view and viewController : each classes in viewController have a maching view (Form, Dialog or Container). Every main classes of my view are manage by a class : "ComponentManager". Same as for viewController : "ComponentControllerManager". All of my views and controller’s view are singleton and could be recreate by manager.
 >
 > I tell you that because I noticed all demos aren’t so much organize which must, in my opinion, not be the case for bigger application. I didn’t say my method is the best, but I wanted to let you know.
 >

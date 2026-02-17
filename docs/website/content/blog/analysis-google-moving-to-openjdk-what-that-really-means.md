@@ -44,7 +44,7 @@ changes in Java 9. Swing/AWT/FX compliance complicate this whole process to a co
 
 There were several claims like this e.g. Google copied code etc.  
 I don’t like the fact that Android isn’t Java compatible and forked, but I generally disagree with that statement.  
-It might have been wrong “morally” to fork Java, but I don’t think it was wrong legally.  
+It might have been wrong "morally" to fork Java, but I don’t think it was wrong legally.  
 In the discovery phase of the trial only one small method was shown to be a direct copy and the judge  
 dismissed that as ridiculous.   
 Google didn’t violate the trademarks of Java and the coffee cup which are an important tool to keep Java clean.  
@@ -58,7 +58,7 @@ That’s a pretty bad thing since copyright is implicit. Its owned even if the p
 explicitly write that little (c) you see next to various types of work. So if you ever implemented an API you are  
 now effectively using copyrighted code! 
 
-Most programmers who understand this think that Google acted based on “fair use” which means they didn’t  
+Most programmers who understand this think that Google acted based on "fair use" which means they didn’t  
 actually violate the rights of the copyright holder. 
 
 #### Oracle is a greedy litigious company
@@ -67,9 +67,9 @@ Not really.
 Oracle does sue companies but generally larger companies that can afford this, I’m unaware of them suing  
 a startup or other small companies (feel free to correct me if I’m wrong here). It is far more profit driven than  
 Sun was. I really loved Sun and loved working there, I can’t say the same about Oracle…  
-But to be totally fair, Sun no longer exists in part because it was mismanaged and maybe not “greedy” enough.  
-Having a strong “landlord” for Java might be disturbing in some regards but it has its advantages. I think  
-anyone trying to show Oracle off as “evil” is plain wrong. 
+But to be totally fair, Sun no longer exists in part because it was mismanaged and maybe not "greedy" enough.  
+Having a strong "landlord" for Java might be disturbing in some regards but it has its advantages. I think  
+anyone trying to show Oracle off as "evil" is plain wrong. 
 
 #### This is like the Microsoft Lawsuit
 
@@ -101,7 +101,7 @@ Furthermore, ending this hostility means Java proved its chops in court which is
 often have the justify-able backlash when the legal system is involved choosing to go with a technology that’s  
 more open (e.g. WebAssembly). Technologies like that might have hidden elements that can be  
 sued over that we aren’t even aware of e.g. just using a GIF file was ground for legal action a few years ago…  
-This is problematic with more open standards as there isn’t a single “landlord” to carry the technology forward  
+This is problematic with more open standards as there isn’t a single "landlord" to carry the technology forward  
 in such a court case. 
 
 Java has seen quite a few days in court and one of the nice things about OpenJDK is that it includes a patent  
@@ -135,7 +135,7 @@ This would hopefully give us a path to move forward in a way that would keep eve
 
 This is great news for all Java developers everywhere!  
 Whether you work on Android, server, mobile or desktop!  
-This could be the start of the long anticipated “peace process” or at least a ceasefire between Google & Oracle.  
+This could be the start of the long anticipated "peace process" or at least a ceasefire between Google & Oracle.  
 This could allow us all to align behind one Java version eventually (taking into consideration the slow Android  
 update process). It could help bring Java back into vogue with some developers who considered the closed  
 nature of Java problematic.
@@ -150,7 +150,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Luix says:
 >
-> Re: “is it good for Java?” The main issue here is Java isn’t good enough for anyone. Most of the apps running in that resource hog are chucks of code blindly stolen from previous apps/programs. Most of the developers just steal the code and mend it to perform more or less decently, and when that’s not enough, they just simply demand more hardware.
+> Re: "is it good for Java?" The main issue here is Java isn’t good enough for anyone. Most of the apps running in that resource hog are chucks of code blindly stolen from previous apps/programs. Most of the developers just steal the code and mend it to perform more or less decently, and when that’s not enough, they just simply demand more hardware.
 >
 > I don’t mean to start a flame war, but IMHO Google should ditch the Java approach all together and find a better replacement.
 >
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> You don’t mean to start a flame war but you post a “Java sux” comment in a Java blog. And with a Darth Vader avatar no less 😉
+> You don’t mean to start a flame war but you post a "Java sux" comment in a Java blog. And with a Darth Vader avatar no less 😉
 >
 > Copy and paste == code reuse. Bad programmers exist everywhere. Java is actually pretty efficient (e.g. embedded etc.) and performant when compared to pretty much all alternatives.
 >
@@ -185,7 +185,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> We discussed this a bit in the hacker news thread. One of the problems with Java on the server/desktop is the lack of MVM (or isolates as they are called today) which allows multiple Java instances to share more state and thus take up less RAM/CPU. Back in the day this wasn’t a priority for Sun as it was selling big iron hardware and it would just mean “buy more hardware”.
+> We discussed this a bit in the hacker news thread. One of the problems with Java on the server/desktop is the lack of MVM (or isolates as they are called today) which allows multiple Java instances to share more state and thus take up less RAM/CPU. Back in the day this wasn’t a priority for Sun as it was selling big iron hardware and it would just mean "buy more hardware".
 >
 > I totally see the issues you are running against, some Java apps are just ridiculous and its often hard for us to gauge what the hell is needed in terms of resources. One annoyance I had with servers was that the Xmx switch for the JVM to indicate the maximum memory has no value for the admin. It only allocates the memory visible to the Java application but not the memory I need to give to the server. So if I use -Xmx2gb the app might take up 2.5gb because of various VM overhead issues. This makes it pretty painful, but that’s an implementation problem more than an inherent issue in the Java language.
 >
@@ -220,7 +220,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Adam says:
 >
-> “While Hotspot will probably beat ART for anything other than startup time performance on mobile is quite different than desktop performance. Battery life is more crucial than speed and I doubt hotspot is optimized for that.”
+> "While Hotspot will probably beat ART for anything other than startup time performance on mobile is quite different than desktop performance. Battery life is more crucial than speed and I doubt hotspot is optimized for that."
 >
 > Are these really competing goals? Something that executes in fewer CPU cycles will result in longer battery life. AOT is always better than JIT for most things (unless they can only be known at runtime), but as far as a JIT engine goes, faster is better for everybody.
 >
@@ -250,7 +250,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Adam says:
 >
-> Yes, a lot of that fits into my “unless they can only be known at runtime” parenthetical there, and I agree, there are limits to ahead of time compilation where a JIT can do much better.
+> Yes, a lot of that fits into my "unless they can only be known at runtime" parenthetical there, and I agree, there are limits to ahead of time compilation where a JIT can do much better.
 >
 > That being said, what on earth would the JIT be doing that is consuming otherwise idle CPU cycles that aren’t otherwise necessary tasks? Overly aggressive garbage collection? Maybe I’m only looking at this from an application level lens when I should be viewing from a virtual machine lens.
 >

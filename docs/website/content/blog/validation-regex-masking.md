@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Gerben says:
 >
 > A regex containing (?= does not seem to work yet. Example, a password that should contain at least one lowercase character:  
-> “^(?=.*[a-z]).{8,24}$”
+> "^(?=.*[a-z]).{8,24}$"
 >
 
 
@@ -195,7 +195,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I don’t think lookarounds are supported. The Javadocs don’t mention them, and the code doesn’t look like it accommodates them:  
 > [http://www.codenameone.com/…](<http://www.codenameone.com/javadoc/com/codename1/util/regex/RE.html>)
 >
-> If I were you I would just break this up into two constraints. E.g. The regex “[a-z]” will be sufficient to make sure it contains at least one lowercase character, and you can do the length constraint separately.
+> If I were you I would just break this up into two constraints. E.g. The regex "[a-z]" will be sufficient to make sure it contains at least one lowercase character, and you can do the length constraint separately.
 >
 
 
@@ -208,7 +208,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 1\. when I use the Validtor.setShowErrorMessageForFocusedComponent(true), the popup error message does not close as expected after correcting the invalid email/text or losing the focus on the TextField, and the only way to get ride of it, is to lose and gain the focus again on the TextField!.
 >
-> 2\. No internationalisation support for the error message and inline with the Label component. for example, you cannot use the RegexConstraint.validEmail(“[invalid.email](<http://invalid.email>)”) to retrive the localized message from the resource file.
+> 2\. No internationalisation support for the error message and inline with the Label component. for example, you cannot use the RegexConstraint.validEmail("[invalid.email](<http://invalid.email>)") to retrive the localized message from the resource file.
 >
 > 3\. As the time of writing this!!, I have no idea on how to style the popup error component via CSS lib!!
 >
@@ -280,7 +280,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Can you post a screenshot? What do you mean by “other way around”?
+> Can you post a screenshot? What do you mean by "other way around"?
 >
 
 

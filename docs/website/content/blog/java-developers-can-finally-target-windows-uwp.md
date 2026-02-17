@@ -35,7 +35,7 @@ As of May Windows 10 is installed on 300 million PC’s and devices making it a 
 Microsoft has traditionally been quite strong in the enterprise and the ability to sell into that market thru it’s  
 appstore (with the success of the Surface tablet line) is valuable.
 
-Microsoft has standardized on the Universal Windows Platform which effectively “reinvents” Windows as  
+Microsoft has standardized on the Universal Windows Platform which effectively "reinvents" Windows as  
 a single platform on all supported devices. In a way this is very much like Java’s Write Once Run Anywhere  
 for the Windows ecosystem (mobile, tablets, xbox, desktops etc.).
 
@@ -72,7 +72,7 @@ with the two other options for desktop & the old Windows Phone support…​
 Figure 4. The new Windows UWP target
 
 Installing the build on your machine requires Windows 10 (obviously) but also requires development mode indicating  
-that you can “sideload” applications. We need to writeup our own documentation on how to do this but  
+that you can "sideload" applications. We need to writeup our own documentation on how to do this but  
 for now check out  
 [this well written guide](https://support.hockeyapp.net/kb/client-integration-windows-and-windows-phone/how-to-sideload-uwp-applications#3-install-application).
 

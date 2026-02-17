@@ -51,7 +51,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > thunderkilll says:
 >
 > please i have question how can i change the file Path trajectory String filePath = Capture.capturePhoto();  
-> and instead the filePath = “http://localhost/images/”+imageName ;
+> and instead the filePath = "http://localhost/images/"+imageName ;
 >
 
 
@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> That’s a URL not a file path. Your app needs to save the file to a path you “own” which is the file system app home directory. Can you clarify what you are trying to do?
+> That’s a URL not a file path. Your app needs to save the file to a path you "own" which is the file system app home directory. Can you clarify what you are trying to do?
 >
 > Notice that you can’t copy a file everywhere in a mobile OS as devices isolate the apps from one another to prevent security exploits.
 >

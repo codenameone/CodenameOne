@@ -50,7 +50,7 @@ Now here is a neat trick to learn about components, open the component inspector
 
 We have a layered layout for the root, this allows the floating action button on the bottom.
 
-A bit deeper we can see the Box Layout Y that contains all of the “Swipeable Container” classes,
+A bit deeper we can see the Box Layout Y that contains all of the "Swipeable Container" classes,
 
 Swipeable container is a layered layout that we can swipe to show the buttons below
 

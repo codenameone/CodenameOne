@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/the-road-ahead-2015-in-review-survey-results/looking-forward.jpg)
 
-I think we’ll remember 2015 as the year we finally “hit our stride” and “got it”. Up until now we did a lot of  
+I think we’ll remember 2015 as the year we finally "hit our stride" and "got it". Up until now we did a lot of  
 things correctly but were a bit disorganized both in the way we communicated Codename One and in the  
 refinement of the product itself.   
 We changed and refined almost every piece of [Codename One](/) in 2015 and the results were  
@@ -22,7 +22,7 @@ what we did right. Followed by the initial survey results and feedback from we g
 #### What We Did Wrong
 
 I worked for a company that built flight simulators for EA in a previous lifetime. We had about 20 airforce pilots  
-on staff and they brought the wonderful culture of “debrief” to the development process. Every time we  
+on staff and they brought the wonderful culture of "debrief" to the development process. Every time we  
 did something we’d analyze what went bad and what went well so we can learn. I think focusing on the bad  
 first really helps drive that point thru! 
 
@@ -67,7 +67,7 @@ and it really simplified a lot of things for us. Its a far better venue than Goo
   * Scroll performance – for quite a few years we got complaints about janky scrolling behavior in Codename One  
 when compared to native iOS apps and recently also to Android apps. Since the complaints were vague  
 we just left them at that as they were pretty hard to investigate (too subjective). We recently made a big  
-push here both on iOS & Android. The end result is much smoother and far more “native”.
+push here both on iOS & Android. The end result is much smoother and far more "native".
   * General performance – the initial release of ParparVM wasn’t as performant even when compared  
 to XMLVM for some use cases. Thanks to many commits made by Steve and myself this has changed  
 drastically!  
@@ -94,7 +94,7 @@ to a product we are really proud of. Steve came up with the idea of rebranding t
 the name which ultimately was one of the best decisions we made this year. 
   * JavaScript Port – the JavaScript Port has proved to be a really useful tool for many different purposes. Our  
 ability to instantly demonstrate an app with no installation requirement is pretty darn amazing.. 
-  * Certificate wizard – this was a “killer feature” the one big missing piece here is appstore 
+  * Certificate wizard – this was a "killer feature" the one big missing piece here is appstore 
   * Toolbar – when we launched Codename One the title area functionality looked totally different between  
 the mobile OS’s. In the interim this slowly converged to something far more similar. The Toolbar API closes  
 the gaps between the OS differences while bringing with it pretty advanced features…
@@ -108,12 +108,12 @@ We posted a link to our
 annual developer survey](https://docs.google.com/forms/d/1XltDhMS2Jlz7yVtiM6X7xkE-fF_eJeylzXXDd1eQtws/viewform), if you haven’t filled it out yet then please do so right now. Its very unscientific  
 but it gives us a sense of how we are doing both in communicating what Codename One has and doesn’t have. 
 
-The two most important questions were first: “Which of the following is the most important to you?”  
+The two most important questions were first: "Which of the following is the most important to you?"  
 To which you answered: 
 
 ![Which of the following is the most important to you?](/blog/the-road-ahead-2015-in-review-survey-results/which-of-the-following-is-the-most-important-to-you.png)
 
-The next question was: “Which of the following is the second most important to you?”  
+The next question was: "Which of the following is the second most important to you?"  
 To which you answered: 
 
 ![Which of the following is the second most important to you?](/blog/the-road-ahead-2015-in-review-survey-results/which-of-the-following-is_the-second-most-important-to-you.png)
@@ -122,18 +122,18 @@ To me these results are quite interesting as they show some interesting patterns
 
   1. I would have expected on-device-debugging to be really important to some developers but its not  
 even mentioned as the first order priority.
-  2. Had I wrote the survey now I would have added “which Java language features are you missing”… I have  
+  2. Had I wrote the survey now I would have added "which Java language features are you missing"… I have  
 a strong sense that pretty much everyone who answered that wanted something different from the other guys  
 who picked that option.
   3. The new GUI builder is an important advancement and we need to finish it for 3.3.
   4. Better Windows Mobile support is probably almost as important as the new GUI builder
 
-Another interesting question was “What form of documentation/help do you value the most?”. The response  
+Another interesting question was "What form of documentation/help do you value the most?". The response  
 for this took us by a bit of a surprise: 
 
 ![What form of documentation/help do you value the most?](/blog/the-road-ahead-2015-in-review-survey-results/what-form-of-documentation-help-do-you-value-the-most.png)
 
-I would have expected the videos to be somewhat higher on the list, the “other” segment mostly refers to the forum  
+I would have expected the videos to be somewhat higher on the list, the "other" segment mostly refers to the forum  
 but that’s not quite documentation. Removing that it seems the clear majority shows a preference for written  
 documentation over videos/courses…  
 Our developer guide is probably the least refined part of our documentation as we were focusing more on  
@@ -160,7 +160,7 @@ have any concrete plans here…
 Getting dependencies from Maven central might be a problem. Most standard libraries won’t work  
 out of the box since most assume a lot of things about Java (e.g. filesystem/networking etc.) that we just don’t  
 support. They also don’t support cn1lib’s which are pretty powerful.   
-Having said that, we would still like to add something like “maven central” to Codename One eventually, we’re  
+Having said that, we would still like to add something like "maven central" to Codename One eventually, we’re  
 just unsure whether maven central itself can actually be used for something like this. 
 
 > Codename One is getting better all the time anyway. I realise that reflection is challenging but RoboVM  
@@ -173,12 +173,12 @@ The reason we don’t support reflection isn’t technical. Its REALLY easy to a
 reason is conceptual. We won’t be able to properly optimize/obfuscate the code, reflection is remarkably  
 slow for AOT invocations and has no critical use case in mobile. Tools that add reflection also require that you  
 import everything into the final build resulting in 100mb+ build results. That isn’t a smart thing to do…  
-We could add something like reflection and just proclaim “if you use it then its your problem”, unfortunately once  
-something like that exists people use it “unaware” because its a part of the API. Then we get the “blame” for  
+We could add something like reflection and just proclaim "if you use it then its your problem", unfortunately once  
+something like that exists people use it "unaware" because its a part of the API. Then we get the "blame" for  
 the resulting problems. 
 
-Having said that, I don’t want to rule anything out completely. We might add something that’s reflection “like”  
-or even reflection itself to support various cases. The problem is avoiding the “link everything” end result that  
+Having said that, I don’t want to rule anything out completely. We might add something that’s reflection "like"  
+or even reflection itself to support various cases. The problem is avoiding the "link everything" end result that  
 comes with reflection. 
 
 > Move away from visual builder – it’s always more restricted than coding. Move towards more of a  
@@ -297,24 +297,24 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Did you use the plugin?
 >
-> I think a lot of the people advocating CSS have a bit of a misconception of how it will “feel” within the Codename One developer workflow. I’d like to know if my concerns are founded or not before we take this big piece of code with all its baggage into Codename One.
+> I think a lot of the people advocating CSS have a bit of a misconception of how it will "feel" within the Codename One developer workflow. I’d like to know if my concerns are founded or not before we take this big piece of code with all its baggage into Codename One.
 
 
 ### **gardnr** — August 1, 2016 at 9:58 pm ([permalink](/blog/the-road-ahead-2015-in-review-survey-results/#comment-22961))
 
 > gardnr says:
 >
-> The next sentences after “The reason is conceptual.” go on to discuss technical aspects of adding reflection.
+> The next sentences after "The reason is conceptual." go on to discuss technical aspects of adding reflection.
 
 
 ### **Shai Almog** — August 2, 2016 at 3:54 am ([permalink](/blog/the-road-ahead-2015-in-review-survey-results/#comment-22993))
 
 > Shai Almog says:
 >
-> They go hand in hand. The conceptual reason is that we want Codename One to be “seamless & efficient”. To do that we need to generate an app that is small like a native app, secure (as in obfuscated), fast etc.  
+> They go hand in hand. The conceptual reason is that we want Codename One to be "seamless & efficient". To do that we need to generate an app that is small like a native app, secure (as in obfuscated), fast etc.  
 > Due to the technical reasons above we can’t deliver the conceptual vision of Codename One & reflection.
 >
-> I think what I was getting at is that while this is solvable technically most people were oblivious to the problems this created as a result so this is more of “this is the wrong way of doing it that caused problems”.
+> I think what I was getting at is that while this is solvable technically most people were oblivious to the problems this created as a result so this is more of "this is the wrong way of doing it that caused problems".
 >
 > We are thinking about offering a client side API that would solve the big reflection use cases (IoC, ORM, language support etc.) without the problems typically associated with reflection. This will require a different API and usage pattern but if this is interesting to you let us know.
 

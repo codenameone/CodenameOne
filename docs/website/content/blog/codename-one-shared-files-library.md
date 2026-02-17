@@ -101,13 +101,13 @@ By default, the files you obtain will no be accessible the next time you load th
 
 3. Use `SharedFile.isBookmark()` to check if the file is a bookmarked file.
 
-4. Use `SharedFileManager.openBookmark(String)` to open a file given its bookmarked path. (i.e. bookmarkedFile.getPath())
+4. Use `SharedFileManager.openBookmark(String)` to open a file given its bookmarked path. (i.e. `bookmarkedFile.getPath()`)
 
 5. Use `SharedFileManager.getBookmarks()` for a list of all current bookmarks.
 
 ### Installation
 
-Add the following maven dependency to your common/pom.xml file
+Add the following maven dependency to your `common/pom.xml` file
 
 ```xml
 				

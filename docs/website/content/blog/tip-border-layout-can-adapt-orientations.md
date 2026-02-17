@@ -45,7 +45,7 @@ When we rotate the device though, things go south…​ Literally:
 Figure 2. In landscape mode the image hides the actual content of the UI
 
 The thing is that there is plenty of space in landscape it is just distributed differently, so if the image was on the east  
-instead of the north position it would “just work”. That’s exactly what swap border position does. By using this  
+instead of the north position it would "just work". That’s exactly what swap border position does. By using this  
 code the component in the north will automatically shift positions when the device is in landscape mode:
     
     

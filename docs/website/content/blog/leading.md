@@ -20,7 +20,7 @@ author: Shai Almog
   
   
 
-One of our enterprise accounts was using lead component in a rather unique setting and needed a way to “unlead” essentially disable the lead component functionality which is one of those things we never imagined people doing. As a result we allowed setLeadComponent(null) to effectively “do the right thing” for most cases. 
+One of our enterprise accounts was using lead component in a rather unique setting and needed a way to "unlead" essentially disable the lead component functionality which is one of those things we never imagined people doing. As a result we allowed setLeadComponent(null) to effectively "do the right thing" for most cases. 
 
 This reminded me that lead component is something that we definitely need to cover again, the developer guide barely touches the subject that is one of the most powerful concepts we have.
 
@@ -34,9 +34,9 @@ As Codename One matures we find ourselves doing less of option 1 and a lot more 
 
 Using a Container allows us a lot of flexibility in terms of layout & functionality for a specific component. MultiButton is a great example of that. Its internally a Container that contains 5 labels and a Button (that might be replaced with a check box or radio button). 
 
-So how do we make the MultiButton “feel” like a single button?
+So how do we make the MultiButton "feel" like a single button?
 
-Simple, we use setLeadComponent() which turns the button (or radio/checkbox) into the “leader” of the component.
+Simple, we use setLeadComponent() which turns the button (or radio/checkbox) into the "leader" of the component.
 
 When a Container hierarchy is placed under a leader all events within the hierarchy are sent to the leader, so if a label within the lead component receives a pointer pressed event this event will really be sent to the leader. E.g. in the case of the multi button the button will receive that event and send the action performed event, change the state etc.
 
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Notice that this will create a copy so changes to the original will not be reflected. 
 >
-> You can also use crateContainer from code to create a container instance thus populate the UI from elements created in the designer. Thanks to lead component you don’t really need to subclass in order to create a completely new component. The main reason we subclassed to create multi-button etc. was so the API will be “pretty”.
+> You can also use crateContainer from code to create a container instance thus populate the UI from elements created in the designer. Thanks to lead component you don’t really need to subclass in order to create a completely new component. The main reason we subclassed to create multi-button etc. was so the API will be "pretty".
 >
 
 

@@ -50,7 +50,7 @@ Some Background
   
   
   
-Codename One has included basic 2D graphics ability since its inception, but until recently, it was missing a few primitives that were required for drawing arbitrary graphics. Most notably, it did not include a general “Shape” API to draw arbitrary paths. This meant that most graphics were composed of images, a few common geometry primitives such as rectangles and circles, and clever use of tiling and clipping. If you wanted to draw an arbitrary shape composed of lines and bezier curves, you were generally out of luck.  
+Codename One has included basic 2D graphics ability since its inception, but until recently, it was missing a few primitives that were required for drawing arbitrary graphics. Most notably, it did not include a general "Shape" API to draw arbitrary paths. This meant that most graphics were composed of images, a few common geometry primitives such as rectangles and circles, and clever use of tiling and clipping. If you wanted to draw an arbitrary shape composed of lines and bezier curves, you were generally out of luck.  
   
   
   
@@ -142,7 +142,7 @@ in memory, and continually add points as bezier curves. Whenever a point is adde
 Step 1: Create a Project  
 **  
   
-We start by creating a standard “Hello World” project using the “Non-visual” template (i.e. built with code, not the GUI editor).  
+We start by creating a standard "Hello World" project using the "Non-visual" template (i.e. built with code, not the GUI editor).  
   
   
   
@@ -268,7 +268,7 @@ method to append curves to the drawing as follows:
   
 
   
-This change should be fairly straight forward except, perhaps, the business with the odd variable. Since quadratic curves require two points (in addition to the implied starting point), we can’t simply take the last tap point and the current tap point. We need a point between them to act as a control point. This is where we get the curve from. The control point works by exerting a sort of “gravity” on the line segment, to pull the line towards it. This results in the line being curved. I use the odd marker to alternate the control point between positions above the line and below the line.  
+This change should be fairly straight forward except, perhaps, the business with the odd variable. Since quadratic curves require two points (in addition to the implied starting point), we can’t simply take the last tap point and the current tap point. We need a point between them to act as a control point. This is where we get the curve from. The control point works by exerting a sort of "gravity" on the line segment, to pull the line towards it. This results in the line being curved. I use the odd marker to alternate the control point between positions above the line and below the line.  
   
   
   
@@ -289,9 +289,7 @@ Detecting Platform Support
 
   
 The DrawingCanvas example is a bit naive in that it assumes that the device supports the shape API. If I were to run this code on a device that doesn’t support the Shape API, it would just draw a blank canvas where I expected my shape to be drawn. You can fall back gracefully if you make use of the  
-[  
-Graphics.isShapeSupported()  
-](/javadoc/com/codename1/ui/Graphics.html#isShapeSupported%28%29)  
+[Graphics.isShapeSupported()](/javadoc/com/codename1/ui/Graphics.html#isShapeSupported%28%29)  
 method. E.g.  
 
 ##    
@@ -398,11 +396,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > } 
 >
-> Inserted an addComponent(new DrawingCanvas()) right after adding the “Hello World” label component. 
+> Inserted an addComponent(new DrawingCanvas()) right after adding the "Hello World" label component. 
 >
-> Form hi = new Form(“Hi World”); 
+> Form hi = new Form("Hi World"); 
 >
-> hi.addComponent(new Label(“Hi World”)); 
+> hi.addComponent(new Label("Hi World")); 
 >
 > hi.addComponent(new DrawingCanvas()); 
 >
@@ -454,7 +452,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Still nothing comes up in the simulator but the “Hi World” label. And clicking on the screen below the label has no effect. Nothing with either your DrawingCanvas or DrawingCanvasBezier. And breakpoints put at the start of the 3 DrawingCanvas methods are never triggered — nothing in DrawingCanvas is getting called (other than its default constructor). 
+> Still nothing comes up in the simulator but the "Hi World" label. And clicking on the screen below the label has no effect. Nothing with either your DrawingCanvas or DrawingCanvasBezier. And breakpoints put at the start of the 3 DrawingCanvas methods are never triggered — nothing in DrawingCanvas is getting called (other than its default constructor). 
 >
 > public void start() { 
 >
@@ -466,9 +464,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > } 
 >
-> Form hi = new Form(“Hi World”); 
+> Form hi = new Form("Hi World"); 
 >
-> hi.addComponent(new Label(“Hi World”)); 
+> hi.addComponent(new Label("Hi World")); 
 >
 > hi.addComponent(new DrawingCanvas()); 
 >

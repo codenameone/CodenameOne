@@ -34,7 +34,7 @@ NEVER
 **  
 change  
   
-the classpath or add an external JAR via the NetBeans/Eclipse classpath UI. The reasoning here is very simple, these IDE’s don’t package the JAR’s into the final executable and even if they did these JAR’s would probably use features unavailable or inappropriate for the device (e.g. java.io.File etc.).
+the classpath or add an external JAR via the NetBeans/Eclipse classpath UI. The reasoning here is very simple, these IDE’s don’t package the JAR’s into the final executable and even if they did these JAR’s would probably use features unavailable or inappropriate for the device (e.g. `java.io.File` etc.).
 
 There are two use cases for wanting JAR’s and they both have very different solutions:  
 
@@ -92,7 +92,7 @@ Android supports using JAR’s since it is based around the java language
   
 The problem is that you still won’t be able to use the JAR (or .a file) from  
   
-within your code, this JAR would be platform specific and you would need to write the “bridging” code to connect it to the native layer. To learn more about native interfaces I suggest reading the developer guide but basically what you need to do is define a native interface e.g.:  
+within your code, this JAR would be platform specific and you would need to write the "bridging" code to connect it to the native layer. To learn more about native interfaces I suggest reading the developer guide but basically what you need to do is define a native interface e.g.:  
   
   
 
@@ -101,7 +101,7 @@ within your code, this JAR would be platform specific and you would need to writ
 Here you can define the interface between your application (which can’t directly access the jar or .a file) and the native code which can. Now you can right click the interface select: Generate Native Access and go the native directory where you can edit the native code. 
 
   
-Notice that the jar will not appear in your IDE’s code completion and the code might be marked as “red” with error messages. That is because we can’t compile that code on the client, only on the server since we don’t have the native Android/iOS SDK’s installed on your PC or Mac (and even if we did, integrating so many difference pieces of software is problematic).  
+Notice that the jar will not appear in your IDE’s code completion and the code might be marked as "red" with error messages. That is because we can’t compile that code on the client, only on the server since we don’t have the native Android/iOS SDK’s installed on your PC or Mac (and even if we did, integrating so many difference pieces of software is problematic).  
 
 **  
   
@@ -144,7 +144,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> “Supporting an arbitrary JAR off the internet is something no one will ever be able to fully deliver on” 
+> "Supporting an arbitrary JAR off the internet is something no one will ever be able to fully deliver on" 
 >
 > I’m very skeptical about this claim after working with robovm, almost 99.99% of the time the arbitrary jar libraries that I downloaded from the internet and used worked out of the box.
 >
@@ -196,7 +196,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > packaging a run-time for each and every app is a bad idea. I agree. 
 >
-> a better approach would be to have some sort of a separate “run-time app” that manages all the java apps. 
+> a better approach would be to have some sort of a separate "run-time app" that manages all the java apps. 
 >
 > an analogy to this could be the python run-time app in Symbian.
 >

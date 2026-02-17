@@ -53,11 +53,11 @@ App Distribution |  Only with active subscription |  Perpetual
 While QT supports QML (an XML flavor) with JavaScript bindings. QT at it’s base is C based. If you need to integrate a native widget like Googles native maps or similar capabilities you need to do this via C.
 
 This might be challenging as most of the integration documentation for various libraries is in Java, Objective-C.  
-Binding an iOS/Android SDK to QT might not be trivial. C++ isn’t garbage collected or “safe” and is a challenging  
+Binding an iOS/Android SDK to QT might not be trivial. C++ isn’t garbage collected or "safe" and is a challenging  
 language for novices.
 
 Codename One uses Java for everything with all of the typical Java advantages (GC, safe memory etc.). When  
-integrating with native code Codename One generates “stubs” for the various platforms allowing developers to  
+integrating with native code Codename One generates "stubs" for the various platforms allowing developers to  
 write native Objective-C, Java (Android flavor), C# etc. code.
 
 This makes integrating with native OS capabilities far simpler as developers can literally copy and paste sample  
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > I won’t blog about Gluon right now. It’s  
-> not a “real” product with shipping mobile apps. Comparing it to us would  
+> not a "real" product with shipping mobile apps. Comparing it to us would  
 > present it in a light where real apps can be built with it where in  
 > fact it is so inherently broken that I can’t find a single good thing to  
 > say about it.
@@ -247,7 +247,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Felix Bembrick says:
 >
-> Which part is untruthful? Just the bit after “I won’t blog about Gluon right now” which even itself was a lie.
+> Which part is untruthful? Just the bit after "I won’t blog about Gluon right now" which even itself was a lie.
 >
 > Underestimating Gluon and the passionate people like me who support what they are doing will be your own downfall.
 >
@@ -266,15 +266,15 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ve worked in this industry and at Sun for quite a while (90’s). Seen these things come and go and I know the complexities involved in both JavaFX on mobile and in mobile Java in general (not to mention Sun/Oracle politics). You are conflicting pride and expertise.
 >
-> I know my stuff and I advocate it, that’s pride. You are looking at my expert opinion and discarding it as “just pride” well… That’s the kettle…
+> I know my stuff and I advocate it, that’s pride. You are looking at my expert opinion and discarding it as "just pride" well… That’s the kettle…
 >
 > It’s true that I am discounting you just like I did RoboVM which ended pretty much where I predicted which is the exact reason we chose not to go with them in 2013.
 >
-> When you say JavaFX “rules” you might as well spell that with a Z. That is not a fact and shows the level of thought you put into this. Please feel free to disprove a single factual point I made above…
+> When you say JavaFX "rules" you might as well spell that with a Z. That is not a fact and shows the level of thought you put into this. Please feel free to disprove a single factual point I made above…
 >
 > E.g. let me give you a nugget, FX fans constantly talk about FX going into VW and making a splash. Guess what, Codename One has shipped in millions of cars for years and we didn’t even mention that ONCE!
 >
-> If you think FX will pick up because of one deal or another I suggest you take your emotional attachment. Put it in a box and take a step backwards. You might like FX, it’s an elegant API designed by brilliant people for whom I have the utmost respect. But that doesn’t change one iota of the facts I wrote above. I’m waiting anxiously for an itemized list of “lies”.
+> If you think FX will pick up because of one deal or another I suggest you take your emotional attachment. Put it in a box and take a step backwards. You might like FX, it’s an elegant API designed by brilliant people for whom I have the utmost respect. But that doesn’t change one iota of the facts I wrote above. I’m waiting anxiously for an itemized list of "lies".
 >
 
 
@@ -302,7 +302,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m well aware of these forks. I’m also well aware that the RoboVM team claimed that Java 9 compatibility which came after the forks was the hardest thing they worked on since building RoboVM itself. So you are saying they lie?
 >
-> I’m calling Johan ignorant and arrogant. A desktop developer walking into mobile expecting things to work in the same way and picking up a HUGE pile of code expecting it to “work” in production.
+> I’m calling Johan ignorant and arrogant. A desktop developer walking into mobile expecting things to work in the same way and picking up a HUGE pile of code expecting it to "work" in production.
 >
 
 
@@ -311,7 +311,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Felix Bembrick says:
 >
-> Oh well, all I can say to you is “keep digging”. That’s already a mighty big sink hole that your life’s investment is about to fall into…
+> Oh well, all I can say to you is "keep digging". That’s already a mighty big sink hole that your life’s investment is about to fall into…
 >
 
 
@@ -333,7 +333,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Running something on a device is miles away from shipping a product or passing a TCK.
 >
-> I’m invested but you still fail to show one thing that was a “lie” in my post.
+> I’m invested but you still fail to show one thing that was a "lie" in my post.
 >
 
 
@@ -353,7 +353,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Felix Bembrick says:
 >
-> Gosh, did I use the word “pride”? I should have used “arrogance”, “delusion” and/or “narcissism”.
+> Gosh, did I use the word "pride"? I should have used "arrogance", "delusion" and/or "narcissism".
 >
 
 
@@ -365,7 +365,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > So let me get this strait.  
 > Johan comes on our blog. Calls me a liar for posting a factual true opinion made by myself with my bias clearly evident and displayed…
 >
-> And you then come off and claim that I somehow am unaware of “facts” that I am clearly aware of and I’m not OK?
+> And you then come off and claim that I somehow am unaware of "facts" that I am clearly aware of and I’m not OK?
 >
 > I’m biased true… I might have a cognitive dissonance. That is always true…
 >
@@ -392,7 +392,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Felix Bembrick says:
 >
-> Well, you have still failed to even concede that your very first statement “I am not going to blog about Gluon right now because the babbling that follows is commenting, not blogging as the two are radically different polar opposite concepts” was a lie.
+> Well, you have still failed to even concede that your very first statement "I am not going to blog about Gluon right now because the babbling that follows is commenting, not blogging as the two are radically different polar opposite concepts" was a lie.
 >
 > And that was the high point of your babbling.
 >
@@ -419,7 +419,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We are not your competitor just like you are no threat to us. At most you could in theory slow our growth but if we go down in sales it means the market is shrinking which is bad for us but horrible for you as you aren’t yet established.
 >
-> I suggest you focus first on understanding “what the market is”, it sounds like a “stupid business speak” but I suggest you understand these concepts if you want to succeed. Then take a step back and objectively compare the end user/developer proposition of our respective tools. You will notice that you guys target a very different demo/value proposition. If you carry that analysis to its full extent you will also see what I saw in my first meeting with Niklas at JavaOne 2013. There is no business model for your approach other than consulting.
+> I suggest you focus first on understanding "what the market is", it sounds like a "stupid business speak" but I suggest you understand these concepts if you want to succeed. Then take a step back and objectively compare the end user/developer proposition of our respective tools. You will notice that you guys target a very different demo/value proposition. If you carry that analysis to its full extent you will also see what I saw in my first meeting with Niklas at JavaOne 2013. There is no business model for your approach other than consulting.
 >
 > Consulting can be moderately profitable, but you can’t sustain long term platform development on consulting fees. Eventually you need to pick and choose if you are a consulting shop or a startup and at that point you need to sit down with someone who understands business and try to imagine the growth that’s achievable in realistic scenarios.
 >
@@ -430,17 +430,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Felix Bembrick says:
 >
-> Thanks for your advice. It’s mostly very accurate and worth reading. It’s just the bit after “Glad to hear that you worked at Sun” that has that “babbling” quality you do so well that I will wisely ignore.
+> Thanks for your advice. It’s mostly very accurate and worth reading. It’s just the bit after "Glad to hear that you worked at Sun" that has that "babbling" quality you do so well that I will wisely ignore.
 >
 > Would you appreciate me endorsing you for the skill of babbling? You are clearly at the elite level.
 >
-> You know, I am fairly sure Johan is a lot like me in one aspect. The more people tell us that something “can’t be done”, the more motivated we become to prove such people wrong (which seems a little superfluous in your case).
+> You know, I am fairly sure Johan is a lot like me in one aspect. The more people tell us that something "can’t be done", the more motivated we become to prove such people wrong (which seems a little superfluous in your case).
 >
 > So, let the Hunger Games begin. I’ll play the part of Katniss and you can continue in your role as Snow (or Coin).
 >
 > The very name of your company suggests you are so narrow minded that you think you are the only technology that anyone ever needs. One size fits all. You are so disrespectful and arrogant to your competitors that I am surprised if there’s room in your office space for anything more than just your ego.
 >
-> But I love to see this. You are such a classic example of the kind of CEO that thinks their business model is “Competitors? What competitors?”.
+> But I love to see this. You are such a classic example of the kind of CEO that thinks their business model is "Competitors? What competitors?".
 >
 > You will only see them when you are broke, unemployed and living in a trailer park.
 >
@@ -460,7 +460,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Codename One is about unifying everything to a single technology that hides the complexity not using a single technology for everything. But feel free to concentrate all your anger at me and use me as your motivation.
 >
 > You didn’t get what I said at all. You don’t compete with us. If you do then you are in big trouble.  
-> We are profitable but we’re not the leader in cross platform by a long shot. We are not even the leader in mobile Java (that’s Android). If you are going after us then you are going after a small market share relatively and that’s “stupid”. I know business books are boring but I suggest picking a few up and learning about “go to market” strategies. But obviously you treat everything I say as evil and malicious so I’m just trying to waste your time with an understanding of how business works and how to define your competitors properly to confuse you.
+> We are profitable but we’re not the leader in cross platform by a long shot. We are not even the leader in mobile Java (that’s Android). If you are going after us then you are going after a small market share relatively and that’s "stupid". I know business books are boring but I suggest picking a few up and learning about "go to market" strategies. But obviously you treat everything I say as evil and malicious so I’m just trying to waste your time with an understanding of how business works and how to define your competitors properly to confuse you.
 >
 > But if it helps you work at night with the dream of somehow putting the big bad me and my family into the streets because I’m such an awful human being who dares to think you are wrong and is wasting his time in his own blog post explaining that to you then feel free to concentrate your anger and contempt at me 😉
 >
@@ -496,7 +496,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I think you need to re-evaluate your words and the line between a strong disagreement and animosity.
 >
-> I didn’t “start” I wrote a factual opinion in a comment response to a question posted to our blog. Your colleague came in, called me a liar without basis. You then come in with name calling and repeated assaults on what you perceive as my personality flaws.
+> I didn’t "start" I wrote a factual opinion in a comment response to a question posted to our blog. Your colleague came in, called me a liar without basis. You then come in with name calling and repeated assaults on what you perceive as my personality flaws.
 >
 > No I don’t suck up to Jim and never have which is why we never got free publicity from Oracle despite paying full price for a booth at J1 a couple of years ago and speaking for years.
 >

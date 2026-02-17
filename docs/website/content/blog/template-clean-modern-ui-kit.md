@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/template-clean-modern-ui-kit/clean-modern-ui-kit.jpg)
 
 In the previous [template post](/blog/template-mobile-material-screens-ui-kit.html) I introduced a material  
-design inspired theme. This time the theme I chose is simpler “cleaner” but not necessarily easier to integrate.  
+design inspired theme. This time the theme I chose is simpler "cleaner" but not necessarily easier to integrate.  
 I’ve had quite a few difficulties wrestling with Photoshop oddities (bugs?) that made this template painful,  
 hopefully I’ve narrowed down the process enough so this should become easier.
 
@@ -50,9 +50,9 @@ One of the more challenging effects was the arrow bar pointing downwards at the 
 Figure 2. The arrow bar
 
 I started off by looking at this as a `Tabs` Container but eventually chose to use a set of `RadioButton` components  
-in toggle button mode. The main challenge is positioning the arrow in the “exact” center. We have an  
+in toggle button mode. The main challenge is positioning the arrow in the "exact" center. We have an  
 arrow border feature but it’s a bit clunky and I didn’t want to make use of that (rewriting this is on my personal  
-“todo list”).
+"todo list").
 
 The arrow is really just a label aligned to the bottom whose padding I change based on radio button selection and  
 device orientation.
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > leroadrunner says:
 >
-> Getting a “cannot find symbol” in NewsfeedForm
+> Getting a "cannot find symbol" in NewsfeedForm
 >
 > Component.setSameSize(radioContainer, spacer1, spacer2);
 >
@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > leroadrunner says:
 >
-> Thanks! I’ll remember that…”refresh cn1libs files” was not enough
+> Thanks! I’ll remember that…"refresh cn1libs files" was not enough
 >
 > Love this new design!
 >

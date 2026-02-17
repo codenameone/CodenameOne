@@ -23,14 +23,14 @@ You will notice the usage of `AsyncResource` which is similar to a future or a p
 
 ### Rendering Hints
 
-One of the API’s I dislike in JavaSE is the `Graphics2D` rendering hints. It’s a bit opaque in the choices it exposes. I want fast and good looking graphics but the tradeoff isn’t always clear. How much would I “pay” for good looking in this case in terms of speed and visa versa.
+One of the API’s I dislike in JavaSE is the `Graphics2D` rendering hints. It’s a bit opaque in the choices it exposes. I want fast and good looking graphics but the tradeoff isn’t always clear. How much would I "pay" for good looking in this case in terms of speed and visa versa.
 
 Now we also have one rendering hint in our graphics:
     
     
     graphics.setRenderingHints(Graphics.RENDERING_HINT_FAST);
 
-I’m not too crazy about the name as it’s a bit misleading. I’m sure developers would just turn it on to make everything “go fast” then complain when it has no impact…​ It doesn’t do that.
+I’m not too crazy about the name as it’s a bit misleading. I’m sure developers would just turn it on to make everything "go fast" then complain when it has no impact…​ It doesn’t do that.
 
 Only iOS uses this and even then only when rendering images. Since copying images to textures is expensive, we keep the last generated texture cached. This works well if we are always rendering the image at the same size. If we are constantly rendering the same image at different sizes, then we’ll constantly be invalidating the cache, this results in artifacts. This affected pinch zoom in the image viewer [causing it to be choppy](https://github.com/codenameone/CodenameOne/issues/2786) as it had to regenerate a texture for every change in size. When Fast rendering is enabled, we now only invalidate the texture cache if the image is larger or smaller than the existing texture by more than a factor of 2.
 

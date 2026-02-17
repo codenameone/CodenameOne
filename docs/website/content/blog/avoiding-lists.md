@@ -134,7 +134,7 @@ The problem with this approach becomes obvious when we try to add an event liste
 
 We can make `name` into a `Button` but then what happens when a user clicks `email`?
 
-We can make all the entries into buttons but that isn’t practical. That’s what [lead component](/manual/components/#lead-component-sidebar) is for, we can make one component into a button and it “takes the lead”. If we make name into a button and set it as the lead of the `Container` it will handle all the events and state changes for the entire row!
+We can make all the entries into buttons but that isn’t practical. That’s what [lead component](/manual/components/#lead-component-sidebar) is for, we can make one component into a button and it "takes the lead". If we make name into a button and set it as the lead of the `Container` it will handle all the events and state changes for the entire row!
 
 __ |  For more information on lead components check out [the sidebar](/manual/components/#lead-component-sidebar) in the developer guide.   
 ---|---  
@@ -168,7 +168,7 @@ Two classes simplify the process of infinite scrolling list: `InfiniteContainer`
 
 ### Don’t Use Lists
 
-In closing I’d like to re-iterate our recommendation: “Don’t use lists”. We didn’t deprecate those API’s because developers rely heavily on them & this might induce “panic”.  
+In closing I’d like to re-iterate our recommendation: "Don’t use lists". We didn’t deprecate those API’s because developers rely heavily on them & this might induce "panic".  
 There’s no valid reason to use a `List` as opposed to a `Container`. `List` is harder to use, slower & not as flexible.
 
 We can’t cover every conceivable use case in this post so if you have a `List` or code you can’t imagine any other way, post it in the comments below.
@@ -183,7 +183,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > bryan says:
 >
-> Agree with all this. I originally used Lists with custom cell renderers, and with the deprecation of the old GUI builder, I took the opportunity to refactor my code and change all Lists to Containers. Initially my thoughts were “it can’t work as well”, but in fact there appears to be zero performance penalty, and as Shai says, you can create a much better UI experience. Don’t use Lists !
+> Agree with all this. I originally used Lists with custom cell renderers, and with the deprecation of the old GUI builder, I took the opportunity to refactor my code and change all Lists to Containers. Initially my thoughts were "it can’t work as well", but in fact there appears to be zero performance penalty, and as Shai says, you can create a much better UI experience. Don’t use Lists !
 >
 
 
@@ -258,7 +258,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hashtable h = (Hashtable) o;
 >
-> Object textoHash = h.get(“Listado”);
+> Object textoHash = h.get("Listado");
 >
 > return super.check(textoHash, str);
 >
@@ -329,7 +329,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > khmaies hassen says:
 >
-> when i reach the end of the list where there are no new pages to show and then i go up and pull the list to refresh, it gives me an empty page. how to reset “pageNumber” to 1 when i use pull to refresh?
+> when i reach the end of the list where there are no new pages to show and then i go up and pull the list to refresh, it gives me an empty page. how to reset "pageNumber" to 1 when i use pull to refresh?
 >
 
 

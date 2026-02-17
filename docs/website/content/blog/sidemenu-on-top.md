@@ -15,21 +15,21 @@ This feature is still undergoing development but I wanted to share the progress 
 
 The chief problem with the old side menu is that it was written prior to the `Toolbar`. As a result it was based on the `Menu` class which was designed in the age of feature phones. Many assumptions that were true back then no longer hold and as a result the side menu has a few elaborate hacks in place to make it feel fluid. When we started looking into the process of rendering the side menu on top we hit a wall.
 
-There are multiple conflicting places in the code that position the side menu and do so in elaborate and unintuitive ways. The current side menu implementation is held back by legacy that makes even a seemingly simple change like this challenging. As a result we decided to take a completely different direction for the “on top” sidemenu.
+There are multiple conflicting places in the code that position the side menu and do so in elaborate and unintuitive ways. The current side menu implementation is held back by legacy that makes even a seemingly simple change like this challenging. As a result we decided to take a completely different direction for the "on top" sidemenu.
 
 ### A New Direction
 
-When the original side menu was designed we didn’t have a layered pane and no `InteractionDialog` as a result the options for implementing the side menu were limited. When we ran into difficulty with implementing the “on top” mode in the same way as the regular side menu we decided to shift our focus into the Toolbar class. The on-top side menu is implemented entirely within the `Toolbar`.
+When the original side menu was designed we didn’t have a layered pane and no `InteractionDialog` as a result the options for implementing the side menu were limited. When we ran into difficulty with implementing the "on top" mode in the same way as the regular side menu we decided to shift our focus into the Toolbar class. The on-top side menu is implemented entirely within the `Toolbar`.
 
 The on-top side menu is based on the work we did for the [permanent side menu](/blog/permanent-sidemenu-getAllStyles-scrollbar-and-more.html) and as a result some incompatibilities and different behaviors will occur when you use that approach. This side menu is placed into an interaction dialog and we use pointer event listeners to track the drag motion to expand and collapse it.
 
 This means a few behaviors of the current side menu will be different:
 
-  * Currently the on-top side menu appears below the `Toolbar` – We have a fix for this but it’s a bit “buggy” see the discussion below
+  * Currently the on-top side menu appears below the `Toolbar` – We have a fix for this but it’s a bit "buggy" see the discussion below
 
-  * On-top Side menu isn’t a separate form – the original side menu was a separate form. That means the existing UI was de-initialized & some subtle behaviors were different. The underlying UI would still be “live”
+  * On-top Side menu isn’t a separate form – the original side menu was a separate form. That means the existing UI was de-initialized & some subtle behaviors were different. The underlying UI would still be "live"
 
-  * Shadow isn’t supported, however the underlying form is “darkened” gradually as we drag
+  * Shadow isn’t supported, however the underlying form is "darkened" gradually as we drag
 
   * Performance might not be as smooth at this time – we optimized the hell out of the old side menu, this isn’t as refined
 
@@ -50,7 +50,7 @@ In the future we will add a theme constant for this and might flip it to be the 
 
 One of the problems with the new side menu is that it doesn’t cover the entire form due to the fact that `InteractionDialog` can’t render on the whole form. That is because the layered pane which the `InteractionDialog` depends on wraps the content pane and not the full `Form`.
 
-That’s not a bad decision as the content pane is where we want most of our UI but there are special cases. Up until now our only option was glass pane but it’s too “low level”. To solve this we added a new layer into Codename One with `getFormLayeredPane` which is semantically identical to `getLayeredPane` but is on top of the entire `Form` not just the content pane.
+That’s not a bad decision as the content pane is where we want most of our UI but there are special cases. Up until now our only option was glass pane but it’s too "low level". To solve this we added a new layer into Codename One with `getFormLayeredPane` which is semantically identical to `getLayeredPane` but is on top of the entire `Form` not just the content pane.
 
 To prevent potential overhead we only add the form layered pane as needed based on user requests. Internally the form has a hidden border layout that you can’t normally access. It places the title area into its right place as well as the content pane etc. Adding another layer might have impacted compatibility or performance in a way that is too disruptive so we chose to use a rather creative approach…​
 
@@ -101,8 +101,8 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > – Thanks I’ll fix that. It’s a pretty easy fix just make the side menu content pane focusable which means it will grab events in the hierarchy.
 >
-> – I’m not sure I can do much about it. There are some deeply held assumptions that prevent me from placing a dialog or interaction dialog “offscreen”. It might be something worth addressing.  
-> Alternatively, a hack might be possible here where the Container “thinks” it has the final size during drag. I’m not sure how hard this will be to address.
+> – I’m not sure I can do much about it. There are some deeply held assumptions that prevent me from placing a dialog or interaction dialog "offscreen". It might be something worth addressing.  
+> Alternatively, a hack might be possible here where the Container "thinks" it has the final size during drag. I’m not sure how hard this will be to address.
 >
 > – It should now use the standard TitleCommand UIID instead of the MenuCommand UIID. Since I used the addMaterialCommandToSideMenu call. I did use the menuImageSize theme constant though which currently defaults to 4.5.
 >
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Notice the content of the section titled “Another Layered Pane”
+> Notice the content of the section titled "Another Layered Pane"
 >
 
 
@@ -222,7 +222,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> I suggest using screenshots to illustrate a question as it would make it easier to answer. Components determine their size based on preferred size. It should “just work” and if you manipulate it this might break.
+> I suggest using screenshots to illustrate a question as it would make it easier to answer. Components determine their size based on preferred size. It should "just work" and if you manipulate it this might break.
 >
 > You can use RTL on a command by using toolbar.findCommandComponent(cmd) and setting the RTL flag on that component explicitly.
 >

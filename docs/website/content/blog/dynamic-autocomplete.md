@@ -125,7 +125,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai,
 >
-> How do I style the AutoCompleteTextField List selected item? The default color is orange on my theme and I will like to change it to blue. I’ve tried styling “AutoCompleteList”, but it doesn’t help… the whole list got changed to blue and I want only one item to change. I also tried AutoCompleteListRenderer and AutoCompleteListRendererFocus, not helping either.
+> How do I style the AutoCompleteTextField List selected item? The default color is orange on my theme and I will like to change it to blue. I’ve tried styling "AutoCompleteList", but it doesn’t help… the whole list got changed to blue and I want only one item to change. I also tried AutoCompleteListRenderer and AutoCompleteListRendererFocus, not helping either.
 >
 
 
@@ -178,7 +178,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Diamond says:
 >
-> ac.getHintLabel().setUIID(“CustomHintUIID”); is throwing a nullPointer exception, is there a way to fix this?
+> ac.getHintLabel().setUIID("CustomHintUIID"); is throwing a nullPointer exception, is there a way to fix this?
 >
 
 

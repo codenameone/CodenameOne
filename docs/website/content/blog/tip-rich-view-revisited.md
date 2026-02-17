@@ -191,9 +191,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is available in the post I linked above: </blog/tip-lightweight-rich-text-view/>
 >
-> “`  
-> hi.add(new RichTextView(“This is plain text **this is bold** and _this is italic_ and all of this breaks lines nicely as well….”));  
-> “`
+> "`  
+> hi.add(new RichTextView("This is plain text **this is bold** and _this is italic_ and all of this breaks lines nicely as well…."));  
+> "`
 >
 
 

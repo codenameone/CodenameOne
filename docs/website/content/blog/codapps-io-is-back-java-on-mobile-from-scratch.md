@@ -15,7 +15,7 @@ We’ve discussed [codapps.io](http://codapps.io/) before, it’s a MOOC (online
 programming and uses mobile/Codename One as its vehicle. Our current documentation and tutorials can be quite  
 intimidating to a person who is a complete Java newbie so this course is quite helpful in bridging that gap.
 
-I think learning GUI programming is probably the best way to learn programming as it lets you “see” the results  
+I think learning GUI programming is probably the best way to learn programming as it lets you "see" the results  
 instantly and experiment.
 
 The [codapps.io](http://codapps.io/) MOOC focuses on typical apps created with the GUI builder and tries to smooth  
@@ -40,7 +40,7 @@ the common components that are a part of Codename One in a visual index
 layouts are one of the hardest concepts to grasp in Codename One, this visual gallery covers the basic Codename One  
 layout managers
 
-  * [JavaDoc](https://www.codenameone.com/javadoc/) – the JavaDoc is a standard “reference guide” to the Codename One  
+  * [JavaDoc](https://www.codenameone.com/javadoc/) – the JavaDoc is a standard "reference guide" to the Codename One  
 API and what’s available in it you can search any method/class by clicking one of the index files  
 Developer guide
 
@@ -50,7 +50,7 @@ New Project → Codename One → Demos →#Name of demo#
 
 ### Help
 
-Stack overflow is the best place to ask for help but it can sometimes be intimidating as you need to ask in the “right way”  
+Stack overflow is the best place to ask for help but it can sometimes be intimidating as you need to ask in the "right way"  
 & that can be difficult when you don’t know anything. Try asking on the [discussion forum](/discussion-forum.html)  
 notice that sometimes things get flagged as SPAM by the automatic Google filters. To avoid that you should probably  
 join the group before posting and use a verified gmail account.

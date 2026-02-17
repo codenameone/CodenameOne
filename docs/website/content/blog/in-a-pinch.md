@@ -165,7 +165,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Images default to “scale to fit” in the image viewer.
+> Images default to "scale to fit" in the image viewer.
 >
 
 

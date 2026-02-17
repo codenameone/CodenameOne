@@ -27,25 +27,25 @@ The app main class should implement `PushActionProvider`. This defines a method 
         };
     }
 
-Then, when sending a push notification, you can specify the “category” of the message. If the category corresponds with a defined category in your `getPushActionCategories()` method, then the user will be presented with a set of buttons corresponding to the PushActions in that category.
+Then, when sending a push notification, you can specify the "category" of the message. If the category corresponds with a defined category in your `getPushActionCategories()` method, then the user will be presented with a set of buttons corresponding to the PushActions in that category.
 
 In the above example, we would send a push type 99 and a body of
     
     
     <push type="0" body="Hello" category="fo"/>
 
-This would trigger the “fo” category that we defined, which has 3 actions: Yes, No, and Maybe. And the “Maybe” action will provide a text input because of the extra parameters provided:
+This would trigger the "fo" category that we defined, which has 3 actions: Yes, No, and Maybe. And the "Maybe" action will provide a text input because of the extra parameters provided:
     
     
     new PushAction("maybe", "Maybe", null, "Enter reason", "Reply")
 
-The last 2 parameters are the “hint” text and the reply button label. On android, the notification will look like this.
+The last 2 parameters are the "hint" text and the reply button label. On android, the notification will look like this.
 
 ![Push Reply](/blog/rich-push-notification-improved/push-replies.png)
 
 Figure 1. Push Reply
 
-If you click on “Maybe” (with Android API level 27 or higher which is the default), then you’ll get a text field to enter a reply directly.
+If you click on "Maybe" (with Android API level 27 or higher which is the default), then you’ll get a text field to enter a reply directly.
 
 You can retrieve both which action was pressed, and what the user text input was using the `PushContent` class.
 

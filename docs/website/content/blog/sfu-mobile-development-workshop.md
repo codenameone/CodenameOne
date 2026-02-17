@@ -11,13 +11,13 @@ author: Steve Hannah
 
 ![Header Image](/blog/sfu-mobile-development-workshop/sfu-workshop-jul-30.jpg)
 
-A few weeks ago, in cooperation with [Simon Fraser University’s School for Interactive Arts and Technology](http://www.sfu.ca/siat.html) [COOP office](http://www.sfu.ca/coop/programs/iat/home.html), I held a java mobile development workshop. This was a bit of an experiment to find out whether there was interest – plus it got me out of the code dungeon for a few hours :). As it turns out, SFU students do indeed have an appetite for learning, or for mobile development, or both. The workshop “sold” out within days of the initial email announcement.
+A few weeks ago, in cooperation with [Simon Fraser University’s School for Interactive Arts and Technology](http://www.sfu.ca/siat.html) [COOP office](http://www.sfu.ca/coop/programs/iat/home.html), I held a java mobile development workshop. This was a bit of an experiment to find out whether there was interest – plus it got me out of the code dungeon for a few hours :). As it turns out, SFU students do indeed have an appetite for learning, or for mobile development, or both. The workshop "sold" out within days of the initial email announcement.
 
 Since the workshop was being held in the [SIAT](http://www.sfu.ca/siat.html) (Interactive Arts & Technology) department, I didn’t know what level of Java experience the students would bring to the table, so I designed a program that maximized the use of the WYSIWYG GUI builder, and minimized custom code. As it turns out, nearly everyone that attended was familiar with and experienced with Java. Who knew that SIAT students were so well rounded 🙂
 
 ## The Format and Content
 
-The workshop followed a strict tutorial format. Once the students were ready, and introductions had been made, we commenced development of a mobile application using Netbeans and Codename One. The source for the app are available on [GitHub](https://github.com/shannah/sfu-mobile-workshop/wiki/SFU-Tour-Guide-App). It is a simple “tour guide” app for SFU, that allows users to find useful services at SFU.
+The workshop followed a strict tutorial format. Once the students were ready, and introductions had been made, we commenced development of a mobile application using Netbeans and Codename One. The source for the app are available on [GitHub](https://github.com/shannah/sfu-mobile-workshop/wiki/SFU-Tour-Guide-App). It is a simple "tour guide" app for SFU, that allows users to find useful services at SFU.
 
 ![SFU Tourguide App Main screen](/blog/sfu-mobile-development-workshop/sfu-workshop-tourguide-app.png)
     
@@ -34,11 +34,11 @@ As this was the first time doing this type of workshop, I didn’t really know w
 
   3. **Make the workshop as interactive as possible**. Computing students don’t want to ask questions unless they absolutely have to. Even if they can’t get something working, they would rather not raise their hand. Do whatever you can throughout the workshop to keep the students engaged and provide them with pain-free ways to interact.
 
-  4. **Overbook and use Waiting List**. For free tutorials like this everyone signs up, but there is no consequence for not showing up. As such, we sold out very quickly, but during the actual workshop there were empty seats. It is better to overbook, and use a waiting list for when even the “overbooking” gets filled. And make it clear that it will be first come first served. In this workshop, about 60% of people who signed up, actually showed up. I don’t know yet if this is typical, but for the next one I’ll be overbooking by 50%.
+  4. **Overbook and use Waiting List**. For free tutorials like this everyone signs up, but there is no consequence for not showing up. As such, we sold out very quickly, but during the actual workshop there were empty seats. It is better to overbook, and use a waiting list for when even the "overbooking" gets filled. And make it clear that it will be first come first served. In this workshop, about 60% of people who signed up, actually showed up. I don’t know yet if this is typical, but for the next one I’ll be overbooking by 50%.
 
 ## Future Workshops
 
-Much of the feedback from the first workshop was positive, and we plan to hold more in the future. Once piece of feedback that was common was that the content was “too easy”. I definitely underestimated the audience. Future workshops will therefore be more challenging.
+Much of the feedback from the first workshop was positive, and we plan to hold more in the future. Once piece of feedback that was common was that the content was "too easy". I definitely underestimated the audience. Future workshops will therefore be more challenging.
 
 I’m located in the Vancouver, Canada area – which is why I did the workshop at SFU (I’m also an SFU grad, so that is another reason). If you would like me to hold a similar workshop in your school, and you are in the Vancouver area, please drop me a line.
 

@@ -15,7 +15,7 @@ description: One of the cool things about Maven is Maven Central - the repositor
   developers can use them in their projects.
 ---
 
-One of the cool things about Maven is Maven Central - the repository that contains every version of every Java library (that has been published on Maven central at least). Once your library is published, it can be used by other projects by copying and pasting an XML snippet into their pom.xml file. In this article, I describe how to publish your Codename One libraries to Maven central so that app developers can use them in their projects.
+One of the cool things about Maven is Maven Central - the repository that contains every version of every Java library (that has been published on Maven central at least). Once your library is published, it can be used by other projects by copying and pasting an XML snippet into their `pom.xml` file. In this article, I describe how to publish your Codename One libraries to Maven central so that app developers can use them in their projects.
 
 ### The Old Way
 
@@ -58,11 +58,11 @@ Using the Codename One Library project archetype, you can deploy your library to
 			
 ```
 
-Notice the <maven> tag which contains the XML dependency snippet that can be added to a project’s pom.xml file. If a user chooses to install the GoogleMaps lib from inside **Codename One Settings** in a Maven project, it will add the library using this Maven dependency. If the project is an Ant project, it will, instead fall back to the old way (downloading the cn1lib to the project’s **lib** directory).
+Notice the `<maven>` tag which contains the XML dependency snippet that can be added to a project’s `pom.xml` file. If a user chooses to install the GoogleMaps lib from inside **Codename One Settings** in a Maven project, it will add the library using this Maven dependency. If the project is an Ant project, it will, instead fall back to the old way (downloading the cn1lib to the project’s **lib** directory).
 
   
 
-Currently there are still many libraries that aren’t on Maven central. These libraries can still be used by Maven projects. You are using **Codename One Settings** to install the library, then the process is seamless. If want to install the cn1lib “manually”, you can use the [install-cn1lib Maven goal](https://shannah.github.io/codenameone-maven-manual/#_install_legacy_cn1lib_install_cn1lib).
+Currently there are still many libraries that aren’t on Maven central. These libraries can still be used by Maven projects. You are using **Codename One Settings** to install the library, then the process is seamless. If want to install the cn1lib "manually", you can use the [install-cn1lib Maven goal](https://shannah.github.io/codenameone-maven-manual/#_install_legacy_cn1lib_install_cn1lib).
 
 ### Getting Started
 
@@ -78,7 +78,7 @@ These are the values as they appear in that file:
 
   
 
-The <licenses>, <developers>, and <scm> sections of your pom.xml file are required. This is a sample adapted from the GoogleMaps lib.
+The `<licenses>`, `<developers>`, and `<scm>` sections of your `pom.xml` file are required. This is a sample adapted from the GoogleMaps lib.
 
 ```xml
 				
@@ -109,11 +109,11 @@ The <licenses>, <developers>, and <scm> sections of your pom.xml file are requir
 			
 ```
 
-In addition, Maven central requires that your project deploys javadoc and source jars. You’ll need to add the maven-javadoc-plugin and maven-source-plugin to the section of the pom.xml file.
+In addition, Maven central requires that your project deploys javadoc and source jars. You’ll need to add the maven-javadoc-plugin and maven-source-plugin to the section of the `pom.xml` file.
 
   
 
-Here is a snippet from the GoogleMaps lib that can be more-or-less just copied and pasted into your pom.xml file.
+Here is a snippet from the GoogleMaps lib that can be more-or-less just copied and pasted into your `pom.xml` file.
 
   
 
@@ -247,9 +247,9 @@ This is a short list of key servers you should send your key to:
 
 > Remember your GPG Passphrase!
 
-And now that you have GPG installed and set up, you should add section to your pom.xml to enable the signing of artifacts.
+And now that you have GPG installed and set up, you should add section to your `pom.xml` to enable the signing of artifacts.
 
-A snippet from the GoogleMaps lib pom.xml file that enables signing artifacts using GPG.
+A snippet from the GoogleMaps lib `pom.xml` file that enables signing artifacts using GPG.
 
 ```xml
 				
@@ -283,13 +283,13 @@ A snippet from the GoogleMaps lib pom.xml file that enables signing artifacts us
 			
 ```
 
-This snippet defines a maven profile that will cause GPG to sign all artifacts in the project during the “verify” phase, which is run any time you execute the verify, package, install, or deploy goals. You can activate this profile by adding -Psign-artifacts to Maven’s command-line arguments. e.g. mvn deploy -Psign-artifacts.
+This snippet defines a maven profile that will cause GPG to sign all artifacts in the project during the "verify" phase, which is run any time you execute the verify, package, install, or deploy goals. You can activate this profile by adding -Psign-artifacts to Maven’s command-line arguments. e.g. mvn deploy -Psign-artifacts.
 
 But we’re not quite ready yet. There are still a couple more ducks we need to line up.
 
-You’ll notice that the above XML snippet references the ${gpg.passphrase} property, which we haven’t yet defined. We don’t want to store the GPG passphrase inside the pom.xml file since this is a secret, and your pom.xml file should be considered public. This is where our maven settings.xml file comes in.
+You’ll notice that the above XML snippet references the ${gpg.passphrase} property, which we haven’t yet defined. We don’t want to store the GPG passphrase inside the `pom.xml` file since this is a secret, and your `pom.xml` file should be considered public. This is where our maven `settings.xml` file comes in.
 
-Open your settings.xml file (located at **$HOME/.m2/settings.xml**). If you don’t have one, then create it. The settings file should look like:
+Open your `settings.xml` file (located at **`$HOME/.m2/settings.xml`**). If you don’t have one, then create it. The settings file should look like:
 
 ```xml
 				
@@ -312,7 +312,7 @@ Open your settings.xml file (located at **$HOME/.m2/settings.xml**). If you don�
 			
 ```
 
-Make sure your file includes the <profiles> snippet shown above. This defines the gpg.passphrase property so that it will be present for your Maven builds.
+Make sure your file includes the `<profiles>` snippet shown above. This defines the gpg.passphrase property so that it will be present for your Maven builds.
 
 ## Importnat:
 
@@ -320,7 +320,7 @@ Make sure your file includes the <profiles> snippet shown above. This defines th
 
 ### Adding Distribution Management Settings
 
-There is one last thing we need to do before we can publish our project to Maven Central. We need to add a <distributionManagement> section to our pom.xml file with a <repository> entry pointing to the Sonatype staging repository.
+There is one last thing we need to do before we can publish our project to Maven Central. We need to add a `<distributionManagement>` section to our `pom.xml` file with a `<repository>` entry pointing to the Sonatype staging repository.
 
   
 
@@ -339,7 +339,7 @@ This section should be as follows:
 			
 ```
 
-And **finally** we need to add a <server> tag to our settings.xml file that includes your sonatype username and password (that you obtained a few steps back when you created a Sonatype JIRA account).
+And **finally** we need to add a `<server>` tag to our `settings.xml` file that includes your sonatype username and password (that you obtained a few steps back when you created a Sonatype JIRA account).
 
   
 
@@ -370,7 +370,7 @@ Deploying a release requires a few steps.
 
 ## Updating the Project Version to a Release Version
 
-When you are developing a project, it will usually have a SNAPSHOT version, meaning that the <version> tag in the project ends with “-SNAPSHOT”. When you perform a release, you should change the version to a release version. Basically this means simply removing the “-SNAPSHOT” from the end of the version number.
+When you are developing a project, it will usually have a SNAPSHOT version, meaning that the `<version>` tag in the project ends with "-SNAPSHOT". When you perform a release, you should change the version to a release version. Basically this means simply removing the "-SNAPSHOT" from the end of the version number.
 
   
 
@@ -408,7 +408,7 @@ Then you need to **commit** this version change by running:
 			
 ```
 
-At this point, if you look at your pom.xml files, you’ll notice that the <version> tag has been changed to “1.0”.
+At this point, if you look at your `pom.xml` files, you’ll notice that the `<version>` tag has been changed to "1.0".
 
 ## Deploying the Project
 
@@ -431,13 +431,13 @@ If the deployment completes successfully, you should log into the [nexus reposit
 
 ![nexus-repository-manager](https://www.codenameone.com/wp-content/uploads/2021/04/nexus-repository-manager.png)
 
-Your repository should be listed in the main frame. You should be able to browse the contents of it in the south frame. If it looks good, click on the “Close” button on the toolbar (with your repository selected). This will start a validation process on the server that will take a minute or so.
+Your repository should be listed in the main frame. You should be able to browse the contents of it in the south frame. If it looks good, click on the "Close" button on the toolbar (with your repository selected). This will start a validation process on the server that will take a minute or so.
 
 ## Releasing the Repository
 
-Click refresh after a minute or two. If the “Close” action was successful, the “Release” button should be enabled.
+Click refresh after a minute or two. If the "Close" action was successful, the "Release" button should be enabled.
 
-Click “Release” to release your library.
+Click "Release" to release your library.
 
 It typically takes a few hours before your new version is available on Maven central. You can check on <https://search.maven.org/> to see if it is listed.
 
@@ -445,7 +445,7 @@ It typically takes a few hours before your new version is available on Maven cen
 
 One last thing remains before we can hang up our hat. We need to set the project version to a new snapshot version.
 
-Usually, before I do that, I’ll commit and tag my “release” version in git.
+Usually, before I do that, I’ll commit and tag my "release" version in git.
 
 ```bash
 				
@@ -485,7 +485,7 @@ If you want other Codename One developers to find your library, I also recommend
   
 2. 2. Add your .cn1lib file to the cn1libs directory. After running mvn deploy on your project, you’ll find that a .cn1lib has been built in your library project’s **common/target** directory. Copy this file into the **cn1libs** directory of the CodenameOneLibs project.
   
-3. 3. Add a <plugin> entry in the CN1Libs.xml file. Use the **GoogleMaps** entry as a reference.
+3. 3. Add a `<plugin>` entry in the `CN1Libs.xml` file. Use the **GoogleMaps** entry as a reference.
   
 4. 4. Commit your change and send a pull request.
 

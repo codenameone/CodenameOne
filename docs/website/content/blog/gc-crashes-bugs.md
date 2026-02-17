@@ -17,7 +17,7 @@ After this fix animations and UI is much smoother on iOS, if you notice any pote
 
 In other news we just fixed two big GC issues in the new VM. The first was a rather complex edge case with GC firing  
 up during native code where more than one allocation was made during the second (or later) allocations  
-(yes edge case). Since objects allocated in native code still don’t have hard Java references the GC can’t “see”  
+(yes edge case). Since objects allocated in native code still don’t have hard Java references the GC can’t "see"  
 those references and thus wiped them. The solution was pretty simple, we now toggle a flag that essentially  
 blocks GC from happening while we are in such a native method… 
 
@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > shannah78 says:
 >
-> I would like to add that the fundamental advancement that has allowed us to run multithreaded code has nothing to do with the “Javascript VM”. Rather it is that we are using TeaVM to convert to javascript, and it includes a support for threads. This port would not have been possible without TeaVM or without Alexey Andreev’s help (TeaVM’s author). For more about TeaVM, check out [https://github.com/konsolet…](<https://github.com/konsoletyper/teavm>)
+> I would like to add that the fundamental advancement that has allowed us to run multithreaded code has nothing to do with the "Javascript VM". Rather it is that we are using TeaVM to convert to javascript, and it includes a support for threads. This port would not have been possible without TeaVM or without Alexey Andreev’s help (TeaVM’s author). For more about TeaVM, check out [https://github.com/konsolet…](<https://github.com/konsoletyper/teavm>)
 >
 
 

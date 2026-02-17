@@ -27,7 +27,7 @@ For most cases you can just fix line 400 of `MyClass` so it won’t throw an exc
 
 That means the real bug occurred elsewhere probably in the area of code where `callSerially() → myClass.myMethod(;` was called. Lets say you looked over the entire body of code and you have suspects but can’t tell which part is at fault. Narrowing this down would help…​
 
-That’s where `Display.setEnableAsyncStackTraces()` comes in. When set to true it creates a “fake” exception for every `callSerially` if there’s a “real” exception thrown within the `callSerially` it uses this “fake” one as the cause. That means you will be able to see the cause for a specific bug when this is enabled.
+That’s where `Display.setEnableAsyncStackTraces()` comes in. When set to true it creates a "fake" exception for every `callSerially` if there’s a "real" exception thrown within the `callSerially` it uses this "fake" one as the cause. That means you will be able to see the cause for a specific bug when this is enabled.
 
 Notice that this API is potentially prohibitive in terms of performance. As such we recommend that people don’t turn this on by default. You can include this as a user configuration or use it in debug builds.
 ---
@@ -69,7 +69,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Francesco Galgani says:
 >
 > I identified the cause of this exception, it was a popup.remove() (note  
-> that “popup” and its parent weren’t null), however the solution that I  
+> that "popup" and its parent weren’t null), however the solution that I  
 > found is to use removeComponent (from the parent of the parent) instead  
 > of popup.remove(). It’s unclear to me the logic of this exception,  
 > however my question is the same: why does a NullPointerException become a  

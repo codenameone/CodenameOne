@@ -114,7 +114,7 @@ enough to survive aggressive refactoring.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37653426/best-strategy-for-a-magazine-app)
 
-### What would cause the “time” picker to display an hour that is different in the selector
+### What would cause the "time" picker to display an hour that is different in the selector
 
 This question picked up a bug in Codename One with meridiem time. Notice it took 4 days for the asker to figure  
 this out…​
@@ -147,7 +147,7 @@ this question:
 
 ### Restrict user to record video for 3 seconds only
 
-There are some things you can only do in native code at this time. Actually implementing a “proper” camera  
+There are some things you can only do in native code at this time. Actually implementing a "proper" camera  
 view for most OS’s should be pretty trivial with a native interface and peer components. However, it would  
 require some understanding of the underlying OS semantics.
 

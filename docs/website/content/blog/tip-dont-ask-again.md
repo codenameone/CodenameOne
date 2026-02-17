@@ -13,7 +13,7 @@ author: Shai Almog
 
 One of my favorite things about Mac OS is something subtle that took me a while to notice: it doesn’t ask stupid questions. If you delete a file on a Mac it goes to the trashcan immediately, no question. Even though other OS’s copied the trashcan concept they didn’t embrace it in the same way, most of them still ask whether you are sure about this action even though the action is reversible.
 
-Part of the problem is in the way other OS’s work, restoring some files is not as smooth as it is in Mac OS. So I understand the timidness even though I don’t like it. There is a middle of the road approach, letting the user choose between safety and minor annoyance. It’s not the ideal approach but when you are afraid to take the full plunge of “not asking” you can use something like this to show a dialog that prompts the user but provides a “don’t ask again” checkbox:
+Part of the problem is in the way other OS’s work, restoring some files is not as smooth as it is in Mac OS. So I understand the timidness even though I don’t like it. There is a middle of the road approach, letting the user choose between safety and minor annoyance. It’s not the ideal approach but when you are afraid to take the full plunge of "not asking" you can use something like this to show a dialog that prompts the user but provides a "don’t ask again" checkbox:
     
     
     Form current = new Form("Don't Ask Again", BoxLayout.y());

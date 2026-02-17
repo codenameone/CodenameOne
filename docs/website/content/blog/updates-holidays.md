@@ -21,7 +21,7 @@ We also pushed in a lot of fixes in the past few weeks and a couple of new featu
 
 ### South Component
 
-One of the common RFE’s in side menu bar is the ability to add a component to the “south” part of the side menu. Up until now we had various patches and workarounds to allow this but these often required some “dubious” hacks.
+One of the common RFE’s in side menu bar is the ability to add a component to the "south" part of the side menu. Up until now we had various patches and workarounds to allow this but these often required some "dubious" hacks.
 
 We now have a new API that works with the on-top and permanent side menu:
     
@@ -40,11 +40,11 @@ The `Label` component might have been one of our mistakes when designing Codenam
 
 Case in point: the gap between the label text and the icon. This defaults to 2 pixels and very few people know how to change it (it’s with the `setGap` method).
 
-Two pixels is ridiculous for most cases and really hard to customize. We can/should fix this in the themes but I’m afraid this might break a lot of “working” code.
+Two pixels is ridiculous for most cases and really hard to customize. We can/should fix this in the themes but I’m afraid this might break a lot of "working" code.
 
 We added a theme constant `labelGap` which is a floating point value you can specify in millimeters that will allow you to determine the default gap for a label. We also added the method `Label.setDefaultGap(int)` which determines the default gap in pixels.
 
-I’m conflicted about the right way to “fix this”:
+I’m conflicted about the right way to "fix this":
 
   * Set the default gap to 1mm in the `Label` class
 
@@ -64,10 +64,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Francesco Galgani says:
 >
-> I read the “Travis CI Integration” by Steve on the wiki page you linked. It’s very interesting, it’s something that I’m looking for. My question are:  
+> I read the "Travis CI Integration" by Steve on the wiki page you linked. It’s very interesting, it’s something that I’m looking for. My question are:  
 > – When will it be available?  
-> – Are the tests that we can use the ones recorded with the “Test Recorder” of the Simulator?  
-> – Can you improve the “Test Recorder” and produce more documentation, guidelines and/or examples about it?  
+> – Are the tests that we can use the ones recorded with the "Test Recorder" of the Simulator?  
+> – Can you improve the "Test Recorder" and produce more documentation, guidelines and/or examples about it?  
 > – Are the tests against real devices or simulated devices?  
 > – You ask for enterprise account to test on Android and iOS, so… do you have your own device farm that is for your enterprise users?  
 > – Can we have a video recording and/or screenshot recording of the app during the tests?
@@ -83,7 +83,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > – Yes  
 > – If there are specific things you’d like to improve in the recorder please file an RFE in the issue tracker with detailed suggestion. We currently only have the JavaDocs for the test API’s that you can refer to. I might add a testing module to the online course in the future.  
 > – By default tests are against our simulator  
-> – If you have an enterprise account you can build against physical devices and run the tests on a device farm. We don’t manage our own device farm as this can become a HUGE problem well outside of our scope. We can connect to any standard appium device farm and let you run your tests there. We shouldn’t enter that field as device farm providers provide a level of flexibility such as “Run the test on device X located on operator network Y with locale Z”. That’s a level of specialization we can’t compete with.  
+> – If you have an enterprise account you can build against physical devices and run the tests on a device farm. We don’t manage our own device farm as this can become a HUGE problem well outside of our scope. We can connect to any standard appium device farm and let you run your tests there. We shouldn’t enter that field as device farm providers provide a level of flexibility such as "Run the test on device X located on operator network Y with locale Z". That’s a level of specialization we can’t compete with.  
 > – That’s offered by the device farm providers
 
 ---

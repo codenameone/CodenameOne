@@ -78,7 +78,7 @@ improved during our latest bout of profiling and I think we have the performance
 it was a couple of weeks ago. 
 
 There are many changes to the handling of images, labels, fonts and more but most of them should be  
-completely seamless to all of you. Your app should just “feel smoother” with literally no code changes.  
+completely seamless to all of you. Your app should just "feel smoother" with literally no code changes.  
 However, there are some tips and behaviors that you guys need to be aware of… 
 
 #### Component Paint Override
@@ -95,7 +95,7 @@ the native rendering thread which means that code like this might behave oddly:
         }
     };
 
-Prior to this change “Label” and the line that would have been drawn on top of it would have been in the same  
+Prior to this change "Label" and the line that would have been drawn on top of it would have been in the same  
 color. With this change the paint code might occur on the Android native layer and so the color of the graphics  
 might not be set when we reach the `drawLine` method call. This is a bug in the code above that  
 should never assume the color of the graphics context in advance. 
@@ -115,7 +115,7 @@ you might want to avoid them within that list. The latter 3 also provide a way t
 this allows you to still use something useful like `FontImage` or `RGBImage` without  
 the performance penalty in a large list. 
 
-If you don’t need the “ends with 3 points” functionality I would highly recommend you disable it. In large lists  
+If you don’t need the "ends with 3 points" functionality I would highly recommend you disable it. In large lists  
 it effectively initiates some string operations in some of the most performance crucial areas of the code.  
 You can disable this globally using the theme constant `endsWith3PointsBool=false`, as part of  
 this change we changed the default to `false`.

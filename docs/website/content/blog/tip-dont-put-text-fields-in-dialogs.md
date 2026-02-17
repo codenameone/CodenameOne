@@ -35,7 +35,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Martin Grajcar says:
 >
-> I can see that you’re right, but I can’t see any good alternative. In a form of mine, there are some 3-5 groups of 4-8 fields, which some users may want to edit, but most of the time, they won’t. So I’m planning to let the user click on a group and then edit its fields. Popping up a dialog with 4-8 text edits seems to be the natural choice. What’s the alternative? A form, which “disposes” by `showBack` the previous form (in exactly the same state just with the changes applied)?
+> I can see that you’re right, but I can’t see any good alternative. In a form of mine, there are some 3-5 groups of 4-8 fields, which some users may want to edit, but most of the time, they won’t. So I’m planning to let the user click on a group and then edit its fields. Popping up a dialog with 4-8 text edits seems to be the natural choice. What’s the alternative? A form, which "disposes" by `showBack` the previous form (in exactly the same state just with the changes applied)?
 >
 
 

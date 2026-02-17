@@ -17,7 +17,7 @@ This is part 5 of the RAD Chatroom tutorial. You can find part 1 [here](/blog/ra
 
 Most messaging applications include the ability to add photos to messages. Let’s add this feature to our chat app now.
 
-First we’ll define a new action called “capturePhoto”, and add to the the `TEXT_ACTIONS` category of our view node.
+First we’ll define a new action called "capturePhoto", and add to the the `TEXT_ACTIONS` category of our view node.
     
     
     public static final ActionNode capturePhoto = action(
@@ -72,10 +72,10 @@ And we’ll also add a handler for this action, which will capture a photo, and 
         }
     });
 
-__**1** | We will create a directory named “photos” where we store all of the photos for the app.  
+__**1** | We will create a directory named "photos" where we store all of the photos for the app.  
 ---|---  
 __**2** | Set the path of this photo under attachmentImageUrl. The ChatBubbleView will accept http, https, and file URLs, as well as storage keys. It will render them correctly in the view according to the type of URL it is.  
-__**3** | The “entity” of this event is the view model for the ChatRoomView. Here we use the ChatRoom.messages tag to access the messages list in a loosely coupled way. This code will work even if we change the class that we use for the ChatRoomView’s view model.  
+__**3** | The "entity" of this event is the view model for the ChatRoomView. Here we use the ChatRoom.messages tag to access the messages list in a loosely coupled way. This code will work even if we change the class that we use for the ChatRoomView’s view model.  
 __**4** | Adding the message to the messages entity list will trigger a list change event and it will be rendered automatically in the chat room.  
   
 Now, let’s fire the chat up again and take it for a test drive.
@@ -84,7 +84,7 @@ Now, let’s fire the chat up again and take it for a test drive.
 
 Figure 1. The capturePhoto action is rendered as a button beside the input text field
 
-You should now be able to click on the “capture photo” button to capture an image. In the simulator, it will open a file dialog to select an image. On device, it will activate the devices camera so that you can take a photo. After capturing an image, it should be added to the chat inside a message bubble as shown below:
+You should now be able to click on the "capture photo" button to capture an image. In the simulator, it will open a file dialog to select an image. On device, it will activate the devices camera so that you can take a photo. After capturing an image, it should be added to the chat inside a message bubble as shown below:
 
 ![Photo appears in chat after capture](/blog/rad-chatroom-part-5/rad-chat-room-24.png)
 
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > I’ll likely add some sample servers at some point, but that isn’t really the focus here. Most people will either want to roll their own server anyways. There are so many different server-side technologies out there, and most devs are already married to one or another, so a sample server would basically just be to make the demo more interactive. 
 >
-> The most likely “server-side” sample would be to plug this into the existing WebSockets chat demo.
+> The most likely "server-side" sample would be to plug this into the existing WebSockets chat demo.
 >
 
 

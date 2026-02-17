@@ -36,7 +36,7 @@ URLImage is an image created with a URL… Simple. It is seamlessly downloaded, 
 The simple use case is pretty trivial:  
   
   
-Image i = URLImage.createToStorage(placeholder, “fileNameInStorage”, “http://xxx/myurl.jpg”, URLImage.RESIZE_SCALE);  
+Image i = URLImage.createToStorage(placeholder, "fileNameInStorage", "http://xxx/myurl.jpg", URLImage.RESIZE_SCALE);  
   
   
   
@@ -99,10 +99,10 @@ Lists
 The biggest problem with image download service is with lists. We decided to attack this issue at the core by integrating URLImage support directly into GenericListCellRenderer which means it will work with MultiList, List & ContainerList. To use this support just define the name of the component (name not UIID) to end with _URLImage and give it an icon to use as the placeholder. This is easy to do in the multilist by changing the name of icon to icon_URLImage then using:  
   
   
-map.put(“icon_URLImage”, urlToActualImage); in the data.  
+map.put("icon_URLImage", urlToActualImage); in the data.  
   
   
-Make sure you also set a “real” icon to the entry in the GUI builder or in handcoded applications. This is important since the icon will be implicitly extracted and used as the placeholder value. Everything else should be handled automatically. You can use setDefaultAdapter & setAdapter on the generic list cell renderer to install adapters for the images. The default is a scale adapter although we might change that to scale fill in the future.  
+Make sure you also set a "real" icon to the entry in the GUI builder or in handcoded applications. This is important since the icon will be implicitly extracted and used as the placeholder value. Everything else should be handled automatically. You can use setDefaultAdapter & setAdapter on the generic list cell renderer to install adapters for the images. The default is a scale adapter although we might change that to scale fill in the future.  
   
   
   
@@ -168,7 +168,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Hi Shai, I tested between two seperate image urls (via simulator) and noticed that unless the “fileNameInStorage” is changed, the image displayed will not change despite the url used. This likely means that the image is stored locally and is no longer being called via the URL. 
+> Hi Shai, I tested between two seperate image urls (via simulator) and noticed that unless the "fileNameInStorage" is changed, the image displayed will not change despite the url used. This likely means that the image is stored locally and is no longer being called via the URL. 
 >
 > I would like to know if the images that are downloaded via the URL are stored in a directory and if so where?
 >

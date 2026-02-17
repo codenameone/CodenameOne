@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/default-validation-emblem/validation-emblem.png)
 
 The validation framework makes it easy to verify input quickly and effectively. Up until now you had to define  
-an emblem in order to create an error icon and if you didn’t you had to define an “Invalid” UIID for every entry.  
+an emblem in order to create an error icon and if you didn’t you had to define an "Invalid" UIID for every entry.  
 This exists by default for text fields and other types but is still a big hassle just to check that we have a valid  
 email…​
 

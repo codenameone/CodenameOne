@@ -21,9 +21,9 @@ So…​ I have created a [Push Cheatsheet](files/push-cheatsheet.pdf), to serve
 
 As with all CN1 docs, this cheatsheet is a living document that will evolve based on your feedback. You can always download the latest PDF at <https://www.codenameone.com/files/push-cheatsheet.pdf> .
 
-I have tried to include all of the pertinent details required to get Push working on all platforms. Each platform has its own “box” with setup instructions. It also includes a minimal code snippet to show how to implement Push support in your codename one app – in particular how to register the device for push, and receive push messages. There is a box for “Sending a Push”, which shows the format of an HTTP request that you can use to send a push message to your app’s users.
+I have tried to include all of the pertinent details required to get Push working on all platforms. Each platform has its own "box" with setup instructions. It also includes a minimal code snippet to show how to implement Push support in your codename one app – in particular how to register the device for push, and receive push messages. There is a box for "Sending a Push", which shows the format of an HTTP request that you can use to send a push message to your app’s users.
 
-__ |  GET parameters in this snippet are color-coded and cross-referenced with other parts of the cheatsheet so you can easily see where to find this information. E.g. The `FCM_SERVER_API_KEY` in the HTTP request is purple and bold, corresponding to its mention in the “Android Client Setup” box, so you can see that this value comes from the google firebase console.   
+__ |  GET parameters in this snippet are color-coded and cross-referenced with other parts of the cheatsheet so you can easily see where to find this information. E.g. The `FCM_SERVER_API_KEY` in the HTTP request is purple and bold, corresponding to its mention in the "Android Client Setup" box, so you can see that this value comes from the google firebase console.   
 ---|---  
   
 Finally, there is a section documenting the different push message type values, so you can quickly decide which type of push is appropriate for a given situation.

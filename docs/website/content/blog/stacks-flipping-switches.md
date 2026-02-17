@@ -25,12 +25,12 @@ After a while with several new features being off by default we are officially f
   
   
   
-We are turning on the new Android/iOS graphics pipelines by default which should mean the new shape/transform API’s should now “just work”. To disable the Android pipeline use android.asyncPaint=false and to disable the iOS pipeline use ios.newPipeline=false  
+We are turning on the new Android/iOS graphics pipelines by default which should mean the new shape/transform API’s should now "just work". To disable the Android pipeline use `android.asyncPaint=false` and to disable the iOS pipeline use `ios.newPipeline=false`  
   
   
   
   
-We are also switching on a virtual keyboard change for iOS which provides a more “native’ feel for the iOS keyboard, it still has some unique edge cases but we feel it provides a better default experience overall. This virtual keyboard mode keeps the keyboard open once you start editing even if you scroll the form, its generally more like the native editing functionality in iOS. You can disable it using ios.keyboardOpen=false.  
+We are also switching on a virtual keyboard change for iOS which provides a more "native’ feel for the iOS keyboard, it still has some unique edge cases but we feel it provides a better default experience overall. This virtual keyboard mode keeps the keyboard open once you start editing even if you scroll the form, its generally more like the native editing functionality in iOS. You can disable it using ios.keyboardOpen=false.  
   
   
   
@@ -40,7 +40,7 @@ You’ll notice that the new VM still isn’t the default, we feel it hasn’t r
   
   
   
-We did find a new and exciting way to generate stack traces on iOS. If you use our standard logging mechanism using Log.e() you can now get full stack traces on iOS devices (not including line numbers) even for the older VM. The traces would look a bit “weird” but they are readable and can be used to locate the source of a problem.  
+We did find a new and exciting way to generate stack traces on iOS. If you use our standard logging mechanism using `Log.e()` you can now get full stack traces on iOS devices (not including line numbers) even for the older VM. The traces would look a bit "weird" but they are readable and can be used to locate the source of a problem.  
   
   
   

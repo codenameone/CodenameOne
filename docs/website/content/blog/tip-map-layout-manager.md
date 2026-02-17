@@ -14,7 +14,7 @@ author: Shai Almog
 __ |  The information in this blog post is slighly out of date. Check out the [newer blog post](/blog/map-component-positioning-revisited.html) that covers positioning components on the map.   
 ---|---  
   
-I’ve recently added a segment to the [online course](https://codenameone.teachable.com/) covering the native maps. This segment is a part of a larger trend towards the upcoming Uber demo which we will release before the end of the year. As part of that work I did some initial “half baked” work on a map layout manager.
+I’ve recently added a segment to the [online course](https://codenameone.teachable.com/) covering the native maps. This segment is a part of a larger trend towards the upcoming Uber demo which we will release before the end of the year. As part of that work I did some initial "half baked" work on a map layout manager.
 
 The motivation was to position components on top of the map in an effective way, I hacked this a bit and mixed some logic from the map and the layout thus breaking some of the separation but it’s still a pretty cool demo…​
 

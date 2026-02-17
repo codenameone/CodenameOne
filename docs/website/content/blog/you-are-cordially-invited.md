@@ -37,7 +37,7 @@ So we started looking at whether upload or the blob store service were down, the
 
   
   
-Since the blob store uses a Google internal URL the upload process consists of two distinct stages, the user needs to “request” an upload URL from google and then upload to that URL (after which he is redirected to the servlet). That was the culprit, when we requested a URL we passed the user credentials. The idea was to save blob store space/upload time in the case of a user who ran out of credits.  
+Since the blob store uses a Google internal URL the upload process consists of two distinct stages, the user needs to "request" an upload URL from google and then upload to that URL (after which he is redirected to the servlet). That was the culprit, when we requested a URL we passed the user credentials. The idea was to save blob store space/upload time in the case of a user who ran out of credits.  
   
   
 Google extracted the arguments that we passed to the servlet (notice that these arguments are never explicitly passed to the blob store which doesn’t get the request context)!  
@@ -47,7 +47,7 @@ Google extracted the arguments that we passed to the servlet (notice that these 
 These arguments were then appended to the URL returned (which is naturally a post URL) creating an illegal URL that can’t be fixed.  
 
   
-We made several attempts at patching this such as editing the URL dynamically (using substring, url encoding etc.) all of which produced cases such as uploads getting “swallowed” with no redirect to the actual build servlet. Eventually, we just redirected without the arguments and this worked around the issue.  
+We made several attempts at patching this such as editing the URL dynamically (using substring, url encoding etc.) all of which produced cases such as uploads getting "swallowed" with no redirect to the actual build servlet. Eventually, we just redirected without the arguments and this worked around the issue.  
 
   
 This was the second time this year where we had a failure of this type (the first was due to Google App Engine being down for a couple of hours). This still puts us at a 99.999  

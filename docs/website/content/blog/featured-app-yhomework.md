@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > The UI was designed before flat design took over, the general design was around the idea of familiarity to 7th-10th grade kids (notebook, calculator motif). My one complaint about the UI is it’s performance which I think could be improved significantly.  
-> Since this app is so old by now it was developed before there were “best practices” for Codename One and a lot of things could probably be accomplished in a more efficient way.
+> Since this app is so old by now it was developed before there were "best practices" for Codename One and a lot of things could probably be accomplished in a more efficient way.
 
 
 ### **Shai Almog** — May 20, 2016 at 4:16 am ([permalink](/blog/featured-app-yhomework/#comment-22542))

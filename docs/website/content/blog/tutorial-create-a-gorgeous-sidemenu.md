@@ -23,7 +23,7 @@ The code from the video above is below, you can check out the full repository on
 
 Figure 1. Side Menu final result
 
-A side menu is a crucial piece of an elegant application. I’ll explain how one creates a simple side menu that’s elegant, portable and easy to build. This is a good “starting point” side menu from which you can build more elaborate designs.
+A side menu is a crucial piece of an elegant application. I’ll explain how one creates a simple side menu that’s elegant, portable and easy to build. This is a good "starting point" side menu from which you can build more elaborate designs.
 
 To get this result we will start from a native theme and a bare bones application to keep things simple.
 
@@ -84,7 +84,7 @@ Figure 6. Margin is 0 except for a thin line below each command
 
 Setting the border to empty is crucial!
 
-The iOS version of the side command inherits a border style so we must “remove” it by defining a different border in this case an empty border. Since borders take precedence over color this would have prevented the color changes we made from appearing.
+The iOS version of the side command inherits a border style so we must "remove" it by defining a different border in this case an empty border. Since borders take precedence over color this would have prevented the color changes we made from appearing.
 
 ![Border must be defined as Empty](/blog/tutorial-create-a-gorgeous-sidemenu/styled-sidemenu-6.png)
 

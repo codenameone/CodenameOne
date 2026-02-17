@@ -12,10 +12,10 @@ author: Shai Almog
 ![Header Image](/blog/its-full-of-stars-terse-commands/components-slider.png)
 
 A very common UI pattern is the 5 star ranking system. Up until recently we always had the same answer  
-when developers asked us how to implement it: “Use toggle buttons  
-([CheckBox](/javadoc/com/codename1/ui/CheckBox/#createToggle-com.codename1.ui.Image-))”.
+when developers asked us how to implement it: "Use toggle buttons  
+([CheckBox](/javadoc/com/codename1/ui/CheckBox/#createToggle-com.codename1.ui.Image-))".
 
-This is still not a bad answer but we think there is a “better” simpler way to do this thru the  
+This is still not a bad answer but we think there is a "better" simpler way to do this thru the  
 [Slider](/javadoc/com/codename1/ui/Slider/) which was  
 effectively designed with this usage in mind.
 
@@ -23,7 +23,7 @@ The best way to do that is to just create two images with all 5 stars full and w
 this to the `Slider`/`SliderFull` UIID’s. Keep in mind that you need to apply both to the selected and unselected  
 states of the UIID’s.
 
-__ |  You can change the UIID of slider itself e.g. to something like “Stars” at which point the UIID’s will be  
+__ |  You can change the UIID of slider itself e.g. to something like "Stars" at which point the UIID’s will be  
 `Stars` & `StarsFull`.   
 ---|---  
   

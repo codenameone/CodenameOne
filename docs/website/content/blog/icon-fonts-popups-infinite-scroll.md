@@ -46,13 +46,13 @@ When Codename One was young we needed a popup arrow implementation but our low l
 
 Since we added a proper graphics pipeline we wanted to rewrite that logic to use proper graphics. This allows for better customization of the border (color, shape etc.) and it looks better on newer displays. It also works on all OSs. Right now only the iOS theme has the old image border approach.
 
-To solve this we [added new support for arrows](https://github.com/codenameone/CodenameOne/commit/921395f6613e7a2bb883f41d4217797f7d790fa9) into the `RoundRectBorder` API. If you style a popup dialog with a round rect border this should “just work” and use this API. By default popup dialogs are styled that way with the exception of iOS where they still have the image border styling for compatibility (although we might change that).
+To solve this we [added new support for arrows](https://github.com/codenameone/CodenameOne/commit/921395f6613e7a2bb883f41d4217797f7d790fa9) into the `RoundRectBorder` API. If you style a popup dialog with a round rect border this should "just work" and use this API. By default popup dialogs are styled that way with the exception of iOS where they still have the image border styling for compatibility (although we might change that).
 
 This works by setting the track component property on border. When that’s done the border implicitly points to the right location.
 
 ### Continue the Infinite
 
-`InfiniteContainer` and `InfiniteAdapter` work great for most use cases but they have a bit of an [“undefined” behavior when it comes to failure](https://github.com/codenameone/CodenameOne/issues/2721). E.g. if we have a network error and don’t have anything to fetch as a result.
+`InfiniteContainer` and `InfiniteAdapter` work great for most use cases but they have a bit of an ["undefined" behavior when it comes to failure](https://github.com/codenameone/CodenameOne/issues/2721). E.g. if we have a network error and don’t have anything to fetch as a result.
 
 to solve this we added this method to `InfiniteContainer`:
     
@@ -76,7 +76,7 @@ So when you get an error you can just add this error button and return null:
     add(errorButton);
     return null;
 
-The error button will let the user retry the operation and continue fetching the content even though it was previously “stopped”.
+The error button will let the user retry the operation and continue fetching the content even though it was previously "stopped".
 
 ### More Coming
 
@@ -92,7 +92,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Francesco Galgani says:
 >
-> I’ve just tested that a Popup Dialog works fine also with an Android skin, thank you! About the Popup Dialog, isn’t the developer guide section “Styling The Arrow Of The Popup Dialog” more valid? Should this part of the developer guide be changed? Link: [https://www.codenameone.com…](</manual/components/#_styling_the_arrow_of_the_popup_dialog>)
+> I’ve just tested that a Popup Dialog works fine also with an Android skin, thank you! About the Popup Dialog, isn’t the developer guide section "Styling The Arrow Of The Popup Dialog" more valid? Should this part of the developer guide be changed? Link: [https://www.codenameone.com…](</manual/components/#_styling_the_arrow_of_the_popup_dialog>)
 >
 
 

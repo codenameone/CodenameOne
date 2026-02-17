@@ -116,7 +116,7 @@ This is optional as there is a default value defined. You can define this once i
 extreme cases permission might be needed for different things e.g. you might ask for this permission with one reason  
 at one point in the app and with a different reason at another point in the app.
 
-The following permission keys are supported: “android.permission.READ_PHONE_STATE”  
+The following permission keys are supported: "`android.permission.READ_PHONE_STATE`"  
 `android.permission.WRITE_EXTERNAL_STORAGE`,  
 `android.permission.ACCESS_FINE_LOCATION`,  
 `android.permission.SEND_SMS`,  

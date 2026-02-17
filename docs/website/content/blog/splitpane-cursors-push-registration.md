@@ -44,7 +44,7 @@ To:
         return new SplitPane(SplitPane.VERTICAL_SPLIT, cmp1, cmp2, "25%", "50%", "75%");
     }
 
-This is mostly self explanatory but only “mostly”. We have 5 arguments the first 3 make sense:
+This is mostly self explanatory but only "mostly". We have 5 arguments the first 3 make sense:
 
   * Split orientation
 

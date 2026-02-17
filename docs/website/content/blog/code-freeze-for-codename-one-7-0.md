@@ -86,7 +86,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > We did some deep dive tutorials on that but it’s hard to go deep as the ground is constantly shifting and you end up having to teach the native platforms themselves with all the related complexity. Unfortunately, there aren’t tricks in our quiver to solve that. It’s just hard trial and error until it works with the various native platforms. Ideally if you can package stuff as a POD or dependency then you’re 90% of the way to getting it working and most things should work that way.  
-> The best tip is to send a build with “include native source” and build on the native platform then migrate your changes back to Codename One. This isn’t trivial but it gives you a good starting point.
+> The best tip is to send a build with "include native source" and build on the native platform then migrate your changes back to Codename One. This isn’t trivial but it gives you a good starting point.
 >
 > We have an RFE on Swift in the issue tracker if I remember correctly. I’m not sure when we’ll get to it as our issue pipeline is pretty deep and our manpower is heavily committed to some deep tasks. This is also a pretty hard task to implement and will produce a sub-par result since Swift is inherently problematic with VMs due to ARC.
 >
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> You can inject sources to various files such as the delegates with build hints. If you look at the source code in git you’ll see various magical comments that generally contain the word “REPLACE” these are special comments that our build servers replace and we can give you a build hint to replace code in that area (some of these build hints are documented).
+> You can inject sources to various files such as the delegates with build hints. If you look at the source code in git you’ll see various magical comments that generally contain the word "REPLACE" these are special comments that our build servers replace and we can give you a build hint to replace code in that area (some of these build hints are documented).
 >
 
 

@@ -25,7 +25,7 @@ iOS allows us to send a push notification to trigger a numeric badge on the appl
   
   
   
-There is also an option to send push type 101 and provide a badge number semi-colon and a message e.g. use a message body such as this: “3;This message is shown to the user with number 3 badge”. Obviously, this feature will only work for iOS so don’t send these push types to other platforms…  
+There is also an option to send push type 101 and provide a badge number semi-colon and a message e.g. use a message body such as this: "3;This message is shown to the user with number 3 badge". Obviously, this feature will only work for iOS so don’t send these push types to other platforms…  
   
   
   
@@ -73,9 +73,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> I’ve made a mistake in this post. Number badges should be separated by a space not a semicolon so this “3;This message is shown to the user with number 3 badge” should be really: 
+> I’ve made a mistake in this post. Number badges should be separated by a space not a semicolon so this "3;This message is shown to the user with number 3 badge" should be really: 
 >
-> “3 This message is shown to the user with number 3 badge”
+> "3 This message is shown to the user with number 3 badge"
 >
 
 

@@ -11,7 +11,7 @@ author: Steve Hannah
 
 ![Header Image](/blog/connecting-to-a-mysql-database/connecting-mysql-to-codenameone.jpg)
 
-In the following series of blog posts I’m going to shift some attention to server-side development in so much as it can complement a Codename One client application. In this post I’ll demonstrate how you can combine a MySQL database, a web-service layer, and a Codename One client to produce a “Contacts” app. I’m going to steal the Contacts code from the Kitchen Sink demo for the UI, but I’ll implement a different datasource that loads the contacts from a remote MySQL database instead of from the phone’s internal contacts.
+In the following series of blog posts I’m going to shift some attention to server-side development in so much as it can complement a Codename One client application. In this post I’ll demonstrate how you can combine a MySQL database, a web-service layer, and a Codename One client to produce a "Contacts" app. I’m going to steal the Contacts code from the Kitchen Sink demo for the UI, but I’ll implement a different datasource that loads the contacts from a remote MySQL database instead of from the phone’s internal contacts.
 
 ## Requirements
 
@@ -125,7 +125,7 @@ At the prompt type:
 __ |  If your `mysql` binary is not in your environment PATH you’ll need to provide it via that `--mysql` option. Similarly if git is not in your environment path you’ll need to provide the `--git` option.   
 ---|---  
   
-The above command basically says “create a Xataface application in the directory named ‘sakila'”.
+The above command basically says "create a Xataface application in the directory named ‘sakila'".
 
 Now, follow the prompts:
 
@@ -137,21 +137,21 @@ First it will ask you for some database connection information.
     ? App Database Username sakila
     ? App Database Password ********
 
-In our case the database host is localhost, the database name is “sakila”, and we are going to generate a user for this application named “sakila” with password “password” that has full access to the “sakila” database.
+In our case the database host is localhost, the database name is "sakila", and we are going to generate a user for this application named "sakila" with password "password" that has full access to the "sakila" database.
 
-Next it will ask us which tables to include in the main menu. This is only used by the web interface for the app, which is beyond the scope of this tutorial. We are merely using Xataface as a thin web-service layer to enable our Codename One app to query the database. Nonetheless, we need to include at least one table here, so we’ll add the “customer” table to the main menu.
+Next it will ask us which tables to include in the main menu. This is only used by the web interface for the app, which is beyond the scope of this tutorial. We are merely using Xataface as a thin web-service layer to enable our Codename One app to query the database. Nonetheless, we need to include at least one table here, so we’ll add the "customer" table to the main menu.
     
     
     ? List the tables that should be included in the main menu in the form: table1=L
     abel1,table2=Label2, etc... customer=Customers
 
-Next it will ask us about our authentication and permission preferences. Xataface provides a rich multi-user authentication and permissions system that will allow to decide exactly who can access what. This generator will setup the the default table-based authentication and add a “users” table to the database if you choose (and we will choose to do so). By default there are 3 levels of user accounts:
+Next it will ask us about our authentication and permission preferences. Xataface provides a rich multi-user authentication and permissions system that will allow to decide exactly who can access what. This generator will setup the the default table-based authentication and add a "users" table to the database if you choose (and we will choose to do so). By default there are 3 levels of user accounts:
 
   1. ADMIN
 
   2. USER
 
-  3. <NONE> (i.e. not logged in).
+  3. `<NONE>` (i.e. not logged in).
 
 By default, ADMIN users can access everything, regular users can access everything, but in a read-only fashion, and the public (i.e. not logged in) can access nothing.
     
@@ -170,7 +170,7 @@ By default, ADMIN users can access everything, regular users can access everythi
     
     ? Would you like to use these default authentication settings? Yes
 
-At this point it will create the “sakila” directory and set up some of the scaffold file structure for the application.
+At this point it will create the "sakila" directory and set up some of the scaffold file structure for the application.
     
     
     Cloning xataface into /Applications/XAMPP/xamppfiles/htdocs/sakila
@@ -197,7 +197,7 @@ Now it will ask us about modifications that need to be made to the databse.
     ? Root MySQL Username root
     ? Create the table users now? Yes
 
-We told the generator to create a “users” table to store user accounts, but we haven’t added any user accounts yet. Next, the generator will allow us to enter a first “admin” account.
+We told the generator to create a "users" table to store user accounts, but we haven’t added any user accounts yet. Next, the generator will allow us to enter a first "admin" account.
     
     
     ? Insert Admin user in users table? Yes
@@ -451,7 +451,7 @@ In our app we created a new client inside the `init()` method:
     
     client = new XFClient("http://localhost/sakila/index.php");
 
-__ |  We used the localhost address to the Xataface app, which will only work when we are running in the simulator on the same machine as the server. If you want to test on device, you’ll need to use an address that is reachable from the device. You should be able to check your computer’s network settings to see what your machine’s LAN address is (e.g. “192.0.0.8”, or “steves-imac.local”). And ultimately when you deploy your app to production, you’ll use the “real” server address that should be accessible over the entire internet.   
+__ |  We used the localhost address to the Xataface app, which will only work when we are running in the simulator on the same machine as the server. If you want to test on device, you’ll need to use an address that is reachable from the device. You should be able to check your computer’s network settings to see what your machine’s LAN address is (e.g. "192.0.0.8", or "steves-imac.local"). And ultimately when you deploy your app to production, you’ll use the "real" server address that should be accessible over the entire internet.   
 ---|---  
   
 ### Authentication
@@ -495,24 +495,24 @@ Let’s take a look at a few examples of how we could customize our query to get
 
 **Filter on last_name**
 
-Only include results with last name “Smith”
+Only include results with last name "Smith"
     
     
     q.matches("last_name", "Smith");
 
-This would match “Smith” but not “Smithers”
+This would match "Smith" but not "Smithers"
 
-If you want to match “Smith” or “Smithers” we could do:
+If you want to match "Smith" or "Smithers" we could do:
     
     
     q.contains("last_name", "Smith");
 
-This would match “Smith”, “Smithers”, or “Sexsmith”. If we wanted to exclude “Sexsmith” we could do something like:
+This would match "Smith", "Smithers", or "Sexsmith". If we wanted to exclude "Sexsmith" we could do something like:
     
     
     q.like("last_name", "Smith%");
 
-Or something a little more commonly practical, if we wanted only those contacts whose last name begins with “S”:
+Or something a little more commonly practical, if we wanted only those contacts whose last name begins with "S":
     
     
     q.like("last_name", "S%");
@@ -560,7 +560,7 @@ Just to get you started down this path, let’s open the terminal and navigate t
     
     $ cd /Applications/XAMPP/htdocs/sakila
 
-Now we’ll create a “fields.ini” file for the “customer_list” table (er view) at `tables/customer_list/fields.ini`.
+Now we’ll create a "fields.ini" file for the "customer_list" table (er view) at `tables/customer_list/fields.ini`.
     
     
     $ mkdir tables/customer_list
@@ -578,7 +578,7 @@ Now we can use the customer_list view from our Codename One app as if it were a 
 
 ## Try out the App
 
-For your convenience, I have published the app on a development server so that you can try it out yourself. I have removed the “admin” user and added a read-only account. You should log in with:
+For your convenience, I have published the app on a development server so that you can try it out yourself. I have removed the "admin" user and added a read-only account. You should log in with:
 
 Username: demo, Password: demo (case sensitive)
 
@@ -623,7 +623,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > It appears that the database user wasn’t created properly. Check the conf.db.ini file. It should list the username and password that it is trying to connect with. Then ensure that mysql has that user.
 >
-> If you need to add the user “username” with password “password” in mysql you can do it with:
+> If you need to add the user "username" with password "password" in mysql you can do it with:
 >
 > create user ‘username’@localhost identied by ‘password’;  
 > grant all privileges to on sakila.* to username@localhost;  
@@ -686,7 +686,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Rudy Lemaitre says:
 >
-> it”s ok now  
+> it"s ok now  
 > i make a new install of eclispe and works now 🙂  
 > thanks 😉
 >
@@ -774,7 +774,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > [Steve Hannah](https://lh3.googleusercontent.com/a-/AAuE7mBmUCgKSZtJ2cqeHgj6bdPY2AAQ10roHlMpgRWc) says:
 >
-> It sounds like it is having issues refreshing the xataface cn1lib. Try again, going through the cycle of “Codename One” > “Refresh Cn1libs”. Then a clean build. Check the “lib/impl/cls” directory (which is where the cn1lib classes get extracted to when they are installed), and ensure that the specified classes are there.
+> It sounds like it is having issues refreshing the xataface cn1lib. Try again, going through the cycle of "Codename One" > "Refresh Cn1libs". Then a clean build. Check the "lib/impl/cls" directory (which is where the cn1lib classes get extracted to when they are installed), and ensure that the specified classes are there.
 >
 
 

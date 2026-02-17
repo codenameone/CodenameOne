@@ -15,7 +15,7 @@ author: Steve Hannah
 It has over eighteen thousand libraries and can help you scale your projects elegantly. Cocoapods can be  
 used in your Codename One project to include native iOS libraries without having to go through the hassle  
 of bundling the actual library into your project. Rather than bundling .h and .a files in your ios/native directory,  
-you can specify which “pods” your app uses via the `ios.pods` build hint. (There are other build hints also  
+you can specify which "pods" your app uses via the `ios.pods` build hint. (There are other build hints also  
 if you need more advanced features).
 
 E.g.:
@@ -33,7 +33,7 @@ the build hint:
     ios.pods=AFNetworking ~> 3.0
 
 For full versioning syntax specifying pods see the  
-[Podfile spec for the “pod” directive](https://guides.cocoapods.org/syntax/podfile.html#pod).
+[Podfile spec for the "pod" directive](https://guides.cocoapods.org/syntax/podfile.html#pod).
 
 ### Including Multiple Pods
 
@@ -59,7 +59,7 @@ optional if the spec is hosted in the central CocoaPods source (`<https://github
 
 ### Converting PodFile To Build Hints
 
-Most documentation for Cocoapods “pods” provide instructions on what you need to add to your Xcode  
+Most documentation for Cocoapods "pods" provide instructions on what you need to add to your Xcode  
 project’s PodFile. Here is an example from the GoogleMaps cocoapod to show you how a PodFile can be  
 converted into equivalent build hints in a Codename One project.
 

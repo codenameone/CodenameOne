@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/performant-radial-gradients/gradients.png)
 
-One of the first Codename One performance tips is: “Don’t use gradients”. We already [wrote about improved performance to gradients](/blog/should-we-use-gradients.html) in the past but that covered linear gradients and didn’t cover radials on iOS.
+One of the first Codename One performance tips is: "Don’t use gradients". We already [wrote about improved performance to gradients](/blog/should-we-use-gradients.html) in the past but that covered linear gradients and didn’t cover radials on iOS.
 
 With recent commits radial gradients are now performant on iOS/Android and elsewhere. On iOS Steve implemented gradients as a shader which should deliver great performance.
 

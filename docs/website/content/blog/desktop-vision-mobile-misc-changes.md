@@ -47,7 +47,7 @@ phone to be the default, its clearly the way to go forward in the long run since
   
 As part of our ongoing work with the new Android pipeline we added an experimental rendering mode that tries to automatically detect invisible layers and not draw them. You can enable this mode by invoking   
   
-Display.getInstance().setProperty(“blockOverdraw”, “true”);  
+`Display.getInstance().setProperty("blockOverdraw", "true");`  
   
   
 This might improve performance for some cases and might improve performance on platforms other than Android. We’d be interested to hear if this mode break stuff in your application.  
@@ -86,7 +86,7 @@ desktop.adaptToRetina – doubles the pixels for a high resolution display (true
 desktop.resizable – whether the window would be resizable (true/false defaults to true)  
   
   
-desktop.theme – the theme to use as the native theme defaults to “native”. Can be “none” to indicate no theme or the name of any resource file within the bundle that you would like to use as a base without the .res extension. E.g. iPhoneTheme assuming you placed the iPhoneTheme.res file in your src directory.  
+desktop.theme – the theme to use as the native theme defaults to "native". Can be "none" to indicate no theme or the name of any resource file within the bundle that you would like to use as a base without the .res extension. E.g. iPhoneTheme assuming you placed the iPhoneTheme.res file in your src directory.  
   
   
   
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Display.getInstance().setProperty(“blockOverdraw”, “true”); doesn’t seem to break anything on first sight.
+> Display.getInstance().setProperty("blockOverdraw", "true"); doesn’t seem to break anything on first sight.
 >
 
 

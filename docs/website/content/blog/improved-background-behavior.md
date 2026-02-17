@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/improved-background-behavior/background-fetch.jpg)
 
-A couple of years ago at Google IO one of the prominent speakers turned to the audience and asked them: “Raise your hands if you understand the activity lifecycle”. He then proceeded to call them “liars”, claiming that after all his years at Google he still doesn’t get it properly…​
+A couple of years ago at Google IO one of the prominent speakers turned to the audience and asked them: "Raise your hands if you understand the activity lifecycle". He then proceeded to call them "liars", claiming that after all his years at Google he still doesn’t get it properly…​
 
 As a guy who worked on VM’s and understands some of the nuance I totally get his point. Lifecycle is hard. On Android it seems the developers took a difficult subject and made it even harder. With that in mind our implementation of background behavior on Android was lacking in some regards and Steve did a major overhaul of the implementation. Like all overhauls this could trigger some regressions so please keep your eyes open for such cases.
 

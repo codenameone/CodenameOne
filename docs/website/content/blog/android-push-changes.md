@@ -46,7 +46,7 @@ You can find instructions on how to generate this `service-account-file.json` (y
 
 > ## The Slightly Longer Version
 
-Google deprecated their legacy FCM APIs on June 20, 2023, and will be removing them on June 21, 2024. Our push servers use this API for all push notifications to Android devices, so we were required to [migrate ](https://firebase.google.com/docs/cloud-messaging/migrate-v1)to their new “v1 HTTP API”. This migration involved some non-trivial changes to our push infrastructure, including, but not limited to, changing from using an FCM API key for authentication, to using OAuth2.
+Google deprecated their legacy FCM APIs on June 20, 2023, and will be removing them on June 21, 2024. Our push servers use this API for all push notifications to Android devices, so we were required to [migrate ](https://firebase.google.com/docs/cloud-messaging/migrate-v1)to their new "v1 HTTP API". This migration involved some non-trivial changes to our push infrastructure, including, but not limited to, changing from using an FCM API key for authentication, to using OAuth2.
 
 The OAuth2 authentication is more complicated than the old API key flow, as it involves multiple pieces of information, including the client ID, client secret, and project ID. To simplify this, Google encapsulates all of these credentials inside a single JSON file which can be used in an opaque manner via its Firebase SDKs.
 

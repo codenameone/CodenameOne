@@ -62,14 +62,14 @@ With the update coming out today we should have more logging that will allow tra
 
 ### Reflection not working in ios in codename one
 
-Dynamic class loading “might” work but it isn’t reliable across platforms and might run into issues with obfuscation  
+Dynamic class loading "might" work but it isn’t reliable across platforms and might run into issues with obfuscation  
 or optimizers. You should use class literals instead
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39343822/reflection-not-working-in-ios-in-codename-one)
 
 ### Codename One and jformdesigner
 
-Some AWT/Swing GUI builder code can be copied to Codename One “as is” with package names and a few class  
+Some AWT/Swing GUI builder code can be copied to Codename One "as is" with package names and a few class  
 name changes
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39339559/codenameone-and-jformdesigner)
@@ -118,7 +118,7 @@ flow and should have integrated them as a cn1lib
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39294975/admob-ads-not-showing-in-ios)
 
-### showForm – java.lang.reflect.InvocationTargetException
+### showForm – `java.lang.reflect.InvocationTargetException`
 
 The error message from the simulator is somewhat unintuitive sometimes as it is wrapped in the simulator code.  
 The actual exception was the `NullPointerException` below the `InvocationTargetException`

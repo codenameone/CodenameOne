@@ -15,7 +15,7 @@ We are thrilled to announce the immediate availability of Codename One 3.3!
 Version 3.3 was tumultuous, we made a lot of earth shattering changes to performance, animations, fonts  
 and many other things. As a result we have a ground-breaking release that requires  
 a step back.   
-With 3.4 we want to tone down on the “big ticket changes” and work heavily on product refinement. We are already  
+With 3.4 we want to tone down on the "big ticket changes" and work heavily on product refinement. We are already  
 hard at work updating our docs and refining our general process..  
 In 3.3 we focused a lot on the open source aspect of Codename One which is something we neglected  
 to some extent in the past. We intend to keep pushing towards more transparency and community involvement  
@@ -28,10 +28,10 @@ Documentation & ease of use.
 ____Faster rendering of backgrounds & Labels
 
 Up until now the logic for rendering the background of the component  
-resided entirely within Component.java & DefaultLookAndFeel.java.  
+resided entirely within `Component.java` & `DefaultLookAndFeel.java`.  
 This allowed for a simple rendering logic that is implemented in a single place, however it didn’t allow us  
 to deeply optimize some operations in a platform specific way. We moved the rendering into  
-CodenameOneImplementation.java which allowed us to override the logic both on Android & iOS  
+`CodenameOneImplementation.java` which allowed us to override the logic both on Android & iOS  
 to deliver native grade performance on any device.  
 On iOS this has been a strait forward change where most of the low level logic is now written using  
 very efficient C code. On Android the pipeline complexity is far greater, but thanks to this approach  
@@ -51,7 +51,7 @@ As part of this enhancement we also added new animation types such as title scro
 ability to animate a style object UIID.  
 Read more about this work in [this blog post](/blog/new-animation-manager.html). 
 
-____“Remastered” Documentation (ongoing)
+____"Remastered" Documentation (ongoing)
 
 We are redoing a lot of the Codename One documentation from scratch with  
 Codename One 3.3. This is ongoing and we barely just started but the new documentation is far more readable,  

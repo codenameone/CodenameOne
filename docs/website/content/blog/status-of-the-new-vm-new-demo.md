@@ -38,7 +38,7 @@ reference counting
   
 Removing the reference counting logic reduced code size by 20% which helps speed up compilation and the overall app performance so this is a pretty significant leap. Doing that helped us leapfrog past the performance of the previous VM in most (although not all) benchmarks. With the new VM compilation time is often under 2 minutes as opposed to 5 minute compilation time on the old VM, this alone justifies the effort in migration.
 
-We also came across several “gotchas” in the new VM that you should be aware of:  
+We also came across several "gotchas" in the new VM that you should be aware of:  
 
   1. Default encoding – the old VM defaulted to US-ASCII as its encoding where the new VM defaults to UTF-8. UTF-8 is slightly slower so you might want to explicitly use US-ASCII.  
 
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can be one company that has several enterprise developer seats but yes we do see the expense. 
 >
-> To do Windows Phone right we need to start over and that’s up to 12 man months of work so picking that up without concrete “real” paying customer demand that would eventually recoup the cost doesn’t make much sense. We already did 3 separate efforts on the port only to be thwarted by MS’s changing strategies and limited market penetration. Its hard to convince ourselves to go at it again when the platform is so uncertain. 
+> To do Windows Phone right we need to start over and that’s up to 12 man months of work so picking that up without concrete "real" paying customer demand that would eventually recoup the cost doesn’t make much sense. We already did 3 separate efforts on the port only to be thwarted by MS’s changing strategies and limited market penetration. Its hard to convince ourselves to go at it again when the platform is so uncertain. 
 >
 > There are also constant rumors about APK support in Windows Phone which will really make this redundant.
 >

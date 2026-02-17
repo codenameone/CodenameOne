@@ -117,7 +117,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Right click the project. Click “Preference” select the Codename One section and click “Update Client Libraries”.
+> Right click the project. Click "Preference" select the Codename One section and click "Update Client Libraries".
 >
 
 

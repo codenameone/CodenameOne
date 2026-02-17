@@ -23,7 +23,7 @@ This demo was originally created using the old GUI builder but was modernized to
 You can check out the  
 [full source code here](https://github.com/codenameone/SocialBoo).
 
-We barely changed anything in this demo, although it did “age” it still looks reasonable even today. One of the  
+We barely changed anything in this demo, although it did "age" it still looks reasonable even today. One of the  
 few things added was a button to toggle the phone/tablet mode, this is really useful for a demo to show off  
 how these differences apply especially when running in a browser.
 
@@ -31,7 +31,7 @@ We replaced the old title behavior with the new `Toolbar` API, this required a f
 in terms of the design we didn’t need to do anything…​
 
 The switch from the old GUI builder to the new GUI builder almost worked but there was some reliance on splash  
-screen support in the old code. This isn’t supported by the new GUI builder as there is no concept of “flow”  
+screen support in the old code. This isn’t supported by the new GUI builder as there is no concept of "flow"  
 so we replicated roughly the same behavior using:
     
 ```java
@@ -43,7 +43,7 @@ if(SocialBoo.isTabletMode()) {
 ```
 
 Notice that we used the `SocialBoo.isTabletMode()` call instead of `Display.getInstance().isTablet()`. We did that  
-to allow forcing tablet/phone mode which is great for a demo although not really necessary for a “real world app”.
+to allow forcing tablet/phone mode which is great for a demo although not really necessary for a "real world app".
 
 ### Up Next
 
@@ -118,11 +118,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Error messages in the generated code in [Main.java](<http://Main.java>) file
 >
-> When I checked I found that all of the setPropertyValue methods which have “icon”, “icons”, or “selectedIcons” property name are not generated correctly.
+> When I checked I found that all of the setPropertyValue methods which have "icon", "icons", or "selectedIcons" property name are not generated correctly.
 >
 > For example, the closing parentheses in the following statement is missing when the code is regenerated every time the app is run:
 >
-> gui_JessicaButton.setPropertyValue(“icon”, (resourceObjectInstance.getImage(“avatar-1a.jpg”));
+> gui_JessicaButton.setPropertyValue("icon", (resourceObjectInstance.getImage("avatar-1a.jpg"));
 >
 > There are other similar icon setters methods in the same file that have the same issue.
 >
@@ -138,13 +138,13 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Thanks I see the bug. Unfortunately the only workaround I can see for now is to edit the .GUI file by hand and deleting this block:  
 > 
 ```
-<custom name=”icons” type=”com.codename1.ui.Image” array=”true” dimensions=”1″>
+<custom name="icons" type="com.codename1.ui.Image" array="true" dimensions="1″>
 <str>friends@2x.png</str>
 <str>chats@2x.png</str>
 <str>send-email@2x.png</str>
 <str>settings@2x.png</str>
 </custom>
-<custom name=”selectedIcons” type=”com.codename1.ui.Image” array=”true” dimensions=”1″>
+<custom name="selectedIcons" type="com.codename1.ui.Image" array="true" dimensions="1″>
 <str>friends@2x_sel.png</str>
 <str>chats@2x_sel.png</str>
 <str>send-email@2x_sel.png</str>

@@ -17,7 +17,7 @@ For more information about the CN1 Websockets lib, check out my [previous blog p
 
 ### Inside the Source of a UWP Native Interface
 
-__ |  This section describes how the C# implementations will look, but you don’t need to memorize this because you can just use the “Generate Native Access” option in your IDE to generate the basic structure, so you just need to fill in the methods with your implementations.   
+__ |  This section describes how the C# implementations will look, but you don’t need to memorize this because you can just use the "Generate Native Access" option in your IDE to generate the basic structure, so you just need to fill in the methods with your implementations.   
 ---|---  
   
 #### Parameter Types
@@ -82,7 +82,7 @@ The usage for this method would look something like:
 
 #### The UI Thread
 
-Most things in UWP are expected to occur on its main UI thread. This is especially the case when you are working with UI elements. The easiest way to run code on the UI thread is via the `com.codename1.impl.SilverlightImplementation.dispatcher.RunAsync()` method, as shown in the snippet above. This will run the code asynchronously. If you need to wait for the result of some code that occurs in this callback, as we did in the example above, then you can chain `.AsTask().GetAwaiter().GetResult();` to `RunAsync()`. This will effectively run your code synchronously.
+Most things in UWP are expected to occur on its main UI thread. This is especially the case when you are working with UI elements. The easiest way to run code on the UI thread is via the `com.codename1.impl.SilverlightImplementation.dispatcher.RunAsync()` method, as shown in the snippet above. This will run the code asynchronously. If you need to wait for the result of some code that occurs in this callback, as we did in the example above, then you can chain `RunAsync().AsTask().GetAwaiter().GetResult();`. This will effectively run your code synchronously.
 
 __ |  `.AsTask()` is only available if you add the `using System;` to the beginning of the file.   
 ---|---  
@@ -107,9 +107,9 @@ When developing native interfaces, the process I usually follow is:
 
   1. Create the native interface in java (in my CN1 environment – Netbeans, Eclipse, IntelliJ, etc..).
 
-  2. Generate native access to generate my stub inside the “native/win” directory.
+  2. Generate native access to generate my stub inside the "native/win" directory.
 
-  3. Enable the “Include Sources” option for my project so that the build server will generate a Visual Studio project for my app.
+  3. Enable the "Include Sources" option for my project so that the build server will generate a Visual Studio project for my app.
 
 ![Include source option enabled](/blog/uwp-native-interfaces-mix-c-java/include-source-option.png)
 
@@ -121,11 +121,11 @@ When developing native interfaces, the process I usually follow is:
 
 ![Download sources of UWP build](/blog/uwp-native-interfaces-mix-c-java/uwp-download-sources.png)
 
-  6. Open the “UWPApp” project in Visual Studio. The project is a Visual Studio 2015 project.
+  6. Open the "UWPApp" project in Visual Studio. The project is a Visual Studio 2015 project.
 
 ![Visual studio project sources](/blog/uwp-native-interfaces-mix-c-java/uwp-sources-directory.png)
 
-  7. Open and edit the native implementation (you’ll find it in the appropriate structure inside the “src” directory.
+  7. Open and edit the native implementation (you’ll find it in the appropriate structure inside the "src" directory.
 
 ![Visual studio solutions explorer](/blog/uwp-native-interfaces-mix-c-java/uwp-solution-explorer.png)
 

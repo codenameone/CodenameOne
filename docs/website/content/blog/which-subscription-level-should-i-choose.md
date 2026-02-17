@@ -26,7 +26,7 @@ Pro subscribers get a lot more, but find the biggest advantage to be in the supp
   
   
   
-With Enterprise subscribers we have scheduled “office hours” this essentially means we spend time with them on Skype (or other VoIP solutions) and go over the issues in person. The great benefit here is that we can actually go over a bug or a feature and give proper hands-on assistance in resolving such issues. E.g. on a recent session with a customer I used a feature within the simulator that allows us to  
+With Enterprise subscribers we have scheduled "office hours" this essentially means we spend time with them on Skype (or other VoIP solutions) and go over the issues in person. The great benefit here is that we can actually go over a bug or a feature and give proper hands-on assistance in resolving such issues. E.g. on a recent session with a customer I used a feature within the simulator that allows us to  
 [  
 edit and continue  
 ](http://codenameone.blogspot.co.il/2012/10/apply-code-changes-edit-continue.html)  

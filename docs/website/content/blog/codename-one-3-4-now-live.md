@@ -27,7 +27,7 @@ as good as the NetBeans plugin
 
   * **Shape Clipping** – it is now possible to [clip a graphics context based on an arbitrary shape](/blog/shape-clipping-bubble-transition/)
 
-  * **ToastBar** – allows [posting “hints” visually](/blog/toastbar-gaussian-blur/) to a hint area
+  * **ToastBar** – allows [posting "hints" visually](/blog/toastbar-gaussian-blur/) to a hint area
 
   * **Toolbar** is [now the default](/blog/toolbar-default-millimeter-sizes-weekly-releases/) &  
 has a refined implementation/usage
@@ -64,7 +64,7 @@ hopefully release/announce it separately.
 Besides the lowlights above which must be addressed, there are several other things we are looking at for 3.5:
 
   * Java 8 all the way – we will make Java 8 into the default build mode. Once that is in order we will experiment  
-with “only” Java 8 mode for newer builds.  
+with "only" Java 8 mode for newer builds.  
 Assuming this will work we will switch to Java 8 thru our entire stack and Codename One builtin code will be able  
 to use Java 8 language features.
 

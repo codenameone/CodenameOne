@@ -20,7 +20,7 @@ author: Shai Almog
   
   
 
-One of the things we’ve been missing is a simple “navigate” feature that allows you to launch the devices native navigation software with a fixed destination. This was relatively simple to hack together using Display.execute but that’s not the same as an official API. Chen just added two methods to Display that should really help in this process: isOpenNativeNavigationAppSupported & openNativeNavigationApp(lat, lon). This should launch the device navigation software (e.g. Google Maps) with the given destination.  
+One of the things we’ve been missing is a simple "navigate" feature that allows you to launch the devices native navigation software with a fixed destination. This was relatively simple to hack together using Display.execute but that’s not the same as an official API. Chen just added two methods to Display that should really help in this process: isOpenNativeNavigationAppSupported & openNativeNavigationApp(lat, lon). This should launch the device navigation software (e.g. Google Maps) with the given destination.  
   
   
   

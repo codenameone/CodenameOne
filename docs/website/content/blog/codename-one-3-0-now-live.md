@@ -109,7 +109,7 @@ to any form or transition.
 
 ____InteractionDialog
 
-A new “modless” dialog that can “float” on top of the  
+A new "modless" dialog that can "float" on top of the  
 UI using the layered pane capability of the parent form  
 Read more about this work on [this blog post](/blog/not-a-dialog-again.html). 
 

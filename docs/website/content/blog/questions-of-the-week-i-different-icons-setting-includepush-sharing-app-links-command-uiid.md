@@ -11,12 +11,12 @@ author: Shai Almog
 
 ![Header Image](/blog/questions-of-the-week-i-different-icons-setting-includepush-sharing-app-links-command-uiid/qanda-friday.jpg)
 
-I’d like to start a new weekly installment for the blog: “questions of the week”. I hope to have this as a regular  
+I’d like to start a new weekly installment for the blog: "questions of the week". I hope to have this as a regular  
 Friday post to coincide with the Friday release process. The general idea of this post is to bring to your attention  
 our answers to some stack overflow questions that might be helpful for the general community.
 
 We spend a lot of time answering stackoverflow questions and some of them are pretty elaborate, e.g  
-[“How Does Codename One Work?”](http://stackoverflow.com/questions/10639766/how-does-codename-one-work/10646336)  
+["How Does Codename One Work?"](http://stackoverflow.com/questions/10639766/how-does-codename-one-work/10646336)  
 is my highest rated answer and might be illuminating to many developers who are new to Codename One.
 
 A lot of us don’t have the time to follow all the questions and the answers but if presented with the questions/answers  

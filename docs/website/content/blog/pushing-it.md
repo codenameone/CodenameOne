@@ -77,7 +77,7 @@ You will then need to register to receive push notifications (its OK to call reg
   
   
   
-Sending the push is a more elaborate affair, we need to pass the elements to the push that are necessary for the various device types depending on the target device. If we send null as the destination device our message will be sent to all devices running our app. However, if we use the device key which you can get via Push.getDeviceKey() you can target the device directly. Notice that the device key is not the argument passed to the registration confirmation callback! 
+Sending the push is a more elaborate affair, we need to pass the elements to the push that are necessary for the various device types depending on the target device. If we send null as the destination device our message will be sent to all devices running our app. However, if we use the device key which you can get via `Push.getDeviceKey()` you can target the device directly. Notice that the device key is not the argument passed to the registration confirmation callback! 
 
   
 Other than that we need to send various arguments whether this is a production push (valid for iOS where there is a strict separation between the debug and the production push builds) as well as the variables discussed above.  

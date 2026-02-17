@@ -78,7 +78,7 @@ IDE integrated approach.
 
 #### The New GUI Builder
 
-Support for the new GUI builder is builtin, as the builder is still in beta I’ll leave this as a somewhat “undocumented feature”  
+Support for the new GUI builder is builtin, as the builder is still in beta I’ll leave this as a somewhat "undocumented feature"  
 until we finish that work. I would like to mention though that the integration injects code directly to the AST and  
 dynamically updates it when the gui XML file is saved.
 
@@ -209,7 +209,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > A few suggestion on improving the IDEA plugin:  
 > 1\. In the Codename One Preferences, tabbing between fields does not seem to work, requiring a mouse click into next fields. For example in the Login or iOS Certificate Wizard.  
 > 2\. It is unclear if user is logged in. It would be good to show login email under Login icon if login was successful.  
-> 3\. Adding certificate, revokes existing certificate. It prompts “Your iTunes account already has an iOS appstore certificate. Would you like to overwrite it?”. If I click ‘No’, then no certificate is used. It would also help to know that old certificate will be revoked in the message.  
+> 3\. Adding certificate, revokes existing certificate. It prompts "Your iTunes account already has an iOS appstore certificate. Would you like to overwrite it?". If I click ‘No’, then no certificate is used. It would also help to know that old certificate will be revoked in the message.  
 > 4\. The iOS Certificate Wizard, tried to create certificate for each device.  
 > 5\. In the device list of iOS Certificate Wizard, showing Identifier would be helpful.  
 > 6\. It should allow to select existing App ID and name for an application.  
@@ -263,7 +263,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > James van Kessel says:
 >
-> Hi Shai, For someone with an existing project, are there any warnings or cautions you’d give someone still using an older CN1 plugin (i am still on 3.1) before clicking “update Plugin”?
+> Hi Shai, For someone with an existing project, are there any warnings or cautions you’d give someone still using an older CN1 plugin (i am still on 3.1) before clicking "update Plugin"?
 >
 
 

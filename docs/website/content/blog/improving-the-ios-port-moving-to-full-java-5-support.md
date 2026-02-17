@@ -34,7 +34,7 @@ found out a while back during his investigations that the synchronized keyword i
 The next thing to do would be to remove the usage of Vector/Hashtable for MUCH faster performance by moving to ArrayList/HashMap both of which are unsynchronized and should boost performance on all devices.  
 
   
-Why didn’t we just “do it”?  
+Why didn’t we just "do it"?  
 
   
 The main issue is compilability,  

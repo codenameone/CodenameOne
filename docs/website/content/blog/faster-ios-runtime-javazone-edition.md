@@ -25,7 +25,7 @@ Before we get into the subject of today’s post a small public service announce
   
   
   
-I’m writing this while preparing for my JavaZone flight. What you see in the picture on the right is the typical content of my backpack which I carry with me everywhere in case there is a problem I need to debug, this is somewhat of a visual tutorial of “what it takes” to be a mobile developer today. I took this picture for the JavaZone presentation I’m making and I think it illustrates well why Codename One exists (BTW it is missing some of my testing devices such as the iPad 2, the Android tablets and a few J2ME phones). From left to right top to bottom:  
+I’m writing this while preparing for my JavaZone flight. What you see in the picture on the right is the typical content of my backpack which I carry with me everywhere in case there is a problem I need to debug, this is somewhat of a visual tutorial of "what it takes" to be a mobile developer today. I took this picture for the JavaZone presentation I’m making and I think it illustrates well why Codename One exists (BTW it is missing some of my testing devices such as the iPad 2, the Android tablets and a few J2ME phones). From left to right top to bottom:  
 
   1.   
 Windows 8 Machine (for building Windows Phone apps)  

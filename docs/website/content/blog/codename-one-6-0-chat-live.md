@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/codename-one-6-0-chat-live/codenameone-6-release-banner.jpg)
 
-We are thrilled to announce the release of [Codename One](https://www.codenameone.com/) 6.0 – Chat. Codename One is an open source “Write Once Run Anywhere” mobile platform for Java and Kotlin developers!  
+We are thrilled to announce the release of [Codename One](https://www.codenameone.com/) 6.0 – Chat. Codename One is an open source "Write Once Run Anywhere" mobile platform for Java and Kotlin developers!  
 With this release we introduced [Codename One Build](https://cloud.codenameone.com/buildapp/index.html) which is one of the biggest overhauls to the Codename One workflow since its inception. We also refined and updated many underlying technologies e.g. the xcode 10.1 migration, `WKWebView` support, push replies, badges on Android and much more.
 
 You can check out the details below for the full review but first if you are new to Codename One here’s a short primer. Codename One is the only platform that:
@@ -57,7 +57,7 @@ __ |  Currently the iOS version is still in beta due to the tedious appstore app
 
   * **Material Design Infinite Progress** — [InfiniteProgress](/blog/switch-progress-pull/) now has a material design mode that includes the custom circle animation we see in material design
 
-  * **WKWebView Support** — Apple includes two implementations of a “WebView”. We now support [both](/blog/wkwebview/)
+  * **WKWebView Support** — Apple includes two implementations of a "WebView". We now support [both](/blog/wkwebview/)
 
   * **CSS Improvements** — underline border is now [supported natively](https://github.com/codenameone/CodenameOne/commit/b6a85e5c8ab161405a18d51871b48df43744e806). Round rectangle is also [supported natively](https://github.com/codenameone/CodenameOne/commit/66c87a6f2896bed0b1ed2834860b230e4ec8648f) and lets you activate the angle only on [specific corners](https://github.com/codenameone/CodenameOne/commit/52172ba9297ccfefaeb9497fae39b3360edeea5d) as per [this RFE](https://github.com/codenameone/CodenameOne/issues/2350)
 

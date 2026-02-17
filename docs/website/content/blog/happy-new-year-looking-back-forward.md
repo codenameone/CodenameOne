@@ -43,7 +43,7 @@ The new year seems like a great time to discuss some of our short/long term plan
 
   5. We traveled too much in 2014, while it seemed productive initially it didn’t directly map to business success and we probably won’t be doing as much travel/conferences in 2015.  
 
-We hope to improve on all of those for 2015 and so far its looking very positive. Most of the “heavy” infrastructure work was done in 2014 which means 2015 will allow us to leap forward with better underlying technology and focus on the surface of things. 
+We hope to improve on all of those for 2015 and so far its looking very positive. Most of the "heavy" infrastructure work was done in 2014 which means 2015 will allow us to leap forward with better underlying technology and focus on the surface of things. 
 
 These are the things we’re very happy about in 2014:  
   

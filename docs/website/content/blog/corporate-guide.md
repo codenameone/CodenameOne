@@ -45,7 +45,7 @@ Up until now desktop applications in Codename One shared the same .cn1 storage a
   
   
   
-The Google Play ads were causing some issues in Gingerbread devices where clicks would have no effect, unfortunately we aren’t clear on why exactly this happens but its related to obfuscation probably removing some compatibility code needed by Google. The only workaround we found for this to work on older devices is to disable obfuscation on Android by using the build argument: android.enableProguard=false  
+The Google Play ads were causing some issues in Gingerbread devices where clicks would have no effect, unfortunately we aren’t clear on why exactly this happens but its related to obfuscation probably removing some compatibility code needed by Google. The only workaround we found for this to work on older devices is to disable obfuscation on Android by using the build argument: `android.enableProguard=false`  
   
   
   

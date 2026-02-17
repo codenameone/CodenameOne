@@ -26,7 +26,7 @@ We were hoping to expose the build argument for the new VM by now but right now 
 
 We are busy catching up to the many issues and RFE’s opened by pro/enterprise users during the past few weeks as we were working on the new VM. Some features/fixes of interest include the JSONParser which now has a special mode called setUseLongs(). This mode uses long objects for round values rather than doubles. So a numeric value might be a long or it might be a double.
 
-By default the JSON parser always produces Doubles, the reason behind that is that we are missing support for the java.lang.Number class which would have been really useful for this case. Without that class its difficult to write a generic parser so we chose to go only with doubles. However, for larger numbers this is a problem which is why we now also offer the option to generate longs.
+By default the JSON parser always produces Doubles, the reason behind that is that we are missing support for the `java.lang.Number` class which would have been really useful for this case. Without that class its difficult to write a generic parser so we chose to go only with doubles. However, for larger numbers this is a problem which is why we now also offer the option to generate longs.
 
 In addition we made maps within the JSON (key/value pairs) use LinkedHashMap rather than HashMap, this preserves their order from within the JSON after parsing which is important for some use cases.
 

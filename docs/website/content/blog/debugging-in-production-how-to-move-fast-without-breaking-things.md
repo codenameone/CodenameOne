@@ -15,7 +15,7 @@ Learn how we debug our backend servers and provide fast updates without breaking
 
 ![Debugging in Production - How to move fast without breaking things](/blog/debugging-in-production-how-to-move-fast-without-breaking-things/Debugging-in-Production-How-to-move-fast-without-breaking-things-1024x280.jpeg)
 
-Mark Zuckerberg famously quipped that Facebook works under the “Move fast and break things” motto. We can write all the unit tests in the world, have the largest QA pipeline but still bugs slither into production. That’s just a fact of life which he chose to celebrate.
+Mark Zuckerberg famously quipped that Facebook works under the "Move fast and break things" motto. We can write all the unit tests in the world, have the largest QA pipeline but still bugs slither into production. That’s just a fact of life which he chose to celebrate.
 
 When dealing with an incredibly complex system like we have in [Codename One](https://www.codenameone.com/) this can be the difference between releasing an update and doing nothing.
 
@@ -27,7 +27,7 @@ The problem with this approach becomes apparent when we have a bug in production
 
 ## • Revert — That might not be an option for all cases • Find/Implement a Fix
 
-Notice that I left out “reproduce it locally”. This is often not an option for production bugs which work on a separate DB in “real world” conditions. In our case local debugging is very difficult due to the multiple separate servers that hand off tasks to one another.
+Notice that I left out "reproduce it locally". This is often not an option for production bugs which work on a separate DB in "real world" conditions. In our case local debugging is very difficult due to the multiple separate servers that hand off tasks to one another.
 
 The second option is usually best but it includes a huge risk: what if the fix fails?
 
@@ -39,7 +39,7 @@ So a couple of years ago I met two young founders who had an idea on how to solv
 
 The gist of this is that your app constantly runs in a production debugging mode, the overhead is barely noticeable. A secure agent connects the app to the cloud and lets you debug in a special way.
 
-e.g. instead of breakpoints you have snapshots. They don’t “break”. They provide you with a stack trace of the thread and the variable state at the given time. You can also inject log statements, count executions and even do simple profiling on methods or blocks of code.
+e.g. instead of breakpoints you have snapshots. They don’t "break". They provide you with a stack trace of the thread and the variable state at the given time. You can also inject log statements, count executions and even do simple profiling on methods or blocks of code.
 
 I was so impressed by this idea that I decided to join the team and now hold two jobs (at [Codename One](https://www.codenameone.com/) and at [Lightrun](https://www.lightrun.com/)). The cool thing is that my job at [Codename One](https://www.codenameone.com/) is now much easier thanks to [Lightrun](https://www.lightrun.com/).
 
@@ -70,7 +70,7 @@ Pretty darn useful!
 Instead of stepping over you can just add multiple snapshots or even inject logs to print information when hitting a specific line. Including simple expressions such as: `The value is {obj.getValue()}`.
   
   
-My immediate thought was “won’t this be expensive?”.
+My immediate thought was "won’t this be expensive?".
   
   
 It isn’t. If we have a very complex/expensive expressions that prints too much per second or uses problematic (e.g. recursive) logic, Lightrun is smart enough to limit itself so the expression won’t take too much CPU. It protects you from shooting yourself in the foot…
@@ -143,13 +143,13 @@ Once logged in, the Next button in the wizard will become enabled and you could 
 
 Agent Install instructions, notice I erased private information
 
-The agent is typically installed on your server and not on your local machine. So when I reached this page “Mac” was selected. I had to explicitly select the Linux page and copy the script that installs the agent on Linux machines.
+The agent is typically installed on your server and not on your local machine. So when I reached this page "Mac" was selected. I had to explicitly select the Linux page and copy the script that installs the agent on Linux machines.
 
-The next step is to SSH to the machine and run the script. It creates an “agent” directory which we’ll use when binding the agent.
+The next step is to SSH to the machine and run the script. It creates an "agent" directory which we’ll use when binding the agent.
 
-The gist of this is that we need to add the `-agentpath` argument to the JVM. That’s very simple if your deployment has a “java” command invocation at some point but if your running as a service or within a container that might not be so simple.
+The gist of this is that we need to add the `-agentpath` argument to the JVM. That’s very simple if your deployment has a "java" command invocation at some point but if your running as a service or within a container that might not be so simple.
 
-Once you do that the “Next” option will be enabled and you would be able to use Lightrun.
+Once you do that the "Next" option will be enabled and you would be able to use Lightrun.
 
 But there are more complex cases, I would recommend reviewing the list [here](https://docs.lightrun.com/).
 

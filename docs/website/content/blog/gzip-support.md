@@ -36,7 +36,7 @@ GZConnectionRequest con = new GZConnectionRequest();
   
 con.  
   
-addRequestHeader(“Accept-Encoding”, “gzip”);
+addRequestHeader("Accept-Encoding", "gzip");
 
   
 Do the rest as usual and you should have smaller responses by potential.  
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Since the web browser uses native connections and doesn’t go thru connection request gzip should “just work” for that case.
+> Since the web browser uses native connections and doesn’t go thru connection request gzip should "just work" for that case.
 >
 
 

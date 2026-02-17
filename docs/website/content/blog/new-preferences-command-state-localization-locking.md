@@ -26,7 +26,7 @@ Notice that the UX while similar has some distinct differences:
 
   * We use the mobile style of scrolling as it was built with Codename One
 
-  * You can see global settings by clicking the “Globe” button on the top left
+  * You can see global settings by clicking the "Globe" button on the top left
 
   * You can save/cancel using the X or save buttons on the top right.
 

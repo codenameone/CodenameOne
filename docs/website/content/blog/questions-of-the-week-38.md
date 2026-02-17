@@ -25,7 +25,7 @@ This isn’t the first time people asked for that but we won’t deliver it. Doi
 
 We have a process of [submitting patches to Codename One](/blog/how-to-use-the-codename-one-sources.html), patches are always accepted quickly when they are valid. If something needs fixing that’s what you need to do. If you need a hack then submit a patch that defines the extension point that you need. That’s why we are open source…​
 
-In the past this might have been painful as you would need to wait until we updated the servers, but since changes go in every week in recent revisions this is no longer an issue. Don’t think of it as “contributing”, think of it as free code reviews where the entire community pulls together to improve your work…​
+In the past this might have been painful as you would need to wait until we updated the servers, but since changes go in every week in recent revisions this is no longer an issue. Don’t think of it as "contributing", think of it as free code reviews where the entire community pulls together to improve your work…​
 
 ---
 

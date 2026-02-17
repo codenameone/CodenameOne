@@ -32,7 +32,7 @@ This will toggle on the new Android optimizations (but have no effect elsewhere)
 forth dynamically to see the difference. Although notice that you should probably recreate the form when doing this  
 as some content might end up blank as a result.   
 Notice that while this improves our Android performance significantly on newish devices (ironically we perform  
-well on older devices and very new devices), this isn’t the “end all” for performance tuning on Android. We  
+well on older devices and very new devices), this isn’t the "end all" for performance tuning on Android. We  
 are still working on improving performance further both on Android & iOS. This will also include revisited  
 tools & guides for performance optimization/tuning of your apps.
 

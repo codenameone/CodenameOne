@@ -14,7 +14,7 @@ author: Shai Almog
 As you may know Google is ending support for Google code effectively forcing us to migrate to github. While  
 we like a lot of things about github their 1gb per workspace restriction makes the migration process rather difficult  
 since we have to manually delete some histories for binary files we committed into SVN.  
-Making matters worse, Google’s so called “automated tools” are ridiculously simplistic and don’t support anything  
+Making matters worse, Google’s so called "automated tools" are ridiculously simplistic and don’t support anything  
 like this or migration of more than 1000 issues! 
 
 This effectively means we will need to perform the migration manually, we will probably discard the existing tags  

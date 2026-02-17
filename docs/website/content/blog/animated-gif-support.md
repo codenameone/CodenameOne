@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/animated-gif-support/vacation.jpg)
 
-So you know how you write a blog post just before you go on vacation, press publish and never check that it actually got published…​ Funny thing, that’s exactly what I did and the blog post mentioning that I was on “vacation” for a couple of weeks never got published. Anyway, other people have been busy while I was “away” but I got a couple of things done too including animated gif support.
+So you know how you write a blog post just before you go on vacation, press publish and never check that it actually got published…​ Funny thing, that’s exactly what I did and the blog post mentioning that I was on "vacation" for a couple of weeks never got published. Anyway, other people have been busy while I was "away" but I got a couple of things done too including animated gif support.
 
 Before we get to that Steve did a lot of work on Mac retina display support. This is a HUGE leap in usability if you use a retina Mac. It makes the iPhone 3gs skin tiny but you can now use the iPhone 5 skin without scaling…​ It looks great and uses the pixels on these Macs really well.
 

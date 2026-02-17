@@ -25,7 +25,7 @@ Exciting news this week, Chen FINALLY did what we procrastinated on for so long 
   
 This is really easy to incorporate  
   
-into your code, just replace your usage of TextField with AutoCompleteTextField and define the data that the auto complete should work from. There is a default implementation that accepts a String array or a ListModel for completion strings, this can work well for a “small” set of thousands (or tens of thousands) of entries.  
+into your code, just replace your usage of TextField with AutoCompleteTextField and define the data that the auto complete should work from. There is a default implementation that accepts a String array or a ListModel for completion strings, this can work well for a "small" set of thousands (or tens of thousands) of entries.  
   
   
   
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> always saying “you can filter”. please show us one example..
+> always saying "you can filter". please show us one example..
 >
 
 

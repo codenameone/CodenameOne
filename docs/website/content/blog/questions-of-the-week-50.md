@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/questions-of-the-week-50/qanda-friday2.jpg)
 
-I’ve been back from the bootcamp this past week and while I have committed many new changes I’m still taking things relatively easy after the hard work of the bootcamp. This will be the last Q&A Friday segment in the blog. Starting next week I’ll replace this segment with “tutorial of the week” which will focus on publishing/updating a “How do I?” video tutorial on a weekly basis.
+I’ve been back from the bootcamp this past week and while I have committed many new changes I’m still taking things relatively easy after the hard work of the bootcamp. This will be the last Q&A Friday segment in the blog. Starting next week I’ll replace this segment with "tutorial of the week" which will focus on publishing/updating a "How do I?" video tutorial on a weekly basis.
 
 We pushed an update to the libraries this week with a few interesting new features that we haven’t documented yet, I hope to have time during the week to write more about these new features and capabilities.
 

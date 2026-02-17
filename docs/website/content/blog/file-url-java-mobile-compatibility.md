@@ -20,7 +20,7 @@ balance. To improve the situation we created two new classes: `com.codename1.io.
 They are meant to be drop-in replacements for `java.io.File` & `java.net.URL` to help you port existing code.
 
 This doesn’t mean that every API will work or behave as you expect as the mapping is sometimes counter intuitive  
-e.g. `File` works with relative paths which we don’t support. We had some thoughts about the “right way” to  
+e.g. `File` works with relative paths which we don’t support. We had some thoughts about the "right way" to  
 implement the `URL` API and eventually decided to use our internal synchronous API and not the high level  
 `ConnectionRequest` API.
 
@@ -29,7 +29,7 @@ more compatible with the JavaSE API of the same name. This also means that using
 separate from `ConnectionRequest` and will not block the network thread when you do so.
 
 We’d like to start looking at big ticket Java libraries that people use that we can port to Codename One. So we  
-can learn from the process and provide both “best practices” and better support from within.  
+can learn from the process and provide both "best practices" and better support from within.  
 If you have a wishlist of a jars you want to use in Codename One let us know and we’ll add them to the consideration.
 
 ---

@@ -70,7 +70,7 @@ If you haven’t been to San Francisco its truly a unique microcosm within the U
   
   
   
-If you haven’t been to JavaOne in recent years (since it left Moscone) then you need to check out “Taylor st. Cafe”. Oracle literally closes a portion of Taylor street that passes next to the Hilton and sets up a coffee shop in the middle of the streets (the whole thing is carpeted and perimetered very efficiently). The effect is pretty amazing and on Sunday we had the first “official” JavaOne party over there which was pretty cool. I spoke with some interesting people and had a blast. 
+If you haven’t been to JavaOne in recent years (since it left Moscone) then you need to check out "Taylor st. Cafe". Oracle literally closes a portion of Taylor street that passes next to the Hilton and sets up a coffee shop in the middle of the streets (the whole thing is carpeted and perimetered very efficiently). The effect is pretty amazing and on Sunday we had the first "official" JavaOne party over there which was pretty cool. I spoke with some interesting people and had a blast. 
 
 On Monday thru Wednesday we spent all day in the booth talking to people and telling them about Codename One, by our estimates we pitched to about 700 different individuals in the 3 pavilion days so we didn’t get to see any sessions other than our own (a first for me at JavaOne). We did get to go to the parties at night if we could drag ourselves after running around pitching all day e.g. on the first night there was an empire of the sun concert. We didn’t know the band beforehand but they were pretty great and gave an amazing show filled with pyrotechnics which were damn impressive.   
 

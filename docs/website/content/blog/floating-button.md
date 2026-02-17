@@ -49,7 +49,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Chidiebere Okwudire** — September 14, 2016 at 3:10 pm ([permalink](/blog/floating-button/#comment-22898))
 
-> Another nice one! Does the “+” also animate to an “x” when opening the sub-menu? 🙂
+> Another nice one! Does the "+" also animate to an "x" when opening the sub-menu? 🙂
 >
 
 
@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> I’ve given this some thought and decided to just change the implementation so the code above “just works”. Set the background color of the UIID: FloatingActionButton
+> I’ve given this some thought and decided to just change the implementation so the code above "just works". Set the background color of the UIID: FloatingActionButton
 >
 
 
@@ -145,7 +145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Google’s design explicitly forbids scrolling.
 >
-> They consider these to be “speed dial” which means you pick the top 4 entries and anything beyond that should reside in a “…” more action. This is indeed more intuitive for such cases.
+> They consider these to be "speed dial" which means you pick the top 4 entries and anything beyond that should reside in a "…" more action. This is indeed more intuitive for such cases.
 >
 
 
@@ -275,12 +275,12 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > fabtn.getAllStyles().setFgColor(0xffd800);  
 > fabtn.getAllStyles().setBgColor(0xffd800);
 >
-> fabtn.addActionListener(e -> ToastBar.showErrorMessage(“Add Personel Not implemented yet…”));  
-> fabtn.createSubFAB(FontImage.MATERIAL_PEOPLE, “Add Personel”).getAllStyles().setBgColor(0xffd800);  
+> fabtn.addActionListener(e -> ToastBar.showErrorMessage("Add Personel Not implemented yet…"));  
+> fabtn.createSubFAB(FontImage.MATERIAL_PEOPLE, "Add Personel").getAllStyles().setBgColor(0xffd800);  
 > fabtn.setTextPosition(BOTTOM);
 >
-> fabtn.addActionListener(f -> ToastBar.showErrorMessage(“Add Equipment Not implemented yet…”));  
-> fabtn.createSubFAB(FontImage.MATERIAL_COMMENT, “Add Equipment”).getAllStyles().setBgColor(0xffd800);  
+> fabtn.addActionListener(f -> ToastBar.showErrorMessage("Add Equipment Not implemented yet…"));  
+> fabtn.createSubFAB(FontImage.MATERIAL_COMMENT, "Add Equipment").getAllStyles().setBgColor(0xffd800);  
 > fabtn.setTextPosition(BOTTOM);
 >
 > Also, I can’t seem to get the submenu text to show! Finally, how do I style the submenu items individually e.g. text position or font colour? I have only been able to change the icon colours for the main button and the sub buttons as shown above.
@@ -307,21 +307,21 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Below is what I have done but the way I’ve done it doesn’t allow changing the BgColor for each SubFub as previously. Could you please show my how I can be able to do so?
 >
-> fabtn.createSubFAB(FontImage.MATERIAL_HELP, “Help”).addActionListener(new ActionListener()  
+> fabtn.createSubFAB(FontImage.MATERIAL_HELP, "Help").addActionListener(new ActionListener()  
 > {  
 > @Override  
 > public void actionPerformed(ActionEvent evt)  
 > {  
-> ToastBar.showErrorMessage(“Help button pressed…”);  
+> ToastBar.showErrorMessage("Help button pressed…");  
 > }  
 > });
 >
-> fabtn.createSubFAB(FontImage.MATERIAL_BUILD, “Settings”).addActionListener(new ActionListener()  
+> fabtn.createSubFAB(FontImage.MATERIAL_BUILD, "Settings").addActionListener(new ActionListener()  
 > {  
 > @Override  
 > public void actionPerformed(ActionEvent evt)  
 > {  
-> ToastBar.showErrorMessage(“Admin button pressed…”);  
+> ToastBar.showErrorMessage("Admin button pressed…");  
 > }  
 > });
 >
@@ -352,9 +352,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> `FloatingActionButton subFabHelp = fabtn.createSubFAB(FontImage.MATERIAL_HELP, “Help”);  
+> `FloatingActionButton subFabHelp = fabtn.createSubFAB(FontImage.MATERIAL_HELP, "Help");  
 > subFabHelp.addActionListener(…);  
-> subFabHelp.setUIID(“SubFabStyle”);  
+> subFabHelp.setUIID("SubFabStyle");  
 > `
 >
 > Or similar.

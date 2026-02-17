@@ -15,7 +15,7 @@ When Codename One packages applications into native apps we hide a lot of detail
 One of the things we had an issue with is `getResource/getResourceAsStream` both of which  
 are problematic since they support hierarchies and a concept of package relativity.   
 That’s a concept that is problematic in iOS, generally everything about file access within the bundle in iOS  
-is a bit problematic to accomplish in a cross platform way because Apple tries so hard to “simplify” and ends  
+is a bit problematic to accomplish in a cross platform way because Apple tries so hard to "simplify" and ends  
 up creating fragmentation for us. 
 
 So we have our own `getResourceAsSteam` in the `Display` class and that works  

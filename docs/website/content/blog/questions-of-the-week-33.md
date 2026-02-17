@@ -28,7 +28,7 @@ I am Working on an app with requirement where we need to create a dynamic image 
 
 ### Can’t install iOs App anymore
 
-I made some fixes for my App and wanted to try it out today on my iPhone and now I can’t install it on the device anymore. I’m getting the error “Unable to Download App” on the phone. I haven’t …​
+I made some fixes for my App and wanted to try it out today on my iPhone and now I can’t install it on the device anymore. I’m getting the error "Unable to Download App" on the phone. I haven’t …​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40772983/codename-one-cant-install-ios-app-anymore)
 
@@ -70,7 +70,7 @@ I’ve got a problem when using the BrowserComponent in Codenameone: When callin
 
 ### Codename1 side menu misplacement
 
-I am trying to specify sidemenu width with the follow code: Hashtable<String, Integer> h = new Hashtable<>(); h.put(“sideMenuSizePortraitInt”, 50); h.put(“…​
+I am trying to specify sidemenu width with the follow code: Hashtable<String, Integer> h = new Hashtable<>(); h.put("sideMenuSizePortraitInt", 50); h.put("…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40715308/codename1-side-menu-misplacement)
 
@@ -82,13 +82,13 @@ I need to debug my CN1 app on Android. That’s why I successfully followed the 
 
 ### Redirect to page Contact Phone IOS in cordova-Codenameone
 
-I use Cordova Hybrid Apps in Codename One and My question is : “How can I call, from AngularJS, the contacts page of my IPhone”. Thanks
+I use Cordova Hybrid Apps in Codename One and My question is : "How can I call, from AngularJS, the contacts page of my IPhone". Thanks
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40715050/redirect-to-page-contact-phone-ios-in-cordova-codenameone)
 
 ### How to use slide transition for images on the same form in codename one
 
-Pls how can i use slide transition for Images on the same Form? I used this code, but it shows and error Label lab = new Label(); lab.setUIID(“IMAGE”); lab.setTransitionOutAnimator(…​
+Pls how can i use slide transition for Images on the same Form? I used this code, but it shows and error Label lab = new Label(); lab.setUIID("IMAGE"); lab.setTransitionOutAnimator(…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40712396/how-to-use-slide-transition-for-images-on-the-same-form-in-codename-one)
 
@@ -116,7 +116,7 @@ If you are experiencing an issue please mention the full platform your issue app
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40700730/codename-one-geofencing)
 
-### How to force permission “android.permission.CAMERA” to be added to manifest in Codename one
+### How to force permission "`android.permission.CAMERA`" to be added to manifest in Codename one
 
 I am trying to show a live preview of the rear facing camera in Codename One. I use for that the native interface (I am targetting Android first). To allow my app to use the camera without messing …​
 
@@ -142,7 +142,7 @@ I am trying to build my App but when sending the build nothing really happens an
 
 ### How to manage/control font/component size in Javascript Build apps
 
-I found my Javascript build apps’s font/control size show differently in different platform, e.g. it show normal in iphone’s safari browser, but shown “huge” in android chrome browser. It also shown …​
+I found my Javascript build apps’s font/control size show differently in different platform, e.g. it show normal in iphone’s safari browser, but shown "huge" in android chrome browser. It also shown …​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40655637/how-to-manage-control-font-component-size-in-javascript-build-apps)
 

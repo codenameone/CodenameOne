@@ -29,7 +29,7 @@ URL’s that work on iOS
   
 Normally on iOS you would do something like  
   
-canOpenURL followed by openURL assuming the can message returned true. However, Android et al doesn’t have anything quite like that. To enable this at least for iOS if not elsewhere we added a Display.canExecute() method to go with the Display.execute() method. However, canExecute returns a Boolean instead of a boolean which allows us to support 3 result states:  
+canOpenURL followed by openURL assuming the can message returned true. However, Android et al doesn’t have anything quite like that. To enable this at least for iOS if not elsewhere we added a `Display.canExecute()` method to go with the `Display.execute()` method. However, canExecute returns a Boolean instead of a boolean which allows us to support 3 result states:  
   
   
 1\. Boolean.TRUE – the URL can be executed.  

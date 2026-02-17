@@ -89,7 +89,7 @@ folder:
 
 I think this shows some of the directions we will be taking with Codename One components as we move forward.  
 Future components from us will make more use of the icon fonts and material design icons to allow a default  
-look that “just works” everywhere.
+look that "just works" everywhere.
 
 You would still be able to customize everything like you always did but unlike the past, we hope the default look  
 will start off as both functional and attractive.
@@ -106,14 +106,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Guys,
 >
-> How do I translate the text (“Search” ) of TextHintSearch?
+> How do I translate the text ("Search" ) of TextHintSearch?
 >
 > I’m testing on Android and I notice a strange behavior.  
 > Is it possible to delete any forrm animation? To avoid appearing to be reloaded?
 >
 > I have commented hi.getContentPane().animateLayout(150); but still flickering the form when click in back.
 >
-> When testing on Android (did not test on others), and start typing, does not show the magnifying glass icon in “Enter” key of keyboard, is possible?
+> When testing on Android (did not test on others), and start typing, does not show the magnifying glass icon in "Enter" key of keyboard, is possible?
 >
 > And also does not accept ENTER in search text field. To perform the search I have to hit back (on device) and only then the text is accepted and search performed.  
 > I believe the component is interpreting ENTER as a new line rather than executing the command.
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > Hi,  
-> I’ll make it so “[m.search](<http://m.search>)” in the resource bundle will allow you to localize this. This video is a bit old but it discusses localizations: [https://www.codenameone.com…]([/how-do-i—localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app.html](https://www.codenameone.com/how-do-i---localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app/))
+> I’ll make it so "[m.search](<http://m.search>)" in the resource bundle will allow you to localize this. This video is a bit old but it discusses localizations: [https://www.codenameone.com…]([/how-do-i—localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app.html](https://www.codenameone.com/how-do-i---localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app/))
 >
 > Currently we don’t support disabling the animation but what did you do that triggered this? It’s hard for me to visualize the issue you’re seeing.
 >
@@ -142,7 +142,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I’ll work a little on it.
 >
 > PS: It may be interesting to leave the SearchTextField field public.  
-> So I could make small hacks like search.getSearchTextField (). PutClientProperty (“searchField”, Boolean.TRUE);
+> So I could make small hacks like search.getSearchTextField (). PutClientProperty ("searchField", Boolean.TRUE);
 
 
 ### **Shai Almog** — February 19, 2017 at 7:15 am ([permalink](/blog/toolbar-search-mode/#comment-23139))
@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Nils Lamb says:
 >
-> I added the “[m.search](<http://m.search>)” key into my custom resource bundle. This currently contains the locales de and en, which works fine for the rest of the application. However, the search hint text which defaults to “Search” in english, does not use the values from the [m.search](<http://m.search>) key.  
+> I added the "[m.search](<http://m.search>)" key into my custom resource bundle. This currently contains the locales de and en, which works fine for the rest of the application. However, the search hint text which defaults to "Search" in english, does not use the values from the [m.search](<http://m.search>) key.  
 > Is this implemented already?
 
 

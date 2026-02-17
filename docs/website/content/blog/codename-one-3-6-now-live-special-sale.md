@@ -11,8 +11,8 @@ author: Shai Almog
 
 ![Header Image](/blog/codename-one-3-6-now-live-special-sale/codenameone-3-6.jpg)
 
-[Codename One](/), the “industry defining” **Write Once Run Anywhere native mobile app platform for Java developers** has just published version 3.6.  
-We’re thrilled with this release whose key features are offline build support and official support for UWP (Universal Windows Platform). Starting with this release we are changing the scope for Codename One: Instead of trying to be “as good as native” we’d like to aim to be “better than native”.
+[Codename One](/), the "industry defining" **Write Once Run Anywhere native mobile app platform for Java developers** has just published version 3.6.  
+We’re thrilled with this release whose key features are offline build support and official support for UWP (Universal Windows Platform). Starting with this release we are changing the scope for Codename One: Instead of trying to be "as good as native" we’d like to aim to be "better than native".
 
 We already offer many advantages over native platform development:
 
@@ -40,7 +40,7 @@ __ |  The special deal has elapsed, thanks for all of you who signed up!
   
 ### Highlights of this Release
 
-  * **Offline Build Support** – Building thru the cloud is one of the “defining features” of Codename One, but some government level customers need the [ability to build offline](/blog/offline-build/) due to regulatory concerns
+  * **Offline Build Support** – Building thru the cloud is one of the "defining features" of Codename One, but some government level customers need the [ability to build offline](/blog/offline-build/) due to regulatory concerns
 
   * **Production grade UWP (Universal Windows Platform) Port** – [UWP](/manual/appendix-uwp/) allows seamless native support for Windows 10 on Intel/ARM devices & PC’s such as the very popular Surface line
 

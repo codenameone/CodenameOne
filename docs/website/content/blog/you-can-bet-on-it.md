@@ -17,7 +17,7 @@ Recently the guys from Software Developer Journal contacted us about writing a
 [  
 mobile gaming article  
 ](http://sdjournal.org/game-development-how-to-become-a-millionaire-preorder/)  
-, since quite a few Codename One developers use it to write games we decided to accept the offer and I wrote an article titled: “Writing casual games In Java for mobile devices”. In this article we create a simple poker game mockup that is fully functional (although it doesn’t include betting, AI or networking), but you can drag the cards to have them replaced and click the deck to deal new cards. 
+, since quite a few Codename One developers use it to write games we decided to accept the offer and I wrote an article titled: "Writing casual games In Java for mobile devices". In this article we create a simple poker game mockup that is fully functional (although it doesn’t include betting, AI or networking), but you can drag the cards to have them replaced and click the deck to deal new cards. 
 
   
 The game took 270 lines of code (including imports,  
@@ -63,9 +63,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> <div class=”blogCommentText”>
+> <div class="blogCommentText">
 >
-> Wow, CN1 is becoming more and more versatile all the time! I’d be curious to know if you had to bend some parts in unexpected ways to make this work…any new animations? a new layout manager? I don’t suppose so since you mentioned it took only a handful of lines of code… After trying the “components” approach instead of directly painting stuff yourself, is this something you would recommend for other casual games? This could open up a whole new family of CN1 apps! 
+> Wow, CN1 is becoming more and more versatile all the time! I’d be curious to know if you had to bend some parts in unexpected ways to make this work…any new animations? a new layout manager? I don’t suppose so since you mentioned it took only a handful of lines of code… After trying the "components" approach instead of directly painting stuff yourself, is this something you would recommend for other casual games? This could open up a whole new family of CN1 apps! 
 >
 > Good job Shai! 
 >
@@ -76,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> <div class=”blogCommentText”>
+> <div class="blogCommentText">
 >
 > Thanks. 
 >

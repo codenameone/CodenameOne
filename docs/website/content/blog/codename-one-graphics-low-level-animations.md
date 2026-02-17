@@ -19,11 +19,11 @@ In my previous post, I created a static analog clock component. In this post, I 
 
 From the [Developer’s Guide:](http://www.codenameone.com/manual/)
 
-> The Codename One event dispatch thread has a special animation “pulse” allowing an animation to update its state and draw itself.
+> The Codename One event dispatch thread has a special animation "pulse" allowing an animation to update its state and draw itself.
 > 
 > Every component in Codename One contains an animate() method that returns a boolean value, you can also implement the Animation interface in an arbitrary component to implement your own animation. In order to receive animation events you need to register yourself within the parent form, it is the responsibility of the parent for to call animate().
 > 
-> If the animate method returns true then the animation will be painted. It is important to deregister animations when they aren’t needed to conserve battery life. However, if you derive from a component, which has its own animation logic you might damage its animation behavior by deregistering it, so tread gently with the low level API’s.” 
+> If the animate method returns true then the animation will be painted. It is important to deregister animations when they aren’t needed to conserve battery life. However, if you derive from a component, which has its own animation logic you might damage its animation behavior by deregistering it, so tread gently with the low level API’s." 
 
 #### Device Support
 
@@ -34,7 +34,7 @@ The Codename One animation API is a core feature of Codename One and it is suppo
 In order to animate our clock so that it updates once per second, we only need to do two things:
 
   1. Implement the animate() method to indicate when the clock needs to be updated/re-drawn.
-  2. Register the component with the form so that it will receive animation “pulses”.
+  2. Register the component with the form so that it will receive animation "pulses".
 
 The animate() method in my AnalogClock class:
     
@@ -51,7 +51,7 @@ The animate() method in my AnalogClock class:
     return false;
     } 
 
-This method will be called on each “pulse” of the EDT. It checks the last time the clock was rendered and returns true only if the clock hasn’t been rendered in the current “time second” interval. Otherwise it returns false. This ensures that the clock will only be redrawn when the time changes. 
+This method will be called on each "pulse" of the EDT. It checks the last time the clock was rendered and returns true only if the clock hasn’t been rendered in the current "time second" interval. Otherwise it returns false. This ensures that the clock will only be redrawn when the time changes. 
 
 #### Starting and Stopping the Animation
 

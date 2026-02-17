@@ -11,11 +11,11 @@ author: Steve Hannah
 
 ![Header Image](/blog/gui-builder-improvements-3-7/uidesign.jpg)
 
-With version 3.7, we have revamped the GUI builder with a designer that allows you to position your elements precisely where you want them. The experience should be closer to what you find in graphical design applications like Photoshop rather than the more rigid “drop in the slot” approach in previous versions of the GUI builder. There are caveats to be aware of with this approach, but overall, it should empower you to build beautiful UIs with greater ease than before.
+With version 3.7, we have revamped the GUI builder with a designer that allows you to position your elements precisely where you want them. The experience should be closer to what you find in graphical design applications like Photoshop rather than the more rigid "drop in the slot" approach in previous versions of the GUI builder. There are caveats to be aware of with this approach, but overall, it should empower you to build beautiful UIs with greater ease than before.
 
 ![Screenshot of new GUI Builder designer](/blog/gui-builder-improvements-3-7/guibuilder-2-screenshot.png)
 
-In this blog post I will be focusing on the low-level details of “how it works” so that you can understand how to best tune it to your liking. We will be producing additional demos, posts, and documentation that cover these changes from a higher-level perspective.
+In this blog post I will be focusing on the low-level details of "how it works" so that you can understand how to best tune it to your liking. We will be producing additional demos, posts, and documentation that cover these changes from a higher-level perspective.
 
 ## Background
 
@@ -25,19 +25,19 @@ If you’ve used Codename One at all, you’re likely aware of its heavy usage o
 
 Shai has written about this many times in the past. The long and short of it is that when your app is shown on a screen with different resolution or dimensions, the app may need to reposition the element. You need a layout manager that is able to dynamically calculate the appropriate position for your components based on the current state.
 
-Unfortunately, this explanation provides little consolation to new users who just want to drag a button onto the form where they want it, and run their app. To expect new users to understand layout managers before they can build their “Hello World” app is, perhaps, a little demanding.
+Unfortunately, this explanation provides little consolation to new users who just want to drag a button onto the form where they want it, and run their app. To expect new users to understand layout managers before they can build their "Hello World" app is, perhaps, a little demanding.
 
 One key goal for this iteration of the designer was to make it more accessible to new users. I want a user to be able to drag labels, buttons, text fields, etc.. from the palette onto the form and position them freely, exactly how they like. I didn’t want them to have to worry about layout managers and the like. Just drag widgets around, and then run the app.
 
 ### But Didn’t I Just Say that Absolute Positioning isn’t Practical?
 
-Indeed absolute positioning in a mobile application is not practical. Our solution is “relative” positioning. We have beefed up the layered layout manager to support insets and inter-component references, and we have added the ability to manipulate the layout using familiar drag-and-drop GUI designer controls.
+Indeed absolute positioning in a mobile application is not practical. Our solution is "relative" positioning. We have beefed up the layered layout manager to support insets and inter-component references, and we have added the ability to manipulate the layout using familiar drag-and-drop GUI designer controls.
 
 For example, if you drag a button down to the bottom corner of the form, the designer doesn’t save the absolute X,Y coordinate for the button. If saves the insets (distance) from that bottom corner. That way, at runtime, the button will always be rendered appropriately in the bottom corner no matter what the device dimensions are.
 
 Going a step further, if you then drag a text field just to the left of the button, the designer will record the text field’s insets relative to the button so that it will lay out properly still even as the device is resized.
 
-__ |  The designer only automatically links the text field’s position to the button if “Smart Insets” is enabled. With “Smart Insets” disabled, you would need to link it explicitly.   
+__ |  The designer only automatically links the text field’s position to the button if "Smart Insets" is enabled. With "Smart Insets" disabled, you would need to link it explicitly.   
 ---|---  
   
 The example with only two components may seem contrived, but we have worked hard to ensure that it can scale to arbitrary UI complexity with dozens of components positioned exactly the way you want.
@@ -66,7 +66,7 @@ The only thing new here is this line:
     
     ll.setInsets(btn, "auto 0 0 auto");
 
-This is called after `btn` has already been added to the container. It says that we want its insets to be “auto” on the top and left, and `0` on the right and bottom. This insets string follows the CSS notation of `top right bottom left` (i.e. start on top and go clockwise), and the values of each inset may be provided in pixels (px), millimetres (mm), percent (%), or the special “auto” value. Like CSS, you can also specify the insets using a 1, 2, or 3 values. E.g.
+This is called after `btn` has already been added to the container. It says that we want its insets to be "auto" on the top and left, and `0` on the right and bottom. This insets string follows the CSS notation of `top right bottom left` (i.e. start on top and go clockwise), and the values of each inset may be provided in pixels (px), millimetres (mm), percent (%), or the special "auto" value. Like CSS, you can also specify the insets using a 1, 2, or 3 values. E.g.
 
   1. `"1mm"` – Sets 1mm insets on all sides.
 
@@ -78,12 +78,12 @@ This is called after `btn` has already been added to the container. It says that
 
 ### `auto` Insets
 
-The special “auto” inset indicates that it is a flexible inset. If all insets are set to “auto”, then the component will be centered both horizontally and vertically inside its “bounding box”.
+The special "auto" inset indicates that it is a flexible inset. If all insets are set to "auto", then the component will be centered both horizontally and vertically inside its "bounding box".
 
-__ |  The “inset bounding box” is the containing box from which a component’s insets are measured. If the component’s insets are not linked to any other components, then its inset bounding box will be bounds of the component’s parent container.   
+__ |  The "inset bounding box" is the containing box from which a component’s insets are measured. If the component’s insets are not linked to any other components, then its inset bounding box will be bounds of the component’s parent container.   
 ---|---  
   
-If one inset is fixed (i.e. defined in px, mm, or %), and the opposite inset is “auto”, then the “auto” inset will simply allow the component to be its preferred size. So if you want to position a component to be centered vertically, and 5mm from the left edge, you could do:
+If one inset is fixed (i.e. defined in px, mm, or %), and the opposite inset is "auto", then the "auto" inset will simply allow the component to be its preferred size. So if you want to position a component to be centered vertically, and 5mm from the left edge, you could do:
     
     
     ll.setInsets(btn, "auto auto auto 5mm");
@@ -120,7 +120,7 @@ If no inset is specified, then it is assumed to be 0. This ensures compatibility
 
 If all you need to do is position a component relative to its parent container’s bounds, then mere insets provide you with sufficient vocabulary to achieve this. But most UIs are more complex than this and require another concept: reference components. In many cases you will want to position a component relative to another child of the same container. This is also supported.
 
-For example, suppose I want to place a text field in the center of the form (both horizontally and vertically), and have a button placed beside it to the right. Positioning the text field is trivial (`setInset(textField, "auto")`), but there is no inset that we can provide that would position the button to the right of the text field. To accomplish our goal, we need to set the text field as a reference component of the button’s left inset – so that the button’s left inset is “linked” to the text field. Here is the syntax:
+For example, suppose I want to place a text field in the center of the form (both horizontally and vertically), and have a button placed beside it to the right. Positioning the text field is trivial (`setInset(textField, "auto")`), but there is no inset that we can provide that would position the button to the right of the text field. To accomplish our goal, we need to set the text field as a reference component of the button’s left inset – so that the button’s left inset is "linked" to the text field. Here is the syntax:
     
     
     Container cnt = new Container(new LayeredLayout());
@@ -179,7 +179,7 @@ The definition above may make reference components and reference position seem m
 
 Now that you understand the basics of insets and reference components, let’s delve into the UI that we’ve designed to leverage this layout. The new GUI Builder includes a new designer that makes it a breeze to layout UIs. It allows you to drag components from the component palette onto the canvas just as you did before. The difference is that now you can move and resize your components exactly as you see fit. You aren’t constrained to the positions dictated by the form’s layout manager.
 
-As an example, let’s drag a button onto a blank form and see what happens. The button will be “selected” initially after adding, it so you’ll see its outline, and resize handles for adjusting its size and position. You’ll also see four floating labels (above, below, to the left, and to the right) that show the corresponding side’s inset values and allow you to adjust them.
+As an example, let’s drag a button onto a blank form and see what happens. The button will be "selected" initially after adding, it so you’ll see its outline, and resize handles for adjusting its size and position. You’ll also see four floating labels (above, below, to the left, and to the right) that show the corresponding side’s inset values and allow you to adjust them.
 
 ![Selected component in designer allows you to freely drag it to a new position](/blog/gui-builder-improvements-3-7/guibuilder-2-designer-selected-cmp.png)
 
@@ -197,25 +197,25 @@ Each control has three sections:
 
 ![Inset drop-down menu](/blog/gui-builder-improvements-3-7/guibuilder-2-insets-dropdown-menu.png)
 
-  2. **The “Link” Button** ![Link button](/blog/gui-builder-improvements-3-7/guibuilder-2-link-button-unselected.png) – If the inset is linked to a reference component, then this button will be highlighted “blue”, and hovering over it will highlight the reference component in the UI so that you can clearly see which component it is linked to. Clicking on this button will open a dialog that will allow you to “break” this link. You can drag this button over any component in the form to “link”.
+  2. **The "Link" Button** ![Link button](/blog/gui-builder-improvements-3-7/guibuilder-2-link-button-unselected.png) – If the inset is linked to a reference component, then this button will be highlighted "blue", and hovering over it will highlight the reference component in the UI so that you can clearly see which component it is linked to. Clicking on this button will open a dialog that will allow you to "break" this link. You can drag this button over any component in the form to "link".
 
-  3. **The “Lock” Button”** ![Inset fixed button](/blog/gui-builder-improvements-3-7/guibuilder-2-inset-fixed-button.png) – This button allows you to toggle the inset between “flexible” (i.e. auto) and “fixed” (i.e. millimetres or percent).
+  3. **The "Lock" Button"** ![Inset fixed button](/blog/gui-builder-improvements-3-7/guibuilder-2-inset-fixed-button.png) – This button allows you to toggle the inset between "flexible" (i.e. auto) and "fixed" (i.e. millimetres or percent).
 
 ### Auto Snap
 
-Notice the “auto-snap” checkbox that appears in the top-right corner of the designer.
+Notice the "auto-snap" checkbox that appears in the top-right corner of the designer.
 
 ![Auto-snap checkbox](/blog/gui-builder-improvements-3-7/guibuilder-2-smart-insets-auto-snap-checkboxes.png)
 
-Auto-snap does exactly what it sounds like: It automatically snaps two components together when you drag them near each other. This is handy for linking components together without having to explicitly link them (using the “link” button). This feature is turned on by default. If auto-snap is turned off, you can still initiate a “snap” by holding down the ALT/Option key on your keyboard during the drag.
+Auto-snap does exactly what it sounds like: It automatically snaps two components together when you drag them near each other. This is handy for linking components together without having to explicitly link them (using the "link" button). This feature is turned on by default. If auto-snap is turned off, you can still initiate a "snap" by holding down the ALT/Option key on your keyboard during the drag.
 
 ### Smart Insets
 
-Beside the “auto-snap” checkbox is another checkbox named “Smart Insets”.
+Beside the "auto-snap" checkbox is another checkbox named "Smart Insets".
 
 ![Smart insets checkbox](/blog/gui-builder-improvements-3-7/guibuilder-2-smart-insets-auto-snap-checkboxes.png)
 
-Smart Insets is an experimental feature at this point. It uses some heuristics during a drag to try to determine how the insets should be linked. Currently the heuristics are quite basic (it tries to link to the nearest neighbour component in most cases), but we will be working on improving this for future releases. This feature is turned off by default while it is still being refined. The goal is to improve this to the point where it **always** makes the correct link choices – at which time you will be able to use the designer without having any knowledge of insets or reference components. It will **just work**. In the current version, I generally work with auto-snap “on”, and explicitly assign links myself using the “link” button. This gives me full control of my UI and how it will be resized. Once you get used to insets and how the links work, it becomes quite easy.
+Smart Insets is an experimental feature at this point. It uses some heuristics during a drag to try to determine how the insets should be linked. Currently the heuristics are quite basic (it tries to link to the nearest neighbour component in most cases), but we will be working on improving this for future releases. This feature is turned off by default while it is still being refined. The goal is to improve this to the point where it **always** makes the correct link choices – at which time you will be able to use the designer without having any knowledge of insets or reference components. It will **just work**. In the current version, I generally work with auto-snap "on", and explicitly assign links myself using the "link" button. This gives me full control of my UI and how it will be resized. Once you get used to insets and how the links work, it becomes quite easy.
 
 ### The Widget Control Pad
 
@@ -223,23 +223,23 @@ Smart Insets is an experimental feature at this point. It uses some heuristics d
 
 When a component is selected, you should see a black floating panel appear in the lower right of the screen.
 
-This is the widget control pad, and it provides an alternative view of the component’s links. It also provides a useful list of incoming links (i.e. components that “depend on” this component’s positioning). In some cases, you may want to disconnect incoming links so that you can drag the component without affecting the position of dependent components.
+This is the widget control pad, and it provides an alternative view of the component’s links. It also provides a useful list of incoming links (i.e. components that "depend on" this component’s positioning). In some cases, you may want to disconnect incoming links so that you can drag the component without affecting the position of dependent components.
 
-This control pad also includes game-pad-like controls (up, down, left, right), that allow you to “tab” the component to the next guide in that direction. Tab positions exist at component edges in the form. This is useful for aligning components with each other.
+This control pad also includes game-pad-like controls (up, down, left, right), that allow you to "tab" the component to the next guide in that direction. Tab positions exist at component edges in the form. This is useful for aligning components with each other.
 
 ### Keyboard Short-Cuts
 
   1. **Arrow Keys** – Use the up/down/left/right arrow keys to nudge the currently selected component a little bit at a time. This is a convenient way to move the component to a position that is more precise than can easily be achieved with a mouse drag.
 
-  2. **Arrow Keys + SHIFT** – Hold down the SHIFT key while pressing an arrow key and it will “tab” the component to the next tab marker. The form has implicit tab markers at the edge of each component on the form.
+  2. **Arrow Keys + SHIFT** – Hold down the SHIFT key while pressing an arrow key and it will "tab" the component to the next tab marker. The form has implicit tab markers at the edge of each component on the form.
 
-  3. **ALT/Option Key + Click or Drag** – Holding down the option/alt key while clicking or dragging a component will resulting in “snapping” behaviour even if auto-snap is turned off.
+  3. **ALT/Option Key + Click or Drag** – Holding down the option/alt key while clicking or dragging a component will resulting in "snapping" behaviour even if auto-snap is turned off.
 
 ### Sub-Containers
 
-In some cases, you may need to add sub-containers to your form to aid in grouping your components together. You can drag a container onto your form using the “Container” palette item (under “Core Components”). The default layout the subcontainer will be LayeredLayout so that you are able to position components within the sub-container with precision, just like on the root container.
+In some cases, you may need to add sub-containers to your form to aid in grouping your components together. You can drag a container onto your form using the "Container" palette item (under "Core Components"). The default layout the subcontainer will be LayeredLayout so that you are able to position components within the sub-container with precision, just like on the root container.
 
-You can also change the layout of subcontainers to another classical layout manager (e.g. grid layout, box layout, etc..) and drag components directly into it just as you did with the old designer. This is very useful if parts of your form lend themselves. As an example, let’s drag a container onto the canvas that uses BoxLayout Y. (You can find this under the “Containers” section of the component palette).
+You can also change the layout of subcontainers to another classical layout manager (e.g. grid layout, box layout, etc..) and drag components directly into it just as you did with the old designer. This is very useful if parts of your form lend themselves. As an example, let’s drag a container onto the canvas that uses BoxLayout Y. (You can find this under the "Containers" section of the component palette).
 
 Drag the button (that was previously on the form) over that container, and you should see a drop-zone become highlighted.
 
@@ -251,7 +251,7 @@ You can drop the button directly there. You can As you drag more components into
 
 ### The Canvas Resize Tool
 
-When designing a UI with the new designer it is **very** important that you periodically test the form’s “resizing” behaviour so that you know how it will behave on different devices. Components may appear to be positioned correctly when the canvas is one size, but become out of whack when the container is resized. After nearly every manipulation you perform, it is good practice to drag the canvas resize tool (the button in the lower right corner of the designer) smaller and bigger so you can see how the positions are changed. If things grow out of whack, you may need to toggle an inset between fixed and auto, or add a link between some of the components so that the resizing behaviour matches your expectations.
+When designing a UI with the new designer it is **very** important that you periodically test the form’s "resizing" behaviour so that you know how it will behave on different devices. Components may appear to be positioned correctly when the canvas is one size, but become out of whack when the container is resized. After nearly every manipulation you perform, it is good practice to drag the canvas resize tool (the button in the lower right corner of the designer) smaller and bigger so you can see how the positions are changed. If things grow out of whack, you may need to toggle an inset between fixed and auto, or add a link between some of the components so that the resizing behaviour matches your expectations.
 
 ## The Future
 
@@ -265,7 +265,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **bryan** — June 28, 2017 at 9:53 pm ([permalink](/blog/gui-builder-improvements-3-7/#comment-23358))
 
-> I haven’t used this, so the answer might be obvious – when you use the new GUI builder, does this create a “GUI only” app ?
+> I haven’t used this, so the answer might be obvious – when you use the new GUI builder, does this create a "GUI only" app ?
 >
 
 

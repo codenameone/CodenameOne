@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/tip-when-shouldnt-i-use-codename-one/tip.jpg)
 
-Bootcamp registration closed well and we are currently in the pre-course (more on that in another post) and already the Facebook group of the bootcamp is seeing decent activity. Being as busy as I am I thought I’d lift a question that was asked there to headline this post: “When shouldn’t I use Codename One?”.
+Bootcamp registration closed well and we are currently in the pre-course (more on that in another post) and already the Facebook group of the bootcamp is seeing decent activity. Being as busy as I am I thought I’d lift a question that was asked there to headline this post: "When shouldn’t I use Codename One?".
 
 That’s a great question. If Codename One was perfect for every use case it would probably suck. One of the biggest reasons for the complexity of the Android API is that it tries to answer every use case (device vendors, utility developers, game developers, app developers etc.).
 
@@ -27,7 +27,7 @@ You can build simple games and they will work fine but once you try to do things
 Then there are device specific tools/utilities e.g. if I wanted to build an Android task manager, this makes no sense in other OS’s. With such a tool bulk of my code would be native Android code anyway so the benefit of using Codename One becomes a hindrance.  
 Codename One provides access to the native layer so you can patch small missing pieces but if the entire functionality of your app needs to be in native and can’t be encapsulated the pain of going back and forth to the native interface to communicate back to Codename One might not be worth it.
 
-In the past this also applied for apps like mapping apps, e.g. up until recently if you wanted to build an app like Uber on top of Codename One this would have been a huge pain as every bit of “on-map” functionality would have required adding support natively to the google maps native code. We recently introduced the ability to place components on top of heavyweight widgets (e.g. maps) so the functionality of an app like Uber can be accomplished mostly within portable Codename One logic.
+In the past this also applied for apps like mapping apps, e.g. up until recently if you wanted to build an app like Uber on top of Codename One this would have been a huge pain as every bit of "on-map" functionality would have required adding support natively to the google maps native code. We recently introduced the ability to place components on top of heavyweight widgets (e.g. maps) so the functionality of an app like Uber can be accomplished mostly within portable Codename One logic.
 ---
 
 ## Archived Comments

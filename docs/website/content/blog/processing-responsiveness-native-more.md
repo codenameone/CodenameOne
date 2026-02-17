@@ -24,9 +24,9 @@ Some of you have already noticed a build error when building for iOS if you used
 
 Unfortunately due to the way java codes method signatures you need to update the libraries in order to for this change to work, we automatically update the libraries when you send the build but that means you will need to send again if you get that failure.
 
-We also improved button responsiveness on iOS, this was a very hard to track issue which we’ve been following for a while. Older iOS devices are somewhat overeager with pointer dragged events and tend to send them all over the place. Unfortunately this triggered a release of a button in some cases making it feel unresponsive. Normally dragging a pressed button should not release it but we had some very old pre-Codename One code that did just that for some cases. This code is now remove and hopefully your UI’s will just “magically” become more responsive.
+We also improved button responsiveness on iOS, this was a very hard to track issue which we’ve been following for a while. Older iOS devices are somewhat overeager with pointer dragged events and tend to send them all over the place. Unfortunately this triggered a release of a button in some cases making it feel unresponsive. Normally dragging a pressed button should not release it but we had some very old pre-Codename One code that did just that for some cases. This code is now remove and hopefully your UI’s will just "magically" become more responsive.
 
-If you do any native interfaces programming in Android you should be familiar with our AndroidUtil class which allows you to access native device functionality more easily from the native code. E.g. many Android API’s need access to the Activity which you can get by calling AndroidNativeUtil.getActivity() which is much simpler than the alternative approaches.
+If you do any native interfaces programming in Android you should be familiar with our AndroidUtil class which allows you to access native device functionality more easily from the native code. E.g. many Android API’s need access to the Activity which you can get by calling `AndroidNativeUtil.getActivity()` which is much simpler than the alternative approaches.
 
 We now also have additional functions in the native util including the following –  
   
@@ -57,7 +57,7 @@ map library source code
   
   
 
-One of Androids annoying “features” is that everything needs to be coded at a very low level and a lot of components don’t do the “right thing” by default. E.g. mailto: URL’s don’t launch the mail app by default when clicked from a BrowserComponent on Android. We fixed this to be the sensible default but we still pass the shouldNavigate call in case you want to do something differently.
+One of Androids annoying "features" is that everything needs to be coded at a very low level and a lot of components don’t do the "right thing" by default. E.g. mailto: URL’s don’t launch the mail app by default when clicked from a BrowserComponent on Android. We fixed this to be the sensible default but we still pass the shouldNavigate call in case you want to do something differently.
 
 If you aren’t familiar with Dialog.showPopup(Component) it allows you to create the UI common on the iPad where a dialog points at the component that launched it. However, if you have a rather complex UI you might not have a component to point at, in which case we can use a new version of the method that accepts a rectangle to point towards as Dialog.showPopup(Rectangle).  
   

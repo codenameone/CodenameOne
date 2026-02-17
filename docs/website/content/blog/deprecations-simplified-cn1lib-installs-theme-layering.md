@@ -14,7 +14,7 @@ author: Shai Almog
 #### Deprecations
 
 We decided to discontinue support for building without a certificate, this support was added initially because  
-generating an iOS certificate was so difficult and we wanted developers to see that “it works” before committing  
+generating an iOS certificate was so difficult and we wanted developers to see that "it works" before committing  
 to the expense. However, this process is wrought with bugs that are often hard to trace back and error prone.  
 Added to that is the fact that we now have the new [certificate wizard](/blog/ios-certificate-wizard.html)  
 which makes the process simpler thus removing the final blocker (no need for a Mac).  
@@ -62,15 +62,15 @@ the content of the `ios.plistInject` into the build hint if its not already ther
 
 There are a couple of things you need to keep in mind: 
 
-  * This code happens with every “refresh libs” call not dynamically on the server. This means it should be pretty  
+  * This code happens with every "refresh libs" call not dynamically on the server. This means it should be pretty  
 simple for the developer to investigate issues in this process. 
-  * Changing flags is problematic – there is no “uninstall” process. Since the data is copied into the `codenameone_settings.properties`  
+  * Changing flags is problematic – there is no "uninstall" process. Since the data is copied into the `codenameone_settings.properties`  
 file. If you need to change a flag later on you might need to alert users to make changes to their properties essentially  
 negating the value of this feature… So be very careful when adding properties here. 
 
 The rule of thumb is that a build hint that has a numeric or boolean value is always required. If an entry has a string that you can append with another string  
 then its probably an appended entry  
-These build hints are probably of the “required” type: 
+These build hints are probably of the "required" type: 
     
     
     android.debug	
@@ -172,7 +172,7 @@ There are two use cases in which you would want to use layering:
   2. You want the ability to customize your theme for a specific use case, e.g. let a user select larger fonts
 
 This is actually pretty easy to do and doesn’t require re-doing the entire theme. You can do something very similar  
-to the cascading effect of CSS where a theme is applied “on top” of another theme. To do that just add a new  
+to the cascading effect of CSS where a theme is applied "on top" of another theme. To do that just add a new  
 theme, make sure to remove the include native theme constant in the new theme. Then in the new theme define  
 the changes e.g. if you just want a larger default font define only that property for all the relevant UIID’s and ignore  
 all other properties! 
@@ -199,7 +199,7 @@ You should fix it to look like this:
     
     theme = UIManager.initNamedTheme("/theme", "Theme");
 
-Notice, this assumes the name of your main theme is “Theme” (not the layer theme you just added). This is important  
+Notice, this assumes the name of your main theme is "Theme" (not the layer theme you just added). This is important  
 since the original code relies on the theme being in the 0 position in the theme name array which might not be  
 the case!  
 Then when you want to add a layer just use: 
@@ -207,8 +207,8 @@ Then when you want to add a layer just use:
     
     UIManager.getInstance().addThemeProps(theme.getTheme("NameOfLayerTheme"));
 
-The `addThemeProps` call will layer the secondary theme on top of the primary “Theme” and  
-keep the original UIID’s defined in “Theme” intact. 
+The `addThemeProps` call will layer the secondary theme on top of the primary "Theme" and  
+keep the original UIID’s defined in "Theme" intact. 
 
 For a GUI builder app this is just as simple, you can override the initTheme method in the state machine in  
 exactly the same way to specify the theme name explicitly: 

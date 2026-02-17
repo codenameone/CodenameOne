@@ -23,7 +23,7 @@ First [Jeremy](http://stackoverflow.com/users/5427671/j%c3%a9r%c3%a9my-marquer) 
 
 [Jordan](http://stackoverflow.com/users/7600458/jordan-rey) asked a very different question that I think people should ask more often: [how to create the UI in this screenshot](http://stackoverflow.com/questions/42374880/having-trouble-creating-this-form-in-the-gui-builder). Ideally we’d have a gallery with common screenshots and instructions on how to implement every such UI as most UI patterns are very similar.
 
-[Graham](http://stackoverflow.com/users/515377/graham) asked [whether Kotlin can be used with Codename One](http://stackoverflow.com/questions/42329892/can-i-use-kotlin-with-codename-one) I explained the challenges and then Steve clarified some of the finer points of the process. The short answer is “not officially”, it’s possible but some work might be required.
+[Graham](http://stackoverflow.com/users/515377/graham) asked [whether Kotlin can be used with Codename One](http://stackoverflow.com/questions/42329892/can-i-use-kotlin-with-codename-one) I explained the challenges and then Steve clarified some of the finer points of the process. The short answer is "not officially", it’s possible but some work might be required.
 ---
 
 ## Archived Comments

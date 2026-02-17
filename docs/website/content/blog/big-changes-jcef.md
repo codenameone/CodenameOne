@@ -105,7 +105,7 @@ With the CEF pipeline media is implemented using the browser component. So video
 
 However, there’s one missing piece at the moment: h264 support.
 
-By default JCEF doesn’t include the h264 codec due to patent restrictions. This isn’t a problem for our use case but it means we need to get a binary build of CEF working and the build environment for Chrome is “tough”. So right now h264 isn’t working.
+By default JCEF doesn’t include the h264 codec due to patent restrictions. This isn’t a problem for our use case but it means we need to get a binary build of CEF working and the build environment for Chrome is "tough". So right now h264 isn’t working.
 
 Other than that we’re still missing Windows and Linux support. We’re also missing an installer that will deliver CEF seamlessly. All of those will ship together as part of an update in the next couple of weeks once all issues are resolved.
 
@@ -144,7 +144,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> See the section titled: “Windows Install” above…
+> See the section titled: "Windows Install" above…
 >
 
 
@@ -210,7 +210,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > [Richard Matovu](https://lh3.googleusercontent.com/a-/AOh14Ggv6DF23oF-udh-1mkmXOx1WryNt3gP1I1fADw2) says:
 >
-> I have intergrated CEF in my project and it runs well. When i came to the point where it had to show a browser component, it showed an error “An internal application error occured: java.lang.RuntimeException: Failed to create CEF browser” and in the console it displayed:  
+> I have intergrated CEF in my project and it runs well. When i came to the point where it had to show a browser component, it showed an error "An internal application error occured: java.lang.RuntimeException: Failed to create CEF browser" and in the console it displayed:  
 > CEF Args: [–disable-gpu, –disable-software-rasterizer, –disable-gpu-compositing, –touch-events=enabled, –enable-media-stream, –device-scale-factor=4, –force-device-scale-factor=4, –autoplay-policy=no-user-gesture-required, –enable-usermedia-screen-capturing]  
 > java.lang.RuntimeException: Failed to create CEF browser  
 > at com.codename1.impl.javase.cef.JavaCEFSEPort.createCEFBrowserComponent(JavaCEFSEPort.java:106)  
@@ -275,8 +275,8 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Not working for me. Whenever I try to play a video or open a browser, it refuses with this output:
 >
-> “/Users/carlos/.codenameone/cef/macos64/libjcef.dylib: dlopen(/Users/carlos/.codenameone/cef/macos64/libjcef.dylib, 1): no suitable image found. Did find:  
-> /Users/carlos/.codenameone/cef/macos64/libjcef.dylib: code signature in (/Users/carlos/.codenameone/cef/macos64/libjcef.dylib) not valid for use in process using Library Validation: library load disallowed by system policy”
+> "/Users/carlos/.codenameone/cef/macos64/libjcef.dylib: dlopen(/Users/carlos/.codenameone/cef/macos64/libjcef.dylib, 1): no suitable image found. Did find:  
+> /Users/carlos/.codenameone/cef/macos64/libjcef.dylib: code signature in (/Users/carlos/.codenameone/cef/macos64/libjcef.dylib) not valid for use in process using Library Validation: library load disallowed by system policy"
 >
 > Tested on Mac OS Catalina 10.15.6
 >
@@ -299,9 +299,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [Artur Hefczyc](https://avatars3.githubusercontent.com/u/1848738?v=4) says:
 >
 > On Macs downloaded files are often automatically unzipped. In such a case, you can add that info to install the cef using move command instead:  
-> “`  
+> "`  
 > mv ~/Downloads/cef ~/.codenameone/  
-> “`
+> "`
 >
 
 
@@ -311,9 +311,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [Artur Hefczyc](https://avatars3.githubusercontent.com/u/1848738?v=4) says:
 >
 > I have installed cef as instructed above. However, when I run my app in simulator I still see  
-> “`  
+> "`  
 > CSS> JavaFX is loaded  
-> “`  
+> "`  
 > in the console output. Is this expected? I mean, do you still use JavaFX in simulator even if cef is installed?
 >
 
@@ -351,19 +351,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [Artur Hefczyc](https://avatars3.githubusercontent.com/u/1848738?v=4) says:
 >
 > Neither with my app running in simulator or running as a compiled desktop app Chrome shows anything at this address:  
-> “`  
+> "`  
 > This site can’t be reached  
 > localhost refused to connect.  
-> “`
+> "`
 >
 > The cef folder exist:  
-> “`  
+> "`  
 > $ ll ~/.codenameone/cef  
 > total 720  
 > -rw-r–r–@ 1 usr staff 170K Jul 10 15:12 jcef-tests.jar  
 > -rw-r–r–@ 1 usr staff 185K Jul 10 15:12 jcef.jar  
 > drwxr-xr-x@ 8 usr staff 256B Jul 10 15:12 macos64  
-> “`
+> "`
 >
 > Do you have any suggestions on what can be wrong?
 >

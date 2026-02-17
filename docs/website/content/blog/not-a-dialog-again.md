@@ -24,11 +24,11 @@ When we introduced the idea of the EDT from Swing (and pretty much any modern UI
 
 However, there is another definition… Dialogs that block the rest of the UI…  
   
-In that regard all dialogs in Codename One are modal; they block the parent form since they are really just forms that show the “parent” in their background as a simple image. A while back we showed you how to  
+In that regard all dialogs in Codename One are modal; they block the parent form since they are really just forms that show the "parent" in their background as a simple image. A while back we showed you how to  
 [  
-“fake” a dialog  
+"fake" a dialog  
 ](http://www.codenameone.com/blog/when-a-dialog-isnt-a-dialog)  
-, which is pretty cool. We ended up using this technique a few times until eventually we asked ourselves: “Shouldn’t this be a part of the framework?”.
+, which is pretty cool. We ended up using this technique a few times until eventually we asked ourselves: "Shouldn’t this be a part of the framework?".
 
 Well, now it is. We just added InteractionDialog to Codename One which tries to be very similar to Dialog in terms of API but unlike dialog it never blocks anything. Not the calling thread or the UI.  
   
@@ -36,29 +36,27 @@ Its really just a container that is positioned within the layered pane. Notice t
 
 Using the interaction dialog is be pretty trivial and very similar to dialog:  
   
-final InteractionDialog dlg = new InteractionDialog(“Hello”);  
+final InteractionDialog dlg = new InteractionDialog("Hello");  
   
 dlg.setLayout(new BorderLayout());  
   
-dlg.addComponent(BorderLayout.CENTER, new Label(“Hello Dialog”));  
-  
-Button close = new Button(“Close”);  
-  
-close.addActionListener(new ActionListener() {  
-  
-public void actionPerformed(ActionEvent evt) {  
-  
-dlg.dispose();  
-  
-}  
-  
-});  
-  
-dlg.addComponent(BorderLayout.SOUTH, close);  
-  
-Dimension pre = dlg.getContentPane().getPreferredSize();  
-  
+```java
+dlg.addComponent(BorderLayout.CENTER, new Label("Hello Dialog"));
+
+Button close = new Button("Close");
+
+close.addActionListener(new ActionListener() {
+    public void actionPerformed(ActionEvent evt) {
+        dlg.dispose();
+    }
+});
+
+dlg.addComponent(BorderLayout.SOUTH, close);
+
+Dimension pre = dlg.getContentPane().getPreferredSize();
+
 dlg.show(0, 0, Display.getInstance().getDisplayWidth() – (pre.getWidth() + pre.getWidth() / 6), 0);
+```
 
 This will show the dialog on the right hand side of the screen, which is pretty useful for a floating in place dialog.  
 

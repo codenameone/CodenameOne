@@ -53,9 +53,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > They are just images. Instead of loading it you create a class instance and use it as an image.  
-> “`  
+> "`  
 > Image img = new SvgImage();  
-> “`
+> "`
 >
 
 

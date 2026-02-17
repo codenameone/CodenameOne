@@ -19,7 +19,7 @@ Learn how to build Codename One from source and use this "local" version in your
 
 One of the benefits of [moving to Maven](/blog/moving-to-maven/) is improved project hygiene. It is now trivial to build Codename One from source.
 
-In this video, I show you how to build Codename One from source and use this “local” version in your Codename One projects.
+In this video, I show you how to build Codename One from source and use this "local" version in your Codename One projects.
 
 ### TLDW (Too Long Didn’t Watch)
 
@@ -33,7 +33,7 @@ cd CodenameOne/maven
 mvn install			
 ```
 
-This will take a few minutes, but at the end of the tunnel you should see “SUCCESS” as shown below:
+This will take a few minutes, but at the end of the tunnel you should see "SUCCESS" as shown below:
 
 **NOTE**: Due to wordpress issues the images in this blogpost were lost.
 
@@ -45,14 +45,14 @@ cd cn1-maven-archetypes
 mvn install				
 ```
 
-This will take another minute or so, but at the end of the tunnel you should see “SUCCESS”:
+This will take another minute or so, but at the end of the tunnel you should see "SUCCESS":
 
 ...
 
 After completing these steps, Codename One will be installed in the local maven repository. A key point I make in this video is the version number of the sources that I checked out of Github. If you are cloning the project from the master branch, then the version will usually be a SNAPSHOT version. E.g. 7.0.21-SNAPSHOT. This is a Maven convention. Release versions will not have the **-SNAPSHOT** suffix.
   
   
-In the video, you can see that the version number is “7.0.21-SNAPSHOT”.
+In the video, you can see that the version number is "7.0.21-SNAPSHOT".
 
 ## Using the Local Version in Your Application Project
 
@@ -66,7 +66,7 @@ I demonstrate this in the video by creating a new project with the [Codename One
 
 > Check out my [Video tutorial on Codename One initializr](https://sjhannah.medium.com/preview-online-tool-to-generate-ios-android-app-starter-project-c9f27c47850b) if you haven’t seen it yet.
 
-After downloading and extracting the project, I open its pom.xml file and and look for the <cn1.version> and <cn1.plugin.version> properties:
+After downloading and extracting the project, I open its `pom.xml` file and and look for the `<cn1.version>` and `<cn1.plugin.version>` properties:
 
 ...
 
@@ -80,7 +80,7 @@ Because you can, and because it is the first step toward taking control of your 
 
 ### Getting Started
 
-If you haven’t built an app yet, it’s easy to get started. Just go to [Codename One initializr](https://start.codenameone.com/) and press “Download”. You could be up and running in only a few minutes.
+If you haven’t built an app yet, it’s easy to get started. Just go to [Codename One initializr](https://start.codenameone.com/) and press "Download". You could be up and running in only a few minutes.
 
 If you want to dig deeper into Codename One’s Maven support, check out the [Codename One Maven Developers Guide](https://shannah.github.io/codenameone-maven-manual/).
 ---

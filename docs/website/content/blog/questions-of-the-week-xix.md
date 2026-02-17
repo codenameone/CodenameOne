@@ -39,7 +39,7 @@ Debugging performance issues is always a pain. We noticed that a lot of times a 
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38989426/htc-preformance-issue-with-codenameone-app)
 
-### How to handle exception java.net.ConnectionException explicitly
+### How to handle exception `java.net.ConnectionException` explicitly
 
 Error handling in networking isn’t always the most intuitive thing, and although we cover it a lot it’s still confusing.
 
@@ -57,7 +57,7 @@ Events in native widgets should be handled by the native widget itself.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38974391/move-the-marker-to-selected-location-on-mapcontainer)
 
-### Virtual keyboard ios “done” button and toolbar disappears
+### Virtual keyboard ios "done" button and toolbar disappears
 
 Some of the virtual keyboard flags are a bit unintuitive.
 

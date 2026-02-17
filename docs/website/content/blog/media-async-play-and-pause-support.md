@@ -45,11 +45,11 @@ Let’s look at an example:
         Playing = (evt.getNewState() == State.Playing);
     });
 
-This code is a complete example of how you can keep track of the playing state of your media. It keeps track of both whether there is a play request pending, and whether it is currently playing. Technically you don’t need to keep your own variable for keeping track of the the “playing” state, as you can just call `media.isPlaying()`, or `media.getState()` at any time. I use a separate playing variable here just to illustrate how to synchronize your application state with the state of your media.
+This code is a complete example of how you can keep track of the playing state of your media. It keeps track of both whether there is a play request pending, and whether it is currently playing. Technically you don’t need to keep your own variable for keeping track of the the "playing" state, as you can just call `media.isPlaying()`, or `media.getState()` at any time. I use a separate playing variable here just to illustrate how to synchronize your application state with the state of your media.
 
 #### How it works
 
-`playAsync()` returns a `PlayRequest` object, which is a subclass of `AsyncResource<Media>`. Its “ready” callback will be executed once playing has begun. The “except” callback will be called if playback fails due to an error.
+`playAsync()` returns a `PlayRequest` object, which is a subclass of `AsyncResource<Media>`. Its "ready" callback will be executed once playing has begun. The "except" callback will be called if playback fails due to an error.
 
 You can also use the **mediaStateChangeListeners** of the `AsyncMedia` object to keep track of changes to state. Whenever the media starts playing, or stops playing, it will fire one of these events.
 

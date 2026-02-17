@@ -19,7 +19,7 @@ We used Google Groups as our main/secondary support channel for a while now. It 
 A couple of weeks ago we made the decision to create a new subreddit ****[r/cn1](https://www.reddit.com/r/cn1/)**** and move our support to that sub.
   
   
-This has multiple advantages for us and for the community. As such we’re asking you to join that group. Don’t just visit it, register and press the “Join” button to be a part of it.
+This has multiple advantages for us and for the community. As such we’re asking you to join that group. Don’t just visit it, register and press the "Join" button to be a part of it.
 
 ### Why Leave Google Group?
 
@@ -74,7 +74,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> They are pretty distinct. Stack overflow is strictly for “worthy questions” and that might be a gray area. If you feel less confident then our subreddit aims to be more welcoming. Since we’re the moderators of the subreddit we have more control over things posted and won’t moderate you aggressively like stackoverflow sometimes does (unfortunately).
+> They are pretty distinct. Stack overflow is strictly for "worthy questions" and that might be a gray area. If you feel less confident then our subreddit aims to be more welcoming. Since we’re the moderators of the subreddit we have more control over things posted and won’t moderate you aggressively like stackoverflow sometimes does (unfortunately).
 >
 > I like SO, it takes getting used to though.
 >

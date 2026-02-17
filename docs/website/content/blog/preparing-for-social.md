@@ -23,7 +23,7 @@ Currently version 6.0 (AKA Chat) is scheduled for release in February 19th 2019.
 
 We named the releases of Codename One based on the signature app we built on top of that given release. 4.0 was named Taxi as it was used to develop an [Uber clone](https://www.amazon.com/Create-Uber-Clone-Days-mobile-ebook/dp/B07FRXZRRV/). Version 5.0 is named social as we built a [Facebook Clone](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java) during the release cycle.
 
-For Version 6.0 we will build a whatsapp clone hence the “Chat” moniker.
+For Version 6.0 we will build a whatsapp clone hence the "Chat" moniker.
 
 ---
 

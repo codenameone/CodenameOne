@@ -132,7 +132,7 @@ There are a small number of attributes which can be added to elements of a UIFra
 
   * `class` – This works like the HTML `class` attribute works. It assigns `tags` to the container that can be used by `ComponentSelector` to select the resulting component. Multiple tags are separated by spaces.
 
-There are also some attributes that are only applicable to certain container types. E.g. `<flow>` supports `align` and `valign` attributes which accept “left”, “right”, “center”, and “top”, “bottom”, “center” respectively for values.
+There are also some attributes that are only applicable to certain container types. E.g. `<flow>` supports `align` and `valign` attributes which accept "left", "right", "center", and "top", "bottom", "center" respectively for values.
 
 `<grid>` and `<table>` both support `rows` and `cols` attributes which specify the number of rows and columns in their layouts respectively. On `<table>` these are optional attributes. If they are omitted it will use the actual data in the table to figure out the correct number of rows and columns.
 
@@ -370,7 +370,7 @@ The JSON and XML notations offer only a limited amount of customization options 
 
   1. Add the `id` attribute to the component, then use the `findById()` method of the fragment to access it.
 
-  2. Add the `class` attribute to the component to add “tags” that can be selected by the ComponentSelector class.
+  2. Add the `class` attribute to the component to add "tags" that can be selected by the ComponentSelector class.
 
 Example using `findById()`
     
@@ -392,9 +392,9 @@ Example using `class` Attribute and ComponentSelector
     $(".tag1", view).selectAllStyles().setBgColor(0xff0000).setBgTransparency(0xff);
     $(".tag2", view).selectAllStyles().setBorder(Border.createLineBorder(1));
 
-This example demonstrates the use of the `class` attribute for setting tags that can be used by `ComponentSelector` for selecting nested components in the fragment. We have two nested containers. One in the center with tags “tag1” and “tag2”; and a second component in the south with tag “tag2” only.
+This example demonstrates the use of the `class` attribute for setting tags that can be used by `ComponentSelector` for selecting nested components in the fragment. We have two nested containers. One in the center with tags "tag1" and "tag2"; and a second component in the south with tag "tag2" only.
 
-We’re able to select on “tag1” to set the background color of the first component to red. Then we selet on “tag2” (which selects both of the components), to set the border of both components to use a line border.
+We’re able to select on "tag1" to set the background color of the first component to red. Then we selet on "tag2" (which selects both of the components), to set the border of both components to use a line border.
 
 The result:
 
@@ -402,7 +402,7 @@ The result:
 
 ## Summary
 
-`UIFragment` provides simple way to user interfaces using a declarative syntax. It supports both an XML and a JSON syntax. The JSON notation is almost always more succinct and easier to read than the XML equivalent, and both provide advantages over directly defining the UI in Java code. You can embed placeholders inside your fragment’s JSON/XML and have them replaced by custom components when the fragment is compiled. Additionally, you can access nested components within fragments for further customization by tagging them either with an “id” or a “class” attribute. Finally you can reuse the same fragment to generate entire sets of components by setting placeholders with different values.
+`UIFragment` provides simple way to user interfaces using a declarative syntax. It supports both an XML and a JSON syntax. The JSON notation is almost always more succinct and easier to read than the XML equivalent, and both provide advantages over directly defining the UI in Java code. You can embed placeholders inside your fragment’s JSON/XML and have them replaced by custom components when the fragment is compiled. Additionally, you can access nested components within fragments for further customization by tagging them either with an "id" or a "class" attribute. Finally you can reuse the same fragment to generate entire sets of components by setting placeholders with different values.
 
 ---
 

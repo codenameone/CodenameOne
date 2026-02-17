@@ -145,7 +145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This fails silently when offline.
 >
-> I wanted to keep the code simple so I didn’t go into the more complex situation of a “user turns on airplane mode to use the app”. I think that if a user resorts to that rather than just update the app he’ll also download an illegal APK/IPA and jailbrake his device so this ventures into another domain.
+> I wanted to keep the code simple so I didn’t go into the more complex situation of a "user turns on airplane mode to use the app". I think that if a user resorts to that rather than just update the app he’ll also download an illegal APK/IPA and jailbrake his device so this ventures into another domain.
 >
 
 

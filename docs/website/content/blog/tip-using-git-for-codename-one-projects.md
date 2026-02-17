@@ -13,7 +13,7 @@ author: Shai Almog
 
 I wrote in the past about [importing a Codename One demo from github](/blog/tip-setup-codename-one-demo-from-git.html) but I left the whole working with git as an open subject. Mostly because I considered it a bit out of scope for the discussion. I have a section in the free online course about the [anatomy of a Codename One application](https://codenameone.teachable.com/courses/java-for-mobile-devices-introducing-codename-one/lectures/2925056) which I completely forgot to upload until I wrote this!
 
-If you want to understand more, I strongly suggest watching that as it explains a lot of the “why” and “how” logic of Codename One project structures. It explains the purpose of every file you see in the project…​
+If you want to understand more, I strongly suggest watching that as it explains a lot of the "why" and "how" logic of Codename One project structures. It explains the purpose of every file you see in the project…​
 
 ### The Right Gitignore
 
@@ -65,7 +65,7 @@ That’s very useful as you can edit the files directly and keep track of every 
 
   * It conflicts – the simulator/device are oblivious to this mode. So if you fetch an update you also need to update the res file and you might still have conflicts related to that file
 
-Ultimately both of these issues shouldn’t be a deal breaker. Even though this mode is a bit flaky it’s better than the alternative as you can literally “see” the content of the resource file. You can easily revert and reapply your changes to the res file when merging from git, it’s tedious but again not a deal breaker.
+Ultimately both of these issues shouldn’t be a deal breaker. Even though this mode is a bit flaky it’s better than the alternative as you can literally "see" the content of the resource file. You can easily revert and reapply your changes to the res file when merging from git, it’s tedious but again not a deal breaker.
 
 #### Eclipse Version
 
@@ -139,7 +139,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Martin Grajcar says:
 >
-> My project build just failed in `<copy todir=”bin”><fileset dir=”override”/></copy>` because of the missing `override` directory. This was my fault as I deleted all empty directories, but git doesn’t track them, so build of a cloned project will fail for the very same reason.
+> My project build just failed in `<copy todir="bin"><fileset dir="override"/></copy>` because of the missing `override` directory. This was my fault as I deleted all empty directories, but git doesn’t track them, so build of a cloned project will fail for the very same reason.
 >
 
 
@@ -160,7 +160,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It may be out of date, but at most by a week as on Oct 29, I created a new project. I edited it manually, because of [https://www.codenameone.com…](</blog/tip-using-lombok-other-tools/>).
 >
-> There are many `<mkdir dir=”override”/>` there, but there’s none before the copy in the jar target. So I added it now.
+> There are many `<mkdir dir="override"/>` there, but there’s none before the copy in the jar target. So I added it now.
 >
 > I’m using Eclipse. I wonder, how to get updates to build.xml, in case you do some important changes in the future (overwriting my edited file is no problem because of git).
 >

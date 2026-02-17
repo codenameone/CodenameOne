@@ -19,7 +19,7 @@ The other thing that jQuery did, was provide an elegant way to select and manipu
 
 With the new `ComponentSelector` class, I have adopted the following aspects of jQuery:
 
-  1. **CSS-like Selection Sytax** – Support for a CSS-like syntax for “selecting” Components to be included in a set.
+  1. **CSS-like Selection Sytax** – Support for a CSS-like syntax for "selecting" Components to be included in a set.
 
   2. **Fluent API** – The API is fluent, meaning you can chain multiple method calls together and reduce typing.
 
@@ -61,7 +61,7 @@ __**9** | – Returns the button itself to assign to the `slideUp` local variabl
 __ |  For people like Shai who don’t like the jQuery `$` syntax used for method names, you can alternatively use the `select()` method as an alias for `$()`.   
 ---|---  
   
-Take a close look at that example, and imagine implementing that functionality the “old” way. It actually gets pretty hairy. Hopefully that example is enough to get you interested in using ComponentSelector.
+Take a close look at that example, and imagine implementing that functionality the "old" way. It actually gets pretty hairy. Hopefully that example is enough to get you interested in using ComponentSelector.
 
 Now let’s go into some of the details of how it works and how to use it.
 
@@ -79,41 +79,41 @@ The first thing you’ll want to do with ComponentSelector, is to select the com
 
 You can specify the roots for a query to limit the scope of the search. If you don’t provide a root, then the current form will be used as a root. If there is no current form yet, then a RuntimeException will be thrown. It is always a good idea to provide a root if you have one.
 
-E.g. `$("Label", myContainer)` = The set of components with UIID=”Label” inside the `myContainer`. This will scour the full subtree of `myContainer` for components that match the provided selector.
+E.g. `$("Label", myContainer)` = The set of components with UIID="Label" inside the `myContainer`. This will scour the full subtree of `myContainer` for components that match the provided selector.
 
-You can provide multiple roots as well. E.g. `$("Label", myContainer, anotherContainer)` = The set of components with UIID=”Label” inside either `myContainer` or `anotherContainer`.
+You can provide multiple roots as well. E.g. `$("Label", myContainer, anotherContainer)` = The set of components with UIID="Label" inside either `myContainer` or `anotherContainer`.
 
-You could also provide set of components, and by extension a ContainerSelector (since it implements `java.util.Set<Component>`) as the roots. E.g. `$("CalendarDay", $("Calendar"))` = The set of all components with UIID “CalendarDay” inside containers with UIID=”Calendar”.
+You could also provide set of components, and by extension a ContainerSelector (since it implements `java.util.Set<Component>`) as the roots. E.g. `$("CalendarDay", $("Calendar"))` = The set of all components with UIID "CalendarDay" inside containers with UIID="Calendar".
 
 Finally, ComponentSelector provides a `find()` method that implicitly uses the current set as the roots. E.g. `$("Calendar").find("CalendarDay")` is equivalent to `$("CalendarDay", $("Calendar"))`.
 
 ### Selector Syntax
 
-So far I’ve just glossed over the selector syntax by saying it’s “like CSS”. Though it is **like** CSS selectors, it is necessarily different to accommodate the differences between Codename One’s component model and Javascript’s DOM. Rather than go into a technical language definition, I’ll use some examples to illustrate the capabilities of our syntax.
+So far I’ve just glossed over the selector syntax by saying it’s "like CSS". Though it is **like** CSS selectors, it is necessarily different to accommodate the differences between Codename One’s component model and Javascript’s DOM. Rather than go into a technical language definition, I’ll use some examples to illustrate the capabilities of our syntax.
 
-  1. `$("Label")` – The set of all components on the form with UIID “Label”
+  1. `$("Label")` – The set of all components on the form with UIID "Label"
 
-  2. `$("#MyField")` – The set of all components on the form with Name “MyField”.
+  2. `$("#MyField")` – The set of all components on the form with Name "MyField".
 
-  3. `$(".some-tag")` – The set of all components on the form with the tag “some-tag”. (I’ll discuss tags below).
+  3. `$(".some-tag")` – The set of all components on the form with the tag "some-tag". (I’ll discuss tags below).
 
-  4. `$("Label#MyField")` – The set of all components on the form with both UIID=”Label” and Name=”MyField”.
+  4. `$("Label#MyField")` – The set of all components on the form with both UIID="Label" and Name="MyField".
 
-  5. `$("Label#MyField.some-tag")` – The set of all components on the form with UIID=”Label”, Name=”MyField”, and tag “some-tag”.
+  5. `$("Label#MyField.some-tag")` – The set of all components on the form with UIID="Label", Name="MyField", and tag "some-tag".
 
   6. `$("*")` – The set of all components on the form.
 
-  7. `$(".some-tag.some-other-tag")` – All components with both tags “some-tag” and “some-other-tag”
+  7. `$(".some-tag.some-other-tag")` – All components with both tags "some-tag" and "some-other-tag"
 
-  8. `$("#MyContainer *")` – All components contained in the subtree whose root has Name=”MyContainer”. The “MyContainer” wouldn’t be included in this set. Only its descendants.
+  8. `$("#MyContainer *")` – All components contained in the subtree whose root has Name="MyContainer". The "MyContainer" wouldn’t be included in this set. Only its descendants.
 
-  9. `$("#MyContainer > *")` – Direct children of components with Name=”MyContainer”. (The “MyContainer” component would not be included in this set. Only its children.)
+  9. `$("#MyContainer > *")` – Direct children of components with Name="MyContainer". (The "MyContainer" component would not be included in this set. Only its children.)
 
-  10. `$("#MyContainer > * > Label")` – Direct grandchildren of components with Name=”MyContainer”. Only grand children with UIID=”Label” are included.
+  10. `$("#MyContainer > * > Label")` – Direct grandchildren of components with Name="MyContainer". Only grand children with UIID="Label" are included.
 
 ### Tags
 
-Some of the examples above mention the use of “tags”. Tags are analogous to “classes” in CSS. I wanted to provide the same type of functionality as CSS classes, but in Java, the term “class” is a little busy, so I decided to use the term “tag” instead. You can add as many tags to a component as you like. You can then use those tags to assist in your queries. Tags are added using the `addTags()` method, and they are removed using the `removeTags()` method.
+Some of the examples above mention the use of "tags". Tags are analogous to "classes" in CSS. I wanted to provide the same type of functionality as CSS classes, but in Java, the term "class" is a little busy, so I decided to use the term "tag" instead. You can add as many tags to a component as you like. You can then use those tags to assist in your queries. Tags are added using the `addTags()` method, and they are removed using the `removeTags()` method.
 
 Here is an example that uses tags to implement table striping so that even rows are a different color than odd rows in a table.
     
@@ -142,25 +142,25 @@ Here is an example that uses tags to implement table striping so that even rows 
 
 ![Table striping screenshot](/blog/jquery-css-style-selectors-for-cn1/component-selector-table-striping.png)
 
-In the above example we add a tag to each label when we add it to the table or either “even” or “odd”. We then use the “even” in our ComponentSelector to set the background color and transparency of all labels in even rows. In this example, we actually build the table and set the striping in the same place, but consider the situation when the table is constructed by another API. This approach would allow the API to provide more extensibility by simply tagging the elements and allowing the library user to decide how to style the even and odd rows.
+In the above example we add a tag to each label when we add it to the table or either "even" or "odd". We then use the "even" in our ComponentSelector to set the background color and transparency of all labels in even rows. In this example, we actually build the table and set the striping in the same place, but consider the situation when the table is constructed by another API. This approach would allow the API to provide more extensibility by simply tagging the elements and allowing the library user to decide how to style the even and odd rows.
 
 ## Modifying Styles
 
-ComponentSelector includes wrappers for most of the methods of `com.codename1.ui.plaf.Style` so that you can easily modify the styles of selected components using a fluent API. This was demonstrated a little bit in the table striping example (`setBgColor()` and `setBgTransparency()` were called on even rows of the table). It is worth going over this in a little more detail though as Codename One styles have “state”. E.g. For the snippet of code:
+ComponentSelector includes wrappers for most of the methods of `com.codename1.ui.plaf.Style` so that you can easily modify the styles of selected components using a fluent API. This was demonstrated a little bit in the table striping example (`setBgColor()` and `setBgTransparency()` were called on even rows of the table). It is worth going over this in a little more detail though as Codename One styles have "state". E.g. For the snippet of code:
     
     
     $(".even", table)
         .setBgColor(0xcccccc)
         .setBgTransparency(255);
 
-Were we setting these values on the “selected” style, the “unselected” style, the “disabled” style, “ALL” styles? In fact we were only setting these values on the “current” style. I.e. the call to `setBgColor()` caused something similar to the following loop to happen on all of the components in the set:
+Were we setting these values on the "selected" style, the "unselected" style, the "disabled" style, "ALL" styles? In fact we were only setting these values on the "current" style. I.e. the call to `setBgColor()` caused something similar to the following loop to happen on all of the components in the set:
     
     
     for (Component c : evenComponents) {
         c.getStyle().setBgColor(0xcccccc);
     }
 
-If a component was in “selected” state, then this would changed the selected style. If it was in pressed state, then it would change the “pressed” style. Etc…​ What if we wanted to specifically change the styles in the “pressed” state. Then we would call `selectPressedStyle()` prior calling our style mutation methods. E.g.
+If a component was in "selected" state, then this would changed the selected style. If it was in pressed state, then it would change the "pressed" style. Etc…​ What if we wanted to specifically change the styles in the "pressed" state. Then we would call `selectPressedStyle()` prior calling our style mutation methods. E.g.
     
     
     $(".even", table)
@@ -168,22 +168,22 @@ If a component was in “selected” state, then this would changed the selected
         .setBgColor(0xcccccc)
         .setBgTransparency(255);
 
-Alternatively, ComponentSelector supports a “state” pseudo-selector that will initialize the selected style so that you don’t have to call `selectXXXStyle()` before making changes. E.g. The following snippet is equivalent to the previous:
+Alternatively, ComponentSelector supports a "state" pseudo-selector that will initialize the selected style so that you don’t have to call `selectXXXStyle()` before making changes. E.g. The following snippet is equivalent to the previous:
     
     
     $(".even:pressed", table)
         .setBgColor(0xcccccc)
         .setBgTransparency(255);
 
-The following “state” pseudo-selectors are available:
+The following "state" pseudo-selectors are available:
 
-  1. `:pressed` – Selects the “pressed” style
+  1. `:pressed` – Selects the "pressed" style
 
-  2. `:selected` – Selects the “selected” style
+  2. `:selected` – Selects the "selected" style
 
-  3. `:unselected` – Selects the “unselected” style
+  3. `:unselected` – Selects the "unselected" style
 
-  4. `:disabled` – Selects the “disabled” style
+  4. `:disabled` – Selects the "disabled" style
 
   5. `:all` – Selects the ALLStyles proxy for each component (so that you can target all styles together)
 
@@ -237,9 +237,9 @@ E.g. Consider this example, that shows a button that replaces itself and all sib
 __**1** | Finds all siblings of the source button  
 ---|---  
 __**2** | Call `replaceAndWait()` with a mapping function to define the component that should replace each component. This will replace each component in the set with a replacement component in its respective container. This will also return a new ComponentSelector with the set of replacement components.  
-__**3** | In our “mapper” callback, we will return a new Label component to replace each existing component.  
+__**3** | In our "mapper" callback, we will return a new Label component to replace each existing component.  
 __**4** | We store the original component in the replacement’s client properties so that we can swap it back afterwards.  
-__**5** | We use the “Fade” transition for the replacement.  
+__**5** | We use the "Fade" transition for the replacement.  
 __**6** | In the second `replaceAndWait()` call’s mapper method, we return the original component which we retrieved from the replacement’s client properties.  
 __**7** | We use a cover transition for the replacement.  
   

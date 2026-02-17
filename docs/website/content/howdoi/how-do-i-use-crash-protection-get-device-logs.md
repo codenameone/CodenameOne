@@ -28,7 +28,7 @@ Log.p() prints out log information, you can print any arbitrary string and shoul
 To send the log manually we can just call sendLog() it will instantly send the log to the email of the user who built the app.
 
 Typical applications have a bindCrashProtection call in their init(Object) callback method. This call handles all uncaught exceptions and automatically sends an email if an exception was thrown in runtime and wasn’t handled. Notice the argument for the bind method is set to true. This argument means that exception error messages are swallowed. Normally if the event dispatch thread has an error we catch that exception and show an error dialog. That’s great during development but might be worse than crashing in production… When you pass true it means this error message is consumed and the user won’t see it.  
-Notice that bindCrashProtection doesn’t do anything on the simulator to avoid “noise” when you are trying to debug an app.  
+Notice that bindCrashProtection doesn’t do anything on the simulator to avoid "noise" when you are trying to debug an app.  
 Bind crash protection tries to catch all exceptions but it focuses mostly on the event dispatch thread exceptions. You can also handle those manually
 
 Event dispatch thread exceptions can be caught by using the EDT error listener from the CN class or from Display. If you consume the event object the error message won’t reach the EDT and an error dialog won’t be shown to the user. Notice that the exception is logged near the end with the Log.e() method and sent manually. You can create your own custom EDT error handler although we’d recommend the bind method which also tracks uncaught exceptions on other threads.

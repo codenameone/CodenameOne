@@ -21,7 +21,7 @@ Parse.com as backend?). A few months down the line, a lot has happened such as t
 Parse Server (yay!) and subsequently the Parse Dashboard. However, I still had to decide what do with my apps  
 and I guess you have to as well.
 
-By now, the imminent shutdown of Parse.com must have hit home for you as well: You wish it was merely a bad dream but unfortunately it’s a stark reality. You’ve got just a few months left to migrate your existing apps and obviously do not want to face another shutdown. Nearly every major MBaaS vendor is brandishing a banner that directly or indirect says “Parse.com let you down but you’re safe with us”. However, whom can you trust? Or maybe you should just host your own Parse Server? How about migrating away from anything Parse-like and settling for a completely different MBaaS.
+By now, the imminent shutdown of Parse.com must have hit home for you as well: You wish it was merely a bad dream but unfortunately it’s a stark reality. You’ve got just a few months left to migrate your existing apps and obviously do not want to face another shutdown. Nearly every major MBaaS vendor is brandishing a banner that directly or indirect says "Parse.com let you down but you’re safe with us". However, whom can you trust? Or maybe you should just host your own Parse Server? How about migrating away from anything Parse-like and settling for a completely different MBaaS.
 
 In this post, I share some important points to consider while deciding on your replacement for Parse.com. In Part 2, I’ll share how I applied these guidelines while migrating my own apps. This article is highly recommended for anyone who still has their apps on Parse.com or is contemplating using a Parse.com-like solution as backend for their (new) apps.
 
@@ -70,9 +70,9 @@ The rest of this article will focus on the first two categories (i.e. self-hosti
 
 Now that you have a better idea of what the options are, here are some things you must bear in mind while making your choice for your Parse.com replacement.
 
-#### Self-hosting is more than merely clicking a “Deploy on X” button
+#### Self-hosting is more than merely clicking a "Deploy on X" button
 
-Most self-hosting Parse migration guides display a “Deploy on <PaaS>” button. While this might help you through the initial migration, it is only the tip of the iceberg! Self-hosting requires non-trivial investment of time and resources; it requires a certain degree of technical competence and could be quite expensive in the long run.
+Most self-hosting Parse migration guides display a "Deploy on `<PaaS>`" button. While this might help you through the initial migration, it is only the tip of the iceberg! Self-hosting requires non-trivial investment of time and resources; it requires a certain degree of technical competence and could be quite expensive in the long run.
 
 On the other hand, self-hosting offers you maximum flexibility from choice of database to Parse server version (remember that Parse Server is still in active development so there are regular updates, bug fixes, etc.). Furthermore, you can add new functionality that is not (yet) available in Parse Server.
 
@@ -84,7 +84,7 @@ If you’re considering self-hosting, be sure to give yourself convincing answer
 
   * Do I have sufficient time to set up my Parse Server and migrate all my apps? You have till January 28, 2017 to get done with migration and that’s not so much time. In fact, according to the migration guide provided by Parse.com, you should already have finished setting up your Parse Server by July 28, 2016. While that’s not a firm deadline, if you’re reading this article now and still haven’t chosen your self-hosting PaaS, you’re kind of running late…​
 
-If you cannot provide satisfactory answers to questions like the ones above, self-hosting is likely not for you. Instead, consider a Parse Server hosting provider that will handle the hosting for you, allowing you to focus on making great apps. That was the power of Parse.com – “focus on your apps and we’ll take care of the rest”. And it remains a strong value proposition.
+If you cannot provide satisfactory answers to questions like the ones above, self-hosting is likely not for you. Instead, consider a Parse Server hosting provider that will handle the hosting for you, allowing you to focus on making great apps. That was the power of Parse.com – "focus on your apps and we’ll take care of the rest". And it remains a strong value proposition.
 
 #### Beware of vendor lock-in
 
@@ -98,15 +98,15 @@ Moreover, you’d be much better off with a Parse Server hosting provider that i
 
 #### Beware of elaborate Freemium offers
 
-As the adage goes “Once bitten, twice shy!” With the unprecedented shutdown of Parse.com, you definitely do  
+As the adage goes "Once bitten, twice shy!" With the unprecedented shutdown of Parse.com, you definitely do  
 not want to migrate your apps only to face another shutdown. So be careful with very attractive freemium offers.  
-One of my college professors often reminded us that “there’s no such thing as a free lunch” and I think he was right.
+One of my college professors often reminded us that "there’s no such thing as a free lunch" and I think he was right.
 
 Although the [announcement](http://blog.parse.com/announcements/moving-on/) of Parse.com’s shutdown didn’t  
 provide details of why Facebook pulled the plugs, the main reason is apparently $$$ as explained in  
 [this New York Times article](http://bits.blogs.nytimes.com/2016/01/28/facebook-to-shut-down-parse-its-platform-for-mobile-developers/?_r=1)  
 which, remarkably, was termed by Parse.com’s CEO, as  
-[“pretty accurate”](https://www.quora.com/Why-is-Parse-shutting-down/answer/Ilya-Sukhar?srid=uX6B5).  
+["pretty accurate"](https://www.quora.com/Why-is-Parse-shutting-down/answer/Ilya-Sukhar?srid=uX6B5).  
 You might also find  
 [this article](https://medium.com/@sashidoio/dangers-and-benefits-of-the-freemium-model-what-did-we-learn-out-of-parses-shutdown-79becb215c84#.ggsb3gf6l)  
 on the dangers and benefits of the freemium model interesting.

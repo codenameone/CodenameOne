@@ -15,7 +15,7 @@ We have added support for IntelliJ’s asynchronous code debugging feature, so t
 
 ![Async Debugging with IntelliJ IDEA - Codename One](/blog/async-debugging-with-intellij-idea/Async-Debugging-with-IntelliJ-IDEA-Codename-One-1024x536.jpg)
 
-When debugging your apps in IntelliJ, stack-traces will include the “async” context’s stack frames so that you can see the stack trace of the code that scheduled your asynchronous code. For example, methods like `callSerially()` are notoriously prickly to debug because the “logical” stack trace includes the stack frame in which `callSerially(Runnable)` is called, and also the frame in which the **Runnable**‘s `run()` method is called. It is very difficult to walk up this “logical” stack from a break-point inside the `run()` method.
+When debugging your apps in IntelliJ, stack-traces will include the "async" context’s stack frames so that you can see the stack trace of the code that scheduled your asynchronous code. For example, methods like `callSerially()` are notoriously prickly to debug because the "logical" stack trace includes the stack frame in which `callSerially(Runnable)` is called, and also the frame in which the **Runnable**‘s `run()` method is called. It is very difficult to walk up this "logical" stack from a break-point inside the `run()` method.
 
 To demonstrate this point, consider the following code:
 
@@ -62,23 +62,23 @@ public class TestAsyncDebugForm extends Form {
 			
 ```
 
-This creates a form with two buttons: “Hello 1” and “Hello 2”. Clicking on either button will ultimately trigger an async call to the `printHello()` method, but they follow different code paths to get there. Clicking “Hello 1” triggers the `button1Clicked()` method, and clicking “Hello 2” triggers the `button2Clicked()` method – both triggering an async call to `printHello()`.
+This creates a form with two buttons: "Hello 1" and "Hello 2". Clicking on either button will ultimately trigger an async call to the `printHello()` method, but they follow different code paths to get there. Clicking "Hello 1" triggers the `button1Clicked()` method, and clicking "Hello 2" triggers the `button2Clicked()` method – both triggering an async call to `printHello()`.
 
 Let’s set a break point inside the `printHello()` method:
 
 ![](/blog/async-debugging-with-intellij-idea/break-point-hello.png)
 
-If we debug the app and press “Hello 1”, we will see a stack trace like the following:
+If we debug the app and press "Hello 1", we will see a stack trace like the following:
 
 ![](/blog/async-debugging-with-intellij-idea/stack-trace-hello1-sync.png)
 
-There is no way to tell from this stack trace which button was pressed to trigger it. If we walk up the stack we hit a dead end at **executeSerialCall()**. This is because the break-point occurs in the asynchronous callback of `callSerially()`, so the original stack frame for the call to `callSerially()` is already “gone” by the time we hit our break-point.
+There is no way to tell from this stack trace which button was pressed to trigger it. If we walk up the stack we hit a dead end at **executeSerialCall()**. This is because the break-point occurs in the asynchronous callback of `callSerially()`, so the original stack frame for the call to `callSerially()` is already "gone" by the time we hit our break-point.
 
 Now, let’s try this again with async debugging enabled. The stack trace this time will look like:
 
 ![](/blog/async-debugging-with-intellij-idea/stack-trace-hello1-async.png)
 
-We can now trace this break-point back to “Button 1” definitively because it displays both the “execution” stack frame’s trace, and the scheduler’s stack frame’s trace.
+We can now trace this break-point back to "Button 1" definitively because it displays both the "execution" stack frame’s trace, and the scheduler’s stack frame’s trace.
 
 ### Enabling Async Debugging
 
@@ -94,13 +94,13 @@ Async debugging requires:
 3. That your `cn1.version` property is set to 7.0.65 or higher.
   
   
-4. That your project is configured to use the `com.codename1.annotations.Async` annotations for the async stack traces feature. All projects created using the [Codename One initializr](https://start.codenameone.com/) after April 18th will include this configuration “out of the box”, so it should “just work”.
+4. That your project is configured to use the `com.codename1.annotations.Async` annotations for the async stack traces feature. All projects created using the [Codename One initializr](https://start.codenameone.com/) after April 18th will include this configuration "out of the box", so it should "just work".
 
 ### Configuring the Async Annotations
 
 As mentioned above, new projects created with [Codename One initializr](https://start.codenameone.com/) after April 18th, should include async stack traces out of the box. If you have an existing project on which you want to enable async traces, you just need to tell IntelliJ to use the Codename One annotations for async stack traces. The easiest way is to simply copy the [debugger.xml](https://github.com/shannah/cn1-maven-archetypes/blob/master/cn1app-archetype/src/main/resources/archetype-resources/.idea/debugger.xml) file from the cn1app-archetype into the `.idea` directory of your project.
 
-## Place the following into the .idea/debugger.xml file of your project to enable async stack-traces.
+## Place the following into the `.idea/debugger.xml` file of your project to enable async stack-traces.
 
 ```xml
 				

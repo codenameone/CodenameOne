@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/migrating-from-digital-ocean-linode/under-the-hood.jpg)
 
-We haven’t talked as much in recent years about what it takes to run Codename One. Our infrastructure and backend are pretty complex with multiple pieces working in cohort to make everything feel like a single product. As part of that we work with 5-10 different backend SaaS providers that sell us various services, this might seem like an “odd” statement since the number should be fixed but it isn’t…​
+We haven’t talked as much in recent years about what it takes to run Codename One. Our infrastructure and backend are pretty complex with multiple pieces working in cohort to make everything feel like a single product. As part of that we work with 5-10 different backend SaaS providers that sell us various services, this might seem like an "odd" statement since the number should be fixed but it isn’t…​
 
 We change provider and some backend providers like Intercom/Cloudflare or AWS you might not think of as proper backend (like Digital Ocean or [Linode](https://www.linode.com/?r=57ffeef90ab49b35f5bdc2a8658a413515d8b3ca)) so the number will fluctuate based on our moving servers from one provider to another and based on what you would consider a provider.
 
@@ -38,7 +38,7 @@ We want to move additional resources from app engine to [Linode](https://www.lin
 
 We’ll try to find better hosts for our Windows/Mac servers which will allow us to add more servers there and shorten the iOS build times for everyone. So far these fields aren’t as competitive as the Linux hosting fields so we’re not as optimistic about that.
 
-Another thing on our todo list for the past couple of years is packaging everything into containers. We started Codename One before Docker was “a thing” so by the time it got on our radar we had too much invested. Had we used it this move might have been even simpler than it already was.
+Another thing on our todo list for the past couple of years is packaging everything into containers. We started Codename One before Docker was "a thing" so by the time it got on our radar we had too much invested. Had we used it this move might have been even simpler than it already was.
 ---
 
 ## Archived Comments
@@ -131,9 +131,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I wrote a bit about it here: [https://www.codenameone.com…](</blog/migrating-away-from-app-engine/>)  
 > Generally Google just started overcharging us at a rate that would have bankrupted us very quickly.
 >
-> The problem is that to be effective PaaS sometimes hides details and in this case we had no way to track the cause of the HUGE expenses. I opened a ticket with Google as a gold customer (400USD per month for that “privilege”) and essentially got an “it’s a problem on your end, we checked in our logs”. Which is essentially a big F U.
+> The problem is that to be effective PaaS sometimes hides details and in this case we had no way to track the cause of the HUGE expenses. I opened a ticket with Google as a gold customer (400USD per month for that "privilege") and essentially got an "it’s a problem on your end, we checked in our logs". Which is essentially a big F U.
 >
-> This went back and forth a lot but basically the gist of it is you have no way of “knowing” what you are paying for with PaaS as it’s way too big. After migrating away our scaling improved because we could write better code (without all the app engine restrictions) and because we could add affordable servers/CDN.
+> This went back and forth a lot but basically the gist of it is you have no way of "knowing" what you are paying for with PaaS as it’s way too big. After migrating away our scaling improved because we could write better code (without all the app engine restrictions) and because we could add affordable servers/CDN.
 >
 
 

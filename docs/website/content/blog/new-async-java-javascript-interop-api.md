@@ -15,18 +15,18 @@ We recently introduced a new API for interacting with Javascript in Codename One
 
 ## So what was wrong with the old API?
 
-The old API provided a synchronous wrapper around an inherently asynchronous process, and made extensive use of [invokeAndBlock()](/javadoc/com/codename1/ui/Display/#invokeAndBlock-java.lang.Runnable-) underneath the covers. This resulted in a very nice API with high-level abstractions that played nicely with a synchronous programming model, but it came with a price-tag in terms of performance, complexity, and predictability. Let’s take a simple example, getting a reference to the “window” object:
+The old API provided a synchronous wrapper around an inherently asynchronous process, and made extensive use of [invokeAndBlock()](/javadoc/com/codename1/ui/Display/#invokeAndBlock-java.lang.Runnable-) underneath the covers. This resulted in a very nice API with high-level abstractions that played nicely with a synchronous programming model, but it came with a price-tag in terms of performance, complexity, and predictability. Let’s take a simple example, getting a reference to the "window" object:
     
     
     JSObject window = ctx.get("window");
 
-This code looks harmless enough, but this is actually quite expensive. It issues a command to the `BrowserComponent`, and uses [invokeAndBlock()](/javadoc/com/codename1/ui/Display/#invokeAndBlock-java.lang.Runnable-) to wait for the command to go through and send back a response. [invokeAndBlock()](/javadoc/com/codename1/ui/Display/#invokeAndBlock-java.lang.Runnable-) is a magical tool that allows you to “block” without blocking the EDT, but it has its costs, and shouldn’t be overused. Most of the Codename One APIs that use `invokeAndBlock()` indicate this in their name. E.g. `Component.animateLayoutAndWait()`. This gives you the expectation that this call could take some time, and helps to alert you to the underlying cost.
+This code looks harmless enough, but this is actually quite expensive. It issues a command to the `BrowserComponent`, and uses [invokeAndBlock()](/javadoc/com/codename1/ui/Display/#invokeAndBlock-java.lang.Runnable-) to wait for the command to go through and send back a response. [invokeAndBlock()](/javadoc/com/codename1/ui/Display/#invokeAndBlock-java.lang.Runnable-) is a magical tool that allows you to "block" without blocking the EDT, but it has its costs, and shouldn’t be overused. Most of the Codename One APIs that use `invokeAndBlock()` indicate this in their name. E.g. `Component.animateLayoutAndWait()`. This gives you the expectation that this call could take some time, and helps to alert you to the underlying cost.
 
 The problem with the `ctx.get("window")` call is that it looks the same as a call to `Map.get(key)`. There’s no indication that this call is expensive and could take time. One call like this probably isn’t a big deal, but it doesn’t take long before you have dozens or even hundreds of calls like this littered throughout your codebase, and they can be hard to pick out.
 
 ## The New API
 
-The new API fully embraces the asynchronous nature of Javascript. It uses callbacks instead of return values, and provides convenience wrappers with the appropriate “AndWait()” naming convention to allow for synchronous usage. Let’s look at a simple example:
+The new API fully embraces the asynchronous nature of Javascript. It uses callbacks instead of return values, and provides convenience wrappers with the appropriate "AndWait()" naming convention to allow for synchronous usage. Let’s look at a simple example:
 
 __ |  In all of the sample code below, you can assume that variables named `bc` represent an instance of [BrowserComponent](/javadoc/com/codename1/ui/BrowserComponent/).   
 ---|---  
@@ -37,7 +37,7 @@ __ |  In all of the sample code below, you can assume that variables named `bc` 
         res -> Log.p("The result was "+res.getInt())
     );
 
-This code should output “The result was 7” to the console. It is fully asynchronous, so you can include this code anywhere without worrying about it “bogging down” your code. The full signature of this form of the [execute()](/javadoc/com/codename1/ui/BrowserComponent/#execute-java.lang.String-com.codename1.util.SuccessCallback-) method is:
+This code should output "The result was 7" to the console. It is fully asynchronous, so you can include this code anywhere without worrying about it "bogging down" your code. The full signature of this form of the [execute()](/javadoc/com/codename1/ui/BrowserComponent/#execute-java.lang.String-com.codename1.util.SuccessCallback-) method is:
     
     
     public void execute(String js, SuccessCallback<JSRef> callback)
@@ -59,14 +59,14 @@ E.g.
     JSRef res = bc.executeAndWait("callback.onSuccess(3+4)");
     Log.p("The result was "+res.Int());
 
-Prints “The result was 7”.
+Prints "The result was 7".
 
 __ |  When using the `andWait()` variant, it is **extremely** important that your Javascript calls your callback method at some point – otherwise it will block **indefinitely**. We provide variants of executeAndWait() that include a timeout in case you want to hedge against this possibility.   
 ---|---  
   
 ## Multi-use Callbacks
 
-The callbacks you pass to `execute()` and `executeAndWait()` are single-use callbacks. You can’t, for example, store the `callback` variable on the javascript side for later use (e.g. to respond to a button click event). If you need a “multi-use” callback, you should use the `addJSCallback()` method instead. Its usage looks identical to `execute()`, the only difference is that the callback will life on after its first use. E.g. Consider the following code:
+The callbacks you pass to `execute()` and `executeAndWait()` are single-use callbacks. You can’t, for example, store the `callback` variable on the javascript side for later use (e.g. to respond to a button click event). If you need a "multi-use" callback, you should use the `addJSCallback()` method instead. Its usage looks identical to `execute()`, the only difference is that the callback will life on after its first use. E.g. Consider the following code:
     
     
     bc.execute(
@@ -74,9 +74,9 @@ The callbacks you pass to `execute()` and `executeAndWait()` are single-use call
         res -> Log.p(res.toString())
     );
 
-The above example, assumes that jQuery is loaded in the webpage that we are interacting with, and we are adding a click handler to a button with ID “somebutton”. The click handler calls our callback.
+The above example, assumes that jQuery is loaded in the webpage that we are interacting with, and we are adding a click handler to a button with ID "somebutton". The click handler calls our callback.
 
-If you run this example, the first time the button is clicked, you’ll see “Button was clicked” printed to the console as expected. However, the 2nd time, you’ll just get an exception. This is because the callback passed to `execute()` is only single-use.
+If you run this example, the first time the button is clicked, you’ll see "Button was clicked" printed to the console as expected. However, the 2nd time, you’ll just get an exception. This is because the callback passed to `execute()` is only single-use.
 
 We need to modify this code to use the `addJSCallback()` method as follows:
     
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I have just added support for this in Git. [https://github.com/codename…](<https://github.com/codenameone/CodenameOne/commit/1d6aa547da7297d7caaff2640d18052f37fedb48>)  
 > This will be available in next server update on Friday.  
 > Just wrap the Javascript literal expression in a JSExpression object. E.g.  
-> [myProxy.call](<http://myProxy.call)(>“myMethod”, new Object[]{“a string”, new JSExpression(“a.javascript.expression()”)}, res->{…})
+> [myProxy.call](<http://myProxy.call)(>"myMethod", new Object[]{"a string", new JSExpression("a.javascript.expression()")}, res->{…})
 >
 
 
@@ -177,15 +177,18 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > ZombieLover says:
 >
-> For anyone trying to run a jquery script using addJSCallback… you may have to do it after the document has loaded. Otherwise you might be running it before jQuery has been loaded. Example:  
-> browser.addWebEventListener(“onLoad”, new ActionListener() {  
-> public void actionPerformed(ActionEvent evt) {  
-> browser.addJSCallback(  
-> “$(‘#someId’).click(function(){callback.onSuccess(‘Button was clicked’)})”,  
-> res -> System.out.print(res.toString())  
-> );  
-> }  
+> For anyone trying to run a jquery script using `addJSCallback` you may have to do it after the document has loaded. Otherwise you might be running it before jQuery has been loaded. Example:
+>
+> ```java
+> browser.addWebEventListener("onLoad", new ActionListener() {
+>     public void actionPerformed(ActionEvent evt) {
+>         browser.addJSCallback(
+>             "$('#someId').click(function(){callback.onSuccess('Button was clicked')})",
+>             res -> System.out.print(res.toString())
+>         );
+>     }
 > });
+> ```
 >
 
 

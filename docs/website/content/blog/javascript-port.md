@@ -15,12 +15,12 @@ We are very excited to announce the alpha release of the Codename One Javascript
 step closer to the coveted _write once run anywhere_ ideal. Starting with Codename One version 3.0, you will  
 be able to deploy your projects as Javascript applications that run directly in the browser. The process is simple:
 
-  1. Select the “JavaScript” build target from the right click menu.
+  1. Select the "JavaScript" build target from the right click menu.
 
   2. Log into the Codename One build server.
 
   3. Download the application as a .zip archive that will run on any web server – or try the app instantly in your  
-browser using the “Preview” link.
+browser using the "Preview" link.
 
 ## Limitations
 
@@ -43,13 +43,13 @@ Once all of the features are complete, I will focus on ensuring support for the 
 When I first started working on the port, I didn’t know whether it would even be viable, performance-wise. I feared  
 that we might finish the port and find that the interface was sluggish, unresponsive, and clunky. The single-threaded  
 architecture of Javascript was viewed as a limitation, and it was thought that the EDT might cause the Javascript  
-main thread to lock and block the UI, causing the dreaded “This page is unresponsive” alert in the browser.
+main thread to lock and block the UI, causing the dreaded "This page is unresponsive" alert in the browser.
 
 I am happy to say that our fears were unfounded. Performance, on the desktop, seems comparable to the current  
 JavaSE port – and in some cases it is even better. The true test of performance, however, is on mobile devices.  
 On newer devices (e.g. iPhone 6, iPad Air 2) the port is quite responsive; Animations and transitions are smooth –  
 though not quite as smooth as in the iOS port. On the previous generation of devices (e.g. Nexus 5, Nexus 7),  
-I would describe the port as “usable”, but animations and transitions are a little jerky. As we move into even older  
+I would describe the port as "usable", but animations and transitions are a little jerky. As we move into even older  
 devices, the apps remain usable, but the slow responsiveness, animations, and transitions become more  
 noticeable.
 
@@ -81,7 +81,7 @@ features or APIs have been rejected by Codename One because they wouldn’t be p
 WORA paradigm.
 
 Being able to run inside the browser opens up a whole array of possibilities for us Codename One developers.  
-Enterprise applications that must target the “web first”, can now be written entirely in Java. No more messing  
+Enterprise applications that must target the "web first", can now be written entirely in Java. No more messing  
 around with HTML and Javascript for the client side. Write the application once, deploy to the web, and also  
 provide native application bundles for users that require the enhanced experience of a native app.
 
@@ -105,7 +105,7 @@ any destination. All requests will be proxied thru that servlet and thus allow y
 you choose seamlessly.
 
 However, we wanted developers to be able to preview their build results easily without requiring a specific server  
-setup. To that end we generate a monolithic HTML file build result that we provide as a “preview” that you can  
+setup. To that end we generate a monolithic HTML file build result that we provide as a "preview" that you can  
 open using the QR code or preview link as a result of the build. Its not as optimized as the actual result but you  
 can see it instantly without setting up a server.
 
@@ -173,7 +173,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Thomas Yuen says:
 >
-> It is good to see js support but if it is only for the enterprise (the “rich”) customer, it is not so good (bad for biz)
+> It is good to see js support but if it is only for the enterprise (the "rich") customer, it is not so good (bad for biz)
 >
 
 
@@ -202,11 +202,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > KL says:
 >
-> Hi, Because of “same origin policy”, if my js apps need to do http request to origin server, should I hardcode the server domain/ip inside the apps? If not, how do I open the http request?  
+> Hi, Because of "same origin policy", if my js apps need to do http request to origin server, should I hardcode the server domain/ip inside the apps? If not, how do I open the http request?  
 > `  
 > ConnectionRequest r = new ConnectionRequest();  
 > r.setPost(false);  
-> r.setUrl(“http://www.abcdefg.com/hello.php”); // Possible not to hard code the domain name?  
+> r.setUrl("http://www.abcdefg.com/hello.php"); // Possible not to hard code the domain name?  
 > NetworkManager.getInstance().addToQueue(r);  
 > `  
 > Kindly advice.  
@@ -229,7 +229,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > KL says:
 >
-> Can I use the Display.getInstance().getProperty(“[browser.window.location.host](<http://browser.window.location.host>)”, “DEFAULT”) to get the host/domain name? I tried, but it just return “DEFAULT” ..
+> Can I use the Display.getInstance().getProperty("[browser.window.location.host](<http://browser.window.location.host>)", "DEFAULT") to get the host/domain name? I tried, but it just return "DEFAULT" ..
 >
 > Still not implemented?
 >

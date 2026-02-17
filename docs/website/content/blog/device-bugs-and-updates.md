@@ -29,7 +29,7 @@ kicking off, this is currently a pretty rough process that requires a lot of han
   
   
   
-Another aspect that hit us this week is the camera bug on iOS which apparently still wasn’t resolved, it got solved thanks to the combined stubbornness of Chen and some clues from Steve. We also had some rendering artifacts on Android KitKat due to regressions Android has with its TextureView, we ended up disabling the TextureView which we introduced to workaround a relatively rare Android bug (there are a lot of those around). You can still explicitly enable the TextureView approach by using the build flag android.textureView=true.  
+Another aspect that hit us this week is the camera bug on iOS which apparently still wasn’t resolved, it got solved thanks to the combined stubbornness of Chen and some clues from Steve. We also had some rendering artifacts on Android KitKat due to regressions Android has with its TextureView, we ended up disabling the TextureView which we introduced to workaround a relatively rare Android bug (there are a lot of those around). You can still explicitly enable the TextureView approach by using the build flag `android.textureView=true`.  
   
   
   

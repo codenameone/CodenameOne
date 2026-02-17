@@ -215,7 +215,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 ### **Shai Almog** — September 15, 2016 at 3:43 am ([permalink](/blog/round-border/#comment-24227))
 
 > Thanks, we are working on bringing material design concepts into Codename One. E.g. yesterdays floating button post.  
-> Most of those concepts don’t really fit into the idea of a “theme” but rather widgets… If you have a specific thought or something else you want from material design let us know.
+> Most of those concepts don’t really fit into the idea of a "theme" but rather widgets… If you have a specific thought or something else you want from material design let us know.
 >
 
 

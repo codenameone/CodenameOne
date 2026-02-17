@@ -25,7 +25,7 @@ As part of that we’ll add a workshop day to the bootcamp where he can cover Pa
 
 ### What is Codename One
 
-I’ve spent some time building materials for the pre-course which runs before the bootcamp starts and it covers some of the big pieces of Codename One to make sure we all start on the same page. One of the features I’ve made is the “long version” of the answer to “what is Codename One”. This answer goes into the details of history, architecture (big pieces), how does it work and lightweight architecture.
+I’ve spent some time building materials for the pre-course which runs before the bootcamp starts and it covers some of the big pieces of Codename One to make sure we all start on the same page. One of the features I’ve made is the "long version" of the answer to "what is Codename One". This answer goes into the details of history, architecture (big pieces), how does it work and lightweight architecture.
 
 This is a small piece of some of the things we are working on:
 

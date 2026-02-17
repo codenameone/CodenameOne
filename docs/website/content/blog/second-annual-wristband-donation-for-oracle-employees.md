@@ -20,11 +20,11 @@ author: Shai Almog
   
   
 
-At JavaOne/Oracle Open World the wristband allows you to attend the ”  
+At JavaOne/Oracle Open World the wristband allows you to attend the "  
 [  
 appreciation event  
 ](https://www.oracle.com/openworld/bands/index.html)  
-” featuring Aerosmith, Macklemore & Ryan Lewis and Spacehog. Unfortunately Oracle employees don’t get the wristband that allows everyone to attend that event!  
+" featuring Aerosmith, Macklemore & Ryan Lewis and Spacehog. Unfortunately Oracle employees don’t get the wristband that allows everyone to attend that event!  
   
   
   

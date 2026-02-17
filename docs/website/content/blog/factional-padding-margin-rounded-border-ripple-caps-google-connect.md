@@ -27,7 +27,7 @@ Google has pretty much ended support for the old Google+ login API’s and Steve
 
   * Enable Google Sign-In
 
-  * Download the google-services.json file into your project’s native/android directory
+  * Download the `google-services.json` file into your project’s native/android directory
 
   * Download the GoogleService-Info.plist file into your project’s native/ios directory
 
@@ -199,17 +199,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I chose the default to work with specific UIID’s since button is so widespread that doing it for everything might have been even more disruptive.
 >
-> The goal is to have a default “native” behavior that’s “seamless”. Android does the same thing by styling buttons as all caps by default so this seems like the right thing to do.
+> The goal is to have a default "native" behavior that’s "seamless". Android does the same thing by styling buttons as all caps by default so this seems like the right thing to do.
 >
 > In that sense a better place to put this would have been the style text effects property, I chose not to do that for performance reasons but I’m not sure if that was the right call.
 >
 > I agree that launching something and flipping a default is problematic but leaving something that’s wrong is problematic too. I asked in the original post for suggestions on how we can move things forward without disruption and got crickets…
 >
-> It’s pretty easy to say “don’t release it like this” without suggesting a better way. We asked this multiple times and suggestions effectively amounted to don’t change the product. Those conflict with the notion of moving it forward:
+> It’s pretty easy to say "don’t release it like this" without suggesting a better way. We asked this multiple times and suggestions effectively amounted to don’t change the product. Those conflict with the notion of moving it forward:
 >
 > – Leave it off by default – that’s a bad suggestion. It’s off then no one uses it and it might as well not exist
 >
-> – Release in a specific time or with huge/many announcements – We did an announcement and included a big “compatibility warning”. Distributed as much as we reasonably can… In the past we did bigger/longer term announcements for similar changes (gradle migration, xcode migration etc). People don’t read these. It’s just a waste of time that delays forward progress
+> – Release in a specific time or with huge/many announcements – We did an announcement and included a big "compatibility warning". Distributed as much as we reasonably can… In the past we did bigger/longer term announcements for similar changes (gradle migration, xcode migration etc). People don’t read these. It’s just a waste of time that delays forward progress
 >
 > – Add ability to disable this easily – we have that
 >
@@ -247,7 +247,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ve committed a fix for this and will push it into today’s update.
 >
-> If we were building a new product from scratch I would uppercase all buttons or put this into the style both of which I agree are better choices. The problem is that both would disrupt too many production apps in unpredictable ways. I’d also want this to apply correctly for multibuttons, span buttons etc. as we move forward and none of them are buttons. So the “right thing” here is a bit “off”.
+> If we were building a new product from scratch I would uppercase all buttons or put this into the style both of which I agree are better choices. The problem is that both would disrupt too many production apps in unpredictable ways. I’d also want this to apply correctly for multibuttons, span buttons etc. as we move forward and none of them are buttons. So the "right thing" here is a bit "off".
 >
 > I’m actually all for a democracy here, even in a democracy there is a PM or President who navigates but can’t do stuff congress disagrees with. Unfortunately I made a post about this which got literally zero comments. Maybe it’s the writing that’s too verbose but I’m guessing it’s just hard for people to understand until they see something that impacts their app.
 >
@@ -296,7 +296,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Thomas says:
 >
-> Is there a way to use rounded borders from the new GUI builder? In the old builder there was a border wizard that allowed to create custom borders by generating a 9 components image but I could not find it in the new GUI builder and the RoundRectBorder type is not offered as an option (only the “round” border type, that seems to map to RoundBorder exists in the border editor of the new GUI builder)
+> Is there a way to use rounded borders from the new GUI builder? In the old builder there was a border wizard that allowed to create custom borders by generating a 9 components image but I could not find it in the new GUI builder and the RoundRectBorder type is not offered as an option (only the "round" border type, that seems to map to RoundBorder exists in the border editor of the new GUI builder)
 >
 
 

@@ -22,14 +22,14 @@ Add the following dependency to your app’s `build.gradle` file:
         compile 'io.intercom.android:intercom-sdk:3.+'
     }
 
-Which instantly raises the question: “How in the world do I do that in Codename One”?
+Which instantly raises the question: "How in the world do I do that in Codename One"?
 
 Well, it’s actually pretty simple. You can add the build hint:
     
     
     android.gradleDep=compile 'io.intercom.android:intercom-sdk:3.+'
 
-This would “work” but there is a catch…​
+This would "work" but there is a catch…​
 
 You might need to define the specific version of the Android SDK used and specific version of Google play services version used. Intercom is pretty sensitive about those and demanded that we also add:
     

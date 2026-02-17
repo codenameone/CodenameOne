@@ -28,7 +28,7 @@ When we designed the Codename One `Table` class we tried to keep it as far as po
 
 I hope we did a better job with our `Table` class, I know it’s not easy but having gone thru tables in many OS’s (don’t get me started on iOS) I would say our approach is MUCH easier.
 
-One of the tricks we do in `Table` is a “forced refresh” which we trigger thru `tbl.setModel(tbl.getModel())` this effectively saves us from the need to derive the model and fire the proper model changed event. It allows us to store state in a different location than the model which we normally shouldn’t do but it’s a hack that’s useful as a shortcut.
+One of the tricks we do in `Table` is a "forced refresh" which we trigger thru `tbl.setModel(tbl.getModel())` this effectively saves us from the need to derive the model and fire the proper model changed event. It allows us to store state in a different location than the model which we normally shouldn’t do but it’s a hack that’s useful as a shortcut.
 
 E.g. [a recent stackoverflow question](http://stackoverflow.com/questions/42303713/how-can-i-select-and-hightlight-a-row-in-a-table-in-codename-one/42311881) asked about highlighting a table row. The asker eventually just meant a checkbox mode (I guess he didn’t think about the fact that `ctrl-click` doesn’t work in touch UI’s) but this is the perfect example for this use case.
 

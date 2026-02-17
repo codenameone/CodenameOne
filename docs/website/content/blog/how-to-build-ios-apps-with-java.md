@@ -141,7 +141,7 @@ Java bytecode is dynamically translated to a native iOS Xcode project and seamle
 
 To run and build the project, you should be running a modern version of Mac OS, Windows, or Linux with JDK 11 installed.
 
-You don’t need to install anything other than the Codename One plugin. You can work with Mac, Windows or Linux and everything should “just work”.
+You don’t need to install anything other than the Codename One plugin. You can work with Mac, Windows or Linux and everything should "just work".
 
 Let’s dig in.
 

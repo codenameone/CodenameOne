@@ -61,7 +61,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Javier Anton says:
 >
-> I can’t click on the “Control Center” link. I also can’t find the tool on the website
+> I can’t click on the "Control Center" link. I also can’t find the tool on the website
 >
 
 
@@ -70,8 +70,8 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Chen Fishbein says:
 >
-> The “Control Center” App replaces the settings app, it is accessible from the IDE plugins.  
-> Select the “CodenameOne Settings” from the plugin.(notice if you still see the old settings do an “update” from the Settings app menu and restart the app).
+> The "Control Center" App replaces the settings app, it is accessible from the IDE plugins.  
+> Select the "CodenameOne Settings" from the plugin.(notice if you still see the old settings do an "update" from the Settings app menu and restart the app).
 >
 
 

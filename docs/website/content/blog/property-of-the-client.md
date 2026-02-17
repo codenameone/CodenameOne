@@ -36,7 +36,7 @@ Why not just store a variable?
   
 This is an immensely useful  
   
-feature that allows you to decouple your UI code from the business logic and store state information directly in the component. This is especially useful in a GUI builder application where you might not want to litter the state machine with variables. We use these methods extensively in Codename One itself e.g. the GridBagLayout stores constraint information right into the component state using the putClientProperty method. Tree indicates whether a node is expanded or folded right in the component itself, it also allows the tree to have a reverse lookup reference from the Component to the state node (so it “knows” the object that formed a specific component). 
+feature that allows you to decouple your UI code from the business logic and store state information directly in the component. This is especially useful in a GUI builder application where you might not want to litter the state machine with variables. We use these methods extensively in Codename One itself e.g. the GridBagLayout stores constraint information right into the component state using the putClientProperty method. Tree indicates whether a node is expanded or folded right in the component itself, it also allows the tree to have a reverse lookup reference from the Component to the state node (so it "knows" the object that formed a specific component). 
 
 On a different subject altogether Fabrício Carvalho Cabeça of  
 [  

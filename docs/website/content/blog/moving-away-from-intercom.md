@@ -32,7 +32,7 @@ With this you should already see the new chat widget below and should be able to
 
 Unfortunately this is just the tip of the iceberg. Intercoms code is embedded deep into the backend systems. The problem is we still have some app engine servers running and it’s really hard to update them as Google effectively killed off the system we were using. So we are finally doing what we procrastinated on for 3 years and removing app engine completely from our stack!
 
-This is a **HUGE** move, I can’t over state it. All our user logs and everything is in app engine. That might mean that if you had an old “dormant” account that you haven’t used in years it might get deleted in the migration as we won’t be able to migrate it. That’s not a big deal since such accounts would typically be free accounts and you could just re-create that account. The bigger benefit is that we would be able to implement a lot of the features we always wanted to and couldn’t because of the problems in our backend!
+This is a **HUGE** move, I can’t over state it. All our user logs and everything is in app engine. That might mean that if you had an old "dormant" account that you haven’t used in years it might get deleted in the migration as we won’t be able to migrate it. That’s not a big deal since such accounts would typically be free accounts and you could just re-create that account. The bigger benefit is that we would be able to implement a lot of the features we always wanted to and couldn’t because of the problems in our backend!
 
 You might notice some kinks in the migration let us know in the comments or the chat if things don’t work well. Setting up the automated emails from scratch will be a nightmare but it has to be done.
 
@@ -115,9 +115,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > – Threaded discussions are/were handled better  
 > – Analytics on email sending is better
 >
-> The pricing difference is amazing, AFAIK no one is remotely close to Crisps “ultimate” tier in terms of pricing. I was referring to Intercoms pricing without all its packages to make it equivalent to Crisp which would have put the price difference at x20/x30…
+> The pricing difference is amazing, AFAIK no one is remotely close to Crisps "ultimate" tier in terms of pricing. I was referring to Intercoms pricing without all its packages to make it equivalent to Crisp which would have put the price difference at x20/x30…
 >
-> The price made us move but after working with Crisp for a while now I think it’s also a technically superior product. This is mostly because these guys are a startup and they are “hungry” unlike Intercom which is so full of investor funding it can’t function. Crisp listens to users whereas Intercom doesn’t really care unless you pay 5-6 figures. We paid mid 4 figures (annually) and they didn’t care to implement anything we asked for. They changed pricing to existing customers with 1 month of notice… Who does that?
+> The price made us move but after working with Crisp for a while now I think it’s also a technically superior product. This is mostly because these guys are a startup and they are "hungry" unlike Intercom which is so full of investor funding it can’t function. Crisp listens to users whereas Intercom doesn’t really care unless you pay 5-6 figures. We paid mid 4 figures (annually) and they didn’t care to implement anything we asked for. They changed pricing to existing customers with 1 month of notice… Who does that?
 >
 > Here are the features that Crisp does way better:
 >
@@ -125,7 +125,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > – Mobile – Intercom was unusable on mobile. There was no way to disable it there. Crisp can be disabled on mobile but is usable there to begin with. It doesn’t annoy. People would complain about our site a lot mostly because of Intercom.
 >
-> – Gifs – Intercom added the most annoying feature in history: gif support. Users started sending us animated gifs. That’s stupid and redundant. We aren’t targeting children… Our chat is there to help not entertain. Crisp has a “while you wait play a game” feature, but it can be turned off. They let us adapt the way the widget looks/behaves to the type of business we have. BTW I commented about the gif issue in their public blog post and a lot of users chimed in complaining about it. Intercoms solution was swift and simple: they disabled commenting on future blog posts…
+> – Gifs – Intercom added the most annoying feature in history: gif support. Users started sending us animated gifs. That’s stupid and redundant. We aren’t targeting children… Our chat is there to help not entertain. Crisp has a "while you wait play a game" feature, but it can be turned off. They let us adapt the way the widget looks/behaves to the type of business we have. BTW I commented about the gif issue in their public blog post and a lot of users chimed in complaining about it. Intercoms solution was swift and simple: they disabled commenting on future blog posts…
 >
 > – I love their visitor view, it has given me a level of insight into our site visitors that neither Google Analytics or Intercom have given. It might be because we integrated Google Analytics badly though.
 >
@@ -164,7 +164,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> I agree. We plan to integrate crisp as a cn1lib. This should be trivial to accomplish but I don’t have an ETA for it right now. It’s very much on our “TODO” list.
+> I agree. We plan to integrate crisp as a cn1lib. This should be trivial to accomplish but I don’t have an ETA for it right now. It’s very much on our "TODO" list.
 >
 
 
