@@ -635,11 +635,13 @@ public class SideMenuBar extends MenuBar {
             leftCommands.remove(cmd);
         }
         if (getCommandCount() == 0) {
-            if (getTitleComponent() != null) {
+            if (getTitleComponent() != null && getTitleComponent().getParent() != null) {
                 getTitleComponent().getParent().removeAll();
             }
-            getTitleAreaContainer().removeAll();
-            getTitleAreaContainer().addComponent(BorderLayout.CENTER, getTitleComponent());
+            if (getTitleAreaContainer() != null) {
+                getTitleAreaContainer().removeAll();
+                getTitleAreaContainer().addComponent(BorderLayout.CENTER, getTitleComponent());
+            }
         }
         installRightCommands();
         installLeftCommands();
