@@ -66,10 +66,7 @@ isGetAllContactsFast() returns true, otherwise it will fallback to code that eff
   
   
   
-We also added a callback method to ConnectionRequest:  
-  
-  
-protected void cookieReceived(Cookie c)  
+We also added a callback method to ConnectionRequest: `protected void cookieReceived(Cookie c)`  
   
   
   

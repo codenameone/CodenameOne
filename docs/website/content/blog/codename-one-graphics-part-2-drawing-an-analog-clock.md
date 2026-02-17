@@ -316,15 +316,15 @@ Drawing the Second Hand
   
 For the "second" hand, I will just use a simple line from the clock center to the inside edge of the medium tick mark at the 12 o’clock position.
 
-GeneralPath secondHand = new GeneralPath();  
-  
-secondHand.moveTo((float)cX, (float)cY);  
-  
+```java
+GeneralPath secondHand = new GeneralPath();
+secondHand.moveTo((float)cX, (float)cY);
 secondHand.lineTo((float)cX, (float)(cY-(r-medTickLen)));
+```
 
 And I will translate it down slightly so that it overlaps the center. This translation will be performed on the GeneralPath object directly rather than through the Graphics context:
 
-Shape translatedSecondHand = secondHand.createTransformedShape( Transform.makeTranslation(0f, 5) );
+`Shape translatedSecondHand = secondHand.createTransformedShape(Transform.makeTranslation(0f, 5));`
 
 **  
 Rotating the Second Hand  

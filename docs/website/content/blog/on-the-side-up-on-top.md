@@ -29,7 +29,7 @@ Hamburger Menu
   
 So lets get started with the features, first is one of the newer features up our sleeve, the ability to place a side menu on the right, top or on both sides of the title (as in the facebook app). You can  
   
-accomplish this by using something like cmd.putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT);
+accomplish this by using something like `cmd.putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT);`
 
   
 Or as you might see in this more detailed example where you can just swap menu placements on the fly:  
@@ -66,7 +66,7 @@ isShowing() – useful for writing generic code that might occur when the SideMe
 
   * SideMenuBar.closeCurrentMenu(Runnable) – just like closeCurrentMenu() however it will invoke the run() method when complete. This allows you to navigate to another form after the menu close animation completed.  
 
-The TitleCommand property allows you to flag a command as something you would want to see in the right hand title area and not within the SideMenu area. Just place it into a component using cmd.putClientProperty("TitleCommand", Boolean.TRUE);
+The TitleCommand property allows you to flag a command as something you would want to see in the right hand title area and not within the SideMenu area. Just place it into a component using `cmd.putClientProperty("TitleCommand", Boolean.TRUE);`
 
   
 Last but not least w  

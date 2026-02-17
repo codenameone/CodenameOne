@@ -102,7 +102,7 @@ of the more interesting ones is the ability to sign in to an App without a user 
   
   
   
-FacebookAccess.anonymousLogin(appid, clientSecret); 
+`FacebookAccess.anonymousLogin(appid, clientSecret);` 
 
 Notice: This post was automatically converted using a script from an older blogging system. Some elements might not have come out as intended…. If that is the case please let us know via the comments section below.
 

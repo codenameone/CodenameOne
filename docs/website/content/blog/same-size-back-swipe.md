@@ -52,12 +52,11 @@ One of our enterprise developers pointed out functionality in iOS7 that allows s
   
 That one command will enable swiping back from currentForm. LazyValue is a new interface that we will probably use quite often moving forward, its defined as:  
   
-  
-public interface LazyValue<T> {  
-  
-public T get(Object… args);  
-  
-}  
+```java
+public interface LazyValue<T> {
+    public T get(Object… args);
+}
+```  
   
   
   

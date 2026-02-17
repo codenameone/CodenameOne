@@ -34,71 +34,58 @@ screenshot process on the server
 ](http://www.codenameone.com/3/post/2014/03/the-7-screenshots-of-ios.html)  
 fails, however we looked thru their code and could see nothing there! It all seemed complex yet not something that should exceed the 20 second timeout per screenshot.
 
-This particular application has a very rich resource file of more than 3.5mb, that is a lot… Our reference to the resource is a soft reference by default and it can be removed at any minute. The developer of the app was aware of this due to previous support incidents and invoked setKeepResourcesInRam(true); in the constructor of the state machine. However, this still caused the resource file to load/unload several times before that code was invoked… Moving it to init vars like this, solved the problem:  
-  
-protected void initVars() {  
-  
-setKeepResourcesInRam(true);  
-  
+This particular application has a very rich resource file of more than 3.5mb, that is a lot… Our reference to the resource is a soft reference by default and it can be removed at any minute. The developer of the app was aware of this due to previous support incidents and invoked `setKeepResourcesInRam(true);` in the constructor of the state machine. However, this still caused the resource file to load/unload several times before that code was invoked… Moving it to init vars like this, solved the problem:
+
+```java
+protected void initVars() {
+    setKeepResourcesInRam(true);
 }
+```
 
 Notice that this version of the initVars() doesn’t take any arguments and it happens before the constructor or anything… 
 
 To understand why that is you need to understand a few things on the Java language specification, say I have two classes:
 
-class A {  
-  
-public A() {  
-  
-print();  
-  
+```java
+class A {
+    public A() {
+        print();
+    }
+
+    public void print() {
+    }
 }
 
-public void print() {  
-  
-}  
-  
-}
+class B extends A {
+    int i = -1;
 
-class B extends A{  
-  
-int i = -1;  
-  
-public B() {  
-  
-}  
-  
-public void print() {  
-  
-System.out.println(i);  
-  
-}  
-  
+    public B() {
+    }
+
+    public void print() {
+        System.out.println(i);
+    }
 }
+```
 
 This will printout 0. 
 
-To understand why look at this which is semantically identical to the above B class. The javac compiler effectively translates class level assignment into assignment within the constructor so class B looks like this:  
-  
-class B extends A{  
-  
-int i;  
-  
-public B() {  
-  
-super();  
-  
-i = 1;  
-  
-}  
-  
-public void print() {  
-  
-System.out.println(i);  
-  
-}  
-  
+To understand why look at this which is semantically identical to the above B class. The javac compiler effectively translates class level assignment into assignment within the constructor so class B looks like this:
+
+```java
+class B extends A {
+    int i;
+
+    public B() {
+        super();
+        i = 1;
+    }
+
+    public void print() {
+        System.out.println(i);
+    }
 }
+```
 
 This is how javac compiles the class so while super (A’s constructor) is executing the variable is still in the default 0 state…
 

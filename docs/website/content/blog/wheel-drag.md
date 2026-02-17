@@ -87,7 +87,7 @@ Codename One has a setter within Display called setDragStartPercentage and some 
   
   
   
-So we added a new method to Component to indicate if a drag in a particular area is positively a drag operation: protected boolean isDragRegion(int x, int y)  
+So we added a new method to Component to indicate if a drag in a particular area is positively a drag operation: `protected boolean isDragRegion(int x, int y)`  
   
   
 For Lists this will return true if the list is large making it easier to scroll larger lists, for side menu this will return true if the drag operation is in the left side of the screen trying to open the sidemenu.  

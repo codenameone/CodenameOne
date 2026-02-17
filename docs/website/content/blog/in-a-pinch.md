@@ -26,9 +26,7 @@ Codename One has supported multi-touch and effectively pinch to zoom events from
   
   
   
-Effectively if you are interested in handling pinch you would just override:  
-  
-protected boolean pinch(float scale) and return true after handling the pinch operation. We did this to support our new  
+Effectively if you are interested in handling pinch you would just override `protected boolean pinch(float scale)` and return true after handling the pinch operation. We did this to support our new  
 [  
 ImageViewer class  
 ](http://code.google.com/p/codenameone/source/browse/trunk/CodenameOne/src/com/codename1/components/ImageViewer.java)  

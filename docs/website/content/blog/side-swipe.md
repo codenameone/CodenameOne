@@ -34,7 +34,7 @@ Using this capability is really trivial just use something like a a MultiButton 
   
   
   
-SwipeableContainer swip = new SwipeableContainer(bottom, top); 
+`SwipeableContainer swip = new SwipeableContainer(bottom, top);` 
 
 You then add the swipeable container probably into a BoxLayout Y container such as in this case, see the demo video below.  
   

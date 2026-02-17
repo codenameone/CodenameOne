@@ -82,11 +82,11 @@ TTF into the application
 ](http://codenameone.blogspot.com/2012/11/fonts-revisited.html)  
 and it "just works" but Helvetica is builtin to iOS and shouldn’t be used on other platforms (due to copyrights). So how do you use a font such as HelveticaNeue?  
   
-Simple: Font helveticaNeue = Font.createTrueTypeFont("HelveticaNeue", null); 
+Simple: `Font helveticaNeue = Font.createTrueTypeFont("HelveticaNeue", null);` 
 
 This will "just work" even though the TTF file name is null it will just search the system. Notice that it will crash if the font doesn’t exist so use it carefully!  
   
-To get a specific size in pixels e.g. 14p just go with: Font fontNeue14 = helveticaNeue.derive(14, Font.STYLE_PLAIN); 
+To get a specific size in pixels e.g. 14p just go with: `Font fontNeue14 = helveticaNeue.derive(14, Font.STYLE_PLAIN);` 
 
 * * *
 

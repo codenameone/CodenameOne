@@ -43,7 +43,7 @@ This works great but takes two lines… Which is why you can also do something l
 
 So far so good… The problem is that this also works:  
   
-String[] array = (String[])c.toArray(new String[0]);
+`String[] array = (String[])c.toArray(new String[0]);`
 
 It will produce an array response that is equal to the size of c and is of type String[] and not Object[]. This will fail on the new iOS VM and should really never be used…
 

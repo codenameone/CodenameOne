@@ -36,11 +36,10 @@ Its really just a container that is positioned within the layered pane. Notice t
 
 Using the interaction dialog is be pretty trivial and very similar to dialog:  
   
-final InteractionDialog dlg = new InteractionDialog("Hello");  
-  
-dlg.setLayout(new BorderLayout());  
-  
 ```java
+final InteractionDialog dlg = new InteractionDialog("Hello");
+dlg.setLayout(new BorderLayout());
+
 dlg.addComponent(BorderLayout.CENTER, new Label("Hello Dialog"));
 
 Button close = new Button("Close");
