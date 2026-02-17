@@ -22,129 +22,85 @@
  */
 package com.codename1.ui.util.xml;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
 
 /**
  * Parsed XML data
  *
  * @author Shai Almog
  */
-@XmlRootElement(name="border")
-@XmlAccessorType(XmlAccessType.FIELD)
 public class Border {
-    @XmlAttribute
     private String key;
 
-    @XmlAttribute
     private String type;
 
-    @XmlAttribute
     private Float thickness;
 
-    @XmlAttribute
     private String css;
     
-    @XmlAttribute
     private boolean millimeters;
 
-    @XmlAttribute
     private Integer color;
 
-    @XmlAttribute
     private Integer colorB;
 
-    @XmlAttribute
     private Integer colorC;
 
-    @XmlAttribute
     private Integer colorD;
 
-    @XmlAttribute
     private Integer arcW;
 
-    @XmlAttribute
     private Integer arcH;
 
-    @XmlAttribute
     private String i1;
 
-    @XmlAttribute
     private String i2;
 
-    @XmlAttribute
     private String i3;
 
-    @XmlAttribute
     private String i4;
 
-    @XmlAttribute
     private String i5;
 
-    @XmlAttribute
     private String i6;
 
-    @XmlAttribute
     private String i7;
 
-    @XmlAttribute
     private String i8;
 
-    @XmlAttribute
     private String i9;
 
-    @XmlAttribute
     private int roundBorderColor;
 
-    @XmlAttribute
     private int opacity = 255;
     
-    @XmlAttribute
     private int strokeColor;
     
-    @XmlAttribute
     private int strokeOpacity = 255;
     
-    @XmlAttribute
     private float strokeThickness;
 
-    @XmlAttribute
     private boolean strokeMM;
 
-    @XmlAttribute
     private float shadowSpread;
 
-    @XmlAttribute
     private int shadowOpacity = 0;
 
-    @XmlAttribute
     private float shadowX = 0.5f;
 
-    @XmlAttribute
     private float shadowY = 0.5f;
 
-    @XmlAttribute
     private float shadowBlur = 10;
 
-    @XmlAttribute
     private boolean shadowMM;
 
-    @XmlAttribute
     private boolean rectangle;
 
-    @XmlAttribute
     private float cornerRadius;
     
-    @XmlAttribute
     private boolean bezierCorners;
     
-    @XmlAttribute
     private boolean topOnlyMode;
     
-    @XmlAttribute
     private boolean bottomOnlyMode;
     
     /**

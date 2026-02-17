@@ -24,26 +24,16 @@
 package com.codename1.ui.util.xml.comps;
 
 import com.codename1.ui.util.xml.Val;
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlValue;
 
 /**
  *
  * @author Shai Almog
  */
-@XmlRootElement(name="mapItems")
-@XmlAccessorType(XmlAccessType.FIELD)
 public class MapItems {    
-    @XmlElement
     private Val[] imageItem; 
 
-    @XmlElement
     private Val[] actionItem; 
     
-    @XmlElement
     private Val[] stringItem; 
 
     /**

@@ -23,44 +23,29 @@
 
 package com.codename1.ui.util.xml.comps;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlRootElement;
 
 /**
  *
  * @author Shai Almog
  */
-@XmlRootElement(name="layoutConstraint")
-@XmlAccessorType(XmlAccessType.FIELD)
 public class LayoutConstraint {
-    @XmlAttribute
     private String value;
 
-    @XmlAttribute
     private int row;
 
 
-    @XmlAttribute
     private int column;
 
-    @XmlAttribute
     private int height;
 
-    @XmlAttribute
     private int width;
 
-    @XmlAttribute
     private int align;
 
-    @XmlAttribute
     private int valign;
 
-    @XmlAttribute
     private int spanHorizontal;
 
-    @XmlAttribute
     private int spanVertical;
 
     /**

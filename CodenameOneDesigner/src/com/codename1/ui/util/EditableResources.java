@@ -59,6 +59,7 @@ import com.codename1.ui.util.xml.L10n;
 import com.codename1.ui.util.xml.Lang;
 import com.codename1.ui.util.xml.LegacyFont;
 import com.codename1.ui.util.xml.ResourceFileXML;
+import com.codename1.ui.util.xml.SimpleXmlParser;
 import com.codename1.ui.util.xml.Theme;
 import com.codename1.ui.util.xml.Ui;
 import com.codename1.ui.util.xml.Val;
@@ -100,8 +101,6 @@ import javax.swing.event.TreeModelEvent;
 import javax.swing.event.TreeModelListener;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
 
 /**
  * This class enhances the resources class by inheriting it and using package
@@ -410,8 +409,7 @@ public class EditableResources extends Resources implements TreeModel {
                         File resDir = new File(res, f.getName().substring(0, f.getName().length() - 4));
                         
                         // open the XML file...
-                        JAXBContext ctx = JAXBContext.newInstance(ResourceFileXML.class);
-                        ResourceFileXML xmlData = (ResourceFileXML)ctx.createUnmarshaller().unmarshal(xml);
+                        ResourceFileXML xmlData = SimpleXmlParser.parse(xml, ResourceFileXML.class);
                         boolean normalize = xmlData.getMajorVersion() > 1 || xmlData.getMinorVersion() > 5;
                         
                         majorVersion = (short)xmlData.getMajorVersion();
@@ -791,9 +789,8 @@ public class EditableResources extends Resources implements TreeModel {
                                 // place renderers first
                                 final ArrayList<String> renderers = new ArrayList<String>();
                                 for(Ui d : xmlData.getUi()) {
-                                    JAXBContext componentContext = JAXBContext.newInstance(ComponentEntry.class);
                                     File uiFile = new File(resDir, normalizeFileName(d.getName()) + ".ui");
-                                    ComponentEntry uiXMLData = (ComponentEntry)componentContext.createUnmarshaller().unmarshal(uiFile);                                    
+                                    ComponentEntry uiXMLData = SimpleXmlParser.parse(uiFile, ComponentEntry.class);
                                     guiElements.add(uiXMLData);
                                     uiXMLData.findRendererers(renderers);
                                 }
@@ -871,7 +868,7 @@ public class EditableResources extends Resources implements TreeModel {
                         }
                         
                         return;
-                    } catch(JAXBException err) {
+                    } catch(RuntimeException err) {
                         err.printStackTrace();
                     }
                 }

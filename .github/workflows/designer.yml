@@ -6,12 +6,14 @@ on:
       - master
     paths:
       - 'CodenameOneDesigner/**'
+      - 'maven/designer/**'
       - '.github/workflows/designer.yml'
   pull_request:
     branches:
       - master
     paths:
       - 'CodenameOneDesigner/**'
+      - 'maven/designer/**'
       - '.github/workflows/designer.yml'
 
 jobs:
@@ -46,6 +48,14 @@ jobs:
 
       - name: Run designer CSS localization tests
         run: xvfb-run -a ant -noinput -buildfile CodenameOneDesigner/build.xml test-css-localization
+
+      - name: Run designer XML parser unit tests (Maven)
+        run: |
+          mkdir -p maven/target
+          rm -rf maven/target/cn1-binaries
+          cp -R ../cn1-binaries maven/target/cn1-binaries
+          cd maven
+          mvn -B -pl designer -am -DunitTests=true -Dcodename1.platform=javase -Plocal-dev-javase -Dmaven.javadoc.skip=true -Dmaven.antrun.skip=true -Dtest=SimpleXmlParserTest -DfailIfNoTests=false test
 
       - name: Build designer release jar
         run: xvfb-run -a ant -noinput -buildfile CodenameOneDesigner/build.xml release

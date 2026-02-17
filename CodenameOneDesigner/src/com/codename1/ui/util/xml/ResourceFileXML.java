@@ -22,45 +22,29 @@
  */
 package com.codename1.ui.util.xml;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
 
 /**
  * A JAXB XML object for loading the resource file into RAM
  *
  * @author Shai Almog
  */
-@XmlRootElement(name="resource")
-@XmlAccessorType(XmlAccessType.FIELD)
 public class ResourceFileXML {
-    @XmlAttribute
     private int majorVersion;
 
-    @XmlAttribute
     private int minorVersion;
     
-    @XmlElement
     private Theme[] theme;
     
-    @XmlElement
     private Ui[] ui;
 
-    @XmlElement
     private LegacyFont[] legacyFont;
 
-    @XmlElement
     private Data[] data;
 
-    @XmlElement
     private Image[] image;
 
-    @XmlElement
     private L10n[] l10n;
 
-    @XmlAttribute
     private boolean useXmlUI;
     
     /**
@@ -70,11 +54,19 @@ public class ResourceFileXML {
         return majorVersion;
     }
 
+    public void setMajorVersion(int majorVersion) {
+        this.majorVersion = majorVersion;
+    }
+
     /**
      * @return the minorVersion
      */
     public int getMinorVersion() {
         return minorVersion;
+    }
+
+    public void setMinorVersion(int minorVersion) {
+        this.minorVersion = minorVersion;
     }
 
     /**
@@ -84,11 +76,19 @@ public class ResourceFileXML {
         return theme;
     }
 
+    public void setTheme(Theme[] theme) {
+        this.theme = theme;
+    }
+
     /**
      * @return the ui
      */
     public Ui[] getUi() {
         return ui;
+    }
+
+    public void setUi(Ui[] ui) {
+        this.ui = ui;
     }
 
     /**
@@ -98,11 +98,19 @@ public class ResourceFileXML {
         return legacyFont;
     }
 
+    public void setLegacyFont(LegacyFont[] legacyFont) {
+        this.legacyFont = legacyFont;
+    }
+
     /**
      * @return the data
      */
     public Data[] getData() {
         return data;
+    }
+
+    public void setData(Data[] data) {
+        this.data = data;
     }
 
     /**
@@ -112,11 +120,19 @@ public class ResourceFileXML {
         return image;
     }
 
+    public void setImage(Image[] image) {
+        this.image = image;
+    }
+
     /**
      * @return the l10n
      */
     public L10n[] getL10n() {
         return l10n;
+    }
+
+    public void setL10n(L10n[] l10n) {
+        this.l10n = l10n;
     }
 
     /**

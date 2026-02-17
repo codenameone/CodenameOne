@@ -22,24 +22,15 @@
  */
 package com.codename1.ui.util.xml;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
 
 /**
  * Parsed XML data
  *
  * @author Shai Almog
  */
-@XmlRootElement(name="l10n")
-@XmlAccessorType(XmlAccessType.FIELD)
 public class L10n {
-    @XmlAttribute
     private String name;
     
-    @XmlElement
     private Lang[] lang;
 
     /**
@@ -51,5 +42,13 @@ public class L10n {
 
     public Lang[] getLang() {
         return lang;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setLang(Lang[] lang) {
+        this.lang = lang;
     }
 }
