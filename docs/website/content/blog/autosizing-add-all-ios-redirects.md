@@ -11,9 +11,9 @@ author: Shai Almog
 
 ![Header Image](/blog/autosizing-add-all-ios-redirects/new-features-5.jpg)
 
-One of the common requests we received over the years is a way to let text “fit” into the allocated space so the font will match almost exactly the width available. In some designs this is very important but it’s also very tricky. Measuring the width of a String is a surprisingly expensive operation on some OS’s. Unfortunately, there is no other way other than trial & error to find the “best size”.
+One of the common requests we received over the years is a way to let text "fit" into the allocated space so the font will match almost exactly the width available. In some designs this is very important but it’s also very tricky. Measuring the width of a String is a surprisingly expensive operation on some OS’s. Unfortunately, there is no other way other than trial & error to find the "best size".
 
-Still despite the fact that something is “slow” we might still want to use it for some cases, this isn’t something you should use in a renderer, infinite scroll etc. and we recommend minimizing the usage of this feature as much as possible.
+Still despite the fact that something is "slow" we might still want to use it for some cases, this isn’t something you should use in a renderer, infinite scroll etc. and we recommend minimizing the usage of this feature as much as possible.
 
 This feature is only applicable to `Label` and its subclasses (e.g. `Button`), with components such as `TextArea` (e.g. `SpanButton`) the choice between shrinking and line break would require some complex logic.
 
@@ -153,7 +153,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Denis says:
 >
-> yes, you are right, in some parts of UI I used flow layout. Is there any other way to make text bigger on tablets ? because it’s really very very tiny on 10 inch tablets, is it possible to set font size for “Label” UUID (to apply it to all labels at once) depending on device screen size ?
+> yes, you are right, in some parts of UI I used flow layout. Is there any other way to make text bigger on tablets ? because it’s really very very tiny on 10 inch tablets, is it possible to set font size for "Label" UUID (to apply it to all labels at once) depending on device screen size ?
 >
 
 
@@ -193,7 +193,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Denis says:
 >
-> cool, thanks ! just tried that, interesting, but font changes doesn’t apply, background color does, i.e. I have correct layered theme and code setup, I see different background for tablets, but font size doesn’t change, I am trying t set to “True Type: native:MainRegular” and “True Type Size: Large”, but nothing happens on tablets, I tried both “[Default Style]” and “Label”, “Button” individually, can you please advise ?
+> cool, thanks ! just tried that, interesting, but font changes doesn’t apply, background color does, i.e. I have correct layered theme and code setup, I see different background for tablets, but font size doesn’t change, I am trying t set to "True Type: native:MainRegular" and "True Type Size: Large", but nothing happens on tablets, I tried both "[Default Style]" and "Label", "Button" individually, can you please advise ?
 >
 
 
@@ -202,7 +202,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Denis says:
 >
-> setting “True Type Size” to millimeters value on component level helped, [Default Style] still doesn’t work even with millimeters value, I set font site for Buttons and Labels, but for example Dialog title is still very tiny, looks like I should set values for all components individually
+> setting "True Type Size" to millimeters value on component level helped, [Default Style] still doesn’t work even with millimeters value, I set font site for Buttons and Labels, but for example Dialog title is still very tiny, looks like I should set values for all components individually
 >
 
 

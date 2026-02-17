@@ -30,9 +30,7 @@ You can download the full source code as well as a compiled binary from a Google
 https://code.google.com/p/bouncy-castle-codenameone-lib/  
 ](https://code.google.com/p/bouncy-castle-codenameone-lib/)  
 and you can download the compiled binary from here:  
-[  
-BouncyCastleCN1Lib.cn1lib  
-](https://code.google.com/p/bouncy-castle-codenameone-lib/source/browse/trunk/BouncyCastleCN1Lib.cn1lib)  
+[BouncyCastleCN1Lib.cn1lib](/files/BouncyCastleCN1Lib.cn1lib)  
 (since Google removed the download section for new projects). 
 
   

@@ -19,11 +19,11 @@ On stackoverflow there were quite a lot of questions:
 
 ### Is there a way in which one can read data stored in a file with extension of .sql
 
-Shipping an app with a default “starter” sql database is pretty common and still pretty confusing.
+Shipping an app with a default "starter" sql database is pretty common and still pretty confusing.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37591037/is-there-a-way-in-which-one-can-read-data-stored-in-a-file-with-extension-of-sq/37605869)
 
-### How to migrate my “Codenameone” Project from (java 5) to (Java 8)
+### How to migrate my "Codenameone" Project from (java 5) to (Java 8)
 
 This is a pretty common FAQ about the move to Java 8, we should blog about it more as clearly this isn’t clear  
 enough…​
@@ -39,7 +39,7 @@ to fix that ommission soon.
 
 ### Why won’t my MenuBar show?
 
-As a product that evolved over time the “right way” to do things has changed drastically over the years and sometimes  
+As a product that evolved over time the "right way" to do things has changed drastically over the years and sometimes  
 the legacy support is hard to distinguish. In this case legacy doesn’t really warrant the overly harsh deprecation  
 but confuses developers still…​
 
@@ -152,7 +152,7 @@ JavaSE version of zip support it should be pretty easy to use.
 
 ### The app needs to be configured to android Tablets only from Google play store
 
-We have a combo box to configure this for iOS builds but Google made this a bit more “interesting” and  
+We have a combo box to configure this for iOS builds but Google made this a bit more "interesting" and  
 the definition of what is a tablet on the play store is also pretty challenging…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37517779/the-app-needs-to-be-configured-to-android-tablets-only-from-google-play-store)

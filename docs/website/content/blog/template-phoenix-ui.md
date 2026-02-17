@@ -22,7 +22,7 @@ action button gradient color and the round look of the walkthru UI.
 I’m pretty happy with the result though, notice that the JavaScript version you see on the right isn’t quite perfect  
 so scroll down to the device screenshots below to see how it looks on my Android OPO device.
 
-Due to time constraints I didn’t port all th forms, I also converted one of the “forms” to a side menu which wasn’t  
+Due to time constraints I didn’t port all th forms, I also converted one of the "forms" to a side menu which wasn’t  
 very clear from the design but worked well in production.
 
 Unlike previous demos I chose to use the GUI builder for most of this demo, as an experienced developer using  
@@ -245,7 +245,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 ### **Shai Almog** — December 6, 2016 at 6:13 am ([permalink](/blog/template-phoenix-ui/#comment-23074))
 
 > Hi,  
-> most of the forms are GUI builder forms and should work “as is” however I needed to do quite a bit of handcoding on top of that to allow some of the more unique features. Everything that’s outside of the GUI builder code block was handwritten.
+> most of the forms are GUI builder forms and should work "as is" however I needed to do quite a bit of handcoding on top of that to allow some of the more unique features. Everything that’s outside of the GUI builder code block was handwritten.
 >
 > The GUI builder can do a lot but it can’t do everything on any platform/OS combination.
 >
@@ -257,7 +257,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Dear Shai,
 >
 > Thanks for your helpful answer. One question remains though, do you mean you have used the new gui builder cuz I can not see any of the gui elements included in the theme.  
-> And if you have used the new gui builder, how can we edit the forms? When I try to edit them using the context menu and clicking on gui builder it says “Gui builder only works with GUI builder files created using the wizard”
+> And if you have used the new gui builder, how can we edit the forms? When I try to edit them using the context menu and clicking on gui builder it says "Gui builder only works with GUI builder files created using the wizard"
 >
 > Thanks again.
 >
@@ -283,7 +283,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I right click on any of the java file form files and chose gui builder but then I get a pop up with the following error message:
 >
-> “Gui builder only works with GUI builder files created using the wizard”
+> "Gui builder only works with GUI builder files created using the wizard"
 >
 
 
@@ -316,7 +316,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 ### **Shai Almog** — May 18, 2020 at 2:41 am ([permalink](/blog/template-phoenix-ui/#comment-21396))
 
 > This is a Codename One project not a standard command line Java project. As such the main class includes the start(), stop() etc. methods.  
-> You need to run it within an IDE with the Codename One plugin installed e.g. NetBeans where pressing play/debug “just works” and invokes init(Object), start() on launch.
+> You need to run it within an IDE with the Codename One plugin installed e.g. NetBeans where pressing play/debug "just works" and invokes init(Object), start() on launch.
 >
 
 

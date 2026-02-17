@@ -11,16 +11,16 @@ author: Steve Hannah
 
 ![Header Image](/blog/sign-in-with-apple-support/sign-in-with-apple-header.jpg)
 
-We have just finished the initial release of our [“Sign-in with Apple” cn1lib](https://github.com/shannah/cn1-applesignin), which adds “Sign-in with Apple” support to Codename One apps. On iOS 13 and higher, this will use Apple’s native Authentication framework. On other platforms (e.g. Android, Desktop, and Simulator), this will use Apple’s Oauth2 authentication service.
+We have just finished the initial release of our ["Sign-in with Apple" cn1lib](https://github.com/shannah/cn1-applesignin), which adds "Sign-in with Apple" support to Codename One apps. On iOS 13 and higher, this will use Apple’s native Authentication framework. On other platforms (e.g. Android, Desktop, and Simulator), this will use Apple’s Oauth2 authentication service.
 
-The main motivation for adding this functionality is that Apple would require apps that use “sign in with…​” to support its service too. If you won’t support sign in with Apple but include support signin with Facebook/Google your app might be rejected in the future.
+The main motivation for adding this functionality is that Apple would require apps that use "sign in with…​" to support its service too. If you won’t support sign in with Apple but include support signin with Facebook/Google your app might be rejected in the future.
 
-__ |  If your app doesn’t require sign-in or uses custom login logic there’s no requirement to support “sign in with Apple”   
+__ |  If your app doesn’t require sign-in or uses custom login logic there’s no requirement to support "sign in with Apple"   
 ---|---  
   
 ## Getting Started
 
-The hardest part of adding Apple sign-in support house-keeping you need to perform in Apple’s developer portal. If you only intend to support Apple sign-in with your iOS app, and not on other platforms, then the process is pretty simple – you just check a box next to “Sign-in with Apple” in the capabilites section of your App ID details page. Set-up for other platforms is a bit more involved. You need to create a “Services ID” (used for the Oauth2 client ID), and generate a private key so you will be able to generate the Oauth2 client secret on-demand.
+The hardest part of adding Apple sign-in support house-keeping you need to perform in Apple’s developer portal. If you only intend to support Apple sign-in with your iOS app, and not on other platforms, then the process is pretty simple – you just check a box next to "Sign-in with Apple" in the capabilites section of your App ID details page. Set-up for other platforms is a bit more involved. You need to create a "Services ID" (used for the Oauth2 client ID), and generate a private key so you will be able to generate the Oauth2 client secret on-demand.
 
 For full instructions see the [setup documentation in the cn1lib’s wiki](https://github.com/shannah/cn1-applesignin/wiki/Getting-Started).
 
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Also, even after doing these things the following error is thrown on the server when compiling AppleLogin:  
 > com_codename1_social_AppleLogin.m:22:10: fatal error: ‘java_io_StringReader.h’ file not found  
-> “#”include “java_io_StringReader.h”
+> "#"include "java_io_StringReader.h"
 >
 > Could it be that java.io.StringReader was used instead of com.codename1.util .regex.StringReader?
 >

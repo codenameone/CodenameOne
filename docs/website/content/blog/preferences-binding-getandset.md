@@ -39,7 +39,7 @@ Say we have a user setting for refresh as an integer in minutes:
     
     int refresh = Preferences.get("refresh", 60);
 
-That will return the refresh value as 60 if it doesn’t exist. The problem is: “how do we know we got back the default?”.
+That will return the refresh value as 60 if it doesn’t exist. The problem is: "how do we know we got back the default?".
 
 Normally that isn’t a big deal but if we have one path that invokes `Preferences.get("refresh", 60)` and another one that does a `Preferences.get("refresh", 100);` how can we tell which one is correct?
 

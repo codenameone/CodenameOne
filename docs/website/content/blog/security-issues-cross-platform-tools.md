@@ -45,7 +45,7 @@ Things to ask your cross platform tool vendor:
 
   * What level of obfuscation do I have here? Is there a separately obfuscated scripting language (e.g. javascript)?
 
-  * Can code be injected remotely? This is sometimes presented as a “feature” where you can circumvent the appstore submission process. Apple made that illegal and removed such tools in the past
+  * Can code be injected remotely? This is sometimes presented as a "feature" where you can circumvent the appstore submission process. Apple made that illegal and removed such tools in the past
 
   * Do you support encrypted storage/DB?
 
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > By the way, in the specific case of the mobile app world, a fundamental part of security is how server-side software is developed and how the server is configured and protected. 
 >
-> On the subject of computer security, I wrote a short section in my thesis “The Age of Technological Persuasion and Education in the Use of Technology”, I refer to paragraph 3.11.2, p. 56, 57 and 58. The text is in Italian: <https://www.informatica-libera.net/content/era-della-persuasione-tecnologica>
+> On the subject of computer security, I wrote a short section in my thesis "The Age of Technological Persuasion and Education in the Use of Technology", I refer to paragraph 3.11.2, p. 56, 57 and 58. The text is in Italian: <https://www.informatica-libera.net/content/era-della-persuasione-tecnologica>
 >
 
 
@@ -117,7 +117,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Agreed. I usually give the multi-layered security analogy as an “onion”. It’s hard to block a truly motivated hacker in some tiers but you can make him cry on every damn layer.
+> Agreed. I usually give the multi-layered security analogy as an "onion". It’s hard to block a truly motivated hacker in some tiers but you can make him cry on every damn layer.
 >
 
 
@@ -126,14 +126,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > [Francesco Galgani](https://lh6.googleusercontent.com/-4K0ax_DVJf4/AAAAAAAAAAI/AAAAAAAAAAA/AMZuuckEd1kcni0y8k6NMzNtxwOCEPatQQ/photo.jpg) says:
 >
-> I’ll try to add something about your question, compared to what Shai has already written. First, the source code of NativeLog Reader is really simple, it’s the first cn1lib I published, you can read the code here: <https://github.com/jsfan3/CN1Libs-NativeLogsReader> As you can see, in the case of Android it simply returns the output of “logcat” (on some phones it requires that the usb debug mode has been activated, even without usb connection), in the case of iOS it redirects the “standard output” (stdout) and the “standard error” (stderr) to a file. However, if you invoke Log.sendLogAsync() after a Log.e(ex), again you will see the file name and line number that launched the captured exception.
+> I’ll try to add something about your question, compared to what Shai has already written. First, the source code of NativeLog Reader is really simple, it’s the first cn1lib I published, you can read the code here: <https://github.com/jsfan3/CN1Libs-NativeLogsReader> As you can see, in the case of Android it simply returns the output of "logcat" (on some phones it requires that the usb debug mode has been activated, even without usb connection), in the case of iOS it redirects the "standard output" (stdout) and the "standard error" (stderr) to a file. However, if you invoke Log.sendLogAsync() after a Log.e(ex), again you will see the file name and line number that launched the captured exception.
 >
 > As for the obfuscation, here I published my own analysis of how easy or difficult it is to reverse engineer an app made with Codename One: <https://www.informatica-libera.net/content/%C3%A8-possibile-il-reverse-engineering-di-unapp-fatta-con-codename-one-risalire-al-codice>  
-> The text is in Italian, however, if you search the page for the word “jadx”, you’ll see three snippets of code, one after the other: the first is the original source code written in Netbeans, the second is the result of the decompilation made when the apk is produced by Codename One in debug mode, the third is the result of the decompilation made when the apk is produced by Codename One in release mode (i.e. with ProGuard active): only in the latter case the code is almost unreadable. In both cases (debug mode and release mode), the comments, if present, are lost, while the text strings remain as they are (and therefore allow an attacker to look for something specific, unless the strings are obfuscated with Xor or other types of obfuscation). Note that the reverse engineering of Android applications made with Codename One is generally more difficult than “native” applications (those made with Android Studio, to understand) because Codename One does not use the XML format. 
+> The text is in Italian, however, if you search the page for the word "jadx", you’ll see three snippets of code, one after the other: the first is the original source code written in Netbeans, the second is the result of the decompilation made when the apk is produced by Codename One in debug mode, the third is the result of the decompilation made when the apk is produced by Codename One in release mode (i.e. with ProGuard active): only in the latter case the code is almost unreadable. In both cases (debug mode and release mode), the comments, if present, are lost, while the text strings remain as they are (and therefore allow an attacker to look for something specific, unless the strings are obfuscated with Xor or other types of obfuscation). Note that the reverse engineering of Android applications made with Codename One is generally more difficult than "native" applications (those made with Android Studio, to understand) because Codename One does not use the XML format. 
 >
-> The article then continues by analyzing iOS: in this case I assert that decompiling is almost “mission impossible”.
+> The article then continues by analyzing iOS: in this case I assert that decompiling is almost "mission impossible".
 >
-> Finally, I examine the case of the web-apps made with Codename One, listing in detail the levels of obfuscation used, and then conclude that going back from the Javascript code produced by the Codename One build server to “usable” Java code is unrealistic (and I report an example to clarify any doubt).
+> Finally, I examine the case of the web-apps made with Codename One, listing in detail the levels of obfuscation used, and then conclude that going back from the Javascript code produced by the Codename One build server to "usable" Java code is unrealistic (and I report an example to clarify any doubt).
 >
 
 

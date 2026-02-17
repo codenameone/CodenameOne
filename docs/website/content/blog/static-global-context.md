@@ -83,7 +83,7 @@ Some things were changed so we won’t have too many conflicts e.g. `Log.p` or `
     log("my log message");
     log(myException);
 
-Instead of `Display.getInstance().getCurrent()` we now have `getCurrentForm()` since `getCurrent()` is too generic. But for most methods you should just be able to remove the `NetworkManager` or `Display` access and it should “just work”.
+Instead of `Display.getInstance().getCurrent()` we now have `getCurrentForm()` since `getCurrent()` is too generic. But for most methods you should just be able to remove the `NetworkManager` or `Display` access and it should "just work".
 
 I ported the Kitchen Sink to use this new convention, to see a sample of how this can cut down on code clutter check of this [diff of my commit](https://github.com/codenameone/KitchenSink/commit/6c4ed67579ec8cbbe3a3da67d30224688c9fe602).
 

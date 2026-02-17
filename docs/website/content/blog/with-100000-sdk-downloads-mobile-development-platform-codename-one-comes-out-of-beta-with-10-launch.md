@@ -29,7 +29,7 @@ The platform to date has been used to build over 1,000 native mobile application
   
   
 
-> “I have been developing with Codename One for a couple of months now. When you line up all of the other options for development, whether native SDKs, Appcelerator, ADF or others, Codename One wins on almost every front,” said software developer Steve Hannah. 
+> "I have been developing with Codename One for a couple of months now. When you line up all of the other options for development, whether native SDKs, Appcelerator, ADF or others, Codename One wins on almost every front," said software developer Steve Hannah. 
 
 Codename One has received widespread, viral acclaim in technology and business media including InfoWorld, Slashdot, Hacker News, VentureBeat, Business Insider, The Next Web, Dr. Dobbs and Forbes, which named the company one of the 10 greatest industry disrupting startups of 2012.  
   
@@ -38,7 +38,7 @@ Codename One has received widespread, viral acclaim in technology and business m
   
   
 
-> “We have been thrilled with the success of our beta launch and are very excited to release the much-awaited 1.0 version,” said co-founder and CEO Shai Almog.  
+> "We have been thrilled with the success of our beta launch and are very excited to release the much-awaited 1.0 version," said co-founder and CEO Shai Almog.  
 >    
 >    
 > 
@@ -80,7 +80,7 @@ Codename One is available for download free of charge.
 
 ## About Codename One  
 
-Codename One, named by Forbes as “one of the 10 greatest industry disrupting startups of 2012,” is an Israel-based technology company that has created a powerful cross-platform software development kit for mobile applications. The technology enables developers to create native applications across multiple operating systems using a single code base. Codename One was founded by renowned software engineers Shai Almog and Chen Fishbein in 2012.  
+Codename One, named by Forbes as "one of the 10 greatest industry disrupting startups of 2012," is an Israel-based technology company that has created a powerful cross-platform software development kit for mobile applications. The technology enables developers to create native applications across multiple operating systems using a single code base. Codename One was founded by renowned software engineers Shai Almog and Chen Fishbein in 2012.  
   
   
   

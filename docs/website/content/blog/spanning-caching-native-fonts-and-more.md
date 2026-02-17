@@ -56,7 +56,7 @@ image X. Normally the ImageDownloadService will never check for update if it has
 However, it might be important to update the image if it changed but you don’t want to fetch the whole thing…  
 
   
-The cached data service will fetch data if it isn’t cached locally and cache it. When you “refresh” it will send a special HTTP request that will only send back the data if it has been updated since the last refresh.  
+The cached data service will fetch data if it isn’t cached locally and cache it. When you "refresh" it will send a special HTTP request that will only send back the data if it has been updated since the last refresh.  
   
 
 * * *
@@ -80,13 +80,13 @@ Chen was dealing with some designers this week and was facing requirements to in
 [  
 TTF into the application  
 ](http://codenameone.blogspot.com/2012/11/fonts-revisited.html)  
-and it “just works” but Helvetica is builtin to iOS and shouldn’t be used on other platforms (due to copyrights). So how do you use a font such as HelveticaNeue?  
+and it "just works" but Helvetica is builtin to iOS and shouldn’t be used on other platforms (due to copyrights). So how do you use a font such as HelveticaNeue?  
   
-Simple: Font helveticaNeue = Font.createTrueTypeFont(“HelveticaNeue”, null); 
+Simple: `Font helveticaNeue = Font.createTrueTypeFont("HelveticaNeue", null);` 
 
-This will “just work” even though the TTF file name is null it will just search the system. Notice that it will crash if the font doesn’t exist so use it carefully!  
+This will "just work" even though the TTF file name is null it will just search the system. Notice that it will crash if the font doesn’t exist so use it carefully!  
   
-To get a specific size in pixels e.g. 14p just go with: Font fontNeue14 = helveticaNeue.derive(14, Font.STYLE_PLAIN); 
+To get a specific size in pixels e.g. 14p just go with: `Font fontNeue14 = helveticaNeue.derive(14, Font.STYLE_PLAIN);` 
 
 * * *
 
@@ -150,7 +150,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > CachedData newCachedData = (CachedData)ne.getMetaData(); 
 >
-> Storage.getInstance().writeObject(“LocallyCachedData”, newCachedData);
+> Storage.getInstance().writeObject("LocallyCachedData", newCachedData);
 >
 
 

@@ -15,7 +15,7 @@ Facebook recently announced the closing of parse.com which is disappointing but 
 knows a project from a large tech company can just shutdown in a blink of an eye leaving millions of users/developers  
 in limbo. In that sense one of the questions that gets under my skin is what happens if Codename One calls it  
 quits…  
-You’d be better off than anyone who used parse and its far less likely to happen. Codename One is “what we do”  
+You’d be better off than anyone who used parse and its far less likely to happen. Codename One is "what we do"  
 and have been doing for the past 4 years. More importantly, unlike Parse you could just use the open source project  
 and your users wouldn’t be the wiser. Since Parse is a service that needs to connect to a hosted server everyone  
 who used parse (myself included) need to develop a rather complex strategy of moving their hosted data (which is  
@@ -77,7 +77,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Jérémy MARQUER says:
 >
-> I’m pretty agree with the “Slowing Down New Feature Development” paragraph, but I find it unfortunate that you will post less news … It allows us (devs) to stay in touch with your development !
+> I’m pretty agree with the "Slowing Down New Feature Development" paragraph, but I find it unfortunate that you will post less news … It allows us (devs) to stay in touch with your development !
 
 
 ### **Shai Almog** — February 3, 2016 at 3:29 am ([permalink](/blog/parse-docs-updates/#comment-22551))

@@ -11,18 +11,18 @@ author: Shai Almog
 
 ![Header Image](/blog/why-we-dont-support-the-full-java-api/generic-java-1.jpg)
 
-This is something we run into every week. A new Codename One user writes asks why “feature X” from Java isn’t  
-supported. In this post we’d like to explain the “bigger picture” or why less is more…​
+This is something we run into every week. A new Codename One user writes asks why "feature X" from Java isn’t  
+supported. In this post we’d like to explain the "bigger picture" or why less is more…​
 
 Supporting the full Java API in Codename One would be a mistake that will lead us down a problematic path.  
 It would cost you a great deal in functionality, performance, portability, stability and more!
 
-__ |  We are still adding features to the VM but we trickle them in rather than supporting “everything”   
+__ |  We are still adding features to the VM but we trickle them in rather than supporting "everything"   
 ---|---  
   
-### Why we Don’t Support “Everything”?
+### Why we Don’t Support "Everything"?
 
-For the lazy here is the “cliff notes” version:
+For the lazy here is the "cliff notes" version:
 
 Supporting everything will increase the size of the distribution, eliminate true portability, reduce performance &  
 ironically make Java compliance harder!
@@ -45,14 +45,14 @@ are getting in return should be worth it!
 
 ### No Benefit in Supporting the Full JVM
 
-The assumptions for many developers is that if we support the full JVM they can just “take code” and it will work…​  
+The assumptions for many developers is that if we support the full JVM they can just "take code" and it will work…​  
 This is a problematic and incorrect assumption for most cases.
 
 Code that relies on `java.io` will need work so it can fit into device filesystem restrictions.
 
 UI needs to be adapted to mobile and most Java UI framework code can’t be.
 
-SQL/Database code can’t be used since connecting from a device to a remote database is “impractical”.
+SQL/Database code can’t be used since connecting from a device to a remote database is "impractical".
 
 Bytecode manipulation won’t work since compiled code no longer has the bytecode. Reflection would be problematic  
 as it will increase the distribution size even more and be ridiculously slow on mobile without a JIT.
@@ -72,7 +72,7 @@ There are two HUGE markets of Java developers: Java EE & Android developers.
 
 All other markets (Swing/FX/JavaME/Embedded etc.) are [small and shrinking](/blog/should-oracle-spring-clean-javafx.html).
 
-Java EE developers can’t reuse code “as is” anyway so the point of compatibility is mute, you would need to do  
+Java EE developers can’t reuse code "as is" anyway so the point of compatibility is mute, you would need to do  
 a lot of work to move code from Java EE so doing a bit more shouldn’t be a deal breaker.
 
 Reusing Android code to some extent is an attractive proposition, however the real value we can provide is in reusing  
@@ -166,7 +166,7 @@ Android development that provides very limited benefits.
 #### java.net API’s
 
 The `java.net` API’s are very elaborate and layered. All the networking code is implemented on top of sockets which  
-are modeled according to typical POSIX sockets. The problem is that most mobile platforms don’t have “proper” POSIX  
+are modeled according to typical POSIX sockets. The problem is that most mobile platforms don’t have "proper" POSIX  
 sockets and when they do they might have some issues associated with them (e.g. iOS).
 
 It’s impossible to implement `java.net` in a compliant way while still working correctly on devices!
@@ -175,10 +175,10 @@ In the future we might introduce a higher level abstractions that implements som
 but aren’t compliant. This would just mean changing the package name for 99% of the code to get it to work.  
 It’s the 1% of unique functionality that is problematic.
 
-#### java.io.File
+#### `java.io.File`
 
 Mobile devices don’t have filesystems in the same way that desktops do. There are areas to you are restricted to  
-and apps are typically “isolated” from one another. We might provide a compatibility migration API similar to the one  
+and apps are typically "isolated" from one another. We might provide a compatibility migration API similar to the one  
 we might include for `java.net` code.
 
 #### NIO
@@ -193,9 +193,9 @@ other JVM platforms. We don’t have any short/long term plans for doing this as
 The main use case for NIO is IO performance, our current recommended strategy is to use native code for such cases  
 which alleviates the need for NIO.
 
-#### String.split()
+#### `String.split()`
 
-This is a tough one. I love `String.split()` and would love to have it as part of the “official” API. But it has two major  
+This is a tough one. I love `String.split()` and would love to have it as part of the "official" API. But it has two major  
 problems that are currently holding it back: It’s in String & it’s complex.
 
 `String` is a core class which means we can’t strip it from the JVM when compiling an iOS app. If we include `split()`  
@@ -283,7 +283,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> These are available in the bouncy castle cn1lib. SecureRandom is under a different package name “javabc”.  
+> These are available in the bouncy castle cn1lib. SecureRandom is under a different package name "javabc".  
 > MessageDigest is problematic as I explained here: [https://stackoverflow.com/q…](<https://stackoverflow.com/questions/50135726/package-in-java-s-equivalent-in-codenameone>)
 >
 
@@ -293,7 +293,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Martin Grajcar says:
 >
-> Concerning reflection, I have some 300 generated classes, which I need to create by name (they’re used for parsing and formatting a stupid EANCOM-like format). So I generated a huge switch like `case “StupidName1”: return new StupidName1();` and a `Map<class<?>, String>` as a `Class#getSimpleName` replacement. It seems to work, at least in Android. Can I expect it to work everywhere? Should I expect problems?
+> Concerning reflection, I have some 300 generated classes, which I need to create by name (they’re used for parsing and formatting a stupid EANCOM-like format). So I generated a huge switch like `case "StupidName1": return new StupidName1();` and a `Map<class<?>, String>` as a `Class#getSimpleName` replacement. It seems to work, at least in Android. Can I expect it to work everywhere? Should I expect problems?
 >
 
 

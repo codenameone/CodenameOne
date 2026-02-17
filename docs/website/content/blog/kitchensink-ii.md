@@ -34,9 +34,9 @@ Figure 2. The kitchen sink demo running on an ipad
 
   * Usable in free tier – the old kitchen sink was a multi-megabyte demo unusable by free subscribers. We wanted a big demo that would still fit in the 1mb free user limit
 
-  * Aesthetically refined – we wanted a UI that’s modern and subtle, the goal isn’t to create something “exceptional”…​ The goal is to create something reasonable and achievable
+  * Aesthetically refined – we wanted a UI that’s modern and subtle, the goal isn’t to create something "exceptional"…​ The goal is to create something reasonable and achievable
 
-  * Realistic use cases – with the one exception of the layouts demo, most of the demos show usage that might be reasonable in a “real world” application
+  * Realistic use cases – with the one exception of the layouts demo, most of the demos show usage that might be reasonable in a "real world" application
 
 **Check the live version running on the right hand side thanks to the power of the Codename One JavaScript port!**
 
@@ -46,7 +46,7 @@ You can install the native Android version of the kitchen sink from [Google Play
 
 With those goals in mind we recreated and re-invented the demos that are a part of kitchen sink.
 
-Before going into the individual demos notice that app now has a UI that is more “card like”. We dynamically round the edges of the images (using masking) and allow you to search thru the demos using the standard search `Toolbar`.
+Before going into the individual demos notice that app now has a UI that is more "card like". We dynamically round the edges of the images (using masking) and allow you to search thru the demos using the standard search `Toolbar`.
 
 You can also switch between grid/list view in the standard cell phone mode (this isn’t available in the tablet mode due to the different UX).
 

@@ -121,7 +121,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Diamond says:
 >
-> Hi Lukman, It’s as simple as placing the component in your LayeredPane after adding your map to the form center layout position. remember to add Build Hint “android.newPeer=true” until it’s true by default.
+> Hi Lukman, It’s as simple as placing the component in your LayeredPane after adding your map to the form center layout position. remember to add Build Hint "android.newPeer=true" until it’s true by default.
 >
 > It’s advisable to do this in postFormShow(), if hand-coded form, do it in the addShowListener() and inside CallSerially. Example 1 – Hand-Coded form:
 >

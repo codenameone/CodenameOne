@@ -225,7 +225,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > true. We thought about this quite a bit before settling on the material icon set and not something with wider reach.
 >
-> The reason we added it was to enable us and you guys to prototype things that look good on all platforms without worrying about the “art” side of the fence. This helps smaller apps, internal apps and demos look reasonable and even more native as the icons adapt to the specific platform convention colors. Material icons are free, unencumbered and cheap in terms of size overhead so they were pretty easy to add out of the box.
+> The reason we added it was to enable us and you guys to prototype things that look good on all platforms without worrying about the "art" side of the fence. This helps smaller apps, internal apps and demos look reasonable and even more native as the icons adapt to the specific platform convention colors. Material icons are free, unencumbered and cheap in terms of size overhead so they were pretty easy to add out of the box.
 >
 > With a refined design as we see in most of our professional grade apps, you wouldn’t use any of our builtin icons and focus on your own so having icons for everything would be redundant.
 >

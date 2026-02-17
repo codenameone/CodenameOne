@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/3-image-tools-for-app-marketing/image-tools-for-app-marketing.jpg)
 
 Every now and again developers ask us how we do the graphics for our posts/promotions and up until recently the  
-answer was “photoshop”. While knowing photoshop is still very worthwhile we still like these 3 tools that provide great  
+answer was "photoshop". While knowing photoshop is still very worthwhile we still like these 3 tools that provide great  
 shortcuts to creating both screenshots and art.
 
 ### The App Launchpad

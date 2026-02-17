@@ -25,14 +25,14 @@ Then every time you commit changes to Github, travis will run your tests.
 
 ### Settings Panel
 
-After you’ve activated Travis, the “Travis Settings” form will look like
+After you’ve activated Travis, the "Travis Settings" form will look like
 
 ![Travis select jobs form](/blog/travis-ci-integration/travis-select-jobs.png)
 
 __ |  On-device continuous integration requires an Enterprise account. Other accounts will see the Android and iOS options disabled. But they can still enable JavaSE.   
 ---|---  
   
-This is a list of the jobs that you can have travis run for you. If you only select “JavaSE”, then Travis will run your unit tests in the Codename One simulator. Android jobs are run on the appropriate Android emulator, and iOS jobs are run on the appropriate iOS simulator.
+This is a list of the jobs that you can have travis run for you. If you only select "JavaSE", then Travis will run your unit tests in the Codename One simulator. Android jobs are run on the appropriate Android emulator, and iOS jobs are run on the appropriate iOS simulator.
 
 We will be adding more versions and platforms as time goes on.
 

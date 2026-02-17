@@ -36,7 +36,7 @@ upload etc. I know some developers did that but sadly they didn’t contribute t
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39986891/codename-one-dropbox-plugin)
 
-### Building from xcode source, missing “pods” library
+### Building from xcode source, missing "pods" library
 
 This is a bit confusing, you need to open the xworkspace file in the new pods build
 

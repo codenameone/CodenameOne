@@ -31,7 +31,7 @@ we also updated the Codename One Designer constants combo box with all the docum
 The current plugin has two annoying bugs, the first of which is a regression in test execution which should be  
 resolved and will be a part of the next update. However, the second is slightly more annoying…. 
 
-It seems that our code for packaging the demos into the plugin had a bug where it didn’t override the build.xml  
+It seems that our code for packaging the demos into the plugin had a bug where it didn’t override the `build.xml`  
 with the latest/current build XML and it got a debug version of that file from my local version of the kitchen sink.  
 If you create the kitchen sink demo using the current plugin keep in mind that this won’t work for sending an Android  
 build. This should be fixed for the next plugin update and shouldn’t affect other plugins.
@@ -52,13 +52,13 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The current problem is the ConnectionRequest cannot do POST request. I have to adjust all my ConnectionRequest to GET.
 >
-> Second issue is, the “KeyListener” not working. The compiled JS apps just dont listen to the key pressed.
+> Second issue is, the "KeyListener" not working. The compiled JS apps just dont listen to the key pressed.
 >
 > `  
 > f.addKeyListener(‘a’, new ActionListener() {  
 > public void actionPerformed(ActionEvent evt) {  
 > String strChar = getChar(evt.getKeyEvent());  
-> System.out.println(“Key ” + evt.getKeyEvent() + ” pressed,getChar() = ” + strChar);  
+> System.out.println("Key " + evt.getKeyEvent() + " pressed,getChar() = " + strChar);  
 > evt.consume();  
 > }  
 > }); 
@@ -76,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > shannah78 says:
 >
-> Are you running your app through the single-file preview on the build server, the ZIP distribution, or the WAR distribution. The “single-file” preview uses a simplified proxy script for use on App Engine that may have trouble with some requests… I haven’t tested it with POST yet. If you use the WAR distribution, it comes bundled with a better proxy that should handle POST (though haven’t actually tested that either — but it is based on a well-established Proxy servlet that claims to handle POST).
+> Are you running your app through the single-file preview on the build server, the ZIP distribution, or the WAR distribution. The "single-file" preview uses a simplified proxy script for use on App Engine that may have trouble with some requests… I haven’t tested it with POST yet. If you use the WAR distribution, it comes bundled with a better proxy that should handle POST (though haven’t actually tested that either — but it is based on a well-established Proxy servlet that claims to handle POST).
 >
 > I haven’t implemented key listeners on the form yet. Please post both of these issues (separately) into the issue tracker so I don’t forget to look into them when the time comes.
 >
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Yes you are right, I try to use hardware keyboard to do data entry, which allow user additional option for data entry. It is working fine in android, but not in JS port, yet.
 >
-> Datachanger listener cannot detect ‘Enter’ key, I use with actionListener to detect enter key. But the problem is, I have to press “Enter” twice (first to end edit mode, second enter only trigger actionListener) then only can grab the “enter” key. This is confusing user. Somemore, after the first enter, the textfield cursor ‘drop’ to newline, even I set true to singleline edit, this make the entered words ‘disapear’..
+> Datachanger listener cannot detect ‘Enter’ key, I use with actionListener to detect enter key. But the problem is, I have to press "Enter" twice (first to end edit mode, second enter only trigger actionListener) then only can grab the "enter" key. This is confusing user. Somemore, after the first enter, the textfield cursor ‘drop’ to newline, even I set true to singleline edit, this make the entered words ‘disapear’..
 >
 > Can you advice any trick to overcome this issue? Or any other component can have keylistener, before shanna implement the keylistener on the form?
 >
@@ -194,7 +194,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Look like I wrongly post this issue to googlecode previously. Thats why this issue still there.
 >
-> I just post to github with the title “Javascipr port, form not support keylistener #1516”
+> I just post to github with the title "Javascipr port, form not support keylistener #1516"
 >
 > Just hope this issue can be fixed.
 >

@@ -15,7 +15,7 @@ author: Shai Almog
 
 ### SOP and CORS
 
-SOP is the “Same Origin Policy” enforced by browsers. It’s prevents CSRF (Cross Site Request Forgery) which essentially lets a site pretend it’s a different site.
+SOP is the "Same Origin Policy" enforced by browsers. It’s prevents CSRF (Cross Site Request Forgery) which essentially lets a site pretend it’s a different site.
 
 SOP makes sure all requests to the site come from the same origin, it’s enforced by the browser and essentially blocks manipulations across domains. This sounds great but if you need to communicate between two sites it might be a problem. That’s where CORS comes in.
 
@@ -36,7 +36,7 @@ __ |  This API will work correctly in native apps as well so you can still enjoy
 ---|---  
   
 This method Calls the `postMessage()` method on the webpage’s `window` object.  
-To receive a message, the web page should register a “message” event listener, just as it would to receive messages from other windows in the browser. See [MDN docs](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage) for `postMessage()` for more information.
+To receive a message, the web page should register a "message" event listener, just as it would to receive messages from other windows in the browser. See [MDN docs](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage) for `postMessage()` for more information.
 
 ---
 

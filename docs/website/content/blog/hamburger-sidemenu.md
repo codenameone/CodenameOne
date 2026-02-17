@@ -22,7 +22,7 @@ The Hambuger sidemenu is the menu style popularized by the Facebook app, its cal
   
 Up until now these things were a pain to implement smoothly in Codename One, but Chen wouldn’t let this rest and just committed support for this feature. Working with a Hamburger menu couldn’t be simpler! Just set the command behavior to side menu (in the Display class) and it just works. You can also set it by setting the commandBehavior theme constant in the  
   
-Codename One designer to “Side”. 
+Codename One designer to "Side". 
 
   
 Then just add commands and watch them make their way into the side menu allowing you to build any sort of navigation you desire.  
@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> This looks great, but I have no idea how to use it. Unfortunately, as a total beginner, ” Just set the command behavior to side menu (in the Display class)” does not mean anything to me yet, and i dont know how to setup the menus on the left to start with. There is a “Commands” Properties in the editor, but when you hit Add, and enter “side menu” as the “name” attribute, it doesnt seen to do anything. 
+> This looks great, but I have no idea how to use it. Unfortunately, as a total beginner, " Just set the command behavior to side menu (in the Display class)" does not mean anything to me yet, and i dont know how to setup the menus on the left to start with. There is a "Commands" Properties in the editor, but when you hit Add, and enter "side menu" as the "name" attribute, it doesnt seen to do anything. 
 >
 > Has anyone got a link to a demo handy?
 >
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > To activate command behavior either: 
 >
-> Open the designer, select the theme. Go to the constants tab, click “Add” and select commandBehavior from the combo box, type in Side for the value. 
+> Open the designer, select the theme. Go to the constants tab, click "Add" and select commandBehavior from the combo box, type in Side for the value. 
 >
 > Or use: 
 >

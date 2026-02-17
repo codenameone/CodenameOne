@@ -32,7 +32,7 @@ Our second port was
   
   
   
-silverlight based and tried to dynamically create a scene-graph structure to match the graphics we are drawing in code, this is a very “imaginative” approach and it worked for most cases but had a lot of issues worst of which was very bad graphics performance and paint artifacts that were very hard to fix. 
+silverlight based and tried to dynamically create a scene-graph structure to match the graphics we are drawing in code, this is a very "imaginative" approach and it worked for most cases but had a lot of issues worst of which was very bad graphics performance and paint artifacts that were very hard to fix. 
 
 The third approach takes a very different direction, we effectively create a writeable bitmap object and draw onto a huge int array representing the screen. This means we draw everything. Our initial attempt at this tried to use silverlight for this but this performed very badly, so we ported Pisces to C# and use that to some degree to get basic graphics primitives and image blitting working on the platform. This isn’t the best approach in terms of performance but its better than what we have now and might be good enough for now. If this pans out we can always port some of the low level code to direct x using the basic API’s we already implemented.  
   
@@ -71,7 +71,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> So far my development under WP has been going well, and I’m making a game. Performance wise, it’s “playable”, maybe not the best but I am using a low-end device for debugging. 
+> So far my development under WP has been going well, and I’m making a game. Performance wise, it’s "playable", maybe not the best but I am using a low-end device for debugging. 
 >
 > Overall it’s a good port, but better performance through through directX would be nice! 🙂
 >
@@ -155,7 +155,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Windows phone isn’t growing anywhere and got 3 total rewrites so far because of Microsoft’s flakiness. 
 >
-> Try getting a non-trivial webapp to work on the mobile version of internet explorer not to mention the browser changes made in the Android 4.x branch which have no workarounds available then talk about the “portability of the web” nonsense. Anyone who says web is portable didn’t actually use it professionally on a wide scale.
+> Try getting a non-trivial webapp to work on the mobile version of internet explorer not to mention the browser changes made in the Android 4.x branch which have no workarounds available then talk about the "portability of the web" nonsense. Anyone who says web is portable didn’t actually use it professionally on a wide scale.
 >
 
 
@@ -251,7 +251,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Windows Phone is the only “modern” mobile OS that doesn’t support installing apps over the air (or by click) only via cable sync or thru the store beta test process.
+> Windows Phone is the only "modern" mobile OS that doesn’t support installing apps over the air (or by click) only via cable sync or thru the store beta test process.
 >
 
 
@@ -266,7 +266,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > – I tried to install the app via SD card, 
 >
-> – it does not appears in the App “Store” 
+> – it does not appears in the App "Store" 
 >
 > – clicking on it in WP 8 file manager doesn’t work 
 >

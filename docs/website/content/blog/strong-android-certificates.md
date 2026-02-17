@@ -60,7 +60,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> It should be under your users home directory under the “.codenameone” directory. So no worries.
+> It should be under your users home directory under the ".codenameone" directory. So no worries.
 >
 
 

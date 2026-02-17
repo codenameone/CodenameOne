@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/questions-of-the-week-40/qanda-friday2.jpg)
 
-Today we have the first weekly release since the 3.6 release and as such it is choke full of changes which is natural given that we skipped a release and had a lot of code pending to “post release”. So please be vigilant especially if you use peer components and let us know about potential regressions ASAP.
+Today we have the first weekly release since the 3.6 release and as such it is choke full of changes which is natural given that we skipped a release and had a lot of code pending to "post release". So please be vigilant especially if you use peer components and let us know about potential regressions ASAP.
 
 an [anonymous](http://stackoverflow.com/users/7454657/anonymous) poster asked a recurring question that we still don’t have a great answer for, [how to capture timed video](http://stackoverflow.com/questions/41852856/how-to-automatically-start-video-recording-and-stop-automatically-after-a-predef). This is possible to do with audio using the `MediaManager` but it can’t be done with video which can only use `Capture`. However, thanks to the new `PeerComponent` work we might expose low level camera API’s including video/picture capture with viewfinder etc.
 

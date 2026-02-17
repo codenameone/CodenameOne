@@ -11,7 +11,7 @@ author: Steve Hannah
 
 ![Header Image](https://www.codenameone.com/img/blog/new-sheet-positioning.jpgnew)
 
-Not so long ago, we [released](/blog/sheets-samples/) a [Sheet component](/javadoc/com/codename1/ui/Sheet/) that acts like a non-modal dialog box that slides up from the bottom. It occupies only the amount of space required to house its contents, and it provides built-in navigation controls to go “back” to the previous sheet. By default Sheets are displayed along the bottom of the screen, but we have recently added an update that allows you to position it along the north, east, west, south, or center of the screen, as shown below:
+Not so long ago, we [released](/blog/sheets-samples/) a [Sheet component](/javadoc/com/codename1/ui/Sheet/) that acts like a non-modal dialog box that slides up from the bottom. It occupies only the amount of space required to house its contents, and it provides built-in navigation controls to go "back" to the previous sheet. By default Sheets are displayed along the bottom of the screen, but we have recently added an update that allows you to position it along the north, east, west, south, or center of the screen, as shown below:
 
 ![Sheet component positions](/blog/sheet-positions/sheet-positions.png)
 

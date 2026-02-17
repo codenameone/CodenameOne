@@ -18,7 +18,7 @@ This work essentially allows to build a Codename One app synchronously which is 
 to do things such as continuous integration or release engineering.  
 Notice that the synchronous build feature is an enterprise only feature since its overuse can have a very heavy toll on our servers. 
 
-Essentially we copied the existing build.xml to a separate file to prevent updates from overriding it. We then added  
+Essentially we copied the existing `build.xml` to a separate file to prevent updates from overriding it. We then added  
 targets such as this for the kitchen sink: 
     
     
@@ -82,7 +82,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Blessing Mahlalela says:
 >
-> Ok, I have now managed to call an ANT “build-for-javascript” target from the build xml. Thanks a lot for this, no more sitting and waiting for builds, secondly the automated test recorder will become a great resource to small dev organisations that just don’t have budget for dedicated test teams!
+> Ok, I have now managed to call an ANT "build-for-javascript" target from the build xml. Thanks a lot for this, no more sitting and waiting for builds, secondly the automated test recorder will become a great resource to small dev organisations that just don’t have budget for dedicated test teams!
 >
 
 

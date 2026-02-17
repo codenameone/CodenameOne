@@ -57,13 +57,13 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Just an observation: with the switch to gradle, i notice when using native android libraries, you now only accept bundling them as aar and no longer andlib, and merging of android manifests is switched on by default. Which is good. I ran into a small build error because my native lib had declared permisions:
 >
-> <uses-permission android_name=”android.permission.INTERNET”/>  
-> <uses-permission android_name=”android.permission.ACCESS_NETWORK_STATE”/>
+> <uses-permission android_name="android.permission.INTERNET"/>  
+> <uses-permission android_name="android.permission.ACCESS_NETWORK_STATE"/>
 >
 > and merging fails. It fails on duplicate entries in resultant manifest file. It seems the CN1 build system also generates these permissions. Also i had to remove
 >
-> android_icon=”@drawable/ic_launcher”  
-> android_label=”@string/app_name”
+> android_icon="@drawable/ic_launcher"  
+> android_label="@string/app_name"
 >
 > attributes from application tag from my native library manifest, since they conflicted during merge (I assume the CN1 build system generates these too, so the merge fails).  
 > Any way, these were small changes i had to make, after which my builds started working as usual again.

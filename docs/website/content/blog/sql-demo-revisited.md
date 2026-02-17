@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/sql-demo-revisited/sql-playground.jpg)
 
-The SQL demo has been on my “todo” list for months. It’s really hard to create a compelling demo for something  
+The SQL demo has been on my "todo" list for months. It’s really hard to create a compelling demo for something  
 as boring (by design) as SQL so this was a big procrastination target. After we built the SQL explorer tool for the developer  
 guide it became apparent to me that this could be the basis for the new SQL demo, just provide the ability to  
 type in arbitrary SQL and see it work…​

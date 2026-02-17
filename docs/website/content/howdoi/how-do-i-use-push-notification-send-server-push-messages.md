@@ -37,7 +37,7 @@ You still need to register with all the providers and get credentials since our 
 We’ll start with Google by going to <https://developers.google.com/mobile/add> where we need to be logged in with our google account. Here start by clicking pick a platform for which we select Android. While GCM has some support for iOS it is not native support and we use the native iOS push servers directly instead.
 
 Now we need to paste the package of the application so Android can properly identify the right caller. You are prompted to create the package if the app doesn’t exist yet. Notice the term app in this case refers to the server side logical application in googles cloud not to the client side Android native application…  
-After we finish this we can press choose and configure services this opens a prompt after a “short” wait…
+After we finish this we can press choose and configure services this opens a prompt after a "short" wait…
 
 In the final stage we can activate cloud messaging this provides us with two important keys one a long string and the other numeric…
 
@@ -80,7 +80,7 @@ If you look at the code you will see it’s a standard http post request that pa
 
 You might have noticed the type value for push mentioned before. I’ll only talk about the 3 most important push types but there are quite a few other types and I recommend checking the developer guide to go thru the list
 
-The first and most common push type is push type 0 or 1. This is the push type you see visually where an app that isn’t running posts a notice like “we haven’t seen you in a while” or “you have a new message”. This message will be seen visually on the device and if the user taps it you will get a call to push(String). You will also get a call in push(String) when the app is running and a push is received, this is true for all of these push types so the difference in behavior is when an app isn’t running.
+The first and most common push type is push type 0 or 1. This is the push type you see visually where an app that isn’t running posts a notice like "we haven’t seen you in a while" or "you have a new message". This message will be seen visually on the device and if the user taps it you will get a call to push(String). You will also get a call in push(String) when the app is running and a push is received, this is true for all of these push types so the difference in behavior is when an app isn’t running.
 
 Invisible push won’t work when the app isn’t running on iOS but will work on Android. This is a conceptual issue. For iOS push is a visual concept whereas for Android it’s a communication protocol. In that sense we recommend people don’t use push as a networking protocol, it isn’t very good as a networking protocol and is useful mostly for signaling.
 

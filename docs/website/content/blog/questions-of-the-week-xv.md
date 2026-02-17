@@ -47,7 +47,7 @@ resource files, c files etc.
 
 ### Network request timeout or network lost or slow network not getting handle properly in codenameone
 
-Currently Codename One has a connection timeout but not a read timeout value which is a bit more “challenging”  
+Currently Codename One has a connection timeout but not a read timeout value which is a bit more "challenging"  
 across platforms. This is something we should probably address.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38475063/network-request-timeout-or-network-lost-or-slow-network-not-getting-handle-prope)
@@ -68,7 +68,7 @@ This looks like a very interesting crash but those things are **really** hard to
 ### How to access the source directory in codename one
 
 Two of the biggest complexities in Codename One are the missing `java.new.URL` and `java.io.File`. We might need  
-to just add these API’s as stub calls to the “real” implementations.
+to just add these API’s as stub calls to the "real" implementations.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38453717/how-to-access-the-source-directory-in-codename-one)
 

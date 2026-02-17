@@ -89,7 +89,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Looks like it has been broken for a couple of days. Cannot see the images for Themes and Templates in the “Codenameone” project. They displayed as radio buttons instead. But it did work for me the very fist day when you announced this plugin. 
+> Looks like it has been broken for a couple of days. Cannot see the images for Themes and Templates in the "Codenameone" project. They displayed as radio buttons instead. But it did work for me the very fist day when you announced this plugin. 
 >
 > Tested on Windows 7, Mac OS X Mavericks with IntelliJ-13 versions Ultimate and CE.
 >

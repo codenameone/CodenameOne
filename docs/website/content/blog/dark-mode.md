@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Resources resources = Resources.openLayered( "/dark-theme");  
 > `
 >
-> Sadly, I keep getting “/dark-theme.res not found” and no sign to the .res file on my folders!
+> Sadly, I keep getting "/dark-theme.res not found" and no sign to the .res file on my folders!
 >
 > Also, please note that, build.xml does not exists on my Maven project!,
 >

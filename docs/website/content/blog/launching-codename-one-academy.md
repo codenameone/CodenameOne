@@ -17,7 +17,7 @@ This wouldn’t have been possible without all the help from community members w
 
 Thanks to all of that the academy is launching with 3 courses:
 
-  * [Java for Mobile Devices](https://codenameone.teachable.com/p/java-for-mobile-devices-introducing-codename-one) – This is the “learn Codename One” course. It covers the basics that all Codename One developers should know. This is a completely free course that we will keep enhancing!
+  * [Java for Mobile Devices](https://codenameone.teachable.com/p/java-for-mobile-devices-introducing-codename-one) – This is the "learn Codename One" course. It covers the basics that all Codename One developers should know. This is a completely free course that we will keep enhancing!
 
   * [Deep Dive into Mobile](https://codenameone.teachable.com/p/deep-dive-into-mobile-development-with-codename-one) – This course goes into all of the complex features of Codename One and builds a non-trivial application. In fact it builds the [restaurant app](/blog/restaurant-app-builder.html)
 

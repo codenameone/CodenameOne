@@ -17,7 +17,7 @@ The demo is trivial and doesn’t really demonstrate anything other than capturi
 from the camera/retrieved from the gallery but this is where it gets interesting. It even works in the  
 JavaScript port so you can even [run this in the browser and it works as you’d expect](/demos/CameraDemo/)!
 
-Notice that since browsers don’t have anything quite like a “gallery” that feature won’t be very useful but capture  
+Notice that since browsers don’t have anything quite like a "gallery" that feature won’t be very useful but capture  
 works really well.
 
 ### The Source
@@ -35,7 +35,7 @@ move to Java 8 in the plugins which [we also announced yesterday](/blog/java-8-s
 ### Moving Forward
 
 There are **many** demos in the [codenameone-demos](https://github.com/codenameone/codenameone-demos)  
-repository and some outside of it. Most of them are out of date and “abandoned” we’ll try to make this a weekly  
+repository and some outside of it. Most of them are out of date and "abandoned" we’ll try to make this a weekly  
 segment of moving demos to the newer API’s and refining them. Some of these demos will take more effort (e.g Kitchen Sink)  
 but others should be simpler.
 

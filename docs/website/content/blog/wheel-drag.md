@@ -42,7 +42,7 @@ Its the main reason we should avoid binding logic to the pointer pressed method 
   
   
   
-To workaround this behavior the Codename One implementation layer filters out drag events until we decide that a drag is “really” occurring and isn’t just “noise”. We filter using two different methods:  
+To workaround this behavior the Codename One implementation layer filters out drag events until we decide that a drag is "really" occurring and isn’t just "noise". We filter using two different methods:  
   
   
   
@@ -87,7 +87,7 @@ Codename One has a setter within Display called setDragStartPercentage and some 
   
   
   
-So we added a new method to Component to indicate if a drag in a particular area is positively a drag operation: protected boolean isDragRegion(int x, int y)  
+So we added a new method to Component to indicate if a drag in a particular area is positively a drag operation: `protected boolean isDragRegion(int x, int y)`  
   
   
 For Lists this will return true if the list is large making it easier to scroll larger lists, for side menu this will return true if the drag operation is in the left side of the screen trying to open the sidemenu.  

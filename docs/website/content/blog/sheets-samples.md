@@ -47,7 +47,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Francesco Galgani** — June 8, 2019 at 10:42 pm ([permalink](/blog/sheets-samples/#comment-24067))
 
-> The “More -> Launch JS” option opens the url “http://localhost:40549/”. Do you have integrated a web server in this Codename One Samples? Just a curiosity, which server is it?
+> The "More -> Launch JS" option opens the url "http://localhost:40549/". Do you have integrated a web server in this Codename One Samples? Just a curiosity, which server is it?
 >
 
 

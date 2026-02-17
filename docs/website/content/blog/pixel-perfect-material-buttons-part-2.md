@@ -32,9 +32,9 @@ The purpose of this segment is 3 fold:
 
   * Inform you of upcoming changes
 
-  * Educate you about how things “should” look
+  * Educate you about how things "should" look
 
-You don’t really need to do anything. Your apps will just “look better”.
+You don’t really need to do anything. Your apps will just "look better".
 
 With the new native themes I also hope to reduce variance between the native themes as the OS’s look far more alike today. I also hope to reduce usage of images and as a result allow deeper customization with less resources. E.g. currently in order to change the color of components we often need to define image borders but this is fixable. We should be able to colorize an app just by overriding a few elements.
 

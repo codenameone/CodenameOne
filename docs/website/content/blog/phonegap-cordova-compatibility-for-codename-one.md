@@ -26,12 +26,12 @@ What Advantages Does Codename One Hold For PhoneGap/Cordova Developers?
 ____Build Cloud On Steroids
 
 Codename One provides a build cloud similar to PhoneGap build only far more advanced.  
-It can translate Java bytecode into native thus allowing you to write a great deal of your “native” API  
+It can translate Java bytecode into native thus allowing you to write a great deal of your "native" API  
 in Java instead of writing it again and again for every platform. 
 
 ____Better Native Code Support
 
-You can and should write your “native” code in Java thus removing  
+You can and should write your "native" code in Java thus removing  
 the need to write Objective-C/Swift code when building a plugin. However, you can still use  
 [cn1lib’s](/cn1libs.html) and  
 [native interfaces](/how-do-i---access-native-device-functionality-invoke-native-interfaces.html)  
@@ -40,7 +40,7 @@ to implement pretty much anything using true native calls to Objective-C, Dalvik
 ____Better Protection Of IP
 
 Cordova/PhoneGap apps are effectively just a set of HTML/JavaScript & CSS files.  
-Since native packaging is “just a zip file”, it triggered a cottage industry of unzipping such applications and reselling them thru  
+Since native packaging is "just a zip file", it triggered a cottage industry of unzipping such applications and reselling them thru  
 other accounts/stores.  
 Its much harder to do this for compiled applications, making the Java code in Codename One more opaque to the  
 casual hacker. If your application contains sensitive logic you can code it in Java for extra security. We are also considering  
@@ -56,7 +56,7 @@ is a huge benefit.
 ____Easy, Doesn’t Require A Mac, Automates Certificates/Signing
 
 Codename One’s environment works on Mac, Linux & Windows  
-without a problem. One of the “killer features” of Codename One is the  
+without a problem. One of the "killer features" of Codename One is the  
 [certificate wizard](/blog/ios-certificate-wizard.html) that makes the normally nightmarish  
 process of signing an iOS app, bare-able. 
 
@@ -88,7 +88,7 @@ if there is enough community interest to justify the effort.
 We were (and still are) concerned about confusion. Codename One uses a rather elaborate architecture of  
 converting bytecode to native code. This is coupled with an OpenGL ES based rendering pipeline and native  
 widget mixing. Yet despite that fact and the fact that we specifically wrote in the top bar of the page that  
-Codename One is NOT an HTML5 solution we still got the feedback of “well another HTML5 framework”.  
+Codename One is NOT an HTML5 solution we still got the feedback of "well another HTML5 framework".  
 Our concern was that if we would include PhoneGap this confusion and ambiguity would just grow and hinder  
 our ability to differentiate Codename One in a market dominated by 3 core ideas (HTML5, native & porting tool)  
 as something that doesn’t fit in either one of those 3 pillars. 
@@ -98,7 +98,7 @@ However, a few months ago we started adding things like
 [TeaVM](http://teavm.org/) and our own set of complex libraries to facilitate  
 WORA (Write Once Run Anywhere). Which makes our offering even more complex…  
 Furthermore, at this point with so many other projects making noise about cross  
-platform mobile development, we came to the conclusion that “avoiding confusion” isn’t the right  
+platform mobile development, we came to the conclusion that "avoiding confusion" isn’t the right  
 strategy. 
 
 #### Does This Mean a Shift In Focus For Codename One?
@@ -161,7 +161,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > shannah78 says:
 >
-> Nice video and slides, Shai. One note: You should be able to use relative paths for the -Dsource parameter. You just can’t use the “~” tilde shorthand for home directory. Paths like “../myapp” or “myapp” should work though.
+> Nice video and slides, Shai. One note: You should be able to use relative paths for the -Dsource parameter. You just can’t use the "~" tilde shorthand for home directory. Paths like "../myapp" or "myapp" should work though.
 
 
 ### **Valeriy Skachko** — November 29, 2015 at 2:18 pm ([permalink](/blog/phonegap-cordova-compatibility-for-codename-one/#comment-21552))
@@ -175,7 +175,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 3) Launch on emulator – ok  
 > 4) Send build – Updating libraries – ok, build succesfull  
 > 5) After that if i run on emulator i see next:error: cannot find symbol  
-> theme = UIManager.initFirstTheme(“/theme”);  
+> theme = UIManager.initFirstTheme("/theme");  
 > symbol: method initFirstTheme(String)  
 > location: class UIManager  
 > 6) Now i cant run on send build after Updating libraries

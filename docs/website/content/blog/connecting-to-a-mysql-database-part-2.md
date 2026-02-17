@@ -103,17 +103,17 @@ I’m going to use Netbeans and its handy wizards to generate the web service th
 
 ### Configuring Netbeans to use MySQL
 
-Click on the “Services” tab, and right click on “Databases”:
+Click on the "Services" tab, and right click on "Databases":
 
 ![Register mysql server](/blog/connecting-to-a-mysql-database-part-2/sakila-netbeans-register-mysql-server.png)
 
-Select the “Register MySQL Server” option. This will bring up a setup dialog as follows. If you installed XAMPP, and are using the mysql server included with that, then your settings will look like mine. If not, you’ll need to customize them for your needs.
+Select the "Register MySQL Server" option. This will bring up a setup dialog as follows. If you installed XAMPP, and are using the mysql server included with that, then your settings will look like mine. If not, you’ll need to customize them for your needs.
 
 ![MySQL Settings](/blog/connecting-to-a-mysql-database-part-2/sakila-netbeans-mysql-settings.png)
 
-After you have completed your settings, and clicked “OK”, you should see a new node appear under the “Databases” node named “MySQL Server at localhost:3306”. Expand this node to see all of your databases revealed.
+After you have completed your settings, and clicked "OK", you should see a new node appear under the "Databases" node named "MySQL Server at localhost:3306". Expand this node to see all of your databases revealed.
 
-Right click on the “sakila” database, and select “Connect…​” as shown below:
+Right click on the "sakila" database, and select "Connect…​" as shown below:
 
 ![Connect to MySQL database](/blog/connecting-to-a-mysql-database-part-2/sakila-netbeans-mysql-connect.png)
 
@@ -121,9 +121,9 @@ At this point we should have all of the groundwork covered to create our server 
 
 ### Creating the Web Service Project
 
-In Netbeans select “File” > “New Project…​”, then in the new project wizard select “Maven” > “Web Application”.
+In Netbeans select "File" > "New Project…​", then in the new project wizard select "Maven" > "Web Application".
 
-__|  I’m using Maven for this tutorial because I prefer it, but you could also use an ANT-based project under “Java Web” > “Web Application” and it should work fine.  
+__|  I’m using Maven for this tutorial because I prefer it, but you could also use an ANT-based project under "Java Web" > "Web Application" and it should work fine.  
 ---|---  
   
 ![New project wizard](/blog/connecting-to-a-mysql-database-part-2/sakila-netbeans-new-web-application-project.png)
@@ -138,25 +138,25 @@ After completing the new project wizard, you should see the SakilaRESTServer pro
 
 Currently the project is a generic web application without any web services or database access defined. Let’s add that now.
 
-Right click on the “SakilaRESTServer” project in the project explorer, and select “New” > “RESTful Web Services from Database” as shown below:
+Right click on the "SakilaRESTServer" project in the project explorer, and select "New" > "RESTful Web Services from Database" as shown below:
 
 ![RESTful Web Services from Database menu item](/blog/connecting-to-a-mysql-database-part-2/sakila-netbeans-restful-web-services-from-database-menu.png)
 
-In the dialog that appears, in the Data Source select list, select “New Data Source…​”.
+In the dialog that appears, in the Data Source select list, select "New Data Source…​".
 
 ![New datasource](/blog/connecting-to-a-mysql-database-part-2/sakila-netbeans-new-datasource.png)
 
-Enter “jdbc/sakila” as the JNDI name, and then select the JDBC connection string for the sakila database from the pull-down:
+Enter "jdbc/sakila" as the JNDI name, and then select the JDBC connection string for the sakila database from the pull-down:
 
 ![New JNDI datasource dialog](/blog/connecting-to-a-mysql-database-part-2/sakila-netbeans-new-jndi-datasource-dialog.png)
 
-After clicking “OK”, you should see the “Available Tables” list populated as shown below.
+After clicking "OK", you should see the "Available Tables" list populated as shown below.
 
 ![Available tables](/blog/connecting-to-a-mysql-database-part-2/sakila-netbeans-webservice-available-tables.png)
 
-For this application, you should uncheck the “Include related tables” checkbox as we only want the “Customer” table, and the Customer_list view to be included. If you were to leave this checked, then all kinds of other information would be included by default in the REST responses which we don’t want.
+For this application, you should uncheck the "Include related tables" checkbox as we only want the "Customer" table, and the Customer_list view to be included. If you were to leave this checked, then all kinds of other information would be included by default in the REST responses which we don’t want.
 
-Now add the “Customer” and “Customer_List” tables to the “Selected Tables” list and click “Next”.
+Now add the "Customer" and "Customer_List" tables to the "Selected Tables" list and click "Next".
 
 The next page we’ll leave default:
 
@@ -166,7 +166,7 @@ And same with the next page.
 
 ![Page 3 of webservice wizard](/blog/connecting-to-a-mysql-database-part-2/sakila-netbeans-webservice-wizard-page-3.png)
 
-Finally, click the “Finish” button to let the magic begin.
+Finally, click the "Finish" button to let the magic begin.
 
 Once the dust has settled, your project structure should look something like the following:
 
@@ -174,18 +174,18 @@ Once the dust has settled, your project structure should look something like the
 
 A few things to notice here:
 
-  1. Entity classes for Customer and CustomerList have been generated in the com.codename1.demos.sakila package.
-  2. Corresponding web service facades have been generated in the com.codename1.demos.sakila. These are the actual web services that will handle requests.
+  1. Entity classes for Customer and CustomerList have been generated in the `com.codename1.demos.sakila` package.
+  2. Corresponding web service facades have been generated in the `com.codename1.demos.sakila`. These are the actual web services that will handle requests.
 
 Take the time to browse through the entity classes and services to get a feel for what is going on. It should be reasonably straight forward.
 
 ### Specify the ID field in CustomerList
 
-Since Customer_List is a view, Netbeans doesn’t know which column is the “id”, so we’ll need to add that. If you open the CustomerList class, you’ll see a compile error because of this.
+Since Customer_List is a view, Netbeans doesn’t know which column is the "id", so we’ll need to add that. If you open the CustomerList class, you’ll see a compile error because of this.
 
 ![Compile error](/blog/connecting-to-a-mysql-database-part-2/sakila-customerlist-id-compile-error.png)
 
-You’ll need to add the `@Id` annotation to the “ID” field declaration. Netbeans will assist you with this if you expant the little light bulb icon in the left column of the error line.
+You’ll need to add the `@Id` annotation to the "ID" field declaration. Netbeans will assist you with this if you expant the little light bulb icon in the left column of the error line.
 
 ### A Look at the Web Service Facades
 
@@ -264,7 +264,7 @@ The CustomerFacade class looks like:
     
     }
 
-__**1** | The relative URL to the web service. To access this web service, you would append this value to the end of the URL for the web app. In our case <http://localhost:8080/SakilaRESTServer/com.codename1.demos.sakilarestserver.customer> is the full URL to this webservice.  
+__**1** | The relative URL to the web service. To access this web service, you would append this value to the end of the URL for the web app. In our case `<http://localhost:8080/SakilaRESTServer/com.codename1.demos.sakilarestserver.customer>` is the full URL to this webservice.  
 ---|---  
 __**2** | Endpoint to insert a new record into the customer table. This can be accessed by sending a POST request to the webservice URL with appropriate XML or JSON data.  
 __**3** | Endpoint to update an existing record. This can be accessed by sending a PUT request to `{webservice_url}/{customer_id}` with the appropriate XML or JSON data. For example, if we wanted to update the customer with customer_id=10 we would send our PUT request to `<http://localhost:8080/SakilaRESTServer/com.codename1.demos.sakilarestserver.customer/10>`  
@@ -278,13 +278,13 @@ Full class can be seen [here](https://github.com/shannah/cn1-mysql-java-restful-
 
 ### Running/Testing the Project
 
-In the project explorer, right click on the SakilaRESTServer project and select “Run”. This should automatically start the bundled GlassFish server, and deploy our app.
+In the project explorer, right click on the SakilaRESTServer project and select "Run". This should automatically start the bundled GlassFish server, and deploy our app.
 
-If all wend well, it should open your web browser to the index page which says “Hello World!”.
+If all wend well, it should open your web browser to the index page which says "Hello World!".
 
 Next, we’ll test out the actual webservices.
 
-In the project explorer, uner the “RESTful Web Services” folder, you should see two web services listed. Right click on either of them and select “Test Resoure Uri” as shown here:
+In the project explorer, uner the "RESTful Web Services" folder, you should see two web services listed. Right click on either of them and select "Test Resoure Uri" as shown here:
 
 ![Testing resource uri](/blog/connecting-to-a-mysql-database-part-2/sakila-test-resource-uri.png)
 

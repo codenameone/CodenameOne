@@ -26,7 +26,7 @@ into the title area of the following form. We’ll get into how this is done soo
 ### New Contacts API
 
 First we need to add contact access permissions to the Google API by adding the line  
-‘gc.setScope(“profile email <https://www.googleapis.com/auth/plus.login> [https://www.googleapis.com/auth/plus.me”);’](https://www.googleapis.com/auth/plus.me)  
+‘gc.setScope("profile email <https://www.googleapis.com/auth/plus.login> [https://www.googleapis.com/auth/plus.me");’](https://www.googleapis.com/auth/plus.me)  
 into the initial login as such:
     
     
@@ -66,7 +66,7 @@ different implementations of this class.
     }
 
 We only added one method to user data, the `getContacts` method. For simplicity we fetch all the contacts and do  
-so synchronously. In a future iteration we might improve this by creating an implementation that “streams” the contacts  
+so synchronously. In a future iteration we might improve this by creating an implementation that "streams" the contacts  
 but for now we wanted something simple that will also lend itself well to search.
 
 ### Getting The Contacts On Google
@@ -126,7 +126,7 @@ The code is a bit large but is in fact really simple, we get the Google token wh
 Google API to request the contacts list. We then do a synchronous call using `addToQueueAndWait` which is  
 really convenient in this case and add all the entries into an array list.
 
-Notice that we skip object types that aren’t “person”, in the Google+ API the pages you follow are also returned so  
+Notice that we skip object types that aren’t "person", in the Google+ API the pages you follow are also returned so  
 its necessary to remove some redundant noise.
 
 The JSON returned keeps all the contacts who are connected under the data property so we parse the JSON and  
@@ -184,7 +184,7 @@ This is almost identical to the Google version, the only differences are in the 
 ### Adding The Things We Need To The Theme
 
 For the next section to work we need to add several multi-images to the theme using `Quick Add Multi Image` in the image  
-menu in the designer then picking “Very High” as the source image resolution. This will automatically adapt the image  
+menu in the designer then picking "Very High" as the source image resolution. This will automatically adapt the image  
 to all DPI’s.
 
 First we need [rounded-mask.png](/files/rounded-mask.png):
@@ -226,7 +226,7 @@ also need to set the transparency to 0 to make sure that the style is transparen
 ![UserImage UIID Definition](/blog/building-a-chat-app-with-codename-one-part-4/chat-app-tutorial-contacts-form-5.png)
 
 We also want to make the `TitleArea` more controllable thru opacity. Currently its defined as an  
-image border which is problematic so we will change the border to be “Empty”, define the background color to  
+image border which is problematic so we will change the border to be "Empty", define the background color to  
 `5bc8fb` and set the transparency to 255 which will give the same effect but allow us more control in the code.
 
 ![TitleArea UIID Definition](/blog/building-a-chat-app-with-codename-one-part-4/chat-app-tutorial-contacts-form-6.png)
@@ -253,7 +253,7 @@ class members that are needed for this:
     private ContactData[] contacts;
 
 These members are defined in the main class and include images that we will use to show the individual entries and  
-create a “rounding” mask to make the rounded picture effect on the title bar area. We also added a variable containing  
+create a "rounding" mask to make the rounded picture effect on the title bar area. We also added a variable containing  
 the contacts array that we can use later in the code.
 
 To initialize these variables we’ll use the `init(Object context)` method, of the main class right after the theme initialization.  
@@ -274,8 +274,8 @@ OS might kill your unresponsive app.
 
 We are doing several interesting things here, we are defining the icon style to use the `LargeIconFont` UIID which  
 allows us to create a scalable placeholder image. This is then used for two purposes in the code, placeholder for  
-pictures of our contacts (before the image is downloaded by `URLImage`) and for “my picture” (currently logged in user)  
-in the title area. In the “my picture” case it will be rounded using the rounded-mask image mentioned above.
+pictures of our contacts (before the image is downloaded by `URLImage`) and for "my picture" (currently logged in user)  
+in the title area. In the "my picture" case it will be rounded using the rounded-mask image mentioned above.
 
 This line is pretty complex so lets break it down a bit:
     
@@ -373,7 +373,7 @@ Notice we style it in code since we want it to be positioned in a very specific 
 of that we use the padding from the toolbar to set the size properly. Notice that we explicitly state the padding unit otherwise  
 some platforms which default to millimeter padding might end up out of whack.
 
-We can do this sort of effect in several different ways but this specific approach with the “scaled to fill” option allows  
+We can do this sort of effect in several different ways but this specific approach with the "scaled to fill" option allows  
 the image to adapt nicely to device orientations without losing proportionality.
 
 There are several methods used within this block, we will go thru them from the easiest to the hardest:
@@ -444,9 +444,9 @@ returns the components to their proper layout positions then animates them out w
 
 Once the components are gone we remove them and then move the image into one big label and turn the UIID  
 of the form to a standard form. This is necessary for the morph transition which can only morph elements and not  
-the form itself. Normally this “trick” would work seamlessly but on iOS we have a `StatusBar` UIID at the top of the form  
+the form itself. Normally this "trick" would work seamlessly but on iOS we have a `StatusBar` UIID at the top of the form  
 to push the application downwards and allow us to see the content of the status bar (battery etc.). A small hack  
-allows us to temporarily remove that component if it exists and prevents a “bounce” in the transition.
+allows us to temporarily remove that component if it exists and prevents a "bounce" in the transition.
 
 Next we name the source/destination components for the morph transition and set it to the parent form. That’s  
 it, the morph transition does the rest of the work of animating the components into one another.
@@ -640,7 +640,7 @@ efficient.
   * We then return to the EDT using `callSerially` to add the components to the UI where we create an entry for  
 every component and revalidate to layout the UI
 
-  * There is some code here for a “recent” entry which should priorities the contacts I’ve contacted recently, its  
+  * There is some code here for a "recent" entry which should priorities the contacts I’ve contacted recently, its  
 functionality that’s added in the local code base but isn’t fully implemented.
 
 Next time we’ll discuss the chat UI.
@@ -680,16 +680,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Diamond** — August 6, 2015 at 3:34 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-4/#comment-21600))
 
-> For the image placeholder, will it be possible to use fullName’s first character in Font Icon? For example, My name Diamond having “D” as the placeholder image just in case user doesn’t have a profile pic.
+> For the image placeholder, will it be possible to use fullName’s first character in Font Icon? For example, My name Diamond having "D" as the placeholder image just in case user doesn’t have a profile pic.
 >
-> “A small hack allows us to temporarily remove that component if it exists and prevents a “bounce” in the transition.” Are you referring to iOS status bar? If yes, any idea on how to temporarily hide the status bar?
+> "A small hack allows us to temporarily remove that component if it exists and prevents a "bounce" in the transition." Are you referring to iOS status bar? If yes, any idea on how to temporarily hide the status bar?
 >
 
 
 
 ### **Shai Almog** — August 7, 2015 at 5:02 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-4/#comment-22345))
 
-> Sure. You can do this dynamically e.g. Map<character, encodedimage=””> mm =…; Then use an Image.create(int, int, int) and get the graphics from it to draw the character on it. Cache it in the map so you don’t have to do this all the time…
+> Sure. You can do this dynamically e.g. Map<character, encodedimage=""> mm =…; Then use an Image.create(int, int, int) and get the graphics from it to draw the character on it. Cache it in the map so you don’t have to do this all the time…
 >
 > Yes, the status bar. You can hide the entire title area by using getTitleArea().setPreferredSize(new Dimension(0, 0))); That will also hide the status bar.
 >

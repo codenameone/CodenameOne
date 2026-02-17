@@ -32,7 +32,7 @@ This allows more flexibility e.g. if our app isn’t available for iOS or we kno
 
 ### Finally
 
-We need to make push simpler and smoother, we need to redo the video tutorials for it which are out of date by now and we need the ability to track users in a generic way to make push “seamless”.
+We need to make push simpler and smoother, we need to redo the video tutorials for it which are out of date by now and we need the ability to track users in a generic way to make push "seamless".
 
 However, having said all that I think we are in a great place in terms of push support as we now support almost every platform that allows it and the functionality is very solid.
 

@@ -13,7 +13,7 @@ author: Shai Almog
 
 We received some interest related to Kotlin over the past couple of years and this has risen noticeably in the past month or so. Up until now we tried to be very focused on Java which is why we didn’t add support to other JVM languages even though this shouldn’t be too hard. But Kotlins similarity to Java and its special relationship to Android make it an ideal second language for us.
 
-We plan to implement Kotlin support in the “right way” and offer all the Codename One supported platforms as it would just be a Codename One project for our build process. This should work in a similar way to the Android support by allowing you to mix Kotlin sources and Java sources in a single project.
+We plan to implement Kotlin support in the "right way" and offer all the Codename One supported platforms as it would just be a Codename One project for our build process. This should work in a similar way to the Android support by allowing you to mix Kotlin sources and Java sources in a single project.
 
 Right now the beta is planned in the 3.8 time frame. The 3.8 release is planned for December so this will probably be out sooner.
 
@@ -128,13 +128,13 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m sorry if an on-device-debugger is a deal breaker for you. Unfortunately people aren’t willing to put their money where their mouth is and help support projects so they can move in the direction that they want. I’m not saying that you are like that… but here’s the thing:
 >
-> Every single time someone said to us: “I like Codename One but I’ll use it if you just add feature X”. That person didn’t back that up…
+> Every single time someone said to us: "I like Codename One but I’ll use it if you just add feature X". That person didn’t back that up…
 >
 > We actually conducted an experiment, we picked a big feature that a lot of people asked for and got written commitments from developers saying they would upgrade if we add that feature.
 >
 > Not a single developer upgraded, not one!!!
 >
-> When someone says “I will buy your product if…” it’s bullshit. You might be the exception shining star on the hill that will actually take up Codename One when we do finally add on device debugging but I have no way of knowing it. So we implement features based on market research and feedback from people who are paying.
+> When someone says "I will buy your product if…" it’s bullshit. You might be the exception shining star on the hill that will actually take up Codename One when we do finally add on device debugging but I have no way of knowing it. So we implement features based on market research and feedback from people who are paying.
 >
 > Please don’t be offended by this, I don’t know who you are so I have absolutely no way of qualifying your statements. It’s business practices we had to learn the hard way when running the company.
 >

@@ -36,7 +36,7 @@ API calls. It also produced a similar version for Android which did the same. In
 the write once run anywhere mantra in favor of a common set of business logic coupled with separate UI/native  
 code/resources.
 
-__ |  When we say “native code” in the Xamarin context that usually means C# code that uses the native OS API,  
+__ |  When we say "native code" in the Xamarin context that usually means C# code that uses the native OS API,  
 the Codename One context of native code refers to actual OS native languages e.g. Objective-C on iOS   
 ---|---  
   
@@ -78,7 +78,7 @@ mature, powerful IDE’s that include anything you might need.
 
 While as a language C# might be a decent option, it is an alien to the two leading mobile platforms.
 
-Android’s “native” language is Java. The UI widgets in Android are implemented in Java, which effectively means  
+Android’s "native" language is Java. The UI widgets in Android are implemented in Java, which effectively means  
 that if you write code in C it will perform slower than Java code as it would need to pass thru JNI. C#  
 code can’t be implemented on top of the current Android VM and effectively needs to pass thru JNI  
 back and forth repeatedly.
@@ -94,8 +94,8 @@ it’s own set of tools but they will always be second class citizens on Apples 
 
 Codename One uses the open source [ParparVM](https://github.com/codenameone/CodenameOne/tree/master/vm)  
 to translate Java bytecode to a native C xcode project on Mac OS. This effectively creates a native iOS project  
-and allows you to write native Objective-C code write into that project. In a sense this is “more native”as it ends  
-up using a greater portion of the “officially supported toolchain”.
+and allows you to write native Objective-C code write into that project. In a sense this is "more native"as it ends  
+up using a greater portion of the "officially supported toolchain".
 
 Xamarin isn’t needed on Windows as Microsofts native tools can be used to provide portability to that platform, there  
 Microsoft is the true native leader by definition.
@@ -110,7 +110,7 @@ from your Mac or Linux machine.
 This makes the installation of Codename One trivial, a single plugin to install. This isn’t true for development  
 environments that don’t use that approach.
 
-Xamarin is far more “low level” than Codename One. Xamarin assumes you have deep platform knowledge e.g.  
+Xamarin is far more "low level" than Codename One. Xamarin assumes you have deep platform knowledge e.g.  
 you have to understand the Android activity API and lifecycle in order to build a Xamarin Android app. You need  
 to understand the `ViewController` to build a Xamarin iOS app. You don’t need  
 to understand either one of those in order to build a Codename One application.
@@ -146,9 +146,9 @@ of native widgets for specific requirements (HTML, media, text etc.) this. The d
 is highly documented and has been debated since the days of smalltalk (think Swing vs. SWT/AWT).
 
 Heavyweight architecture is closer to the way the native OS behaves and as a result is inherently less portable  
-and not as flexible. This is a tradeoff that some developers are willing to accept in order to be “more native”.
+and not as flexible. This is a tradeoff that some developers are willing to accept in order to be "more native".
 
-Heavyweight is sometimes deemed “faster” by its proponents but the technological basis for such claims is flawed as  
+Heavyweight is sometimes deemed "faster" by its proponents but the technological basis for such claims is flawed as  
 these widgets are harder to measure realistically across platforms and optimize properly.
 
 ##### Xamarin Forms
@@ -165,10 +165,10 @@ GUI builders for obvious reasons.
 #### Portability Strategy
 
 Codename One uses a single project that works everywhere. When you need access to native code this native  
-code is hidden by the native interfaces abstraction that allow that single project to remain “clean” of native code.  
+code is hidden by the native interfaces abstraction that allow that single project to remain "clean" of native code.  
 By default no native code of any type is necessary to build a Codename One application.
 
-Xamarin requires a “pseudo native” project (still written in C#) to represent the lifecycle, resources and other elements  
+Xamarin requires a "pseudo native" project (still written in C#) to represent the lifecycle, resources and other elements  
 of the various supported platforms. By default this will include a lot of the platform specific code such as UI etc.  
 with the exception of Forms apps where there will be less code in the separate projects.
 
@@ -272,7 +272,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Benjamin Hamilton says:
 >
 > From your article  
-> Android’s “native” language is Java. The UI widgets in Android are implemented in Java, which effectively means that if you write code in C it will perform slower than Java code as it would need to pass thru JNI.
+> Android’s "native" language is Java. The UI widgets in Android are implemented in Java, which effectively means that if you write code in C it will perform slower than Java code as it would need to pass thru JNI.
 >
 > From Google  
 > [https://developer.android.c…](<https://developer.android.com/training/articles/perf-jni.html>)
@@ -306,7 +306,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hello Shai, how about the Dependency Injection with Codename One?
 >
-> I tried to search for spec, examples or even searched for phrase “@Inject” through the Github examples.  
+> I tried to search for spec, examples or even searched for phrase "@Inject" through the Github examples.  
 > Is it possible to decouple code this way?
 >
 > Are there any other decoupling methods available like EventBus?
@@ -338,7 +338,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Martin Grajcar says:
 >
-> Dagger 2 uses no reflection at all, so in theory it must work. As this is the only relevant search result for “codenameone” and “dependency injection”, I’m afraid that nobody has really tried it yet.
+> Dagger 2 uses no reflection at all, so in theory it must work. As this is the only relevant search result for "codenameone" and "dependency injection", I’m afraid that nobody has really tried it yet.
 
 
 ### **Shai Almog** — September 9, 2017 at 7:13 am ([permalink](/blog/comparing-xamarin-and-codename-one/#comment-23502))

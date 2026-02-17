@@ -21,7 +21,7 @@ Version 1.1 solidifies Codename One as the technological market leader in Write 
 The platform to date has been used to build over 2,000 native mobile applications and has received widespread, viral acclaim in technology and business media including InfoWorld, Slashdot, Hacker News, VentureBeat, Business Insider, The Next Web, Dr. Dobbs and Forbes, which named the company one of the 10 greatest industry disrupting startups of 2012.
 
 _  
-“It is amazing that within 4 months since our 1.0 doubled or more on every single KPI, we have some amazing plans for the future and expect to exceed that many times over.”  
+"It is amazing that within 4 months since our 1.0 doubled or more on every single KPI, we have some amazing plans for the future and expect to exceed that many times over."  
 _  
 said co-founder and CEO Shai Almog.
 
@@ -43,7 +43,7 @@ About Codename One
   
 **  
   
-Codename One, named by Forbes as “one of the 10 greatest industry disrupting startups of 2012,” is an Israel-based technology company that has created a powerful cross-platform software development kit for mobile applications. The technology enables developers to create native applications across multiple operating systems using a single code base. Codename One was founded by renowned software engineers Shai Almog and Chen Fishbein in 2012.  
+Codename One, named by Forbes as "one of the 10 greatest industry disrupting startups of 2012," is an Israel-based technology company that has created a powerful cross-platform software development kit for mobile applications. The technology enables developers to create native applications across multiple operating systems using a single code base. Codename One was founded by renowned software engineers Shai Almog and Chen Fishbein in 2012.  
 
 Notice: This post was automatically converted using a script from an older blogging system. Some elements might not have come out as intended…. If that is the case please let us know via the comments section below.
 

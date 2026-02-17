@@ -125,7 +125,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> You can just set the UIID of one of them to selected or even just increase the font or padding so this would be easy and should “just work”. The main challenge is detecting where you are in the scroll. When a user scrolls by pressing a button this should be pretty easy but when the user scrolls via touch this might be more challenging. You can use the scroll listener which should be pretty easy to work with and then hack something with getComponentAt(x, y) to find the location you are currently in.
+> You can just set the UIID of one of them to selected or even just increase the font or padding so this would be easy and should "just work". The main challenge is detecting where you are in the scroll. When a user scrolls by pressing a button this should be pretty easy but when the user scrolls via touch this might be more challenging. You can use the scroll listener which should be pretty easy to work with and then hack something with getComponentAt(x, y) to find the location you are currently in.
 >
 > Another approach which I haven’t tested but might be more elegant is this:  
 > After constructing and initializing the layout loop over the component and assign a Y range to every alphabet letter. getY() of a specific component should return the right scroll offset and this should work nicely with the scroll listener.

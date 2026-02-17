@@ -15,7 +15,7 @@ I’m used to NetBeans but if I will ever switch it will be to IntelliJ/IDEA. It
 
 ### Tree Mode
 
-IntelliJ defaults to showing errors as a “tree”. It parses the output of the app to the console and shows “pretty” output. Unfortunately this doesn’t always play nice with Codename One and hides things like compiler errors.
+IntelliJ defaults to showing errors as a "tree". It parses the output of the app to the console and shows "pretty" output. Unfortunately this doesn’t always play nice with Codename One and hides things like compiler errors.
 
 We strongly recommend you disable that setting…​
 

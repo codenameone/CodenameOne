@@ -13,7 +13,7 @@ author: Steve Hannah
 
 FontBox is a mature java library for loading, manipulating, and rendering fonts in Java. It gives you direct access to the font glyphs so that you can perform effects or transformations on them. A couple of years ago, I ported FontBox to Codename One, but since CN1 didn’t yet include support for drawing shapes, I made it dependent upon the [CN1Pisces library](https://github.com/shannah/CN1Pisces), which did support drawing shapes. This was cool but it had some major limitations; the main one being that FontBox fonts could only be used to draw strings on Pisces graphics contexts, which can only be rendered to an image – not directly to the screen. This meant that you couldn’t **just** use a FontBox font in your app (e.g. in a label or a button). You could only use it to write on an image.
 
-Fast forward to the present day, when Codename One supports [drawing shapes](/javadoc/com/codename1/ui/geom/GeneralPath/) “natively” on all major platforms, I felt is was time to revamp this library so that it integrates better with Codename One. My goal was to be able to use a FontBox font interchangeably with “normal” fonts. E.g. for a label, button, text field, graphics context, etc…​ The motivation for this update came as I was developing the “Meme Maker” demo. I needed to draw some text that was filled white but had a black outline. Built-in fonts don’t have this ability, but since FontBox provides direct access to the font glyphs as paths (i.e. lines and curves) I could fairly easily create a font that had both fill and stroke. That’s just what I did, with the new `TTFFont` class.
+Fast forward to the present day, when Codename One supports [drawing shapes](/javadoc/com/codename1/ui/geom/GeneralPath/) "natively" on all major platforms, I felt is was time to revamp this library so that it integrates better with Codename One. My goal was to be able to use a FontBox font interchangeably with "normal" fonts. E.g. for a label, button, text field, graphics context, etc…​ The motivation for this update came as I was developing the "Meme Maker" demo. I needed to draw some text that was filled white but had a black outline. Built-in fonts don’t have this ability, but since FontBox provides direct access to the font glyphs as paths (i.e. lines and curves) I could fairly easily create a font that had both fill and stroke. That’s just what I did, with the new `TTFFont` class.
 
 ### What can `TTFFont` do that `Font` cannot?
 
@@ -39,7 +39,7 @@ Figure 3. Compressed text
 
 ### Drawbacks
 
-Since `TTFFonts` are actually rendered in CN1 as shapes, they will be slower than built-in fonts, which are rendered natively by the platform. Therefore, you should only use TTFFont in cases where you require its extra capabilities. That said, there was no noticeable “lag” introduced in the [Meme Maker app](https://github.com/shannah/mememaker) by my use of TTFFont.
+Since `TTFFonts` are actually rendered in CN1 as shapes, they will be slower than built-in fonts, which are rendered natively by the platform. Therefore, you should only use TTFFont in cases where you require its extra capabilities. That said, there was no noticeable "lag" introduced in the [Meme Maker app](https://github.com/shannah/mememaker) by my use of TTFFont.
 
 ### Usage Examples
 
@@ -142,7 +142,7 @@ Since `TTFFonts` are actually rendered in CN1 as shapes, they will be slower tha
 
 ### More About CN1FontBox
 
-For more information about CN1FontBox, check out the [CN1FontBox github repository](https://github.com/shannah/CN1FontBox). The best way to install it is through the “Extensions” section of the Codename One Settings for your project.
+For more information about CN1FontBox, check out the [CN1FontBox github repository](https://github.com/shannah/CN1FontBox). The best way to install it is through the "Extensions" section of the Codename One Settings for your project.
 
 ### Get the Meme Maker App
 

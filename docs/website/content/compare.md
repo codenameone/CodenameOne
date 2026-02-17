@@ -2,6 +2,12 @@
 title: "COMPARE"
 date: 2020-09-11
 slug: "compare"
+seoTitle: "Comparing Cross-Platform Frameworks"
+description: "Comparison of Codename One with different cross-platform app development frameworks to see how it matches up to other cross-platform solutions in the market."
+keywords:
+  - "Comparing Cross-Platform Frameworks"
+  - "Compare Codename One"
+  - "Codename One Comparison"
 ---
 
 # Compare Codename One
@@ -83,4 +89,3 @@ MAF historically combined enterprise complexity with hybrid-web tradeoffs and a 
 ## Bottom Line
 
 If you want a Java/Kotlin-based, high-portability cross-platform workflow with strong native output and reduced platform build friction, Codename One is built for exactly that.
-

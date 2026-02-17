@@ -70,7 +70,7 @@ The defualt behavior of table layout works with preferred/available size and mig
 
 ### Enabling TLS 1.2 on Codename one App for Android 4.0.X , 4.1.X and 4.2.X
 
-Some questions can only be answered with a “you will need to implement this natively” although this specific  
+Some questions can only be answered with a "you will need to implement this natively" although this specific  
 native implementation looks like one line of code…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37003354/enabling-tls-1-2-on-codename-one-app-for-android-4-0-x-4-1-x-and-4-2-x)

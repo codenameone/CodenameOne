@@ -13,7 +13,7 @@ author: Shai Almog
 
 As part of the bootcamp we wrote a couple of cn1libs and the first one is the [Braintree cn1lib](https://github.com/codenameone/BraintreeCodenameOne) which allows us to do credit card payments within an app. If you aren’t familiar with [Braintree](https://www.braintreepayments.com/) it’s a PayPal company that provides payment integration for mobile devices.
 
-Notice that this differs from [In App Purchase](/blog/intro-to-in-app-purchase/) which targets “virtual goods”. This is useful for things like paying for physical goods and services e.g. paying for a taxi.
+Notice that this differs from [In App Purchase](/blog/intro-to-in-app-purchase/) which targets "virtual goods". This is useful for things like paying for physical goods and services e.g. paying for a taxi.
 
 In order to make a purchase with [this API](https://github.com/codenameone/BraintreeCodenameOne) we can use code such as:
     
@@ -38,7 +38,7 @@ In order to make a purchase with [this API](https://github.com/codenameone/Brain
             }
         });
 
-Notice that we don’t pass pricing or any other information within the code, this is all done in the server code that generates the token for the purchase. This allows our client code to remain “tamper proof”, all credit card collection and charge code is written by Braintree and is thus compliant with all the PCI level security restrictions and we can keep our code simple.
+Notice that we don’t pass pricing or any other information within the code, this is all done in the server code that generates the token for the purchase. This allows our client code to remain "tamper proof", all credit card collection and charge code is written by Braintree and is thus compliant with all the PCI level security restrictions and we can keep our code simple.
 
 Many basic and subtle hacks can be avoided, e.g. a common hack is to manipulate client side code to change charge pricing but since pricing is determined by our (your) server and communicated directly to the Braintree server this is 100% tamper proof.
 
@@ -96,11 +96,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I have quoted the followings from PayPal Mobile SDK developer site:
 >
-> “In countries where Braintree Direct is not available, or to access other features of the PayPal REST API from a mobile app, the native libraries of the PayPal Mobile SDKs enable you to build fast, responsive apps”
+> "In countries where Braintree Direct is not available, or to access other features of the PayPal REST API from a mobile app, the native libraries of the PayPal Mobile SDKs enable you to build fast, responsive apps"
 >
-> it also states that “You can use PayPal’s SDKs in any country where PayPal is accepted”.
+> it also states that "You can use PayPal’s SDKs in any country where PayPal is accepted".
 >
-> So the PayPal Mobile SDKs are accepted in more countries including my country “Oman”.
+> So the PayPal Mobile SDKs are accepted in more countries including my country "Oman".
 >
 > is the CN1 library built using PayPal Mobile SDKs ??
 >

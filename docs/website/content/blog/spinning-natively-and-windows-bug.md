@@ -87,7 +87,7 @@ So to show a native picker you must first verify that the picker type is support
   
   
   
-The value type depends on the picker type, for date/date and time a java.util.Date object is expected. For time and Integer value with minutes since midnight is expected.  
+The value type depends on the picker type, for date/date and time a `java.util.Date` object is expected. For time and Integer value with minutes since midnight is expected.  
 
   
 The API is blocking like typical dialog API’s and will return with the value when finished.  

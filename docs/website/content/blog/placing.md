@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Hi I have downloaded latest plugin. Ran simulator. Can’t find “Map” menu item…
+> Hi I have downloaded latest plugin. Ran simulator. Can’t find "Map" menu item…
 >
 
 

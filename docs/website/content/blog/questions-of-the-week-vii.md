@@ -12,8 +12,8 @@ author: Shai Almog
 ![Header Image](/blog/questions-of-the-week-vii/qanda-friday.jpg)
 
 Woke up this morning to the amazing news of Google winning against Oracle on the issue of fair use!  
-This is great news for everyone as it effectively makes “clean room implementation” legal. This solidifies  
-Java’s status as “open” showing that even its owner has limitations on their power.
+This is great news for everyone as it effectively makes "clean room implementation" legal. This solidifies  
+Java’s status as "open" showing that even its owner has limitations on their power.
 
 I might write more about this next week if I have some time, I just hope the verdict doesn’t get turned in an appeal.
 

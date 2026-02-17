@@ -98,7 +98,7 @@ Android 4.4 or newer requires the Android SDK to achieve a similar result using
 [this technique](https://developer.android.com/tools/help/shell.html#screenrecord).  
 Using these techniques will allow a non-grainy video that’s easy to understand even for elaborate/refined issues.
 
-We recommend uploading the video to youtube as “unlisted” video and embedding the link into the issue.  
+We recommend uploading the video to youtube as "unlisted" video and embedding the link into the issue.  
 This allows anyone to view the video almost instantly even on mobile while wading thru issues. This also
 
 #### Resources/Images

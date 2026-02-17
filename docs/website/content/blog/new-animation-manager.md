@@ -72,7 +72,7 @@ We didn’t just do this to fix bugs though, we are looking at integrating some 
 see here: 
 
 This animation is a combination of a new ability to step thru animation stages when scrolling with a new  
-“style animation” that accepts a destination UIID for a Component and morphs from the source style to the  
+"style animation" that accepts a destination UIID for a Component and morphs from the source style to the  
 destination UIID. This specific demo includes this code: 
     
     

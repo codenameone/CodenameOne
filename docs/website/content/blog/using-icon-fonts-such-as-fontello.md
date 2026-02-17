@@ -110,7 +110,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > I believe that what I am seeing on my device is a ripple effect. The background button has a circular background The background color for the back button when clicked / long pressed changes gradually starting from the center down to the circle’s edges over about a half a second time period.
 >
-> If it was just a background color that is set when clicked then it would not change “gradually” it would instead get updated all at once.
+> If it was just a background color that is set when clicked then it would not change "gradually" it would instead get updated all at once.
 >
 > I will try this week to recreate this behavior from a bare bone app and share it. I see the ripple effect only on an android device.
 >
@@ -136,7 +136,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I see that makes sense now. I was not using the toolbar on that specific form. Also you are right I don’t see the effect if I use the Toolbar.
 >
-> I actually used “Form”.setBackCommand(backCommand Also I am not using a native theme but I think probably due to the way I am using the theme it is indeed using the native component.
+> I actually used "Form".setBackCommand(backCommand Also I am not using a native theme but I think probably due to the way I am using the theme it is indeed using the native component.
 >
 > Thank you for the insights and for your time! I understand what is going on now.
 >
@@ -157,7 +157,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > That would be great but I’m not sure how we can enable something like that in terms of the API?  
-> One of the ideas that floated around when we introduced FontImage was to create it in an “auto-adapt” mode so it will use component styles all the time. This makes the code a bit awkward as you’d need to create multiple FontImage instances and won’t be able to reuse them.  
+> One of the ideas that floated around when we introduced FontImage was to create it in an "auto-adapt" mode so it will use component styles all the time. This makes the code a bit awkward as you’d need to create multiple FontImage instances and won’t be able to reuse them.  
 > The material code is easy to do because we just pass the character and possibly the size. Here we’d need the additional information of the font which changes the balance a bit. If you have a suggestion of how the API should look I’d be interested in hearing that.
 >
 

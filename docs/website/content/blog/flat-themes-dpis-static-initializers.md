@@ -15,7 +15,7 @@ With the release of 3.0 we were overwhelmed with a lot of last minute features a
 that we neglected to mention a lot of features that made it into the final 3.0 product.  
 One of the nicest new features is a set of new flat themes with various colors in the designer and the project  
 wizard. We found that a lot of developers prefer themes with more control over the look, themes that look  
-more similar across platform yet have a more modern “flat” feel. 
+more similar across platform yet have a more modern "flat" feel. 
 
 A long time request has been to add the additional DPI resolutions we added for higher density devices into  
 the designer tool. We now support these additional densities in the designer tool both in the multi image import  
@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > Can you file an issue on that?  
-> We’ll need to add them there too. As a workaround you can just create a new project with a native theme. Open the designer tool, delete the “Theme” entry and create a new theme, you should have these options there assuming you are using the latest plugin.
+> We’ll need to add them there too. As a workaround you can just create a new project with a native theme. Open the designer tool, delete the "Theme" entry and create a new theme, you should have these options there assuming you are using the latest plugin.
 >
 
 

@@ -11,7 +11,7 @@ author: Steve Hannah
 
 ![Header Image](/blog/background-fetch/background-fetch.jpg)
 
-Background fetch allows an app to periodically “fetch” information from the network while the app is in  
+Background fetch allows an app to periodically "fetch" information from the network while the app is in  
 the background. This is scheduled by the native platform, where apps that support background  
 fetch will be started up (in the background), and their `performBackgroundFetch` method will be invoked.
 
@@ -301,7 +301,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Steve Hannah says:
 >
-> Background execution has gotten a lot harder with newer versions of Android. It is difficult to predict when the platform will run your background tasks, and they may be blocked for any reason on both Android and iOS. If you can check the device log it might give you a clue as to what its “complaint” is.
+> Background execution has gotten a lot harder with newer versions of Android. It is difficult to predict when the platform will run your background tasks, and they may be blocked for any reason on both Android and iOS. If you can check the device log it might give you a clue as to what its "complaint" is.
 >
 
 
@@ -344,7 +344,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ve done some digging on this, and believe I have found the issue. (described here <https://developer.android.com/about/versions/oreo/background.html#services>).
 >
-> “Prior to Android 8.0, the usual way to create a foreground service was to create a background service, then promote that service to the foreground. With Android 8.0, there is a complication; the system doesn’t allow a background app to create a background service. For this reason, Android 8.0 introduces the new method startForegroundService() to start a new service in the foreground. After the system has created the service, the app has five seconds to call the service’s startForeground() method to show the new service’s user-visible notification. If the app does not call startForeground() within the time limit, the system stops the service and declares the app to be ANR.”
+> "Prior to Android 8.0, the usual way to create a foreground service was to create a background service, then promote that service to the foreground. With Android 8.0, there is a complication; the system doesn’t allow a background app to create a background service. For this reason, Android 8.0 introduces the new method startForegroundService() to start a new service in the foreground. After the system has created the service, the app has five seconds to call the service’s startForeground() method to show the new service’s user-visible notification. If the app does not call startForeground() within the time limit, the system stops the service and declares the app to be ANR."
 >
 > This doesn’t offer a clear solution at your level, unfortunately, other than attempting to keep execution of background fetches under 5 seconds — it isn’t clear whether that is a solution or not.
 >

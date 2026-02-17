@@ -13,13 +13,13 @@ author: Shai Almog
 
 We’ve been spending a lot of times looking at performance for one of our enterprise customers. As part of the investigation  
 he came up with an interesting and very important find… He found that `hashMap.get("String")` was much  
-slower under the new VM than under the old VM. Its these sort of “simple” finds that help narrow down bigger issues  
+slower under the new VM than under the old VM. Its these sort of "simple" finds that help narrow down bigger issues  
 in performance that might impact a lot of things in Codename One, since HashMap is so ubiquitous the implications  
 of improving it can be huge. 
 
 One of the advantages of the new VM is in the fact that we now also control the full API including the HashMap API and  
 can rewrite large portions of it natively for full performance advantage. But it seems that a lot of the things that were  
-really affecting performance were in the more “subtle” pieces touched by the `String` class and  
+really affecting performance were in the more "subtle" pieces touched by the `String` class and  
 `get` method… 
 
 We moved many small bottlenecks into native code e.g. `toString()`, `String.equals()`,  

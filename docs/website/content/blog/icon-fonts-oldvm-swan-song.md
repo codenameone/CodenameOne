@@ -36,7 +36,7 @@ progress wheel, thanks to the smoothness of the font the progress looks far more
     ip.showInifiniteBlocking();
 
 We can create such an image using two methods, a fixed size/color image which you can use to assign a pixel  
-size for such an image and a more “generic” method that will accept a style and adapt the icon for that style. 
+size for such an image and a more "generic" method that will accept a style and adapt the icon for that style. 
 
 As we move forward we would like to integrate icon fonts far deeper into the Codename One stack, this would  
 include integration with the designer tools etc. 

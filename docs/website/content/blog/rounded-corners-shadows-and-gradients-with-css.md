@@ -44,9 +44,9 @@ The result will be a button that looks like this:
 
 How it works:
 
-At compile-time, the CSS library compiles the CSS file into a codename one resource file. Each element selector (in the example above this is “Round1”) is converted into a UIID/Style that can be referenced from your codename one application. If the CSS styles specified can be expressed completely by Codename One style properties (e.g. padding, margin, font, simple borders, etc…​), then the resulting UIID will be more or less a direct conversion of the CSS properties. If, however, the CSS styles mandate a background or border that Codename One cannot express using its regular styles (e.g. rounded corners, shadows, gradients), then an appropriate image border or background will be generated and saved in the resource file as a multi-image.
+At compile-time, the CSS library compiles the CSS file into a codename one resource file. Each element selector (in the example above this is "Round1") is converted into a UIID/Style that can be referenced from your codename one application. If the CSS styles specified can be expressed completely by Codename One style properties (e.g. padding, margin, font, simple borders, etc…​), then the resulting UIID will be more or less a direct conversion of the CSS properties. If, however, the CSS styles mandate a background or border that Codename One cannot express using its regular styles (e.g. rounded corners, shadows, gradients), then an appropriate image border or background will be generated and saved in the resource file as a multi-image.
 
-In the above example, we specify that the “Round1” UIID should include rounded corners with a radius of 20pt. Since Codename One doesn’t support rounded corners natively, the CSS module will (at compile time) generate a an image with the appropriate rounded border and use this in an image border for the “Round1” UIID.
+In the above example, we specify that the "Round1" UIID should include rounded corners with a radius of 20pt. Since Codename One doesn’t support rounded corners natively, the CSS module will (at compile time) generate a an image with the appropriate rounded border and use this in an image border for the "Round1" UIID.
 
 ## Inner Shadows
 
@@ -59,7 +59,7 @@ Let’s spice up our button a bit more by adding shadows into the mix. Add this 
         border: 1pt solid transparent;
     }
 
-This defines a new UIID named “Round1InnerShadow” that derives from the “Round1” UIID (i.e. inherits all of its properties), but changes to a transparent border, and adds an inner shadow.
+This defines a new UIID named "Round1InnerShadow" that derives from the "Round1" UIID (i.e. inherits all of its properties), but changes to a transparent border, and adds an inner shadow.
 
 And the result is
 
@@ -89,7 +89,7 @@ The result:
 
 I could go on and on with different cool CSS effects that you can generate, but I’ll stop at this one last one: Gradients.
 
-Codename One has been capable of generating gradient backgrounds at runtime for quite some time, but we are told not to use them because they are “slow”. Instead we are instructed to create an image with the gradient that we want, and then use it as a background image.
+Codename One has been capable of generating gradient backgrounds at runtime for quite some time, but we are told not to use them because they are "slow". Instead we are instructed to create an image with the gradient that we want, and then use it as a background image.
 
 Using CSS and the `linear-gradient` or `radial-gradient` property, you can have your cake and eat it too since it will generate the gradients as images at compile-time, then use them as image backgrounds (or image borders) in your theme.
     
@@ -116,7 +116,7 @@ For those of you who don’t speak CSS fluently yet, you will be happy to learn 
 
   1. Change all `px` units to `pt`. This will cause the coordinate to be scaled appropriate for the device density.
 
-  2. Only include the standard CSS properties, not the browser-specific ones. Browser specific property names will be prefixed by one of `-moz-`, `-webkit`, or some other prefix beginning with “-“. E.g. The tool output the following CSS for a rounded border:
+  2. Only include the standard CSS properties, not the browser-specific ones. Browser specific property names will be prefixed by one of `-moz-`, `-webkit`, or some other prefix beginning with "-". E.g. The tool output the following CSS for a rounded border:
          
          border-radius: 10px 10px 10px 10px;
          -moz-border-radius: 10px 10px 10px 10px;
@@ -130,7 +130,7 @@ We would change this to
 
 ## Where Do I Put My CSS File?
 
-“This CSS looks really nice, but where to I put it, and how to I set up the CSS module?”, you say. I’m glad you asked. The CSS compiler will look for .css files inside your project’s “css” directory (which you’ll need to create). It will compiles these CSS files into corresponding .res files which will be placed into your project’s src directory. You can then load this theme in your app just as you would load any other theme file.
+"This CSS looks really nice, but where to I put it, and how to I set up the CSS module?", you say. I’m glad you asked. The CSS compiler will look for .css files inside your project’s "css" directory (which you’ll need to create). It will compiles these CSS files into corresponding .res files which will be placed into your project’s src directory. You can then load this theme in your app just as you would load any other theme file.
 
 ![Codename One CSS flow chart](/blog/rounded-corners-shadows-and-gradients-with-css/bf44abe4-73f7-11e5-8ecb-976478e297da.png)
 
@@ -189,14 +189,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > And I am inspired me :
 >
-> EncodedImage img = EncodedImage.createFromImage(_parent.getTheme().getImage(“teams_female.png”), false);
+> EncodedImage img = EncodedImage.createFromImage(_parent.getTheme().getImage("teams_female.png"), false);
 >
-> Image mask = _parent.getTheme().getImage(“teams_rounded-mask.png”);
+> Image mask = _parent.getTheme().getImage("teams_rounded-mask.png");
 >
 > EncodedImage roundPlaceholder = EncodedImage.createFromImage(img.scaled(mask.getWidth(), mask.getHeight()).applyMask(mask.createMask()), false);
 >
 > Label photo = new Label(roundPlaceholder);  
-> photo.setUIID(“UserImage”);
+> photo.setUIID("UserImage");
 >
 > Regards
 >

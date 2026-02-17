@@ -14,7 +14,7 @@ author: Steve Hannah
 We recently added a new tool to the  
 Codename One simulator that will allow you to run arbitrary code  
 snippets in your app’s runtime environment. You can access  
-it from “File” > “Groovy Console”, while your app is running in  
+it from "File" > "Groovy Console", while your app is running in  
 the simulator.
 
   
@@ -34,7 +34,7 @@ many cases, you can probably just write Java code, and it will
 still work. Personally, I like the way that Groovy lets you  
 refer to object properties via their property name, so you don’t  
 need to use the getter or setter methods explicitly. E.g. You  
-can do “form.title”, instead of “form.getTitle()”, to get the  
+can do "form.title", instead of "`form.getTitle()`", to get the  
 form’s title. The former is converted into the latter  
 automatically for you.
 
@@ -44,11 +44,11 @@ Getting the Current form’s title
 As a simple first example, let’s get  
 the current form’s title and print the value in the console.   
 The default content in the console already has a reference to the  
-current form via the “form=CN.currentForm” line. So all we  
+current form via the "form=CN.currentForm" line. So all we  
 need to do is add:
 
-Then press “Command-Enter” (or  
-Ctrl-Enter on Windows/Linux”), to see the output. You should  
+Then press "Command-Enter" (or  
+Ctrl-Enter on Windows/Linux"), to see the output. You should  
 see something like the following in the bottom-half of the  
 console:
 
@@ -87,17 +87,17 @@ fundamentals of both Groovy, and of the ComponentSelector
 class.
 
   1. `$(‘*’, form)` – This creates a set  
-of all components in the current form. “*” matches  
+of all components in the current form. "*" matches  
 all.
   2. `.filter{ ..}` – This method  
 filters the set so that only the components for which the closure  
 returns `true` are included. Notice the convenient  
 notation for a closure in Groovy: `{ .. }`. And it  
-provides you with the implicit variable “it” which refers to the  
+provides you with the implicit variable "it" which refers to the  
 parameter in a single-parameter method closure.
   3. `.each{…}` – Allow you to execute  
-code on “each” element in the set. Again, we use the  
-convenient closure notation and implicit “it” object provided by  
+code on "each" element in the set. Again, we use the  
+convenient closure notation and implicit "it" object provided by  
 Groovy.
 
 ### Useful for  
@@ -109,10 +109,10 @@ bug reporting. If a developer asks the community for help in
 debugging a problem in their app it is now possible for community  
 members to share snippets that might help to diagnose the problem.  
 It was already possible to share snippets, but the console  
-makes it easier to provide advice like: “When you get to the  
+makes it easier to provide advice like: "When you get to the  
 part of your app that is having the problem, try running this  
 snippet of code inside the console, and let me know what the output  
-is”.
+is".
 
 ## Versus  
 Debugging in the IDE
@@ -128,7 +128,7 @@ lighter-weight approach to achieve many of the same things.
 
 You’ll have to find your own usage  
 patterns, but I have found that it is handy to be able to just open  
-up a console, whether or not my app is being run in “Debug” mode,  
+up a console, whether or not my app is being run in "Debug" mode,  
 and start tinkering with some code to get a clearer picture of what  
 is going on inside my app.
 

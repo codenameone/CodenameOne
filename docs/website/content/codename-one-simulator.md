@@ -13,7 +13,7 @@ Test and Debug your app right inside your IDE
 
 ## Debug and test your app directly inside NetBeans with the integrated Codename One Simulator
 
-Just press “Run” on your project, and the simulator will open with your app running.
+Just press "Run" on your project, and the simulator will open with your app running.
 
 ## Select Your IDE:
 
@@ -33,9 +33,9 @@ Just press “Run” on your project, and the simulator will open with your app 
 
 Unlike the emulators Xcode and Android Studio, the Codename One simulator launches instantly, and starts your app. This allows you to iterate more quickly and increase productivity.
 
-### Large Selection of “Skins”
+### Large Selection of "Skins"
 
-Choose from a large selection of device “skins” to see how your app will look on particular devices. The skin takes into account factors such as resolution and device density to provide a pixel-perfectre presentation of your app, as it would appear on the real device. Switching between device skins is nearly instant.
+Choose from a large selection of device "skins" to see how your app will look on particular devices. The skin takes into account factors such as resolution and device density to provide a pixel-perfectre presentation of your app, as it would appear on the real device. Switching between device skins is nearly instant.
 
 ### Interactive Console
 
@@ -43,7 +43,7 @@ Interact with your application’s APIs at runtime using the interactive Groovy 
 
 ### Live Reload
 
-The Simulator let’s you take advantage of the “Apply Code Changes” feature in NetBeans so that changes you make in your Java source code will be applied immediately to your already-running app in the simulator.
+The Simulator let’s you take advantage of the "Apply Code Changes" feature in NetBeans so that changes you make in your Java source code will be applied immediately to your already-running app in the simulator.
 
 ### CSS Live Update
 

@@ -14,13 +14,13 @@ author: Shai Almog
 Codename One 3.2 is scheduled for Tuesday the 27th of October. In keeping with our successful 3.1 release we’ll  
 use a very short one week code freeze on the 20th of October at which point we will only commit crucial fixes  
 with code review. I hope we can land quite a few new features for the release, the GUI builder is getting  
-very close although its still a very rough product and will only be featured as a “technology preview” showing  
+very close although its still a very rough product and will only be featured as a "technology preview" showing  
 the direction we are heading rather than a final product. 
 
 #### New Approach To Demos
 
-Up until now we always thought about demos as developers often do: “As a tool to show how to program using  
-a set of features in the tool”.  
+Up until now we always thought about demos as developers often do: "As a tool to show how to program using  
+a set of features in the tool".  
 Recently, after working on my spouses Yoga Studio management app I came to the epiphany that this isn’t  
 the best way for mobile app demos. The main problem is that we can’t upload these demos to app stores  
 and show them running on a device. So with that in mind we are rethinking some future demos starting with  
@@ -56,7 +56,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Ross Taylor says:
 >
-> Hey I tried your solitaire app. However I have some critiques and wonder if its anything related to codenameone. The first is the card images are grainy (medium – low quality). I suppose you did this to save app size? The second is there is a line separation in the menu command after the “About”, where I think it shouldn’t be since it makes the menu command separation look untidy (looks like something broke off suddenly). The third is the background blurs (or refreshes?) when the menu command and the About dialog is disposed. The last is that when the button of the dialog is pressed in the pressed state, the highlighted area of the button way exceeds the area of the actual button. Other than these UI blips, the app seems to be pretty fast.
+> Hey I tried your solitaire app. However I have some critiques and wonder if its anything related to codenameone. The first is the card images are grainy (medium – low quality). I suppose you did this to save app size? The second is there is a line separation in the menu command after the "About", where I think it shouldn’t be since it makes the menu command separation look untidy (looks like something broke off suddenly). The third is the background blurs (or refreshes?) when the menu command and the About dialog is disposed. The last is that when the button of the dialog is pressed in the pressed state, the highlighted area of the button way exceeds the area of the actual button. Other than these UI blips, the app seems to be pretty fast.
 >
 
 

@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/logged-versions/generic-java-1.jpg)
 
-When we get a crash report one of our first questions is “when did you build this?”.  
+When we get a crash report one of our first questions is "when did you build this?".  
 The answer is often too vague to trace the specific version, so we end up with a mixture of guessing.
 
 The main issue is that there are different version values. They conflict with one another. They can be confusing and they can be inaccurate.

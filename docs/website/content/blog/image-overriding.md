@@ -15,7 +15,7 @@ I hoped todays post would cover the new Kitchen Sink demo but due to a couple of
 
 The new kitchen sink renders a set of icons like the old demo. In this version of the demo we wanted to show off graphics drawing which is an important feature missing from the old demo. Steve’s clock demo is a great example of that!
 
-When the time came to create an icon for that demo it dawned on us that it would be cool if the clock icon was actually “live”. We decided to create an `Image` in code that draws everything dynamically. Yes, we could have used a `Painter` but that would have meant reworking a lot of the existing code, the same would have been true if we used another component.
+When the time came to create an icon for that demo it dawned on us that it would be cool if the clock icon was actually "live". We decided to create an `Image` in code that draws everything dynamically. Yes, we could have used a `Painter` but that would have meant reworking a lot of the existing code, the same would have been true if we used another component.
 
 This is the code we used to create a clock, I’m redacting the clock drawing code itself for brevity’s sake:
     

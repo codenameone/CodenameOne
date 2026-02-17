@@ -11,8 +11,8 @@ author: Shai Almog
 
 ![Header Image](/blog/codename-one-3-7-live/codenameone-3-7.jpg)
 
-[Codename One](/) 3.7, the “Write Once Run Anywhere” mobile solution for Java developers is now live!  
-This exciting new release brings with it a surprising new overhaul of the Codename One GUI builder which now includes support to “auto-layout” allowing developers to place components with the ease/power of Photoshop or Illustrator..
+[Codename One](/) 3.7, the "Write Once Run Anywhere" mobile solution for Java developers is now live!  
+This exciting new release brings with it a surprising new overhaul of the Codename One GUI builder which now includes support to "auto-layout" allowing developers to place components with the ease/power of Photoshop or Illustrator..
 
 Codename One is the only platform that…​
 
@@ -65,9 +65,9 @@ In addition to that we made numerous enhancements to the UX of the GUI builder f
 
   * **Thread Helper & Threadsafe SQLite API’s** – A new API for communicating with threads & a new [threadsafe wrapper for sqlite](/blog/threadsafe-sqlite.html)
 
-  * **Better Desktop/Web API’s** – We now support API’s such as mouse cursor customization, split pane, mouse hover events etc. which allow more elaborate desktop apps. We also include an experimental new “desktop skin” to debug desktop apps
+  * **Better Desktop/Web API’s** – We now support API’s such as mouse cursor customization, split pane, mouse hover events etc. which allow more elaborate desktop apps. We also include an experimental new "desktop skin" to debug desktop apps
 
-  * **Experimental “On Top” Sidemenu & Form Layered Pane** – Side menu can now be [on top](/blog/sidemenu-on-top.html) of the UI and potentially on top of the entire form with a new layered pane mode
+  * **Experimental "On Top" Sidemenu & Form Layered Pane** – Side menu can now be [on top](/blog/sidemenu-on-top.html) of the UI and potentially on top of the entire form with a new layered pane mode
 
   * **ParparVM Performance Improvements** – Some of the code such as method invocations will now compile to the C equivalent of that code in terms of performance, many basic numeric operations are much faster thanks to VM optimizations and code is up to 40% smaller over 3.6
 
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Dalvik says:
 >
-> I’ve just tried the new GUI builder, at first it was a bit confusing as it felt a bit like I can put a component anywhere but then I watched the video and it “clicked”.  
+> I’ve just tried the new GUI builder, at first it was a bit confusing as it felt a bit like I can put a component anywhere but then I watched the video and it "clicked".  
 > I really like the drag and drop UI of the GUI builder, it’s pretty smooth… Was it built with JavaFX?
 
 
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Congratulations on the updates of this new version!
 >
-> PS: In Delphi this feature is called “Anchors” what I think would be a more appropriate name.
+> PS: In Delphi this feature is called "Anchors" what I think would be a more appropriate name.
 
 
 ### **Shai Almog** — June 27, 2017 at 1:37 pm ([permalink](/blog/codename-one-3-7-live/#comment-24149))
@@ -156,7 +156,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Mac Flanegan says:
 >
-> In Delphi this a more simple feature. The reference is “always” the parent component. But the idea is the same. Delphi has constraints too.
+> In Delphi this a more simple feature. The reference is "always" the parent component. But the idea is the same. Delphi has constraints too.
 >
 > AutoLayout reminds me the automatic arrangement of components, as it already exists in codename. So the suggestion to use Anchors. In my opinion Anchors says more about what this feature does.
 >
@@ -196,7 +196,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > – New GUI builder forms created with autolayout
 >
-> If you are referring to converting the GUI builder code pre-3.7 to post 3.7 you can easily do that but it will require a bit of hacking. Just open the .gui XML file and set the layout of the form to be layered layout. Then set autoLayout=”true” in the top level component tag. This will enable the new layout mode on an older form. Everything might be “messed up” after you do that which might require some work of fixing.
+> If you are referring to converting the GUI builder code pre-3.7 to post 3.7 you can easily do that but it will require a bit of hacking. Just open the .gui XML file and set the layout of the form to be layered layout. Then set autoLayout="true" in the top level component tag. This will enable the new layout mode on an older form. Everything might be "messed up" after you do that which might require some work of fixing.
 
 
 ### **Francesco Leoni** — June 29, 2017 at 7:55 pm ([permalink](/blog/codename-one-3-7-live/#comment-23636))
@@ -205,7 +205,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thankyou so much for your reply. Unfortunately that didn’t do the trick: after modifying the top level component like this (see below), the GUI builder is not starting at all.
 >
-> component type=”Form” layout=”LayeredLayout” title=”MyApp” name=”GuiComponent” autoLayout=”true”>
+> component type="Form" layout="LayeredLayout" title="MyApp" name="GuiComponent" autoLayout="true">
 >
 > Lauching Gui builder from commandline I can see some null pointer exceptions like the one below:
 >

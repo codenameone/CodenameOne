@@ -11,9 +11,9 @@ author: Steve Hannah
 
 ![Header Image](/blog/new-improved-native-google-maps/maps.jpg)
 
-One of the primary use-cases that benefits from our recent improvements for native peer integration, is “map apps”. That is, apps that use native maps in some shape or form. This is an extremely common uses case for mobile apps these days. Codename One has supported native maps for quite some time, but (up until recently), they were limited by a couple of factors:
+One of the primary use-cases that benefits from our recent improvements for native peer integration, is "map apps". That is, apps that use native maps in some shape or form. This is an extremely common uses case for mobile apps these days. Codename One has supported native maps for quite some time, but (up until recently), they were limited by a couple of factors:
 
-  1. **Native Widgets Were Always In Front** – Since Google Maps were “native” widgets Codename One couldn’t paint over top of the map. Native widgets were always placed in front of the Codename One UI. We could place markers on the map, and draw paths using MapContainer APIs (which were backed by native code on each platform), but we couldn’t, for example, place a Button over top of the map.
+  1. **Native Widgets Were Always In Front** – Since Google Maps were "native" widgets Codename One couldn’t paint over top of the map. Native widgets were always placed in front of the Codename One UI. We could place markers on the map, and draw paths using MapContainer APIs (which were backed by native code on each platform), but we couldn’t, for example, place a Button over top of the map.
   2. **The Simulator Still Used the Old MapComponent** – The simulator didn’t have support for native maps. It would just use the light-weight Codename One MapComponent, which uses tiles (rather than vector graphics like the native maps), and didn’t behave the same as native maps in some cases. E.g. you **could** draw over top of the MapComponent, which would cause a bit of a surprise if you were counting on that, only to find out after building for iOS that your beautiful buttons were rendered behind the map.
 
 I am happy to announce that on Friday we released an update for the Google maps library the resolves both of these issues.
@@ -23,7 +23,7 @@ I am happy to announce that on Friday we released an update for the Google maps 
 
 ## Configuration
 
-Adding the native maps library is easy. Just open Codename One Settings, click on “Extensions”, and install the “Google Maps” library.
+Adding the native maps library is easy. Just open Codename One Settings, click on "Extensions", and install the "Google Maps" library.
 
 ![Install Google Maps library in Codename One Settings](/blog/new-improved-native-google-maps/google-maps-lib-install.png)
 
@@ -165,7 +165,7 @@ Read more about the Google Maps library in its [Github repository](https://githu
 
 ## Interaction Dialog vs Dialog
 
-When using native peers, you’ll find it preferable to use `InteractionDialog` rather than `Dialog` whenever possible. This is because `Dialog` is actually a `Form`, and Codename One uses a “trick” (displaying a screen shot) to be able to display the existing form underneath it. InteractionDialog, on the other hand, is a light-weight component that acts like a dialog, but is rendered in the LayeredPane in front of the elements of the current form. This plays with the new native peers quite nicely.
+When using native peers, you’ll find it preferable to use `InteractionDialog` rather than `Dialog` whenever possible. This is because `Dialog` is actually a `Form`, and Codename One uses a "trick" (displaying a screen shot) to be able to display the existing form underneath it. InteractionDialog, on the other hand, is a light-weight component that acts like a dialog, but is rendered in the LayeredPane in front of the elements of the current form. This plays with the new native peers quite nicely.
 ---
 
 ## Archived Comments
@@ -223,8 +223,8 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi Steve, the MapContainer addPointerReleasedListener is not working on my side. I tried this code:
 >
 > mapContainer.addPointerReleasedListener((ActionListener) (ActionEvent evt) -> {  
-> Log.p(“Lat released= ” + lat, Log.DEBUG);  
-> Log.p(“Long released= ” + lng, Log.DEBUG);  
+> Log.p("Lat released= " + lat, Log.DEBUG);  
+> Log.p("Long released= " + lng, Log.DEBUG);  
 > });
 >
 > Note the lat & lng values are obtained inside addMapListener which is working well.

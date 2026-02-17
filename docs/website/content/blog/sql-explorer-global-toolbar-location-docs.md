@@ -18,7 +18,7 @@ SQL I decided to just create a tool that allows you to type arbitrary SQL to exe
 the results in a `Table`…​
 
 Beside being a cool example this can be a hugely powerful debugging tool to one of the more painful API’s to  
-debug on the device. You can integrate this as a hidden feature into your application and use it to debug odd “on device”  
+debug on the device. You can integrate this as a hidden feature into your application and use it to debug odd "on device"  
 issues by querying the DB!
 
 ### Toolbars All Around
@@ -72,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Dalvik says:
 >
 > Can we maybe add more functionality to the DB explorer tool?  
-> This opens some potential to “on device analysis” style API’s. Any plans on that?
+> This opens some potential to "on device analysis" style API’s. Any plans on that?
 >
 
 

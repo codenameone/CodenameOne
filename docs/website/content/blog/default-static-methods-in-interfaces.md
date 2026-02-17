@@ -45,7 +45,7 @@ clases but sometimes that doesn’t make sense. E.g. the [Push](/javadoc/com/cod
 is entirely composed of static methods and doesn’t make much sense as a standalone class. We could have  
 rolled all the methods within the class into the interface as static methods and eliminated the class entirely.
 
-This isn’t necessarily “good practice” but for some use cases this might be a better place to hold the method.
+This isn’t necessarily "good practice" but for some use cases this might be a better place to hold the method.
 
 E.g.:
     

@@ -1,5 +1,5 @@
 ---
-title: "16. The “New Post” Form"
+title: "16. The 'New Post' Form"
 layout: "course-lesson"
 course_id: "course-03-build-real-world-full-stack-mobile-apps-java"
 course_title: "Build Real World Full Stack Mobile Apps in Java - Free Course"

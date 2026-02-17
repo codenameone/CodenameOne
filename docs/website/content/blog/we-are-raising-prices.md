@@ -23,7 +23,7 @@ To this day, we have dozens of Basic plan subscribers on that $9 per month plan.
 
 As you know the prices for hosting, living etc have increased globally. The current price structure is just untenable moving forward with our current cost structure.
 
-As such we decided to do our first “real” pricing change. Even after this change we’re still one of the most affordable options in our field and we still have the free account which we plan to keep forever.
+As such we decided to do our first "real" pricing change. Even after this change we’re still one of the most affordable options in our field and we still have the free account which we plan to keep forever.
 
 ### For current subscribers
 

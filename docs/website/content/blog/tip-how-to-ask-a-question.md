@@ -13,7 +13,7 @@ author: Shai Almog
 
 I deal with a lot of questions every day and unfortunately most of them are phrased in a way that forces  
 me to guess. There are some guidelines on [how to ask a question](http://stackoverflow.com/help/how-to-ask)  
-but I think they are mostly pretty bad. Asking a question “correctly” helps you tremendously both in getting  
+but I think they are mostly pretty bad. Asking a question "correctly" helps you tremendously both in getting  
 a correct answer faster and also in solving your own question. Following these three rules will significantly improve  
 your questions:
 
@@ -29,15 +29,15 @@ Questions are a form of expressing our lack of knowledge, but when I bring someo
 pieces of knowledge that person is ignorant about me and what I’m trying to do. That’s why every question should  
 first start with and explanation of what we are trying to do.
 
-E.g. I can ask a person where is the next pharmacy and he can send me two miles away, but if I ask “where can I buy  
-gum?” he can send me around the block to a convenience store…​
+E.g. I can ask a person where is the next pharmacy and he can send me two miles away, but if I ask "where can I buy  
+gum?" he can send me around the block to a convenience store…​
 
-This is very applicable to technical questions e.g. developers often ask “how can I add a button anywhere in the screen”.
+This is very applicable to technical questions e.g. developers often ask "how can I add a button anywhere in the screen".
 
-The answer is “it’s problematic and varies”.
+The answer is "it’s problematic and varies".
 
-A better question would start with “I am trying to place a button in the top right portion of the screen similar to this  
-image…​”.
+A better question would start with "I am trying to place a button in the top right portion of the screen similar to this  
+image…​".
 
 __ |  If you have an image use it, just make sure to highlight the element within the image you are interested in   
 ---|---  
@@ -53,7 +53,7 @@ into the direction you are taking so if some things weren’t clear in your desc
 A good explanation would also include the source URL where you got that information as it might provide further  
 clues to why things didn’t work out.
 
-__ |  It’s OK to say “I don’t even know where to begin” or “I tried googling XYZ and came up blank”   
+__ |  It’s OK to say "I don’t even know where to begin" or "I tried googling XYZ and came up blank"   
 ---|---  
   
 ### Screenshots, Code Snippets & Error Logs

@@ -16,7 +16,7 @@ thumbnail: https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-3-1.
 
 #### Transcript
 
-In this short video I’ll explain the ideas behind device densities and images in a mobile phone environment. In this environment the differences between device screens are big. Lets start with a simple question, on the left you see an iPhone 6 and on the right you see an iPad Air 2. Both are not to scale but I’ll ask the abstract question: “which device is bigger?”
+In this short video I’ll explain the ideas behind device densities and images in a mobile phone environment. In this environment the differences between device screens are big. Lets start with a simple question, on the left you see an iPhone 6 and on the right you see an iPad Air 2. Both are not to scale but I’ll ask the abstract question: "which device is bigger?"
 
 In terms of resolution the iPad is clearly bigger. It has more pixels than the iPhone 6. The iphone has 1 million pixels and the ipads has 3 million pixels. Thats a 3 fold difference!
 

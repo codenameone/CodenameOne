@@ -52,8 +52,8 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Sure it didn’t take you 5000 hours for building this uber clone. BUT, you didn’t reinvent the wheel …  
 > As they said in article, 5000 hours is estimated for the following services :  
-> “Design / iOS and Android native app development / Backend development / Web development / Project management / Quality assurance  
-> According to our estimates of similar projects, the time it takes to build a taxi-hailing app, including an app for drivers and an app for riders, is somewhere near 5000 hours.”
+> "Design / iOS and Android native app development / Backend development / Web development / Project management / Quality assurance  
+> According to our estimates of similar projects, the time it takes to build a taxi-hailing app, including an app for drivers and an app for riders, is somewhere near 5000 hours."
 >
 > It seems you would like to justify your academy price changes …. (maybe I’m wrong ! 🙂  
 > Nevertheless, I’m pretty agree that Codenameone might help to build both android and iOS app. And congrats for this clone 🙂  

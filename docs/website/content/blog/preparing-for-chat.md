@@ -18,7 +18,7 @@ After the code freeze only reviewed commits can be cherry picked. Only critical 
 
 We named the releases of Codename One based on the signature app we built on top of that given release. 5.0 was named social and 4.0 was named Taxi representing the Facebook/Uber clones respectively. Version 6.0 is named Chat as we built a [WhatsApp Clone](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java) during the release cycle.
 
-For Version 7.0 we plan to build a Netflix clone. The planned name for version 7.0 is “Video”.
+For Version 7.0 we plan to build a Netflix clone. The planned name for version 7.0 is "Video".
 
 ---
 

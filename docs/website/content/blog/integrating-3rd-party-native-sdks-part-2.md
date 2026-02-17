@@ -17,7 +17,7 @@ In [part one](http://www.codenameone.com/blog/integrating-3rd-party-native-sdks-
 
 ## Step 5: Implementing the Native Interface in Android
 
-Now that we have set up our public API and our native interface, it is time to work on the native side of things. You can generate stubs for all platforms in your IDE (Netbeans in my case), by right clicking on the `MobihelpNative` class in the project explorer and selecting “Generate Native Access”.
+Now that we have set up our public API and our native interface, it is time to work on the native side of things. You can generate stubs for all platforms in your IDE (Netbeans in my case), by right clicking on the `MobihelpNative` class in the project explorer and selecting "Generate Native Access".
 
 ![c9d4b9cc 61f6 11e5 8b67 4691600188cd](/blog/integrating-3rd-party-native-sdks-part-2/c9d4b9cc-61f6-11e5-8b67-4691600188cd.png)
 
@@ -77,7 +77,7 @@ The last step (at least on the Android side) is to bundle the FreshDesk SDK. For
 
   1. **The SDK includes only Java classes** – NO XML UI files, assets, or resources that aren’t included inside a simple .jar file. In this case, you can just place the .jar file inside your project’s `native/android` directory.
 
-  2. **The SDK includes some XML UI files, resources, and assets.** In this case, the SDK is generally distributed as an Android project folder that can be imported into an Eclipse or Android studio workspace. In general, in this case, you would need to zip the entire directory and change the extension of the resulting .zip file to “.andlib”, and place this in your project’s `native/android` directory.
+  2. **The SDK includes some XML UI files, resources, and assets.** In this case, the SDK is generally distributed as an Android project folder that can be imported into an Eclipse or Android studio workspace. In general, in this case, you would need to zip the entire directory and change the extension of the resulting .zip file to ".andlib", and place this in your project’s `native/android` directory.
 
   3. **The SDK is distributed as an`.aar` file** – In this case you can just copy the `.aar` file into your `native/android` directory.
 
@@ -145,9 +145,9 @@ So, to summarize our findings, we need to include the following files in our `na
 
   1. appcompat-v7-19.1.0.aar
 
-  2. support-v4-19.1.0.jar
+  2. `support-v4-19.1.0.jar`
 
-And since our Mobihelp SDK lists the appcompat_v7 dependency path as “../appcompat_v7” in its project.properties file, we are going to rename `appcompat-v7-19.1.0.aar` to `appcompat_v7.aar`.
+And since our Mobihelp SDK lists the appcompat_v7 dependency path as "../appcompat_v7" in its `project.properties` file, we are going to rename `appcompat-v7-19.1.0.aar` to `appcompat_v7.aar`.
 
 When all is said and done, our `native/android` directory should contain the following:
     
@@ -157,7 +157,7 @@ When all is said and done, our `native/android` directory should contain the fol
 
 ## Step 7 : Injecting Android Manifest and Proguard Config
 
-The final step on the Android side is to inject necessary permissions and services into the project’s AndroidManifest.xml file.
+The final step on the Android side is to inject necessary permissions and services into the project’s `AndroidManifest.xml` file.
 
 We can find the manifest file injections required by opening the `AndroidManifest.xml` file from the MobiHelp SDK project. Its contents are as follows:
     
@@ -282,7 +282,7 @@ We’ll want to merge this and then paste them into the build hint `android.prog
 
 ## Troubleshooting Android Stuff
 
-If, after doing all this, your project fails to build, you can enable the “Include Source” option of the build server, then download the source project, open it in Eclipse or Android Studio, and debug from there.
+If, after doing all this, your project fails to build, you can enable the "Include Source" option of the build server, then download the source project, open it in Eclipse or Android Studio, and debug from there.
 
 ## In Our Next Instalment…​
 

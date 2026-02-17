@@ -27,7 +27,7 @@ However, I did mention an interesting project which didn’t get much attention 
 
 ### Alternative Methods in CodenameOne
 
-This is a pretty common question: “Method X is missing what should I do”, in this case the methods that  
+This is a pretty common question: "Method X is missing what should I do", in this case the methods that  
 were missing included `Scanner` (to which we have no direct parallel), `File`, `Math.pow` & `String.format`.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/36681724/alternative-methods-in-codenameone)

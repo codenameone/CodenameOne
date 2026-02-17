@@ -19,7 +19,7 @@ So be sure to do extra checks on Android when building a new release.
 
 This change is mandated by Google who require that you target the latest Android version by August of this year.
 
-You can set the build hint android.buildToolsVersion=29 as a temporary workaround if things break for your app. Please let us know in that case so we can help resolve those issues.
+You can set the build hint `android.buildToolsVersion=29` as a temporary workaround if things break for your app. Please let us know in that case so we can help resolve those issues.
 ---
 
 ## Archived Comments

@@ -23,7 +23,7 @@ Onwards to the activity on stackoverflow this week:
 ### IS there a way to obtain device screen width and height
 
 This was marked as a duplicate despite being very explicitly defined as a Codename One question. I think  
-the biggest takeaway is don’t call anything “urgent” on stackoverflow…​
+the biggest takeaway is don’t call anything "urgent" on stackoverflow…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37859571/is-there-a-way-to-obtain-device-screen-width-and-height)
 
@@ -123,13 +123,13 @@ in favor of the builtin material design icon font which should make color inheri
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37796869/codenameone-change-color-of-checkbox-in-theme)
 
-### Can not access com.codename1.impl.android.AndroidNativeUtil From nativeInterface
+### Can not access `com.codename1.impl.android.AndroidNativeUtil` From nativeInterface
 
 You still need import statements when building the native code for an application…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37783366/can-not-access-com-codename1-impl-android-androidnativeutil-from-nativeinterface)
 
-### Why the decreasing the png/jpg quality factor in ImageIO.save() does not decrease the output image file size?
+### Why the decreasing the png/jpg quality factor in `ImageIO.save()` does not decrease the output image file size?
 
 It’s nice that people notice small things like that about the API, it was indeed unclear from the JavaDocs that  
 this was acceptable by design.

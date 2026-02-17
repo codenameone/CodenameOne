@@ -62,7 +62,7 @@ We had some UWP deployment issues that should be fixed in todays update
 
 ### iOS certification generation with Codename One
 
-The certificate generation process is by definition “flaky” as we rely on undocumented behavior. That’s why we  
+The certificate generation process is by definition "flaky" as we rely on undocumented behavior. That’s why we  
 hide it behind a webservice so we can patch it without asking everyone to update their install
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39472324/ios-certification-generation-with-codename-one)
@@ -132,9 +132,9 @@ more interest around it. This demonstrates perfectly why you can’t take featur
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39425633/how-do-i-use-the-codename-one-migration-tool-on-my-android-studio-project)
 
-### Error on Build: “error: cannot find symbol method compare(int, int)”
+### Error on Build: "error: cannot find symbol method compare(int, int)"
 
-This is one of those “Codename One doesn’t support Java feature X” which prompted us to write  
+This is one of those "Codename One doesn’t support Java feature X" which prompted us to write  
 [this](/blog/why-we-dont-support-the-full-java-api.html).
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39422409/codenameone-error-on-build-error-cannot-find-symbol-method-compareint-int)

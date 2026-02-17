@@ -18,7 +18,7 @@ some ideas for Codename One.
 There are some nice ideas there, but none of them is revolutionary or exceptional and most of them are pretty  
 old news for Codename One developers running in Java 8.
 
-One thing I did like was how short the [React demo code ](https://facebook.github.io/react-native/docs/tutorial.html#final-source-code)seemed to be, so I ported it to Codename One and ended up with roughly the same amount of code and arguably better/simpler code! Check out the full listing at the end of the article or in the github project [here](https://github.com/codenameone/codenameone-demos/tree/master/ReactDemo), but lets first review why the Java code is “better”.
+One thing I did like was how short the [React demo code ](https://facebook.github.io/react-native/docs/tutorial.html#final-source-code)seemed to be, so I ported it to Codename One and ended up with roughly the same amount of code and arguably better/simpler code! Check out the full listing at the end of the article or in the github project [here](https://github.com/codenameone/codenameone-demos/tree/master/ReactDemo), but lets first review why the Java code is "better".
 
 ### Synchronous Execution
 
@@ -85,7 +85,7 @@ Developers often pour hate on the Java checked exceptions feature and I have to 
 (f’ing `InterruptedException` is stupid) but this is a great example of why checked exceptions matter.
 
 We MUST handle errors properly and we can’t just ignore it until our code reaches production with this  
-lovely “TODO” comment that no one bothered reading.
+lovely "TODO" comment that no one bothered reading.
 
 ### One Language – Less Code
 
@@ -101,14 +101,14 @@ which is the separation of responsibilities.
 
 React Native can be debugged by reloading which is there to help when working with the **awful** Android emulator.
 
-Luckily Codename One doesn’t need that emulator, you also don’t need to restart your app to reload compiled changes… E.g. in NetBeans just use “Apply Code Changes” in the debugger and your changes are instantly mirrored into a running app.
+Luckily Codename One doesn’t need that emulator, you also don’t need to restart your app to reload compiled changes… E.g. in NetBeans just use "Apply Code Changes" in the debugger and your changes are instantly mirrored into a running app.
 
-### Scripting Languages Are Problematic “On Device”
+### Scripting Languages Are Problematic "On Device"
 
-This isn’t quite a “React Native” specific rant, its related to all tools packaging JavaScript in the app bundle.  
-Scripting languages are great for the web, they are like “duct tape”. Show me a hacker who doesn’t LOVE duct tape!
+This isn’t quite a "React Native" specific rant, its related to all tools packaging JavaScript in the app bundle.  
+Scripting languages are great for the web, they are like "duct tape". Show me a hacker who doesn’t LOVE duct tape!
 
-The temptation to ship an app built with such duct tape is big, but unlike the web where you can just fix that “weird undefined” bug in production by deploying a new update. With apps you need to go thru Apples approval process… This means production bugs that stay while you watch your rating drop.
+The temptation to ship an app built with such duct tape is big, but unlike the web where you can just fix that "weird undefined" bug in production by deploying a new update. With apps you need to go thru Apples approval process… This means production bugs that stay while you watch your rating drop.
 
 Yes, unit tests, lint and a lot of other solutions are supposed to catch those things but when you use a modern IDE and it detects potential null inference thanks to the strict language syntax its pretty amazing!
 
@@ -156,7 +156,7 @@ I’m still not a fan of duck typing or scripting languages but I’d really lik
 
 ### Final Word
 
-One of the problems I find with terse programming is that people use it to hide basic concepts so too much happens in an “unspoken” way. This makes terse code as easy to read as a Tweet, unfortunately if you need to express even a moderately complex idea Twitter just doesn’t cut it and that’s a big problem with some of these API’s.
+One of the problems I find with terse programming is that people use it to hide basic concepts so too much happens in an "unspoken" way. This makes terse code as easy to read as a Tweet, unfortunately if you need to express even a moderately complex idea Twitter just doesn’t cut it and that’s a big problem with some of these API’s.
 
 React native has its fans, after all its probably better than PhoneGap which has its own set of limitations. But its  
 still a limited concept standing on the chicken legs of a scripting infrastructure. It has no real advantage when  
@@ -262,7 +262,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > oojr says:
 >
-> ES7 async functions is coming next year and would make the code look even better, Javascript is shaping up to be “The Next Big Language” [https://jakearchibald.com/2…](<https://jakearchibald.com/2014/es7-async-functions/>)
+> ES7 async functions is coming next year and would make the code look even better, Javascript is shaping up to be "The Next Big Language" [https://jakearchibald.com/2…](<https://jakearchibald.com/2014/es7-async-functions/>)
 >
 
 
@@ -273,13 +273,13 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Its been brought to my attention that JavaScript fans can’t read my code and misunderstand me when I say that the code is sync…
 >
-> What I mean is that the code “looks” synchronous but really works like async code by running on the event dispatch thread and yet allowing for events etc. to still process seamlessly. That’s a pretty neat trick called invokeAndBlock:
+> What I mean is that the code "looks" synchronous but really works like async code by running on the event dispatch thread and yet allowing for events etc. to still process seamlessly. That’s a pretty neat trick called invokeAndBlock:
 >
 > [http://www.codenameone.com/…](<http://www.codenameone.com/blog/callserially-the-edt-invokeandblock-part-1.html>)
 >
 > [http://www.codenameone.com/…](<http://www.codenameone.com/blog/callserially-the-edt-invokeandblock-part-2.html>)
 >
-> I think JavaScript has its place as an important language, but even huge JavaScript fans find it hard to create large maintainable projects in it. The question of where the line passes where you probably should switch to a more “strict” language like Java (Scala if you prefer a more dynamic language etc.) is a matter of personal choice.
+> I think JavaScript has its place as an important language, but even huge JavaScript fans find it hard to create large maintainable projects in it. The question of where the line passes where you probably should switch to a more "strict" language like Java (Scala if you prefer a more dynamic language etc.) is a matter of personal choice.
 >
 
 
@@ -288,7 +288,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > oojr says:
 >
-> I went into a large corporation that had several lines of Java server code and discovered that ” large maintainable apps in Javascript are harder to do than a language like Java” is a huge myth, writing several modular components that work seamlessly together is hard in any language, it is all about preference and what will make you more productive. Uber’s codebase is mostly Javascript/Node.js and they seem to be doing just fine at scale. It is better to have a language that has optional type checking than strict.
+> I went into a large corporation that had several lines of Java server code and discovered that " large maintainable apps in Javascript are harder to do than a language like Java" is a huge myth, writing several modular components that work seamlessly together is hard in any language, it is all about preference and what will make you more productive. Uber’s codebase is mostly Javascript/Node.js and they seem to be doing just fine at scale. It is better to have a language that has optional type checking than strict.
 >
 > Back to the blog though, I use React Native and can code in Objective-C and Java, why? React Native allows me to use a flexbox layout and has all the benefits of an open source platform/ecosystem
 >
@@ -301,13 +301,13 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I would tend to agree that you can write horrible messy code in any language and great code in any language. Developer skills are important.
 >
-> One “illness” that Java developers have is over abstraction and over complicating everything, but it seems JavaScript developers have picked up some of that flu as well see: [http://geek-and-poke.com/ge…](<http://geek-and-poke.com/geekandpoke/2014/11/8/frameworks>)
+> One "illness" that Java developers have is over abstraction and over complicating everything, but it seems JavaScript developers have picked up some of that flu as well see: [http://geek-and-poke.com/ge…](<http://geek-and-poke.com/geekandpoke/2014/11/8/frameworks>)
 >
-> About Uber, its a startup hence no legacy code maintenance and highly controlled architecture. Keep in mind that no corporation will advertise the “pain” of working on their codebase.
+> About Uber, its a startup hence no legacy code maintenance and highly controlled architecture. Keep in mind that no corporation will advertise the "pain" of working on their codebase.
 >
 > Back to the blog post, Codename One has been open source since its inception (which was far before react native was even conceived) and has had flexible design layouts that work for all devices from before that.
 >
-> If you prefer JavaScript as a language that’s totally fine, to each his own. The blog post is aimed at Java developers who sometimes get the sense of “the grass is greener” when JavaScript developers talk about how X is easier. That’s just not the case.
+> If you prefer JavaScript as a language that’s totally fine, to each his own. The blog post is aimed at Java developers who sometimes get the sense of "the grass is greener" when JavaScript developers talk about how X is easier. That’s just not the case.
 >
 
 
@@ -476,7 +476,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ve settled on RN for the UI of my app, and thought its not been without its hurdles I feel like its a good way to do cross platform mobile development. I’m actually more comfortable writing C++11 (the other half of the app is in C++) than Javascript but since ES6 and ES7 things are looking much better. Yes it still has its warts but so does every other language in one way or another. I started writing my app UI in Swift for iOS with the intention to write the Android UI in Java but RN looked like a much better proposal to save rewriting all the UI logic for each platform. I’d have given your product a spin if I’d known about it sooner.
 >
-> Your comment “With apps you need to go thru Apples approval process” is not true for javascript only updates – there are tools to enable pushing javascript only updates to installed apps thereby circumventing the Apple approval process.
+> Your comment "With apps you need to go thru Apples approval process" is not true for javascript only updates – there are tools to enable pushing javascript only updates to installed apps thereby circumventing the Apple approval process.
 >
 
 
@@ -505,7 +505,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Don't Bother says:
 >
-> >Javascript are harder to do than a language like Java” is a huge myth…
+> >Javascript are harder to do than a language like Java" is a huge myth…
 >
 > It’s not a myth it’s a sad truth. The reality is that on large JavaScript project people just afraid to make any serious refactoring because you never know what will break and when. I have experienced this many times. If you have not seen this it means you have not seen any large and complex project.
 >
@@ -516,7 +516,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Don't Bother says:
 >
-> True but TypeScript is a not JavaScript. It is different language. And it has huge difference which is defined by world “Type” :-), and it has other things which are not present in JavaScript. It is same as if you say that Swift will make javaScript apps easier…
+> True but TypeScript is a not JavaScript. It is different language. And it has huge difference which is defined by world "Type" :-), and it has other things which are not present in JavaScript. It is same as if you say that Swift will make javaScript apps easier…
 >
 
 
@@ -632,7 +632,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I don’t think react native lacks in the department of advocacy or visibility so if people get the wrong impression about it this usually biases in the other way.
 >
-> Notice that you need to install the Android SDK and then the iOS SDK and then the Windows SDK and then rewrite for web… You also need to adapt code as it isn’t a WORA solution… We actually allow you to install one plugin and it “just works” on everything.
+> Notice that you need to install the Android SDK and then the iOS SDK and then the Windows SDK and then rewrite for web… You also need to adapt code as it isn’t a WORA solution… We actually allow you to install one plugin and it "just works" on everything.
 >
 
 
@@ -659,7 +659,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Nicolás Schürmann Lindemann says:
 >
-> Java 8 seems to have a lot of good features now!, i remember back in the old days making an ajax call in java was a pain!, even trying to simplify it with libraries was difficult. I agree that strong typing adds a lot of ease in development and mitigates bugs. I think that the only complain about this is that you are comparing 2 synchronous codes while the JS call is being asynchronous. And also is the implementation of promises and the fetch API in ecmascript 6. Also the promises API implements a “catch” method that is used for errors management (therefore, no try/catch) it accept functions as callbacks so you can compose more easily. The code that you written was very imperative. Also the advantage/disadvantage of javascript is in fact the loose typing. Some loves it, others hate it. It gives you a lot of freedom in expresion, but you can get bugs that you will only get in production unless you do a lot of testing or add strong typing (typescript, flow).
+> Java 8 seems to have a lot of good features now!, i remember back in the old days making an ajax call in java was a pain!, even trying to simplify it with libraries was difficult. I agree that strong typing adds a lot of ease in development and mitigates bugs. I think that the only complain about this is that you are comparing 2 synchronous codes while the JS call is being asynchronous. And also is the implementation of promises and the fetch API in ecmascript 6. Also the promises API implements a "catch" method that is used for errors management (therefore, no try/catch) it accept functions as callbacks so you can compose more easily. The code that you written was very imperative. Also the advantage/disadvantage of javascript is in fact the loose typing. Some loves it, others hate it. It gives you a lot of freedom in expresion, but you can get bugs that you will only get in production unless you do a lot of testing or add strong typing (typescript, flow).
 >
 > I believe that something like this may be more comparable and will let understand the benefits of promises and js:
 >
@@ -793,13 +793,13 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Using Visual Studio is like traveling back thru time for a person using a modern Java IDE, it’s like using Eclipse after you used NetBeans or IntelliJ. It constantly fails on basic things, doesn’t provide valuable hints and its debugger is just plain painful (inspecting variables etc.). So while I see the theoretical logic of comparing it to Java I can tell you that in practice Java is far more refined.
 >
-> Atom is surprisingly good as an editor, in fact I use it a lot for asciidoc editing. But it’s no IDE. Most JavaScript tooling isn’t nearly in the same level. When I talk to JavaScript devs they argue about the “need” for tooling. As a guy who started Java during the beta of 1.0 I can totally sympathize, I used a text editor and command line rather than use C++ and preferred it over visual studio of the day (was it visual studio 92 back then?). Anyway, I was right at the time but when tooling came to Java they brought productivity to a completely different level and they might eventually do the same for JavaScript. JavaScript needs tooling more than Java because the code hides far more meaning than the Java code.
+> Atom is surprisingly good as an editor, in fact I use it a lot for asciidoc editing. But it’s no IDE. Most JavaScript tooling isn’t nearly in the same level. When I talk to JavaScript devs they argue about the "need" for tooling. As a guy who started Java during the beta of 1.0 I can totally sympathize, I used a text editor and command line rather than use C++ and preferred it over visual studio of the day (was it visual studio 92 back then?). Anyway, I was right at the time but when tooling came to Java they brought productivity to a completely different level and they might eventually do the same for JavaScript. JavaScript needs tooling more than Java because the code hides far more meaning than the Java code.
 >
-> That’s what you missed about the code problems in JavaScript. The problem is that the Java code is very clear in its intention you point at X in the IDE and the IDE will tell you it’s an integer. In JavaScript you don’t even know what “this” is.
+> That’s what you missed about the code problems in JavaScript. The problem is that the Java code is very clear in its intention you point at X in the IDE and the IDE will tell you it’s an integer. In JavaScript you don’t even know what "this" is.
 >
-> React native itself has a slew of other issues, it has one nice thing with is the live preview/update. That is something we have in the simulator with “apply code changes” but it’s still pretty cool to have it “on-device”.
+> React native itself has a slew of other issues, it has one nice thing with is the live preview/update. That is something we have in the simulator with "apply code changes" but it’s still pretty cool to have it "on-device".
 >
-> I’m not sure if our tooling will be simpler for you since obviously there is a “filter” when picking up any technology and getting your brain used to it’s “oddities” and if you are not a Java guy to begin with the habits might be too deep. But our tools are WAY simpler and that’s obvious even during the installation phase not to mention in final projects where the IDE can literally show you the where & what of everything.
+> I’m not sure if our tooling will be simpler for you since obviously there is a "filter" when picking up any technology and getting your brain used to it’s "oddities" and if you are not a Java guy to begin with the habits might be too deep. But our tools are WAY simpler and that’s obvious even during the installation phase not to mention in final projects where the IDE can literally show you the where & what of everything.
 >
 
 
@@ -864,7 +864,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Jason Nathan says:
 >
-> My sentiments exactly. I think a deep dive into JS is needed to make a proper comparison. The Promise and “then”-problems described are really the woes of someone newly discovering JS, for example.
+> My sentiments exactly. I think a deep dive into JS is needed to make a proper comparison. The Promise and "then"-problems described are really the woes of someone newly discovering JS, for example.
 >
 
 
@@ -952,7 +952,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Stan says:
 >
-> Totally agree and has anybody heard of this new phenomena called “Javascript Fatigue”? It’s dizzying the number of frameworks, libraries, packagers and add ons that one must know…
+> Totally agree and has anybody heard of this new phenomena called "Javascript Fatigue"? It’s dizzying the number of frameworks, libraries, packagers and add ons that one must know…
 >
 
 
@@ -961,7 +961,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > anonymyst says:
 >
-> Ya well Java doesn’t hold a candle to Swift. Besides, your claim may be true in some ways, but in the way that’s most glaring and important to most, is speed… I’ve got junior dev react native programmers that can code outcomes much faster than your senior dev java developers. Another way in which it fails, is in it’s inability to deliver a consistent user experience across 2 platforms… react native gives my clients a single codebase, which makes better business sense, so in that sense, it’s a major fail for both Java and Swift. So I’d hold back in speaking in such extremes as “superior in every way,” because it makes you sound biased and ignorant.
+> Ya well Java doesn’t hold a candle to Swift. Besides, your claim may be true in some ways, but in the way that’s most glaring and important to most, is speed… I’ve got junior dev react native programmers that can code outcomes much faster than your senior dev java developers. Another way in which it fails, is in it’s inability to deliver a consistent user experience across 2 platforms… react native gives my clients a single codebase, which makes better business sense, so in that sense, it’s a major fail for both Java and Swift. So I’d hold back in speaking in such extremes as "superior in every way," because it makes you sound biased and ignorant.
 >
 
 
@@ -972,7 +972,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > To each his own. I don’t like Swift personally and even if you are a big fan of the language it needs years to reach the maturity level of Java in tooling, 3rd party support, resources etc.
 >
-> I agree that a lot of Java programmers tend to “overthink” problems especially when it comes to the monstrosity that is Java EE. There is a cultural problem there. In JavaScript react you have the exact opposite of patchwork and unawareness of production/security problems that might occur. I’m sure that you are comparing react programmers to native Android programming which is horribly broken.
+> I agree that a lot of Java programmers tend to "overthink" problems especially when it comes to the monstrosity that is Java EE. There is a cultural problem there. In JavaScript react you have the exact opposite of patchwork and unawareness of production/security problems that might occur. I’m sure that you are comparing react programmers to native Android programming which is horribly broken.
 >
 > I am biased (notice the site you are on) but I’m quite well informed.
 >
@@ -1012,7 +1012,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > you are comparing Swing an old and outdated implementation of the idea with new implementations of JS frameworks so naturally the former will feel old and the latter will feel new.
 >
-> The imperative nature of these frameworks isn’t there in the name of progress, it’s in place to workaround the oddities and pains of the DOM/JavaScript combo. Imperative frameworks are problematic as they are harder to learn and debug due to the underlying “magic”.
+> The imperative nature of these frameworks isn’t there in the name of progress, it’s in place to workaround the oddities and pains of the DOM/JavaScript combo. Imperative frameworks are problematic as they are harder to learn and debug due to the underlying "magic".
 >
 > Where do these imperative frameworks provide any real world concrete advantage?
 >
@@ -1037,7 +1037,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Wrong. Their declarative nature has nothing to do with pains of DOM/Javascript. React Native has no DOM. Adobe Flex uses declarative techniques without DOM, so does JavaFX, etc.
 >
-> > Imperative frameworks are problematic as they are harder to learn and debug due to the underlying “magic”.
+> > Imperative frameworks are problematic as they are harder to learn and debug due to the underlying "magic".
 >
 > Wrong. Some of these frameworks are harder to learn and debug but React is super simple and easy to debug, reason, read, etc. Do you think that it would take off like this if it was hard?
 >
@@ -1066,7 +1066,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > There are quite a few things I’d like to correct here but I’m pretty busy with the bootcamp to write something extensive. Our system mixes some concepts from UI and model like Swing used to. Some developers might think that’s old… The fact that iOS/Android take that approach natively (because they are old?) is probably important.
 >
-> React is simpler than doing barebones AJAX but it’s not simpler than just coding the UI directly. Not every idea that comes later and fits into a new structure is better e.g. Linus came back with monolithic kernels years after the debate for microkernels “won”. The reason for Reacts success relates to the problems of the system it is layered on top.
+> React is simpler than doing barebones AJAX but it’s not simpler than just coding the UI directly. Not every idea that comes later and fits into a new structure is better e.g. Linus came back with monolithic kernels years after the debate for microkernels "won". The reason for Reacts success relates to the problems of the system it is layered on top.
 >
 > We took an age old solution to a common problem and provide a lot of advantages/capabilities you just can’t do with React Native (and yes I based this code on the react tutorial demo so I’m very aware of what’s there).
 >
@@ -1097,10 +1097,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Codename One is more native than React Native. On iOS code is translated to native code and compiled using XCode not run thru JavaScript JIT. On Android Java is running directly on the Android VM. We allow embedding native widgets (e.g. Google Maps etc.) so in most aspects Codename One is more native.
 >
-> However, let me attack the “native is best” dogma that has undertaken our industry. That dogma didn’t exist 10 years ago. It came to be because iOS UI’s were so radically different there was no other way, the same was true for Android. Over the years both Android and iOS converged a lot. The cross platform tools have also made great strides and are now rivaling native.  
+> However, let me attack the "native is best" dogma that has undertaken our industry. That dogma didn’t exist 10 years ago. It came to be because iOS UI’s were so radically different there was no other way, the same was true for Android. Over the years both Android and iOS converged a lot. The cross platform tools have also made great strides and are now rivaling native.  
 > The fact that you can take a design, caching system and features quickly everywhere is huge in terms of delivering fast functionality and update to your user base. Update speed for applications is probably more important than anything in mobile.
 >
-> I’m not a fan of functional programming for real applications. It’s great for math but without encapsulation or imperative style it becomes a maintenance problem down the road. The idea that multi-core will be leveraged by this style is one that the JS crowd has been pushing for years, it “might” be valid for NodeJS but it’s not for react native where the UI is single threaded and any bit of “adventure” off the main UI thread will demolish you. Our GC & networking run in their own threads and make use of multi-core and since our EDT is separate from the main OS thread we leverage multi-core better while increasing portability.
+> I’m not a fan of functional programming for real applications. It’s great for math but without encapsulation or imperative style it becomes a maintenance problem down the road. The idea that multi-core will be leveraged by this style is one that the JS crowd has been pushing for years, it "might" be valid for NodeJS but it’s not for react native where the UI is single threaded and any bit of "adventure" off the main UI thread will demolish you. Our GC & networking run in their own threads and make use of multi-core and since our EDT is separate from the main OS thread we leverage multi-core better while increasing portability.
 >
 
 
@@ -1177,7 +1177,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > nathan32 says:
 >
-> I think the biggest disadvantage of codename one is the “Environment”. React Native is truly opensource. As for mac version we can buy a mac mini and set it up like a server for the whole office and it costs me just $499, that equals just 6 months of professional subscription we pay for codename one. If we’re uncomfortable or prohibited by client contract from uploading the content to a 3rd party server we shell out $399 each month, honestly we can equip my whole office with macs in what we would pay CN1.  
+> I think the biggest disadvantage of codename one is the "Environment". React Native is truly opensource. As for mac version we can buy a mac mini and set it up like a server for the whole office and it costs me just $499, that equals just 6 months of professional subscription we pay for codename one. If we’re uncomfortable or prohibited by client contract from uploading the content to a 3rd party server we shell out $399 each month, honestly we can equip my whole office with macs in what we would pay CN1.  
 > As for horrible Android emulator, React Native provides an easy way to build app using Expo and even preview it on ios/android mobile using the Expo client ([https://expo.io/)](<https://expo.io/>)), So just scan the code and it shows a preview on the device. Any code changes is reflected instantly on the device. That one feature has made our lives a lot easier. Easy DOM manipulation is good for business apps interacting frequently with a backend.  
 > Except for that I find both toolkits similar, the standard gui principles are used. It boils down to the language of your preference (both JS and Java fall on the disliked side of things for me).  
 > We went with React Native for just those reasons, If you could provide a truly opensource toolkit we’d have been on the side of Codename One. A simple VBox image of a pre-configured server would make CN1 more popular, to test this just release one vbox image and see for yourself. Just the response to a linux based server for android builds might surprise you.
@@ -1198,7 +1198,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > – We support Kotlin not just Java although Java is the main target. We could support any language supported by the JVM from Ruby to Jython to Scala etc. There is even a nifty guide Steve wrote explaining the steps he took in porting Kotlin (FYI he also added unofficial support for Mirah a few years back): [https://www.codenameone.com…](</blog/how-to-port-jvm-languages-to-codename-one/>)
 >
-> – There used to be a 3rd party offline build project, we hired its maintainer (not to stop the project, he’s just a really great hacker). When that project ran very few people used it, it might still work but most people don’t really care about that stuff so the last paragraph should be reversed. “You would be surprised”.
+> – There used to be a 3rd party offline build project, we hired its maintainer (not to stop the project, he’s just a really great hacker). When that project ran very few people used it, it might still work but most people don’t really care about that stuff so the last paragraph should be reversed. "You would be surprised".
 >
 
 
@@ -1232,10 +1232,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > John. We make our money through the SaaS product which is our chief source of income. That guarantees sustainability unlike a company like Facebook or Google both of whom proved they have no problem throwing away a product used by millions because it didn’t gather revenue… We only support push notification in the pro level but if you look in the parse plugin for Codename One you will find that this isn’t a requirement there. It’s not something we advertise as we can’t guarantee it but it works fine.  
 > There are also people and projects by third parties who use our source code to build their apps, if you look in our discussion group just the other day a user posted about a free plugin for building apps. Naturally that isn’t a sustainable model and you can’t expect us to support it.
 >
-> Legally we can’t publish “vbox images” as we can’t re-distribute Mac OS or Windows. Your assumption that our backend application is something a human being can reasonably setup with a guide off the internet is incorrect. Our architecture is ridiculously complex.
+> Legally we can’t publish "vbox images" as we can’t re-distribute Mac OS or Windows. Your assumption that our backend application is something a human being can reasonably setup with a guide off the internet is incorrect. Our architecture is ridiculously complex.
 >
 > About open source being free of charge. That’s just wrong. Free software != free beer.  
-> The fact that we charge is a huge advantage. If something breaks or needs fixing in a “free” product you are stuck. There is no one there. You can pay a consultant but that’s a coin toss. Here you have a guarantee by the authors of the product that we provide support. With Facebook even if you are a huge company you can’t buy that guarantee because react isn’t a product that makes money for Facebook.  
+> The fact that we charge is a huge advantage. If something breaks or needs fixing in a "free" product you are stuck. There is no one there. You can pay a consultant but that’s a coin toss. Here you have a guarantee by the authors of the product that we provide support. With Facebook even if you are a huge company you can’t buy that guarantee because react isn’t a product that makes money for Facebook.  
 > Furthermore, if you appreciate your craft you pay for good tools. There are 3 great Java IDE’s and the most popular among them isn’t completely free (IntelliJ). It’s still open source and it’s still a great IDE that is worth the money. We pay a large salary to our developers it makes sense to spend a little on their tools so they work more effectively.
 >
 > About expo it didn’t exist when I wrote the article. Regardless it’s nothing like Codename One which is a WORA solution something that React Native is not (based on Facebooks explicit definition). Build servers are possible with a WORA lightweight architecture but with a heavyweight architecture (one that relies on native peers for everything) this is problematic as you need a far larger set of testing devices to verify anything. Cloud build becomes a hindrance rather than an advantage in that case.
@@ -1247,7 +1247,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Nick says:
 >
-> A little late but I found it amusing you speak very highly of “separation of responsibilities” but you have view rendering logic coupled tightly with your data fetching logic, which a framework like React encourages to actually separate (don’t know about Codename one).
+> A little late but I found it amusing you speak very highly of "separation of responsibilities" but you have view rendering logic coupled tightly with your data fetching logic, which a framework like React encourages to actually separate (don’t know about Codename one).
 >
 
 
@@ -1256,8 +1256,8 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Sure, it’s demo code so that’s how I treated this. I don’t think a framework should “force” separation.  
-> It sounds good on paper but when you need to cross the separation bounds to do some back and forth logic things start getting “hazy” and you end up having a lot of clutter all over the place just to pass through that artificial bridge.
+> Sure, it’s demo code so that’s how I treated this. I don’t think a framework should "force" separation.  
+> It sounds good on paper but when you need to cross the separation bounds to do some back and forth logic things start getting "hazy" and you end up having a lot of clutter all over the place just to pass through that artificial bridge.
 >
 > React native didn’t do that because it’s good engineering. That separation exists because the platform is in a different language and difference system. We let you access everything if you need to. Yes, power allows you to shoot yourself in the foot (i.e. threads) but it’s still more powerful to have the choice and languages that support encapsulation.
 >

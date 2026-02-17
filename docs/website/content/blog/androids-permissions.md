@@ -24,29 +24,29 @@ One of the annoying tasks when programming native Android applications is tuning
 
 However, sometimes you might find the permissions that come up a bit confusing and might not understand why a specific permission came up. This maps Android permissions to the methods/classes in Codename One that would trigger them:
 
-android.permission.WRITE_EXTERNAL_STORAGE – this permission appears by default for Codename One applications, since the File API which is used extensively relies on it. You can explicitly disable it using the build argument android.blockExternalStoragePermission=true, notice that this is something we don’t test and it might fail for you on the device.
+`android.permission.WRITE_EXTERNAL_STORAGE` – this permission appears by default for Codename One applications, since the File API which is used extensively relies on it. You can explicitly disable it using the build argument `android.blockExternalStoragePermission=true`, notice that this is something we don’t test and it might fail for you on the device.
 
-android.permission.INTERNET – this is a hardcoded permission in Codename One, the ability to connect to the network is coded into all Codename One applications.
+`android.permission.INTERNET` – this is a hardcoded permission in Codename One, the ability to connect to the network is coded into all Codename One applications.
 
-android.hardware.camera & android.permission.RECORD_AUDIO – are triggered by com.codename1.Capture 
+`android.hardware.camera` & `android.permission.RECORD_AUDIO` – are triggered by `com.codename1.Capture` 
 
-android.permission.RECORD_AUDIO – is triggered by MediaManager.createMediaRecorder() & Display.createMediaRecorder()
+`android.permission.RECORD_AUDIO` – is triggered by `MediaManager.createMediaRecorder()` & `Display.createMediaRecorder()`
 
-android.permission.READ_PHONE_STATE – is triggered by com.codename1.ads package, com.codename1.components.Ads, com.codename1.components.ShareButton, com.codename1.media, com.codename1.push, Display.getUdid() & Display.getMsisdn(). This permission is required for media in order to suspend audio playback when you get a phone call.
+`android.permission.READ_PHONE_STATE` – is triggered by `com.codename1.ads` package, `com.codename1.components.Ads`, `com.codename1.components.ShareButton`, `com.codename1.media`, `com.codename1.push`, `Display.getUdid()` & `Display.getMsisdn()`. This permission is required for media in order to suspend audio playback when you get a phone call.
 
-android.hardware.location, android.hardware.location.gps, android.permission.ACCESS_FINE_LOCATION, android.permission.ACCESS_MOCK_LOCATION & android.permission.ACCESS_COARSE_LOCATION – map to com.codename1.maps & com.codename1.location.
+`android.hardware.location`, `android.hardware.location.gps`, `android.permission.ACCESS_FINE_LOCATION`, `android.permission.ACCESS_MOCK_LOCATION` & `android.permission.ACCESS_COARSE_LOCATION` – map to `com.codename1.maps` & `com.codename1.location`.
 
-package.permission.C2D_MESSAGE, com.google.android.c2dm.permission.RECEIVE, android.permission.RECEIVE_BOOT_COMPLETED – are requested by the com.codename1.push package
+package.permission.C2D_MESSAGE, `com.google.android.c2dm.permission.RECEIVE`, `android.permission.RECEIVE_BOOT_COMPLETED` – are requested by the `com.codename1.push` package
 
-android.permission.READ_CONTACTS – triggers by the package com.codename1.contacts & Display.getAllContacts().
+`android.permission.READ_CONTACTS` – triggers by the package `com.codename1.contacts` & `Display.getAllContacts()`.
 
-android.permission.VIBRATE – is triggered by Display.vibrate() and Display.notifyStatusBar()
+`android.permission.VIBRATE` – is triggered by `Display.vibrate()` and `Display.notifyStatusBar()`
 
-android.permission.SEND_SMS – is triggered by Display.sendSMS()
+`android.permission.SEND_SMS` – is triggered by `Display.sendSMS()`
 
-android.permission.WAKE_LOCK – is triggered by Display.lockScreen() & Display.setScreenSaverEnabled()
+`android.permission.WAKE_LOCK` – is triggered by `Display.lockScreen()` & `Display.setScreenSaverEnabled()`
 
-android.permission.WRITE_CONTACTS – is triggered by Display.createContact(), Display.deleteContact(), ContactsManager.createContact() & ContactsManager.  
+`android.permission.WRITE_CONTACTS` – is triggered by `Display.createContact()`, `Display.deleteContact()`, `ContactsManager.createContact()` & ContactsManager.  
   
 deleteContact() 
 

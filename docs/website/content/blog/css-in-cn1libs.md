@@ -15,7 +15,7 @@ We’ve just added support for including CSS inside of Codename One library proj
 
 ### How it works
 
-To begin, you just need to add a “css” directory inside your **Codename One Library** project, with a “theme.css” file in it.
+To begin, you just need to add a "css" directory inside your **Codename One Library** project, with a "theme.css" file in it.
 
 Add your CSS styles into the **theme.css** file, and build the library project.
 
@@ -28,11 +28,11 @@ __ |  If you try to install a cn1lib that includes CSS into a **Codename One app
 
 This tip is for those of you who are building your own cn1libs. When I’m developing a CN1lib, I always have a separate application project that uses the lib. This is because you can’t test a cn1lib directly inside a library project. The cn1lib first has to be installed into application project before it can be used and tested.
 
-This can create a lot of manual steps each time you make changes to your cn1lib and want to test them out. You need to build the library project, then copy the cn1lib from the library’s dist directory, into the application project’s lib directory. Then you need to select “Refresh Cn1libs” from the Codename One menu in the IDE.
+This can create a lot of manual steps each time you make changes to your cn1lib and want to test them out. You need to build the library project, then copy the cn1lib from the library’s dist directory, into the application project’s lib directory. Then you need to select "Refresh Cn1libs" from the Codename One menu in the IDE.
 
-As far as I’m concerned, anything more than a single button press is too much for being able to test my changes. Luckily its really easy to eliminate the extra steps by adding a small snippet into your library project’s build.xml file.
+As far as I’m concerned, anything more than a single button press is too much for being able to test my changes. Luckily its really easy to eliminate the extra steps by adding a small snippet into your library project’s `build.xml` file.
 
-At the end of the “jar” target, add the following:
+At the end of the "jar" target, add the following:
     
     
     <copy file="dist/${application.title}.cn1lib" todir="path/to/AppProject/lib"/>

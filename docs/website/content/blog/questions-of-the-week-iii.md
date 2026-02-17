@@ -16,14 +16,14 @@ versions for the release itself but if they are stable they will be the actual r
 week on stackoverflow as well with many excellent questions. As usual this post isn’t exhaustive and doesn’t cover  
 all the questions asked, but it should provide a sense of the top discussions of the week.
 
-### Turning off android.permission.INTERNET in CodenameOne
+### Turning off `android.permission.INTERNET` in CodenameOne
 
 Codename One includes two default permissions on Android, Internet and storage. We turned them on by default  
 since detecting an actual need for one of those permissions is really hard.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/36902376/turning-off-android-permission-internet-in-codenameone)
 
-### Is there a companion to the Form.onShow() method I can use when a Form is hidden?
+### Is there a companion to the `Form.onShow()` method I can use when a Form is hidden?
 
 This is often confusing to new Codename One developers. Unlike desktop developers don’t explicitly dispose a  
 window and so the lifecycle isn’t clear. Since the old GUI builder handles things differently from regular applications  

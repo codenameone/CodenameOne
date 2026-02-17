@@ -36,12 +36,7 @@ in Admob’s website, you should end up with the key similar to this:
 ca-app-pub-8610616152754010/3413603324
 
   
-To enable this for Android just define  
-  
-android.googleAdUnitId=  
-  
-  
-ca-app-pub-8610616152754010/3413603324 in the build arguments and for iOS use the same as in ios.googleAdUnitId. The rest is seamless, the right ad will be created for you at the bottom of the screen and the form should automatically shrink to fit the ad. This shrinking is implemented differently between iOS and Android due to some constraints but the result should be similar and this should work reasonably well with device rotation as well.  
+To enable this for Android just define `android.googleAdUnitId=ca-app-pub-8610616152754010/3413603324` in the build arguments and for iOS use the same as in `ios.googleAdUnitId`. The rest is seamless, the right ad will be created for you at the bottom of the screen and the form should automatically shrink to fit the ad. This shrinking is implemented differently between iOS and Android due to some constraints but the result should be similar and this should work reasonably well with device rotation as well.  
 
 * * *
 

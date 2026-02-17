@@ -19,7 +19,7 @@ our page rank and as a result will improve your page rank as we link back to you
 
 To add your app to the app gallery just comment on the post below with full details/link to your app. Make sure  
 to include the package name, we need to verify that the app was built with Codename One and we don’t accept  
-any other apps so please don’t post such entries as they would be deleted and comment links are “nofollow”  
+any other apps so please don’t post such entries as they would be deleted and comment links are "nofollow"  
 anyway.
 
 FYI the moderation system might block posts with links and put them in the moderation queue, we get a notification  
@@ -45,7 +45,7 @@ which will hopefully solve some of these problems. Since this is a big change it
 it this week…​
 
 One point that didn’t get enough attention when we released the original JavaScript port was an issue it has with  
-static initializers. [TeaVM](http://teavm.org) does some pretty insane things to make threading “feel” real despite  
+static initializers. [TeaVM](http://teavm.org) does some pretty insane things to make threading "feel" real despite  
 the fact that the browser is single threaded. Essentially every call to `wait`/`notify` etc. triggers a split in the generated  
 code that allows the VM to switch co-operatively to other code. For 98% of the code this is totally seamless as  
 proper code would eventually block somewhere.
@@ -78,7 +78,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai, we have CodenameOne logo and link on our app website: [http://ozioma.net](<http://ozioma.net>)
 >
-> Our app “Ozioma” is already on the CodenameOne app gallery here: [https://www.codenameone.com…](</featured-ozioma/>) but I want to change the screenshots of the app to the newer version screenshot, how can I do that?
+> Our app "Ozioma" is already on the CodenameOne app gallery here: [https://www.codenameone.com…](</featured-ozioma/>) but I want to change the screenshots of the app to the newer version screenshot, how can I do that?
 >
 > App package id: net.chibex.ozioma
 >

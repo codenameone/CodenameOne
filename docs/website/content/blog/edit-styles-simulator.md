@@ -21,7 +21,7 @@ With the update this week we added this:
 
 If you don’t have the patience for the video or don’t understand what you just saw this tool allows you to edit any style within a running app (that you built) and instantly preview the changes!
 
-It works with multiple res files/themes but might be “flaky” in such cases as it needs to re-apply the theme. You can open the Component Inspector by clicking Simulator → Component Inspector. You might want to use refresh when reviewing the UI.
+It works with multiple res files/themes but might be "flaky" in such cases as it needs to re-apply the theme. You can open the Component Inspector by clicking Simulator → Component Inspector. You might want to use refresh when reviewing the UI.
 
 __ |  This changes the `.res` file so if you have it open in a designer you might overwrite changes made by this tool!   
 ---|---  

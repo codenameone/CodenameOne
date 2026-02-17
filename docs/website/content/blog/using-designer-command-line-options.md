@@ -13,7 +13,7 @@ author: Shai Almog
 
 Codename One’s resource files contain a lot of details but it’s sometimes hard to add elements into the resource  
 file automatically. Recently I wanted to add a better way to add images directly in the new GUI builder. I considered  
-several options and eventually decided to operate the designer tool automatically to do the “heavy lifting”.
+several options and eventually decided to operate the designer tool automatically to do the "heavy lifting".
 
 I’m not the first person to try this though, some Codename One users automate tasks by generating the theme  
 and UI XML’s to automatically scaffold an app.
@@ -50,7 +50,7 @@ You can scaffold a project resource file relatively easily by building all of th
 directory of the project and then force the creation of an up to date resource file by invoking the designers  
 `-regen` command line.
 
-This is useful for wizards or tools that customize a theme.xml file and then want to save the changes directly  
+This is useful for wizards or tools that customize a `theme.xml` file and then want to save the changes directly  
 so it is visible in the UI without the user having to re-open the res file and save it.
     
     
@@ -89,7 +89,7 @@ You can add a regular image thru a command such as:
 The last argument is the name of the image in the resource file, it’s optional and if you leave it out the name will  
 use the file name.
 
-This will add a regular image, you can add a multi-image in a similar way to the “quick add” method in the designer  
+This will add a regular image, you can add a multi-image in a similar way to the "quick add" method in the designer  
 by using the following command:
     
     

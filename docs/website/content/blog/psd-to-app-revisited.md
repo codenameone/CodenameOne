@@ -52,7 +52,7 @@ Figure 1. Sign Up form Design
 
 Figure 2. Component hierarchy and layouts
 
-  3. Extract the images we needed using Photoshop – this process is often referred to as “cutting”
+  3. Extract the images we needed using Photoshop – this process is often referred to as "cutting"
 
   4. Extract the fonts, colors, and styles we needed to reproduce the design in Codename One
 
@@ -100,7 +100,7 @@ __ |  The right click menu will present different options when you click differe
   
 ![In the right click menu option select ](/blog/psd-to-app-revisited/psd2app-image6.png)
 
-Figure 6. In the right click menu option select “Convert To Smart Object”
+Figure 6. In the right click menu option select "Convert To Smart Object"
 
 Once the layer hierarchy is a smart object you can just double click it which will open the sub hierarchy in a new tab and you now only have the pieces of the image you care about.
 
@@ -114,7 +114,7 @@ The first thing we need to do is remove from the image all of the things that we
 
 Normally we’d want to have the back arrow but thanks to the material design icons that are a part of Codename One we don’t need that icon so we can hide that too.
 
-We don’t need the “Sign Up” or “Done” strings in the title either but before removing them we’d like to know the font that is used.
+We don’t need the "Sign Up" or "Done" strings in the title either but before removing them we’d like to know the font that is used.
 
 To discover that I can click them to select the layer then switch to the text tool:
 
@@ -143,7 +143,7 @@ We can now hide both text layers so they won’t pose a problem later.
 
 The camera button includes an icon and the button background itself. You can just use that as a single image and be done with it, but for the purpose of this tutorial I will take the harder route of separating this into a button background and a foreground image.
 
-When you click on the camera icon you will notice that the camera icon is comprised of two separate layers: the camera and the “x” symbol above it. We can select both layers using ctrl-click (command click on the Mac) and convert both to a smart object together using the same method as before:
+When you click on the camera icon you will notice that the camera icon is comprised of two separate layers: the camera and the "x" symbol above it. We can select both layers using ctrl-click (command click on the Mac) and convert both to a smart object together using the same method as before:
 
 ![The camera smart object](/blog/psd-to-app-revisited/psd2app-image11.png)
 
@@ -172,7 +172,7 @@ Figure 14. The camera button image set to a gray background so it will be visibl
 
 Now we can hide both of these elements and proceed to get the background image for the title.
 
-Here the “smart object trick” won’t work…​ There is an effects layer in place and the smart object will provide us with the real underlying image instead of the look we actually want. However, solving this is trivial now that we hid all of the elements on top of the image!
+Here the "smart object trick" won’t work…​ There is an effects layer in place and the smart object will provide us with the real underlying image instead of the look we actually want. However, solving this is trivial now that we hid all of the elements on top of the image!
 
 We need to switch to the rectangular select tool:
 
@@ -192,7 +192,7 @@ You can now save the image, since it’s just a background using JPEG is totally
 
 Figure 16. The background image
 
-The last thing we need is the colors used in the UI. We can use the “eye drop” tool in a high zoom level to discover the colors of various elements e.g. the text color is `4d606f` and the separator color is `f5f5f5`:
+The last thing we need is the colors used in the UI. We can use the "eye drop" tool in a high zoom level to discover the colors of various elements e.g. the text color is `4d606f` and the separator color is `f5f5f5`:
 
 ![The eye drop tool can be pointed at an area of the image to get the color in that region](/blog/psd-to-app-revisited/psd2app-image13.png)
 
@@ -202,7 +202,7 @@ Figure 17. The eye drop tool can be pointed at an area of the image to get the c
 
 While that was verbose it was relatively simple. We’ll create a simple barebones manual application with the native theme.
 
-__ |  The reason for this is to avoid “noise”, if we use a more elaborate theme it would have some existing settings. This can make the tutorial harder to follow   
+__ |  The reason for this is to avoid "noise", if we use a more elaborate theme it would have some existing settings. This can make the tutorial harder to follow   
 ---|---  
   
 ![Simple bare bones app settings](/blog/psd-to-app-revisited/psd2app-image14.png)
@@ -333,7 +333,7 @@ Define the padding as:
 
 This will allow enough space for the title. Define margin as 0 on all sides. Then press OK.
 
-Add the “Title” UIID. In the Color tab define the foreground as `ffffff` define transparency as `0` (fully transparent so we will see the `TitleContainer`). Define padding as 1 millimeter on all sides and margin as 0 on all sides.
+Add the "Title" UIID. In the Color tab define the foreground as `ffffff` define transparency as `0` (fully transparent so we will see the `TitleContainer`). Define padding as 1 millimeter on all sides and margin as 0 on all sides.
 
 In the Border tab press the …​ button and select [Empty].
 
@@ -341,21 +341,21 @@ In the Font tab select the True Type as native:MainThin. Select the True Type Si
 
 Press OK to save the changes.
 
-Copy the `Title` UIID and paste it, change the name to “TitleCommand” and press OK to save the changes.
+Copy the `Title` UIID and paste it, change the name to "TitleCommand" and press OK to save the changes.
 
-Copy the `Title` UIID again and paste it, change the name to “RedCommand”. In the Color tab set the foreground color to `f73267`. In the Font tab set the True Type to native:MainLight and set the size to 3. Press OK to save the changes.
+Copy the `Title` UIID again and paste it, change the name to "RedCommand". In the Color tab set the foreground color to `f73267`. In the Font tab set the True Type to native:MainLight and set the size to 3. Press OK to save the changes.
 
-Add the “TitleArea” UIID. In the Color tab define transparency as `0` (fully transparent so we will see the `TitleContainer`). Define padding and margin as 0 on all sides.  
+Add the "TitleArea" UIID. In the Color tab define transparency as `0` (fully transparent so we will see the `TitleContainer`). Define padding and margin as 0 on all sides.  
 In the Border tab press the …​ button and select [Empty].  
 Press OK to save the changes.
 
-Add the “TextField” UIID. In the Color tab define transparency as `255` (fully opaque) and the background as `ffffff` (white). Define padding as 2 millimeter on all sides and margin as 0 on all sides.  
+Add the "TextField" UIID. In the Color tab define transparency as `255` (fully opaque) and the background as `ffffff` (white). Define padding as 2 millimeter on all sides and margin as 0 on all sides.  
 In the Border tab press the …​ button and select [Empty].  
 In the Font tab set the True Type to native:MainLight and set the size to 2. Press OK to save the changes.
 
-Copy the `TextField` UIID again and paste it, change the name to “TextHint”. In the Color tab set the foreground color to `4d606f`. Press OK to save the changes.
+Copy the `TextField` UIID again and paste it, change the name to "TextHint". In the Color tab set the foreground color to `4d606f`. Press OK to save the changes.
 
-Add the “SouthButton” UIID. In the Color tab define transparency as `255` (fully opaque) and the background as `f73267` (red) and the foreground as `ffffff` (white). Define Alignment as Center.
+Add the "SouthButton" UIID. In the Color tab define transparency as `255` (fully opaque) and the background as `f73267` (red) and the foreground as `ffffff` (white). Define Alignment as Center.
 
 Define padding as:
 
@@ -370,7 +370,7 @@ Define padding as:
 Define margin as 0 on all sides.  
 In the Font tab set the True Type to native:MainThin and set the size to 3. Press OK to save the changes.
 
-Add the “CameraButton” UIID. In the Color tab define transparency as `0` (fully transparent). Define Alignment as Center.  
+Add the "CameraButton" UIID. In the Color tab define transparency as `0` (fully transparent). Define Alignment as Center.  
 Define padding as:
 
   * Left – 1 millimeter

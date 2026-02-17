@@ -22,7 +22,7 @@ author: Shai Almog
 
 Some features we have in Codename One are a bit hidden behind the surface, we add them as a patch for a developer and don’t have the proper place to document them so they get buried. Case in point is the ability in Android to use the search magnifier icon instead of the done button. To get that functionality you can just set a client property on the relevant text field as such:  
   
-Display.getInstance().putClientProperty(“searchField”, Boolean.TRUE); 
+`Display.getInstance().putClientProperty("searchField", Boolean.TRUE);` 
 
 This also allows other options such as sendButton & goButton. 
 
@@ -46,7 +46,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> How do i listen to the done or search event when the user presses either the search button or send. I want to capture the event. Also, instead of the search icon, can I set the text to something like “create”?
+> How do i listen to the done or search event when the user presses either the search button or send. I want to capture the event. Also, instead of the search icon, can I set the text to something like "create"?
 >
 
 

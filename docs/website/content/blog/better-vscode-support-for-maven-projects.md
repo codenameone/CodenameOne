@@ -35,7 +35,7 @@ Point your browser to **[https://start.codenameone.com](https://start.codenameon
 
 ![](/blog/better-vscode-support-for-maven-projects/start-codenameone-com.png)
 
-In the left panel, select the “Bare-bones Java App” template, enter a package and Main Class, and select “VSCode” in the **IDE** drop-down. Then press the **Download** button.
+In the left panel, select the "Bare-bones Java App" template, enter a package and Main Class, and select "VSCode" in the **IDE** drop-down. Then press the **Download** button.
 
 It will prompt you to save the project, which will then download as a zip file. Extract the zip file, then open the resulting project folder in VSCode.
 
@@ -49,11 +49,11 @@ The project window should look like the following screenshot:
 
 ### Running the Project
 
-Unfortunately VSCode “Run” button doesn’t work to run the project in the simulator. We’re working on that. To run the project in the Codename One simulator, you’ll need to use the “Run in Simulator” command which is available in the **Maven favorites** menu.
+Unfortunately VSCode "Run" button doesn’t work to run the project in the simulator. We’re working on that. To run the project in the Codename One simulator, you’ll need to use the "Run in Simulator" command which is available in the **Maven favorites** menu.
 
-In the left “Explorer” panel, you should see a “Maven” option at the bottom. Expand this to show all of the modules in the application. The first module listed is the “root” module, and is also the module on which all of the core actions are registered.
+In the left "Explorer" panel, you should see a "Maven" option at the bottom. Expand this to show all of the modules in the application. The first module listed is the "root" module, and is also the module on which all of the core actions are registered.
 
-Right click on this module, then select “Favorites…​” in the context menu as shown below:
+Right click on this module, then select "Favorites…​" in the context menu as shown below:
 
 ![](/blog/better-vscode-support-for-maven-projects/maven-favorites.png)
 
@@ -65,7 +65,7 @@ This will reveal a menu with all of the important actions you’ll need to perfo
 
 > If this is your first time running the project, you should select "Tools > Update Codename One" to force the project to download all of the dependencies. If you don’t do this, it is possible you’ll get an error when you try to run the app, due to missing dependencies.
 
-Select the “Run in Simulator” option to build and launch your app in the Codename One simulator.
+Select the "Run in Simulator" option to build and launch your app in the Codename One simulator.
 
 ![](/blog/better-vscode-support-for-maven-projects/hello-simulator.png)
 
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Bryan Buchanan says:
 >
 > Trying this out. Followed all the steps, and get to  
-> If this is your first time running the project, you should select “Tools > Update Codename One” to force the project to download all of the dependencies
+> If this is your first time running the project, you should select "Tools > Update Codename One" to force the project to download all of the dependencies
 >
 > Under Tools there is no Update option ?
 >
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > N P says:
 >
-> VScode is telling me “found no favorite commands” when I click on favorites
+> VScode is telling me "found no favorite commands" when I click on favorites
 >
 
 
@@ -141,7 +141,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Steve Hannah says:
 >
 > Just tested on a fresh project and seemed to work.  
-> In the Explorer, expand “Maven”  
+> In the Explorer, expand "Maven"  
 > You’ll see:  
 > your-app  
 > your-app-anroid  
@@ -150,8 +150,8 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > your-app-javascript  
 > …
 >
-> Expand the “your-app” one.  
-> Then expand “Favourites”
+> Expand the "your-app" one.  
+> Then expand "Favourites"
 >
 > You should see all of the key build and run commands there.
 >

@@ -23,9 +23,9 @@ We just added an experimental feature to connection request that allows you to s
 
   * **OFF** is the default meaning no caching.
 
-  * **SMART** means all get requests are cached intelligently and caching is “mostly” seamless
+  * **SMART** means all get requests are cached intelligently and caching is "mostly" seamless
 
-  * **MANUAL** means that the developer is responsible for the actual caching but the system will not do a request on a resource that’s already “fresh”
+  * **MANUAL** means that the developer is responsible for the actual caching but the system will not do a request on a resource that’s already "fresh"
 
   * **OFFLINE** will fetch data from the cache and wont try to go to the server. It will generate a 404 error if data isn’t available
 
@@ -65,7 +65,7 @@ implementation to block such a case.
 These methods are pretty self explanatory. Notice one caveat though…​
 
 When you download a file or a storage element we don’t cache them and rely on the file/storage element to  
-be present and serve as “cache”. When purging we won’t delete a file or storage element you downloaded and  
+be present and serve as "cache". When purging we won’t delete a file or storage element you downloaded and  
 thus these might remain.
 
 However, we do remove the `ETag` and `Last-Modified` data so the files might get refreshed the next time around.

@@ -28,7 +28,7 @@ The reason we chose to put everything into a binary resource
 file should be obvious: small size, portability. These are two critical features we had in mind when we designed the resource file format, we also wanted it to be really simple so we can e-mail it to our designer and so people could use it without an IDE (which back in 2006 was far more common). We initially thought about creating an XML file format which a special tool will convert into the res file format (and we had some prior work on the matter such as the XML ant tasks) but these proved to be cumbersome to maintain. 
 
   
-The reason we looked at XML was team support, a binary file can only be modified by one person in the team which forced us to use “a wireless protocol for file locking contention based on sonic broadcasts” (otherwise known as shouting in the office: I’m changing the resource file, don’t make any changes to it).  
+The reason we looked at XML was team support, a binary file can only be modified by one person in the team which forced us to use "a wireless protocol for file locking contention based on sonic broadcasts" (otherwise known as shouting in the office: I’m changing the resource file, don’t make any changes to it).  
 
   
 With the advent of Codename One a lot of the initial constraints are no more, resources are in the root of the source folder and so we can make various assumptions that can keep the compatibility & ease of the existing resource file while provid  
@@ -43,7 +43,7 @@ this week but it isn’t working properly.
   
 When you activate  
   
-the option every time you save the resource file we will automatically store an XML file in a “res” directory under your project root and a directory hierarchy containing all the data from within the resource file. When you load a res file (notice you always work with the res file never with the XML file) we will automatically detect that an XML file exists (assuming the XML option is turned on) and load that instead of the res file.
+the option every time you save the resource file we will automatically store an XML file in a "res" directory under your project root and a directory hierarchy containing all the data from within the resource file. When you load a res file (notice you always work with the res file never with the XML file) we will automatically detect that an XML file exists (assuming the XML option is turned on) and load that instead of the res file.
 
   
 What this means is that if the option is turned on, XML overrides resource. So even though you will have conflicts in the res file the XML file can just override the conflicts every time and its far more team friendly! Also because of the way it is laid out you can actually change things such as images without using the designer tool (you will need to reopen the file for changes to take effect). It is however important to save within the design tool for your changes to actually apply to the running project.  
@@ -71,7 +71,7 @@ We’ve made some UI improvements to the project settings for iOS. We just had s
   
 In other news the side menu now allows you to swipe the menu in by just swiping the screen  
   
-and it is also more robust in terms of “regret” e.g. if you start swiping it to close and don’t drag it enough it will bounce back to open state.
+and it is also more robust in terms of "regret" e.g. if you start swiping it to close and don’t drag it enough it will bounce back to open state.
 
   
 There are also some changes for dSYM files but these will have to wait for their own blog post.  

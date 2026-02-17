@@ -20,7 +20,7 @@ author: Shai Almog
   
   
 
-Cloud files are a great pro feature that we didn’t emphasize enough, its remarkably useful. It allows you to upload a file into the cloud which you can then transfer to anyone thru a simple “obfuscated” URL. The URL is long so the probability of someone guessing it is low, hence its pretty secure for private file transfer (if its really private you should use  
+Cloud files are a great pro feature that we didn’t emphasize enough, its remarkably useful. It allows you to upload a file into the cloud which you can then transfer to anyone thru a simple "obfuscated" URL. The URL is long so the probability of someone guessing it is low, hence its pretty secure for private file transfer (if its really private you should use  
 [  
 bouncy castle  
 ](http://www.codenameone.com/3/post/2013/06/bouncy-castle-crypto-api.html)  
@@ -31,10 +31,9 @@ bouncy castle
   
   
   
-String fileId = CloudStorage.getInstance()  
-  
-  
-.uploadCloudFile(mimeType, fileName);  
+```java
+String fileId = CloudStorage.getInstance().uploadCloudFile(mimeType, fileName);
+```
   
   
   
@@ -45,14 +44,9 @@ This will block to upload the file so you might want to display an infinite prog
   
   
   
-String url = CloudStorage.getInstance().  
-  
-  
-getUrlForCloudFileId  
-  
-(  
-  
-fileId);  
+```java
+String url = CloudStorage.getInstance().getUrlForCloudFileId(fileId);
+```
   
   
   
@@ -68,14 +62,14 @@ which will allow you to purge some of your quota.
 You can use this for image exchange and other such tricks but one of my favorite concepts is sharing data between devices e.g. you can upload your application state as a file to the cloud and expose it via a QR code like this:  
   
   
-int size = Math.min(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());  
+`int size = Math.min(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());`  
   
   
   
   
   
   
-Label qrCode = new Label(new URLImage(“http://chart.apis.google.com/chart?cht=qr&chs=” + size + “x” + size “&chl=” + fileId + “&chld=H|0”));  
+Label qrCode = new Label(new URLImage("http://chart.apis.google.com/chart?cht=qr&chs=" + size + "x" + size "&chl=" + fileId + "&chld=H|0"));  
   
   
   

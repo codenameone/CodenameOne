@@ -17,7 +17,7 @@ Last week I talked about [using SMS to activate your application](/blog/tip-send
 
 In order to grab an incoming SMS we need a broadcast receiver which is a standalone Android class that receives a specific event type. This is often confusing to developers who sometimes derive the impl class from broadcast receiver…​ That’s a mistake…​
 
-The trick is you can just place any native Android class into the `native/android` directory. It will get compiled with the rest of the native code and “just works”. So I placed this class under `native/android/com/codename1/sms/intercept`:
+The trick is you can just place any native Android class into the `native/android` directory. It will get compiled with the rest of the native code and "just works". So I placed this class under `native/android/com/codename1/sms/intercept`:
     
     
     package com.codename1.sms.intercept;
@@ -127,7 +127,7 @@ The native sample in stack overflow bound the listener in the activity but here 
 
 That’s easy!
 
-Notice that `isSupported()` returns false for all other OS’s so we won’t need to ask whether this is “Android” we can just use `isSupported()`.
+Notice that `isSupported()` returns false for all other OS’s so we won’t need to ask whether this is "Android" we can just use `isSupported()`.
 
 The implementation is pretty easy too:
     
@@ -255,7 +255,7 @@ The final piece of the puzzle is a simple API that can wrap the whole thing up a
 
 Next time I will wrap this all up with the user experience and package everything into an easy to use cn1lib.
 
-Some of the things I touched here might be a bit “hairy” in terms of native interface usage so if something isn’t clear just ask in the comments.
+Some of the things I touched here might be a bit "hairy" in terms of native interface usage so if something isn’t clear just ask in the comments.
 ---
 
 ## Archived Comments
@@ -321,7 +321,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> That could work but I wouldn’t spend time on that. Notice it says that the sample will only work on unlocked devices and “will not pass WACK”. I’m not sure about this but I recall that if you use specific Windows features your app can’t be sold in China
+> That could work but I wouldn’t spend time on that. Notice it says that the sample will only work on unlocked devices and "will not pass WACK". I’m not sure about this but I recall that if you use specific Windows features your app can’t be sold in China
 >
 
 
@@ -339,7 +339,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Rashedul Hasan says:
 >
-> Hi Shai, thanks for the article but how do i put the java class “SMSListener” inside “native/android” directory? a bit confused!
+> Hi Shai, thanks for the article but how do i put the java class "SMSListener" inside "native/android" directory? a bit confused!
 >
 
 

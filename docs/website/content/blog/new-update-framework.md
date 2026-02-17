@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/new-update-framework/new-features-2.jpg)
 
-When it comes to big changes this is pretty huge but surprisingly “subtle”. This weekend we’ll release a new plugin update that will completely replace the update process of Codename One and a week after that we will start nagging you to update your plugin so we can all be on the same page. This is a HUGE change as we didn’t change anything about the update process since 2012. But the cool thing about it is that you might not notice it…​
+When it comes to big changes this is pretty huge but surprisingly "subtle". This weekend we’ll release a new plugin update that will completely replace the update process of Codename One and a week after that we will start nagging you to update your plugin so we can all be on the same page. This is a HUGE change as we didn’t change anything about the update process since 2012. But the cool thing about it is that you might not notice it…​
 
 When we launched Codename One in 2012 we needed a way to ship updates and fixes faster than the plugin update system. So we built the client lib update system. Then we needed a way to update the designer tool (resource editor), the GUI builder & the skins…​ We also needed a system to update the builtin builder code (`CodeNameOneBuildClient.jar` so we built a tool for that too).
 
@@ -28,7 +28,7 @@ A big piece of the change is the removal of code within the IDE plugins that tri
 
   * Update of settings/designer without IDE plugin update – The IDE plugin update process is slow and tedious. This way we can push out a bug fix for the GUI builder without going through the process of releasing a new plugin version
 
-For the most part this framework should be seamless. You should no longer see the “downloading” message whenever we push an update after your build client is updated. Your system would just poll for a new version daily and update when new updates are available.
+For the most part this framework should be seamless. You should no longer see the "downloading" message whenever we push an update after your build client is updated. Your system would just poll for a new version daily and update when new updates are available.
 
 You can also use the usual method of Codename One Settings → Basic → Update Client Libs which will force an update check. Notice that the UI will look a bit different after this update.
 
@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > You don’t know an update is released.  
-> When a build is made in the IDE we run the update tool and it checks for you. It does this check once a day unless it’s running in “force” mode which happens when you do an update client libs. Normally, this should be seamless.
+> When a build is made in the IDE we run the update tool and it checks for you. It does this check once a day unless it’s running in "force" mode which happens when you do an update client libs. Normally, this should be seamless.
 >
 
 

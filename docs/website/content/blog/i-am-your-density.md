@@ -11,9 +11,9 @@ author: Steve Hannah
 
 ![Header Image](/blog/i-am-your-density/density-heading.jpg)
 
-This morning I was awoken by myself – or rather the 1985 version of myself. He (I’ll refer to the 1985 version of myself in the 3rd person here forward) was in a panic and was yammering about something to do with changing history. He asked why my pants were inside out, and I wondered why he was wearing a life preserver. According to him, he had driven a time machine from 1985 to this day (October 21, 2015) in the future to stop me from making a terrible mistake. I asked him: “What mistake?”, to which he produced a 3.5 inch floppy disk.
+This morning I was awoken by myself – or rather the 1985 version of myself. He (I’ll refer to the 1985 version of myself in the 3rd person here forward) was in a panic and was yammering about something to do with changing history. He asked why my pants were inside out, and I wondered why he was wearing a life preserver. According to him, he had driven a time machine from 1985 to this day (October 21, 2015) in the future to stop me from making a terrible mistake. I asked him: "What mistake?", to which he produced a 3.5 inch floppy disk.
 
-“On this disk, you’ll find a scan of a single page from a Grays Sports Almanac, that displays the score to the 2015 world series”. He implored me to look at the image and use it to change the team that I had planned to bet on. No sooner did I take the disk from him, than he made like a tree and got out of there.
+"On this disk, you’ll find a scan of a single page from a Grays Sports Almanac, that displays the score to the 2015 world series". He implored me to look at the image and use it to change the team that I had planned to bet on. No sooner did I take the disk from him, than he made like a tree and got out of there.
 
 The first hurdle to viewing this image was in loading it off of that floppy disk in this post floppy disk world. I wasn’t going to let that stop me, though. If you put your mind to it, you can accomplish anything.
 
@@ -21,7 +21,7 @@ After some struggles, I managed to copy the image from the floppy disk onto my c
 
 What the??! He said it was 1 inch squared. How will I ever see what is on this image? I soon realized that the problem was that I wasn’t thinking 4th dimensionally: the fourth dimension being density. My 1985 self was using a Macintosh of the time that had a pixel density of approximately 57 pixels per inch. My cell phone, on the other hand was a new iPhone 6+, with a pixel density of about 480 pixels per inch. So his 57×57 pixel image looked fine on his old screen, but was only an eighth of an inch on mine. Heavy! Device displays in the future are too dense to display this image at a reasonable size.
 
-What I needed to do was convert this image to a multi-image so that it would display at the proper size on my device, and all devices. So I imported the image into my Codename One resource file, specifying a source density of “Very Low”. Then created a simple app using the Codename One GUI builder, that displays a single label. The source to display the multi-image roughly as follows (Please excuse the crudity of this model. I didn’t have time to build it to scale or paint it):
+What I needed to do was convert this image to a multi-image so that it would display at the proper size on my device, and all devices. So I imported the image into my Codename One resource file, specifying a source density of "Very Low". Then created a simple app using the Codename One GUI builder, that displays a single label. The source to display the multi-image roughly as follows (Please excuse the crudity of this model. I didn’t have time to build it to scale or paint it):
     
     
     System.out.println("I'm your density: "+ Display.getInstance().getDeviceDensity());
@@ -29,15 +29,15 @@ What I needed to do was convert this image to a multi-image so that it would dis
     Label image = new Label(theme.getImage("AlmanacClipping.png"));
     theForm.addComponent(image);
 
-Since the image is a multi-image, the app should display it at the correct “real” size of 1 inch by 1 inch.
+Since the image is a multi-image, the app should display it at the correct "real" size of 1 inch by 1 inch.
 
-After loading the app onto my phone, I can finally see the message: “Chicago Cubs win the World Series!”.
+After loading the app onto my phone, I can finally see the message: "Chicago Cubs win the World Series!".
 
 ![925d0d00 77ea 11e5 8b1b dee46a613a54](/blog/i-am-your-density/925d0d00-77ea-11e5-8b1b-dee46a613a54.png)
 
 Hmm. Good thing I didn’t bet on the Blue Jays, as I had planned to do. On the bright side, my app works. It displays the image in the correct size on all devices. I finally invent something that works! Perhaps I should submit this to the iTunes store and Google Play.
 
-But what if I send in the app in and they don’t like it? What if they say I’m no good? What if they say, “Get out of here kid. You’ve got no future”? I mean, I just don’t think I can take that kind of rejection.
+But what if I send in the app in and they don’t like it? What if they say I’m no good? What if they say, "Get out of here kid. You’ve got no future"? I mean, I just don’t think I can take that kind of rejection.
 
 ## Behind the Scenes: The Making of this Post
 
@@ -67,11 +67,11 @@ Constant |  Density |  Example Device
   
 ### Multi-Images
 
-In 99% of cases, you’ll want images to render at the same “real” size on all devices, rather than their pixel size. Codename One has you covered here with its multi-image support. You can import an image into the resource file, specifying its source density, and it will be embedded at all of the densities that you specify. Then you can obtain a reference to the image using the `Resources.getImage()` method at runtime, it will give the correct version of the image for the device’s density so that the “real” size of the image will be preserved across all devices.
+In 99% of cases, you’ll want images to render at the same "real" size on all devices, rather than their pixel size. Codename One has you covered here with its multi-image support. You can import an image into the resource file, specifying its source density, and it will be embedded at all of the densities that you specify. Then you can obtain a reference to the image using the `Resources.getImage()` method at runtime, it will give the correct version of the image for the device’s density so that the "real" size of the image will be preserved across all devices.
 
 ### Use Millimetres, Not Pixels for Dimensions
 
-When configuring your styles, you should almost never use “Pixels” as the unit for padding, margins, font size, and border thickness because the results will be inconsistent on different densities. Instead, you should use millimetres for all non-zero units of measurements.
+When configuring your styles, you should almost never use "Pixels" as the unit for padding, margins, font size, and border thickness because the results will be inconsistent on different densities. Instead, you should use millimetres for all non-zero units of measurements.
 
 #### Fractions of Millimetres
 
@@ -91,7 +91,7 @@ And now you can set the padding on an element to 1.5mm. E.g.
 
 ### Font Sizes
 
-If you’re using system fonts (the default), then you’re limited to only three font sizes: Small, Medium, and Large. These will be converted to an appropriate “real” size on the device. If you need more precision, you can embed a TTF font with your app, then you can specify font size in millimetres (or DIPS). And if you require more precision on the font size than millimetres, you can use the same trick above to obtain a fractional millimetres to pixels conversion, and use the `Font.deriveFont()` method to generate a font in the exact “real” size that you desire.
+If you’re using system fonts (the default), then you’re limited to only three font sizes: Small, Medium, and Large. These will be converted to an appropriate "real" size on the device. If you need more precision, you can embed a TTF font with your app, then you can specify font size in millimetres (or DIPS). And if you require more precision on the font size than millimetres, you can use the same trick above to obtain a fractional millimetres to pixels conversion, and use the `Font.deriveFont()` method to generate a font in the exact "real" size that you desire.
 
 ---
 

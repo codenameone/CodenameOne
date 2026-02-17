@@ -13,7 +13,7 @@ author: Shai Almog
 
 Text editing is implemented natively in Codename One. This provides a huge benefit as it allows us to ignore a lot of complex topics such as virtual keyboard localization etc. If we had to implement all that logic the overhead of Codename One would have been huge…​
 
-One free benefit is seamless support for copy & paste. It “just works” thanks to the usage of the native widget we don’t need to worry about that UI. However, this breaks down when we want to provide the ability to select & copy without the ability to edit. E.g. in a web app we can usually select any bit of text and copy it…​ That’s convenient for some cases.
+One free benefit is seamless support for copy & paste. It "just works" thanks to the usage of the native widget we don’t need to worry about that UI. However, this breaks down when we want to provide the ability to select & copy without the ability to edit. E.g. in a web app we can usually select any bit of text and copy it…​ That’s convenient for some cases.
 
 __ |  A good example would be listing user details within the app that the user might want to copy e.g. his user ID   
 ---|---  

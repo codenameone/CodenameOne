@@ -59,7 +59,7 @@ We have MANY scroll related methods and it can be a bit confusing sometimes.
 
 ### Why does the android button have a different appearance than the IOS button
 
-Steve explains the CSS answer, in general it’s because the button has a “Border” which takes precedence over color…​
+Steve explains the CSS answer, in general it’s because the button has a "Border" which takes precedence over color…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38592240/codename-one-why-does-the-android-button-have-a-different-appearance-than-the-i)
 
@@ -107,7 +107,7 @@ No, however there are other ways to work/indicate with pickers
 
 ### parse4cn1 callback usage example
 
-It’s good to see developers still picking parse4cn1 in the “post parse” era…​
+It’s good to see developers still picking parse4cn1 in the "post parse" era…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38542197/parse4cn1-callback-usage-example)
 
@@ -142,9 +142,9 @@ This isn’t so much about notification as much as about the location API but it
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38518839/notification-service-codename-one)
 
-### “Bluetooth failes to initialize” when automating Bluetooth steps
+### "Bluetooth failes to initialize" when automating Bluetooth steps
 
-One of the drawbacks of picking up the pre-existing BluetoothLE support is that we get this support “as is” and  
+One of the drawbacks of picking up the pre-existing BluetoothLE support is that we get this support "as is" and  
 only enhanced it slightly.
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/38508966/bluetooth-failes-to-initialize-when-automating-bluetooth-steps)

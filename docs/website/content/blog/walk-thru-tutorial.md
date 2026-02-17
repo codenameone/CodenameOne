@@ -31,10 +31,10 @@ There are generally two approaches for laying an overlay:
   1.   
 Glass pane – this is how we used to do things in the old days, its powerful but has many limitations. You essentially need to draw everything using graphics.  
   
-A glass pane is just a “layer” on top of all components that you can draw on. It might seem that you can “emulate” the glass pane by overriding the paint method in Form and that would indeed work for simple use cases however the glass pane is “clever” and knows how to repaint itself when a component is updated (e.g. if a ticker is running the whole form won’t repaint so glass pane will work but overriding Form paint would not!). 
+A glass pane is just a "layer" on top of all components that you can draw on. It might seem that you can "emulate" the glass pane by overriding the paint method in Form and that would indeed work for simple use cases however the glass pane is "clever" and knows how to repaint itself when a component is updated (e.g. if a ticker is running the whole form won’t repaint so glass pane will work but overriding Form paint would not!). 
 
   2.   
-Layered layout – this is a more “modern” approach we take where we essentially place two containers in a LayeredLayout and the last one added remains on top.  
+Layered layout – this is a more "modern" approach we take where we essentially place two containers in a LayeredLayout and the last one added remains on top.  
   
 
 Generally the glass pane is not interactive (it just draws) where the layered layout can actually grab input etc. we made use of the layered layout in a previous post (  
@@ -48,7 +48,7 @@ when a dialog is no a dialog
   
   
 
-You will notice several interesting things about the tutorial mode. We added an option to “swipe” out of the tutorial mode at any time (this is the bottom portion starting at line 47).  
+You will notice several interesting things about the tutorial mode. We added an option to "swipe" out of the tutorial mode at any time (this is the bottom portion starting at line 47).  
   
   
 We draw everything manually in the glass pane (that’s how it works).  

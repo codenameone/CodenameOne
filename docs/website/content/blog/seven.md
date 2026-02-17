@@ -75,7 +75,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Is a build done with the “auto” flag bigger in size? I presume it must pack both versions’ resources and then decide which one to use at runtime?
+> Is a build done with the "auto" flag bigger in size? I presume it must pack both versions’ resources and then decide which one to use at runtime?
 >
 
 
@@ -97,7 +97,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> As per discussion earlier on on forum I was trying to “define OS by setting the build argument”. 
+> As per discussion earlier on on forum I was trying to "define OS by setting the build argument". 
 >
 > But since I am using Eclipse – i cannot find WHERE I can do that manually as you mentioned before (to set ios.xcode_version=5.0) . Is it a part of build.xml (looked there could not find), or theme Constants (could not find it ether). 
 >
@@ -112,7 +112,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > In this case you will want ios.xcode_version=4.5 since now 5.0 is the default. Right click the project->Properties->Codename One 
 >
-> Select “Build Hints” tab at the top and press “Add”. 
+> Select "Build Hints" tab at the top and press "Add". 
 >
 > Theme constants are in the designer in the theme under the constants tab.
 >

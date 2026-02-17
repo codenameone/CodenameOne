@@ -24,12 +24,12 @@ of xcode in place.
 
 ### The Migration Plan
 
-We’ve setup a new build server as a “test pilot” to see that builds go thru as planned. You can/should test your app to see if it will work, please let us know if there are issues!
+We’ve setup a new build server as a "test pilot" to see that builds go thru as planned. You can/should test your app to see if it will work, please let us know if there are issues!
 
 __ |  If you don’t do this we will not be able to go back!   
 ---|---  
   
-To test your app on the test pilot build server open the build.xml and search for the string `"iphone"` **with the quotes**.  
+To test your app on the test pilot build server open the `build.xml` and search for the string `"iphone"` **with the quotes**.  
 Replace it with `"iphone_new"` .
 
 E.g. notice the `targetType="iphone_new"` line below:
@@ -56,7 +56,7 @@ E.g. notice the `targetType="iphone_new"` line below:
 
 Assuming all goes well we will flip the switch and update some of the build servers to the latest OS. We’ll keep one build server around with the legacy OS and change it so you will need to explicitly send a build to it…​
 
-This effectively means you will need to revert this `build.xml` change to keep building as the new servers will then use the “iphone” target. To build for the old build target you will need to do the inverse of the current change by sending a build to the `"iphone_old"` target.
+This effectively means you will need to revert this `build.xml` change to keep building as the new servers will then use the "iphone" target. To build for the old build target you will need to do the inverse of the current change by sending a build to the `"iphone_old"` target.
 
 We’ll support that for a while until we decide that the migration works at which point we will retire the old servers.
 

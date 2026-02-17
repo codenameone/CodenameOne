@@ -36,8 +36,8 @@ GUI solution now.
 
 This post isn’t about whether JavaFX sucks or not. Its not about whether its a good API and it isn’t about  
 whether you can create nice looking apps with it (you can). Its about fixing JavaFX or moving away from it  
-to something else, its about acknowledging the problems within it rather than presenting an aura of “everything’s  
-fine” to fresh Java developers.  
+to something else, its about acknowledging the problems within it rather than presenting an aura of "everything’s  
+fine" to fresh Java developers.  
 Initially I wrote about some technical issues in JavaFX as well. I decided not to go into that discussion. I have the  
 utmost admiration and respect to the guys who created JavaFX. Its impressive in many ways. But good technologies  
 also fail and in the next few sections I’ll try to elaborate on this: 
@@ -73,7 +73,7 @@ While all of the above are totally fine, you can’t grow a community based on t
 new things, the students will graduate to do something else and the hardcore fans…  
 They might be left with nothing as the platform declines. 
 
-I’ll cover the “why should we care” down this post but first lest talk about the proof for the hardcore fans. 
+I’ll cover the "why should we care" down this post but first lest talk about the proof for the hardcore fans. 
 
 ### Proof JavaFX Doesn’t Have Traction
 
@@ -85,8 +85,8 @@ I would like to point out though that Oracle no longer distributes Scene Builder
 but if you are looking for signs of what Oracle is thinking… The messaging is pretty loud and clear. 
 
 **Exhibit B: JavaFX Hasn’t Gained The Traction Of Swing**  
-Stack overflow was launched on “September 15th, 2008”, this is important since JavaFX was launched released  
-on “December 4th, 2008”. Effectively StackOverflow was brand new when FX came out with all of its PR glory  
+Stack overflow was launched on "September 15th, 2008", this is important since JavaFX was launched released  
+on "December 4th, 2008". Effectively StackOverflow was brand new when FX came out with all of its PR glory  
 and Swing should have been on the decline. There was very little time where StackOverflow existed and JavaFX  
 didn’t exist. 
 
@@ -98,14 +98,14 @@ indicates to me that even the Swing developers who are the CORE demographic of d
 haven’t migrated. 
 
 Now to be fair, JavaFX transitioned between JavaFX script to the Java based JavaFX. But that should have  
-caused far more questions and confusion within the community. The “reboot” so to speak generated attention  
+caused far more questions and confusion within the community. The "reboot" so to speak generated attention  
 all over the place and should have mapped to usage numbers.  
 This is really punctuated by this illuminating graph from Google trends: 
 
 ![javafx swing google trends](/blog/should-oracle-spring-clean-javafx/javafx-vs-swing-trends.png)
 
 Notice that Swing (which had some traction) declined, JavaFX remained low and effectively competes for attention  
-against Swing rather than growing. This chart might be read as “desktops lost interest to mobile and web”,  
+against Swing rather than growing. This chart might be read as "desktops lost interest to mobile and web",  
 which would be true and acceptable as an answer (see my discussion below) but the fact that FX can’t even  
 beat Swing indicates a far larger problem at play.  
 But lets compare it to another company in a similar situation that had a desktop oriented tool that was popular  
@@ -120,7 +120,7 @@ according to the (unscientific) Google trends.
 While I don’t think you should pick a technology because of the job market, it is an indication of the state of the  
 market. Searching thru dice.com for JavaFX netted me 28 positions of which only 4 placed Java FX as a requirement  
 to the job (I checked one by one which is possible when you only have 28!).  
-“Java FX” only listed 12 options. But this is where it gets interesting… Swing had 198 positions!  
+"Java FX" only listed 12 options. But this is where it gets interesting… Swing had 198 positions!  
 JavaEE had 16,752 positions and Android had 2,333 positions. 
 
 To be fair there was a job as a NASA contractor that did look pretty sweet in the Java FX search but I think that  
@@ -149,7 +149,7 @@ is far more conductive to the teaching process than getting some webservice depl
 If you want a future generation of Java developers we need a decent UI option. Some of you  
 JavaEE developers out there (or play framework fans) might jump on the HTML bandwagon for teaching…  
 I think that’s a better solution than teaching Java FX but effectively its still harder than desktop programming  
-and you are then in direct competition with JavaScript tools which have a “home court advantage” as  
+and you are then in direct competition with JavaScript tools which have a "home court advantage" as  
 students would probably rather learn 2 languages instead of 3 (HTML+JavaScript only).  
 Todays students sometimes learn JavaFX or Swing in class and often find out that they learned yesterdays  
 technologies as they leave the classroom!  
@@ -175,7 +175,7 @@ side development in Java. It also means we should start focusing on new things a
 can emerge as a replacement.  
 I think that the most important thing to do here is to move students off of JavaFX and into more sustainable  
 areas in Java such as the newer server/HTML frameworks or to mobile, this will still provide some of the  
-pleasurable “tingle” of seeing your UI run but would provide a more sustainable skill set.  
+pleasurable "tingle" of seeing your UI run but would provide a more sustainable skill set.  
 I’ve spent several days trying to come up with a potential replacement to JavaFX on the desktop and  
 unfortunately there are no serious contenders at this point in time. Maybe one of the contenders I listed below  
 will rise to the task: 
@@ -200,7 +200,7 @@ which seems like a demotion.
   * Android – like Codename One Android wasn’t designed for the desktop. But unlike us its being adapted  
 to the desktop (replacing Chrome OS according to rumors). Its a huge, complex and pretty complete API  
 missing a few key features but its still pretty powerful. The only problem is that this would require quite a bit of  
-effort both in the porting effort and in adding desktop “concepts” to the API (Windows etc.) which was very  
+effort both in the porting effort and in adding desktop "concepts" to the API (Windows etc.) which was very  
 much mapped to mobile.
 
 ### How did we get here?
@@ -210,7 +210,7 @@ a fresh Java developer reading my huge rant will have very little historical con
 the history rather easily as I had a front row seat working at Sun Microsystem during the peek of Java FX  
 and at Oracle as it failed to materialize. 
 
-Java launched with AWT which was a pretty problematic “rushed to market” GUI API.  
+Java launched with AWT which was a pretty problematic "rushed to market" GUI API.  
   
 Sun wanted to improve AWT and replace it with Swing unfortunately at that time Netscape (the leading browser  
 vendor by a good margin) had standardized on Java 1.1 and Microsoft was also stuck there. 
@@ -247,7 +247,7 @@ huge but still incomplete at some parts because the required breadth for such an
 developers who got no real updates for years mostly evaporated to other platforms and now we have Swing  
 and FX one of which is outdated and the other brand spanking new but has no real traction. 
 
-I think the biggest lesson from JavaFX is to always “think small” and release often. Trying to build a complete  
+I think the biggest lesson from JavaFX is to always "think small" and release often. Trying to build a complete  
 solution from day one rarely works even if you have the full set of resources that Sun/Oracle were able  
 to wield. I would argue that all the problems in JavaFX are a result of mismanagement. 
 
@@ -269,7 +269,7 @@ with students picking up JavaFX either thru universities or online courses. We m
 COBOL, there are jobs writing COBOL too. 
 
 With the current state of JavaFX and the lack of any contender to occupy its space (which is currently not officially vacant)  
-I get a sense that we might be better off with nothing. At least then we’d have a big “vacancy” sign in our  
+I get a sense that we might be better off with nothing. At least then we’d have a big "vacancy" sign in our  
 virtual front yard where our desktop API should reside. This will let one of the options I listed above (or something  
 brand new) occupy that spot…   
   
@@ -287,13 +287,13 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Andrea Liana says:
 >
 > Hallo, I liked your post because I share many of your worries about Java future. I had great expectations from Java One 2015, but except for the module feature, I wanted to hear too a clear and resounding message from Oracle about desktop commitment. And that did not came.  
-> I have a large codebase running on a custom fork of a very old AWT based framework and at the moment I am working on a little pure JavaFX framework because I expect soon or later to read an Oracle message like “JDK 1.xx will no more support AWT”.  
+> I have a large codebase running on a custom fork of a very old AWT based framework and at the moment I am working on a little pure JavaFX framework because I expect soon or later to read an Oracle message like "JDK 1.xx will no more support AWT".  
 > What I still don’t understand on Oracle policy, like:  
 > – letting RoboVM being acquired by Xamarin instead of buying it and use its codebase for the recent accounce of a project about JVM for iOS / Android;  
 > – delegating SceneBuilder to GluOn instead of keeping it as an official Java branded tool;  
 > – why is it so hard to extends JavaFX components considering all the customization required by current AWT/Swing project to meet our customer needs.
 >
-> I chose Java becuase I trusted that platform with the “Write once, run everywhere” key feature. I just only hope not to be forced to abandon it because of Oracle foggy decisions…
+> I chose Java becuase I trusted that platform with the "Write once, run everywhere" key feature. I just only hope not to be forced to abandon it because of Oracle foggy decisions…
 >
 
 
@@ -331,7 +331,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > Hard to tell.  
-> I don’t share your immediate concern about AWT. It wasn’t even officially deprecated so I can’t really see it going away “soon”. Since Java release cycles are around 18-24 months assuming Java 9 deprecates AWT you would still be clear for another 2 years after that…
+> I don’t share your immediate concern about AWT. It wasn’t even officially deprecated so I can’t really see it going away "soon". Since Java release cycles are around 18-24 months assuming Java 9 deprecates AWT you would still be clear for another 2 years after that…
 >
 > JavaFX is way better than Swing and AWT as you probably noticed. Its more modern and easier to use.
 >
@@ -404,7 +404,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > a. Not providing easy interaction with Swing from the start (throwing away existing traction).  
 > b. Building something huge that’s very hard to move and adapt
 >
-> The project is generally over ambitious and tries to be “all that”. Its admirable but really hard to get a battle-cruiser of this size into production quality. Then it takes a huge amount of maintenance. This is astounding to me as the original proof of concept for JavaFX Script was the work of one guy…
+> The project is generally over ambitious and tries to be "all that". Its admirable but really hard to get a battle-cruiser of this size into production quality. Then it takes a huge amount of maintenance. This is astounding to me as the original proof of concept for JavaFX Script was the work of one guy…
 >
 
 
@@ -528,11 +528,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Pretty much all of the major distros are backed by pretty big corporations. There are unaffiliated distros but they are pretty small by comparison.
 >
 > But Gnome/KDE are far better examples… KDE didn’t have corporate backing and was winning.  
-> RedHat and most corporate Linux vendors standardized on Gnome and invested many millions into it. At Sun we specifically invested a huge amount of effort on many “unsexy” endeavors such as accessibility etc.
+> RedHat and most corporate Linux vendors standardized on Gnome and invested many millions into it. At Sun we specifically invested a huge amount of effort on many "unsexy" endeavors such as accessibility etc.
 >
 > This was all part of a proxy war against Microsoft that the open source community benefited from.
 >
-> We’re an open source company and I’ve been running open source projects for many years so I’m a big fan of open source. But the “oh open source it and let the community take over” is one of the things that crashed Sun.
+> We’re an open source company and I’ve been running open source projects for many years so I’m a big fan of open source. But the "oh open source it and let the community take over" is one of the things that crashed Sun.
 >
 
 
@@ -585,7 +585,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Flash performed very badly on Android devices as well one of its core problems was that it expected very specific behaviors from the low level drawing primitives. This can be mitigated in desktop GPU’s but not so much on mobile GPU’s which are both flaky and varied.
 >
-> FX has issues with desktop GPU’s and I doubt it has resources to deal with the huge complexity that is mobile. It is over ambitious. Being over ambitious is a problem as it creates an “all or nothing” situation. HTML/JS/CSS shares that over ambitious nature and has some failings because of that.
+> FX has issues with desktop GPU’s and I doubt it has resources to deal with the huge complexity that is mobile. It is over ambitious. Being over ambitious is a problem as it creates an "all or nothing" situation. HTML/JS/CSS shares that over ambitious nature and has some failings because of that.
 >
 
 
@@ -597,7 +597,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > The goal of the post was to talk about the problems in FX not HTML. The fact that I don’t like HTML is a given…
 >
 > I detailed a lot of the problems in Gluon in a comment a while back: [http://www.codenameone.com/…](<http://www.codenameone.com/blog/comparing-qt-and-codename-one.html>)  
-> This created an unpleasant exchange with a “colorfull” person who then proceeded to harass me personally going so far as to create fake accounts on dzone with word plays on my name and post insulting comments to every social network post we make. He is the first and only person we ever blocked from commenting…
+> This created an unpleasant exchange with a "colorfull" person who then proceeded to harass me personally going so far as to create fake accounts on dzone with word plays on my name and post insulting comments to every social network post we make. He is the first and only person we ever blocked from commenting…
 >
 > The problems I detailed with Gluon just got far worse since I wrote what I did, they are now building their own OpenJDK AoT compiler which is insane. Besides the amount of work/maintenance which is already impractical, JavaFX depends on a huge number of classes and including them will produce binaries unfit for mobile distribution as iOS requires 2-3 platforms in a fat binary…
 >

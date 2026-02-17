@@ -174,7 +174,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > (3) Make sure the package matches between the main preferences screen in the IDE and the iOS settings screen (see pictures below). 
 >
-> Im my mac, dont existe option to “export 2 files”
+> Im my mac, dont existe option to "export 2 files"
 >
 
 

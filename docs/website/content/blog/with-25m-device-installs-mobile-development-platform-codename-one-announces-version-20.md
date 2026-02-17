@@ -20,7 +20,7 @@ Version 2.0 is a major leap forward with containing 300 new features and improve
 
 The platform to date has been used to build over 5,000 native mobile applications and has received widespread, viral acclaim in technology and business media including InfoWorld, Slashdot, Hacker News, VentureBeat, Business Insider, The Next Web, Dr. Dobbs and Forbes.  
   
-“The level of traction we are seeing is astounding, it is amazing that in less than 2 years we have amassed so many applications.” said co-founder and CEO Shai Almog.
+"The level of traction we are seeing is astounding, it is amazing that in less than 2 years we have amassed so many applications." said co-founder and CEO Shai Almog.
 
 Almog, along with co-founder Chen Fishbein, decided to launch the venture after noticing a growing inefficiency within mobile application development. By enabling developers to significantly cut time and costs in developing native applications for iOS, Android, Blackberry, Windows Phone and other devices, Almog and Fishbein hope to make mobile application development increasingly feasible.
 

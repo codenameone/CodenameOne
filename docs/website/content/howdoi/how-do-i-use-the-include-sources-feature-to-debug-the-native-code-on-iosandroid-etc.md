@@ -16,7 +16,7 @@ thumbnail: https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-7-1.
 
 #### Transcript
 
-In this video I’ll discuss the “include source” feature. With include source we can get the native OS source code as a result of a build. This allows us to debug & profile on devices.  
+In this video I’ll discuss the "include source" feature. With include source we can get the native OS source code as a result of a build. This allows us to debug & profile on devices.  
 Notice that this isn’t meant for manual native OS coding as we have the native interfaces feature that allows you to write native code. Still include source is a very useful tool when working with native interfaces and I recommend checking that video out too.
 
 We can activate include source by launching Codename One Settings and checking the include source flag, once that is done we can send a build to the servers.
@@ -38,7 +38,7 @@ I’ll only discuss iOS & Android in this video but include source works for oth
 When we download and unzip the respective source archives we can see the Android & iOS source structures.
 
 The iOS sources are stored under the dist directory.  
-You will notice two important files the xcodeproj which intuitively seems like the “right file” but it’s not and you shouldn’t open it!  
+You will notice two important files the xcodeproj which intuitively seems like the "right file" but it’s not and you shouldn’t open it!  
 Instead you need to open the xcworkspace file… This file includes the full project and that’s the project that will run. When we double click the xcworkspace file we get a warning about a file downloaded from the internet and then xcode launches.
 
 In the launched file we can just press play to run the project in the native simulator or on device. Notice you can connect your device and run directly on it!

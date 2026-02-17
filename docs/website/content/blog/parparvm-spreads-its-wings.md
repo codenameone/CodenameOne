@@ -13,7 +13,7 @@ author: Shai Almog
 
 We wrote quite a bit about the architecture of the new VM we built for iOS and why we built it. Up until recently  
 we always viewed it as a Codename One specific tool. Something that would only be useful for us. We used open  
-source because “that is our way” and didn’t give it much thought after that.  
+source because "that is our way" and didn’t give it much thought after that.  
 It started to dawn on us recently that this tool could be useful for other developers that might take it in a different  
 direction from our original intention. We also came to the conclusion that this might not be a bad idea altogether.  
 So we are are effectively launching the Codename One VM as  
@@ -24,9 +24,9 @@ To avoid confusion and complex support overhead we always indicated that we don�
 [Codename One](https://www.codenameone.com/) natively. This made sense back in the  
 day when our main support channels were email & the discussion forum. However, now that we are  
 focusing support around StackOverflow this shouldn’t be as much of a barrier since it won’t increase  
-the “noise”. We can’t guarantee an answer for every question as these things might step out of our  
+the "noise". We can’t guarantee an answer for every question as these things might step out of our  
 comfort zone, but we’ll try to do our best as usual. So feel free to ask questions about the VM and native  
-compilation on [stackoverflow with the “codenameone” tag](http://stackoverflow.com/tags/codenameone). 
+compilation on [stackoverflow with the "codenameone" tag](http://stackoverflow.com/tags/codenameone). 
 
 #### Getting Started
 

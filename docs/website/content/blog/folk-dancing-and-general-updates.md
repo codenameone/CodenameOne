@@ -25,7 +25,7 @@ ImageViewer class that I mentioned a while back
 ](http://www.codenameone.com/3/post/2013/08/in-a-pinch.html)  
 , it will now be a part of the designer and has some small improvements to its event handling as well as keyboard handling.
 
-We now have a new set of image rotation API’s designed for camera images. These API’s can rotate or flip an image by square angles, which is important for rotating an image that isn’t a perfect square (e.g. taken by camera). These API’s are really simple to use e.g.: image.rotate90Degrees(true);
+We now have a new set of image rotation API’s designed for camera images. These API’s can rotate or flip an image by square angles, which is important for rotating an image that isn’t a perfect square (e.g. taken by camera). These API’s are really simple to use e.g.: `image.rotate90Degrees(true);`
 
 Where the boolean argument indicates whether the image is opaque (e.g. for the case of a camera image). There are also methods for 180 and 270 degrees as well as vertical and horizontal flip methods.
 

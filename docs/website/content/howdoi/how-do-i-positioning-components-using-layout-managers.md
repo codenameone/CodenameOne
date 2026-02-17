@@ -30,7 +30,7 @@ This begs the question: Why? Why not place the components where we want them to 
 
 Devices can have different resolution, pixel density, font sizes and form factors. So a specific position that looks good on one device can look awful in another.
 
-With device orientation changes, tablets, desktop/web versions of the app etc. You would expect the UI to adapt “automatically”. It gets worse with localization for instance languages like German have very long words and you would expect components to resize accordingly
+With device orientation changes, tablets, desktop/web versions of the app etc. You would expect the UI to adapt "automatically". It gets worse with localization for instance languages like German have very long words and you would expect components to resize accordingly
 
 Layout managers convey the logic of component placement in a way that Codename One understands and can adapt e.g. Let’s say I want to say put a label on the left and put a text area next to it. I also want to give that text area the rest of the available space
 
@@ -64,7 +64,7 @@ Now here is a neat trick to learn about components, open the component inspector
 
 We have a layered layout for the root, this allows the floating action button on the bottom.
 
-A bit deeper we can see the Box Layout Y that contains all of the “Swipeable Container” classes,
+A bit deeper we can see the Box Layout Y that contains all of the "Swipeable Container" classes,
 
 Swipeable container is a layered layout that we can swipe to show the buttons below
 

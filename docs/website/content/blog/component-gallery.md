@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/component-gallery/component-gallery.png)
 
 As you know we’ve been working a lot on the docs both the developer guide and the JavaDoc’s, we nearly doubled  
-the amount pages in the developer guide and we did it without “cheating” (e.g. cramming more stuff, increasing font size).  
+the amount pages in the developer guide and we did it without "cheating" (e.g. cramming more stuff, increasing font size).  
 You can see all that work in the [developer guide](https://www.codenameone.com/manual/) section but what I want  
 to discuss today is the new [Component Gallery](/javadoc/com/codename1/ui/package-summary/)  
 & [Layout Gallery](/javadoc/com/codename1/ui/layouts/package-summary/).

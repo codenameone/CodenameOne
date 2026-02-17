@@ -13,9 +13,9 @@ author: Shai Almog
 
 A couple of years ago I wrote an app for my spouses yoga studio for managing her student list. I intended to open source it but the code is a bit messy and I can’t seem to find the time/energy to clean it up. I used the excellent [parse4cn1](https://github.com/sidiabale/parse4cn1) library from [Chidiebere Okwudire](https://www.smash-ict.com/) during the height of Parse.
 
-As Parse ended I started thinking about contingency plans but after a few emails with Chidi and his [posts](/blog/how-i-chose-my-replacement-for-parse-com/) detailing the various [options](/blog/how-i-chose-my-replacement-for-parse-com-part-2/) I thought it might be possible to take the “lazy approach”.
+As Parse ended I started thinking about contingency plans but after a few emails with Chidi and his [posts](/blog/how-i-chose-my-replacement-for-parse-com/) detailing the various [options](/blog/how-i-chose-my-replacement-for-parse-com-part-2/) I thought it might be possible to take the "lazy approach".
 
-Since the app is mostly for personal use I wasn’t faced with the prospect of replacing a “live” server which would have probably made the migration difficult. Since the app doesn’t use any “difficult” feature like push or complex server code this would be a trivial migration. Still I braced myself for hiccups…​
+Since the app is mostly for personal use I wasn’t faced with the prospect of replacing a "live" server which would have probably made the migration difficult. Since the app doesn’t use any "difficult" feature like push or complex server code this would be a trivial migration. Still I braced myself for hiccups…​
 
 Looking at the options available I chose to go with [back4app](https://www.back4app.com/), it’s the first one I picked so I have no idea if other options are better/worse. I liked how easy they made the migration and I’m all for taking the lazy option when it’s available.
 

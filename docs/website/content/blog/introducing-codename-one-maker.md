@@ -19,7 +19,7 @@ Maker
 ](/maker.html)  
 . Codename One Maker is an App that allows non-developers to build native applications directly from their mobile phone or tablet by using the Codename One backend.  
   
-The tool is relatively simple and produces “cookie cutter” applications, however we think that you would be able to build amazing plugins to make the tool truly powerful  
+The tool is relatively simple and produces "cookie cutter" applications, however we think that you would be able to build amazing plugins to make the tool truly powerful  
   
 . We intend to introduce a plugin architecture based on our Codename One libraries that will allow you to build extensions to Maker using our standard Java API and native code. 
 

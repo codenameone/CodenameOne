@@ -85,7 +85,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Oh, ok. I was also trying to find it via the CodenameOne group on LinkedIn, but I can only see the posts Chen did (last one was “Showcase your app at JavaOne” a month ago. You should probably link it there as well for increased visibility!
+> Oh, ok. I was also trying to find it via the CodenameOne group on LinkedIn, but I can only see the posts Chen did (last one was "Showcase your app at JavaOne" a month ago. You should probably link it there as well for increased visibility!
 >
 
 

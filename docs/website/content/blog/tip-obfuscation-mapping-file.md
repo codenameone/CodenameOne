@@ -13,7 +13,7 @@ author: Shai Almog
 
 Proguard is one of the most disliked aspects of Android programming. Developers attack it left and right because there are so many nuances to it. That’s a huge mistake, proguard is one of the most important tools in our development toolchain. It makes our apps slightly more secure, much smaller and even slightly faster. Codename One apps use proguard by default for Android. This is a huge benefit in our case because the limits related to obfuscation are very similar to the limits related to portability.
 
-However, one of the side effects of obfuscation is jumbled stack traces. Normally this isn’t a “big deal” since line numbers are still correct. But when we have multiple releases it might be harder to track some of these line numbers through tags and history.
+However, one of the side effects of obfuscation is jumbled stack traces. Normally this isn’t a "big deal" since line numbers are still correct. But when we have multiple releases it might be harder to track some of these line numbers through tags and history.
 
 That’s where the mapping file you get when sending an Android build becomes useful.
 

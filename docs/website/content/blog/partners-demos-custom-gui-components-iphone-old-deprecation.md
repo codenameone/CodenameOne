@@ -71,7 +71,7 @@ full power to place anything there.
 ### 64bit Debug Builds
 
 One annoyance of iOS 10 is that it now pops up a warning that the application is built for an older OS and might  
-be slow. This is one of those “Appleisms” that tries to force developers to move to 64bit, we already support  
+be slow. This is one of those "Appleisms" that tries to force developers to move to 64bit, we already support  
 64bit but no longer build it in the debug version to avoid the performance cost.
 
 If you build a release build and install it via testflight this should behave fine, however if you find this warning  
@@ -80,7 +80,7 @@ annoying you can just build a 64bit version instead of a 32bit version with the 
 `ios.debug.archs=arm64`
 
 Notice that once you enable that flag the app will fail installation on older devices that don’t have 64bit support.  
-That is why this is off by default. Normally we compile both 64 and 32 bit and package everything in a “fat binary”  
+That is why this is off by default. Normally we compile both 64 and 32 bit and package everything in a "fat binary"  
 however for debug builds that effectively doubles the build time and increases the download size significantly.
 
 ### End of Life for iphone_old

@@ -26,7 +26,7 @@ We tried to migrate all the blog posts from the old blog, this worked with parti
   * Dates/times on some of the older posts are incorrect
   * Hierarchy got broken
   * Emails are missing so you won’t get notified on responses to old comments.
-  * Some comments were “just lost” – its hard to know which ones though…
+  * Some comments were "just lost" – its hard to know which ones though…
 
 However, the vast majority of the information (close to 1k comments) was preserved and provides a lot of important information  
 about our older blog posts. We migrated all the older posts but some formatting might be broken, we couldn’t go over all of them  
@@ -41,7 +41,7 @@ interface. Specifically the biggest problem is migrating this amount of issues a
 Even simple projects that we tried to migrate such as the Google Native Maps project had failures in the migration process  
 and this doesn’t leave us in a state of confidence about github fixing their problems.
 
-Now before people jump to conclusions about “us not understanding “distributed version controls advantages” a brief history  
+Now before people jump to conclusions about "us not understanding "distributed version controls advantages" a brief history  
 lesson about git… Do you know it was actually inspired by Sun and that we used a distributed versioning system there for years  
 that IMO was FAR superior to git?
 
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Chidiebere Okwudire says:
 >
-> Suppose a new potential subscriber stumbles on your website, won’t it be very handy to see an overview of what platforms are supported? Right now all one sees is ‘Write Once Run Anywhere’ and the question that immediately comes to mind is: “Where is ‘anywhere’? I couldn’t find any single page on the website that answers this basic question. And when one googles for “CodenameOne supported platforms”, the first hit is that wiki page which you said is out-dated so that doesn’t help.
+> Suppose a new potential subscriber stumbles on your website, won’t it be very handy to see an overview of what platforms are supported? Right now all one sees is ‘Write Once Run Anywhere’ and the question that immediately comes to mind is: "Where is ‘anywhere’? I couldn’t find any single page on the website that answers this basic question. And when one googles for "CodenameOne supported platforms", the first hit is that wiki page which you said is out-dated so that doesn’t help.
 >
 > Like I’ve mentioned to you before, I still think the marketing of this great product can/should be better 😉
 

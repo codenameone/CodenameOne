@@ -23,7 +23,7 @@ author: Shai Almog
 **  
 Update:  
 **  
-minor correction to the build process about the build.xml issue in the Codename One project.  
+minor correction to the build process about the `build.xml` issue in the Codename One project.  
   
   
   
@@ -61,7 +61,7 @@ that these projects might be marked in red and you will probably need to right c
   
 Once you do that you can build bot  
   
-h projects without a problem. Notice that you will probably get a minor compilation error due to a build.xml line in the Codename One project, don’t fret. Just edit that line and comment it out.  
+h projects without a problem. Notice that you will probably get a minor compilation error due to a `build.xml` line in the Codename One project, don’t fret. Just edit that line and comment it out.  
 
 * * *
 
@@ -77,7 +77,7 @@ h projects without a problem. Notice that you will probably get a minor compilat
 Now the fun part, select any Codename One project in NetBeans, right click and click properties. 
 
   
-Now select “Libraries” from the tree to your right select all the jars within the compile tab. Click remove.  
+Now select "Libraries" from the tree to your right select all the jars within the compile tab. Click remove.  
 
   
 Click the Add Project button and select the project for Codename One in the SVN.  
@@ -94,7 +94,7 @@ Click the Add Project button and select the project for Codename One in the SVN.
   
   
 
-Now select the Run tab and remove the JavaSE.jar file from there by selecting it and pressing remove. 
+Now select the Run tab and remove the `JavaSE.jar` file from there by selecting it and pressing remove. 
 
   
 Add the JavaSEPort project using the Add Project  

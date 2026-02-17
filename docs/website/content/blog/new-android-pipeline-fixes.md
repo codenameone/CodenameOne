@@ -25,23 +25,17 @@ We introduced a new rendering pipeline for Android a while back, it showed a lot
   
   
   
-To test the new pipeline just define the build argument  
-  
-  
-android.asyncPaint  
-  
-  
-=true  
+To test the new pipeline just define the build argument `android.asyncPaint=true`  
   
   
   
-You define the build argument by going to your project properties, selecting Codename One and you should see a “Build Hints” tab option. Just enter the values there.  
+You define the build argument by going to your project properties, selecting Codename One and you should see a "Build Hints" tab option. Just enter the values there.  
   
   
   
   
   
-Once we feel this is stable enough we will “flip the switch” and make it the default rendering pipeline on Android so hopefully it should be stable and performant by then.  
+Once we feel this is stable enough we will "flip the switch" and make it the default rendering pipeline on Android so hopefully it should be stable and performant by then.  
   
   
   
@@ -51,12 +45,12 @@ The regular Android pipeline should still work for the foreseeable future althou
   
   
   
-Since the new pipeline is completely different performance of your application might actually degrade when you switch to it. You need to spend time investigating the paint chain in the Component Inspector tool (in the simulator menu) and make sure that there isn’t too much “overdraw”. Overdraw is the situation where a pixel on the screen is painted multiple times over and over. The old native pipeline eliminated this overdraw but the newer system doesn’t do a good job with that.  
+Since the new pipeline is completely different performance of your application might actually degrade when you switch to it. You need to spend time investigating the paint chain in the Component Inspector tool (in the simulator menu) and make sure that there isn’t too much "overdraw". Overdraw is the situation where a pixel on the screen is painted multiple times over and over. The old native pipeline eliminated this overdraw but the newer system doesn’t do a good job with that.  
   
   
   
   
-On an unrelated subject we also added a “Clean Storage” option to the simulator and a  
+On an unrelated subject we also added a "Clean Storage" option to the simulator and a  
   
   
   
@@ -64,7 +58,7 @@ On an unrelated subject we also added a “Clean Storage” option to the simula
   
   
   
-“Remove All” option to the network monitor tool.  
+"Remove All" option to the network monitor tool.  
 
 * * *
 
@@ -82,7 +76,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Async issue reported here [https://code.google.com/p/c…](<https://code.google.com/p/codenameone/issues/detail?id=1071>) is not yet fixed. 
 >
-> On March 5th I sent you an email with “Black issue with WebBrowser component”; that was also an async paint issue. Any progress on that? 
+> On March 5th I sent you an email with "Black issue with WebBrowser component"; that was also an async paint issue. Any progress on that? 
 >
 > Wim
 >

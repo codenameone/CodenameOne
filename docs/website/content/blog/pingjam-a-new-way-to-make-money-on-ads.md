@@ -89,7 +89,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Sounds good to be true 🙂 
 >
-> But how about this statement: “Only one app will get the credit per device; if multiple apps have pingjam enabled, the credit will go to the first app that was installed.” 
+> But how about this statement: "Only one app will get the credit per device; if multiple apps have pingjam enabled, the credit will go to the first app that was installed." 
 >
 > The source is here: [http://support.andromo.com/…](<http://support.andromo.com/kb/common-questions/pingjam-caller-id-ads>)
 >
@@ -100,11 +100,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Its similar to startapp in that sense, they pay “rent” for the ad space and the app that “owns” that space is the first one where the user accepted the terms (probably first one installed). 
+> Its similar to startapp in that sense, they pay "rent" for the ad space and the app that "owns" that space is the first one where the user accepted the terms (probably first one installed). 
 >
 > However, if the first app was removed then your app will start receiving the payments for that device. 
 >
-> Another benefit is that this is a relatively young network so your chances of reaching a “virgin” device are very high.
+> Another benefit is that this is a relatively young network so your chances of reaching a "virgin" device are very high.
 >
 
 

@@ -26,7 +26,7 @@ on the next high priority video?
 
 Should we focus on re-doing one of our existing videos that is badly done or create a completely new video?
 
-Currently I’m leaning towards the latter as I think we are missing a “How does Codename One work?” video  
+Currently I’m leaning towards the latter as I think we are missing a "How does Codename One work?" video  
 which might go a long way to explain some basic concepts that are hard to explain with the current set  
 of materials. If you have other thoughts or things you would like to see featured in future videos please let us know.
 

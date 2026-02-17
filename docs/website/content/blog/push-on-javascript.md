@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/push-on-javascript/push-megaphone.png)
 
 Up until now push notification in Codename One only worked for Android & iOS devices. This is about to change this weekend when the JavaScript port should (almost) seamlessly start working with push!  
-This is pretty cool as push to the web is a pain with every browser taking a somewhat different route but with Codename One this will “mostly” work.
+This is pretty cool as push to the web is a pain with every browser taking a somewhat different route but with Codename One this will "mostly" work.
 
 The JavaScript port will generate push keys that match the notation `cn1-web`.
 
@@ -45,7 +45,7 @@ Safari is problematic as it doesn’t use the same semantics of any other push s
 
 Push on UWP is something we hope to introduce in the near future as well. We began some work on this but it is not ready at this time. Hopefully we’ll have a completely universal push solution in the near future.
 
-We will update the new push support this Friday which should include a push server update. Once that update goes in push for web should “just work” but would require a new build.
+We will update the new push support this Friday which should include a push server update. Once that update goes in push for web should "just work" but would require a new build.
 
 ---
 

@@ -23,7 +23,7 @@ Mac OS is locked down to some degree and if you ship an app outside of the app s
 
 One of the more important features we are still lacking is device farm testing. We have support for auto-tests and quite a few other capabilities but running tests automatically for all devices using a cloud based device farm is something we just never got around to do.
 
-Apparently we’re already there, when we commit a change to Codename One or a pull request it will now test that change on the simulator as well as on multiple versions of Android out of the box. The complexity of adding automated iOS tests is due to the complexity of the fact that we are testing an “unpublished” version of Codename One but this should be relatively easy to accomplish for your apps.
+Apparently we’re already there, when we commit a change to Codename One or a pull request it will now test that change on the simulator as well as on multiple versions of Android out of the box. The complexity of adding automated iOS tests is due to the complexity of the fact that we are testing an "unpublished" version of Codename One but this should be relatively easy to accomplish for your apps.
 
 Steve also added a status badge to the project that highlights when all the tests pass in green so you know if something is failing just by looking at our [github project page](http://github.com/codenameone/CodenameOne/).
 
@@ -58,7 +58,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Sure. You have a test recorder built into the simulator and you can run automated tests with the simulator. You can send device builds with the test code in the enterprise subscription and get the binaries to run on your device. The one feature that was missing was the “run them automatically for you on the device”. That feature is coming soon after the 3.8 release.
+> Sure. You have a test recorder built into the simulator and you can run automated tests with the simulator. You can send device builds with the test code in the enterprise subscription and get the binaries to run on your device. The one feature that was missing was the "run them automatically for you on the device". That feature is coming soon after the 3.8 release.
 >
 
 
@@ -67,7 +67,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Francesco Galgani says:
 >
-> Thank you. My problem is that in the developer guide I found very few information (in the section 13.6 “Device Testing Framework/Unit Testing”, pages 412-413) and in the Codename One website I found only a very short tutorial of two minutes: [https://www.codenameone.com…](</blog/test-it/>)
+> Thank you. My problem is that in the developer guide I found very few information (in the section 13.6 "Device Testing Framework/Unit Testing", pages 412-413) and in the Codename One website I found only a very short tutorial of two minutes: [https://www.codenameone.com…](</blog/test-it/>)
 >
 > I didn’t find any more information. I read the API and I also tried a pull request: [https://github.com/codename…](<https://github.com/codenameone/CodenameOne/pull/2276>)
 >

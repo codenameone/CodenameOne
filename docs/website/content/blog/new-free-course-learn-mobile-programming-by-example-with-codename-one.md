@@ -16,7 +16,7 @@ author: Shai Almog
 This material is out of date by now. We recommend checking out the [Codename One Academy](/blog/launching-codename-one-academy.htmls). 
 
 We just released a new online course on Udemy called  
-“[Learn Mobile Programming By Example With Codename One](https://www.udemy.com/learn-mobile-programming-by-example-with-codename-one/)“.  
+"[Learn Mobile Programming By Example With Codename One](https://www.udemy.com/learn-mobile-programming-by-example-with-codename-one/)".  
 Before a single day went by we already have over 600 students enrolled which is pretty cool. This course is based on the videos we made for the  
 [Dr. Sbaitso](http://www.codenameone.com/blog/dr-sbaitso) demo and the  
 [PropertyCross demo](http://www.codenameone.com/blog/propertycross-demo) with some additional  

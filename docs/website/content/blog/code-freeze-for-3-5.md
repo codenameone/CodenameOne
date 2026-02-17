@@ -19,7 +19,7 @@ The code freeze applies to the Codename One libraries and ports as those are the
 
 We have many new features and great capabilities that we were able to introduce for 3.5. We will go into those with our release announcement.
 
-The biggest “miss” we have in this release is the new iOS build servers with xcode 7+. We wanted to get them out before the release but this requires more work than we initially expected to get right. We remain committed to going thru with this process and will do so after the 3.5 release.
+The biggest "miss" we have in this release is the new iOS build servers with xcode 7+. We wanted to get them out before the release but this requires more work than we initially expected to get right. We remain committed to going thru with this process and will do so after the 3.5 release.
 
 We didn’t finish modernizing and updating all the demos with this release. It’s disappointing but not crucial as most of the big ones are already done and the process is half way thru.
 

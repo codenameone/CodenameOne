@@ -13,15 +13,15 @@ author: Steve Hannah
 
 The concept of threads in the Javascript community is a controversial one. The founders and leaders are dogmatically against threads, and have been from very early on. [This 2007 article by Brendan Eich](https://brendaneich.com/2007/02/threads-suck/) reveals his feeling on threads (they suck!) and the advancements in subsequent years seem to have followed this sentiment by vigorously avoiding anything thread-like.
 
-Countless “solutions” and workarounds have been developed by clever programmers to try to improve the situation without actually adding threads. Web Workers solve some concurrency issues, but don’t come close to solving the general case, and Promises are currently a popular way to make threadless code more readable. Now with ES6, we have generators and the yield statement offering yet a new ugly workaround for this glaring language omission. These are all ugly patches that make code less readable and less maintainable, not more.
+Countless "solutions" and workarounds have been developed by clever programmers to try to improve the situation without actually adding threads. Web Workers solve some concurrency issues, but don’t come close to solving the general case, and Promises are currently a popular way to make threadless code more readable. Now with ES6, we have generators and the yield statement offering yet a new ugly workaround for this glaring language omission. These are all ugly patches that make code less readable and less maintainable, not more.
 
-In the olden days, Javascript was only used for adding a little interactivity to web pages so keeping it “thead-less” made sense. It reduced complexity and precluded the possibility of running into complex race conditions or dead-locks related to threading. Guess what, Javascript, it’s not the olden days anymore. Serious developers are building serious apps in Javascript now, and they are bending over backwards to work around this deficiency.
+In the olden days, Javascript was only used for adding a little interactivity to web pages so keeping it "thead-less" made sense. It reduced complexity and precluded the possibility of running into complex race conditions or dead-locks related to threading. Guess what, Javascript, it’s not the olden days anymore. Serious developers are building serious apps in Javascript now, and they are bending over backwards to work around this deficiency.
 
-Netflix talks a little bit about how they deal with asynchronous programming in [this video](https://www.youtube.com/watch?v=a8W5VVGO-jA). The first part of the video shows “the problem” – which includes race conditions, callback hell, etc… If you’ve developed anything of decent size in Javascript, you are well aware of these problems. Their solutions appear to be optimal considering Javascript’s lack of threads. But it just pains me to see everybody quite happy to jump through these hoops when the answer is staring them in the face. Just support threads!
+Netflix talks a little bit about how they deal with asynchronous programming in [this video](https://www.youtube.com/watch?v=a8W5VVGO-jA). The first part of the video shows "the problem" – which includes race conditions, callback hell, etc… If you’ve developed anything of decent size in Javascript, you are well aware of these problems. Their solutions appear to be optimal considering Javascript’s lack of threads. But it just pains me to see everybody quite happy to jump through these hoops when the answer is staring them in the face. Just support threads!
 
 [TeaVM](http://teavm.org) is a Java to Javascript compiler that supports threads by using static analysis to cleverly convert the application into continuations. I have been using it quite a bit over the past few months (we are using it as a platform to port Codename One into Javascript), and it has just reminded me how nice it is to program synchronously.
 
-For example any time you are writing a function that has to call a “slow” function, like making a network request, accessing local data (e.g. IndexedDB), you have to break it up into multiple callbacks in Javascript. Rather than having a single “black box” function that takes inputs and returns outputs, you have to consider whether that function will need to access any services that require a callback.
+For example any time you are writing a function that has to call a "slow" function, like making a network request, accessing local data (e.g. IndexedDB), you have to break it up into multiple callbacks in Javascript. Rather than having a single "black box" function that takes inputs and returns outputs, you have to consider whether that function will need to access any services that require a callback.
 
 Consider an example function that returns the current user’s age. Our first version might always have the user’s age stored in a variable so we don’t need to worry about callbacks
     
@@ -65,7 +65,7 @@ This period of being able to build web apps with threading has spoiled me. I don
 
 If you’re looking to build web apps that support threading, you can check out [TeaVM](http://www.teavm.org) and its related sub-project, [Flavour](https://github.com/konsoletyper/teavm-flavour), that provides bindings similar to Knockout and Angular. It’s not for every project, but once it reaches a certain size, being able to write code synchronously will pay dividends while providing a much more pleasant development experience. Codename One has supported threads from the beginning on every platform, and with the help of TeaVM we also support threads in the browser.
 
-I have been developing in both Java and Javascript for years, so needing to use Java to have threads is no big deal, but for Javascript developers it may be more of a “change” than they want. It is especially for **those** developers that Javascript needs to grow up and get threaded.
+I have been developing in both Java and Javascript for years, so needing to use Java to have threads is no big deal, but for Javascript developers it may be more of a "change" than they want. It is especially for **those** developers that Javascript needs to grow up and get threaded.
 ---
 
 ## Archived Comments
@@ -79,7 +79,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This post is out of date in many ways, and it misses the reasons why threads suck for JS as a language used by millions of programmers (data races without any proof system like Rust’s ownership/type system to make races static errors; races leaking into pure JS objects; easily-misused primitives meant for compilers and experts, not appropriate in the most widely used programming language on the planet). Have you been tracking the SharedArrayBuffer and Atomics work by Lars T. Hansen at Mozilla? Or WebAssembly?
 >
-> Dogmatic equation of “threads” with “growing up” did not make the case. Compiling real C++ programs to asm.js did. SharedArrayBuffer and Atomics are not yet in standard JS, and even if they make it (which I think is likely; they’re on the agenda for the September TC39 meeting, but who knows?), they won’t be for almost all of the millions of hand-coding JS programmers. Because threads suck.
+> Dogmatic equation of "threads" with "growing up" did not make the case. Compiling real C++ programs to asm.js did. SharedArrayBuffer and Atomics are not yet in standard JS, and even if they make it (which I think is likely; they’re on the agenda for the September TC39 meeting, but who knows?), they won’t be for almost all of the millions of hand-coding JS programmers. Because threads suck.
 >
 > /be
 >
@@ -92,12 +92,12 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for commenting. Big fan of your work.
 >
-> I have to concede that threads are involved in most “newbie” mistakes in java. If I had a nickel for every time I had to point out “You’re modifying the UI off the EDT — big no-no”, I’d be … more wealthy than I am. And you might be right about threads not being needed by most Javascript developers. But…
+> I have to concede that threads are involved in most "newbie" mistakes in java. If I had a nickel for every time I had to point out "You’re modifying the UI off the EDT — big no-no", I’d be … more wealthy than I am. And you might be right about threads not being needed by most Javascript developers. But…
 >
-> “””  
+> """  
 > easily-misused primitives meant for compilers and experts, not appropriate in the most widely used programming language on the planet
 >
-> “””
+> """
 >
 > This makes it sound like you have lower expectations of Javascript developers than other languages- as if JS is a training-wheel language that is only appropriate for newbies. I.e. don’t give them threads because they can’t handle threads. On the contrary, some of the best minds in the world are now working in Javascript for most of their productive hours. These guys can handle a few sharp objects.
 >
@@ -105,7 +105,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’ve been doing some experimentation with [parse.com](<http://parse.com>) cloud functions – which requires me to use server-side JS – and I find myself wincing as I write the code and then realize — oh , have to make another db call here…. ok.. let’s wrap this in another promise, and change the flow of the entire function to work with promises now. Enjoyment factor just tanks as soon as I have to do that.
 >
-> I am watching the progress of WASM with anticipation, and I fully expect that JS will add threads – or at least the basis upon which threads could be implemented at some time in the future. I’d just like to see it sooner than later. I still contend that threads (or at least concurrency with easily shared memory) are a feature of any “grown-up” language, and JS devs need the option of removing the training wheels from time to time.
+> I am watching the progress of WASM with anticipation, and I fully expect that JS will add threads – or at least the basis upon which threads could be implemented at some time in the future. I’d just like to see it sooner than later. I still contend that threads (or at least concurrency with easily shared memory) are a feature of any "grown-up" language, and JS devs need the option of removing the training wheels from time to time.
 >
 
 
@@ -114,7 +114,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Jason Mulligan says:
 >
-> You don’t need threads in your “core” reactor, but do you need to understand how to write code for the env/language. Use promises for IO, events for user interaction and stateless functions for the rest; you’ll do fine. IPC may seem undesirable, but it forces you to really think about what you’re doing.
+> You don’t need threads in your "core" reactor, but do you need to understand how to write code for the env/language. Use promises for IO, events for user interaction and stateless functions for the rest; you’ll do fine. IPC may seem undesirable, but it forces you to really think about what you’re doing.
 >
 
 
@@ -178,7 +178,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > > easily-misused primitives meant for compilers and experts, not appropriate in the most widely used programming language on the planet
 >
-> There are still developers that can and want to deal with threads. 99% of developers use frameworks, and remaining 1% write them. The problem that the latter ones need more “powerful” features of a language, and they usually (I belive) realize what are they doing. Example is: when I write business code for an enterprise application in Java using Spring, Hibernate, Servlet container, I don’t bother with threads at all. On the other hand I don’t bother with “asyncronous” nature of underlying infrastructure, because there is not asynchronousity at all. Consider the following code:
+> There are still developers that can and want to deal with threads. 99% of developers use frameworks, and remaining 1% write them. The problem that the latter ones need more "powerful" features of a language, and they usually (I belive) realize what are they doing. Example is: when I write business code for an enterprise application in Java using Spring, Hibernate, Servlet container, I don’t bother with threads at all. On the other hand I don’t bother with "asyncronous" nature of underlying infrastructure, because there is not asynchronousity at all. Consider the following code:
 >
 > for (Role role : employee.getRoles()) {
 >
@@ -212,7 +212,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Asmithdev says:
 >
-> Threads don’t suck with the use of the current web worker API and transferrable objects…although I do agree the API itself sucks on many levels the memory model makes threading extremely safe, I’m not entirely sure why people are unwilling to open their minds up to multithreading in JavaScript as the problem isn’t the language but rather lack of creativity and dedication to making them usable in a practical way. I wrote WebHamsters ([http://hamsters.io](<http://hamsters.io>)) specifically for this very reason, the tools are freely available for use by anyone who cares to invest the time to learn them. I don’t know why you would throw the potential of 100’s of % performance improvements with automatic parallelization because something “sucks” on an idealogical level.
+> Threads don’t suck with the use of the current web worker API and transferrable objects…although I do agree the API itself sucks on many levels the memory model makes threading extremely safe, I’m not entirely sure why people are unwilling to open their minds up to multithreading in JavaScript as the problem isn’t the language but rather lack of creativity and dedication to making them usable in a practical way. I wrote WebHamsters ([http://hamsters.io](<http://hamsters.io>)) specifically for this very reason, the tools are freely available for use by anyone who cares to invest the time to learn them. I don’t know why you would throw the potential of 100’s of % performance improvements with automatic parallelization because something "sucks" on an idealogical level.
 >
 
 

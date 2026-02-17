@@ -15,19 +15,19 @@ Thanks for answering our questions about what you want in Codename One 1.1, your
 
 A frequent request is for more ad network integration  
 _  
-“AdMob, iAd support and more”  
+"AdMob, iAd support and more"  
 _  
 we are working on those but getting the agreements through and adapting them is difficult. These two specific networks are specifically difficult, Google is very rigid on AdMob and Apple is worse. We are constantly talking with networks about adding support for them (e.g. Zooz and Startapp which were recently integrated), but this is a time consuming slow process.
 
 A comment asked for:  
 _  
-“Lists that require less code to implement.”  
+"Lists that require less code to implement."  
 _  
 . Did you checkout MultiList? Check out the up to date developer guide which covers them, they are pretty lean and also very easy to work with in the GUI builder.
 
 One poster answered  
 _  
-“Fast rendering on iOS (Slow performance on iPad 1 / iOS 5.5.1)”  
+"Fast rendering on iOS (Slow performance on iPad 1 / iOS 5.5.1)"  
 _  
 to which I would like to answer that rendering is pretty fast already. If you feel performance is slow a survey isn’t the place to say that, use the discussion forum and read the developer guide tips.  
   
@@ -35,19 +35,19 @@ Mutable images are inherently slow on iOS and drawing most graphics primitives i
 
 One poster asked for  
 _  
-“Debugging on real device directly from Eclipse/Netbeans”  
+"Debugging on real device directly from Eclipse/Netbeans"  
 _  
 which we plan to do in the future and actually have all the pieces in place for this. It would just require quite a major effort from us to actually accomplish this so this isn’t planned for 1.1.
 
 We got one request for  
 _  
-“Proximity Sensor Support”  
+"Proximity Sensor Support"  
 _  
 , I’m guessing that we would have to implement bluetooth, NFC, sockets, motion sensor and only then proximity if at all. There is just too much ground to cover in these things.
 
 Another commenter asked for  
 _  
-“Annotations Support to make compilation metaprogramming”  
+"Annotations Support to make compilation metaprogramming"  
 _  
 . We already support static annotations, dynamic annotations won’t be possible on older platforms (which might be fine) but would require some reflection capabilities. Since a mobile application is statically linked runtime annotations might be completely redundant since we know of all classes during compile time, that won’t change since we translate bytecode to native.  
   
@@ -104,7 +104,7 @@ My interpretation of the data is this:
   * People want Windows Phone 8 support. We are working on getting it into 1.1. 
   * Library support, again a major requested feature although I’m not sure people understand what it means. This doesn’t mean you could take any arbitrary JAR off the internet. We already announced this feature for 1.1 so we are good here. 
   * New layout manager made a surprise showing at the top… I think this generally says people find layout managers difficult and hope we would have a better option. But its very likely a new layout manager will suffer from different set of problems from the current ones. I’d be happy if people who voted for this can post examples of what they would want in the comments. 
-  * It surprised me that no one voted for the Matisse like layout manager in the GUI builder. I’m guessing people didn’t understand that this meant placing components in arbitrary locations and having it “just work” (sort of). 
+  * It surprised me that no one voted for the Matisse like layout manager in the GUI builder. I’m guessing people didn’t understand that this meant placing components in arbitrary locations and having it "just work" (sort of). 
   * Continuous integration made a great showing, I really want it as part of 1.1. 
   * I’m guessing most people who voted for improved vector graphics assume this is about performance or maybe SVG support. If I’m wrong about this feel free to correct me in the comments below. I’d like to start some of the work for this and would especially love to add features such as perspective transform. 
   * It surprised me how low bluetooth scored, we will probably not have it for 1.1 either unless we get a code contribution there. 

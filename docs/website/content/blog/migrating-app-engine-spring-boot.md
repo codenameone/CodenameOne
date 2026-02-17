@@ -67,7 +67,7 @@ After working a bit Spring Boot would fail with RAM errors. Turns out we need to
 
 ### What Worked Great
 
-So many things “just worked”!
+So many things "just worked"!
 
 The migration to SQL was mostly smooth and included only a few pitfalls/schema changes. Being able to use proper SQL instead of datastore is a huge step forward. It’s so much faster we don’t need memcached and get better performance to boot!
 
@@ -77,7 +77,7 @@ Despite the `User-Agent` issue cloudflare is a huge asset. It makes caching repe
 
 I can’t sing the praises of Spring Boot enough, it makes this trivial. It has it’s pain points (unreadable huge stack traces) but the ease of development is amazing. We manage our own infrastructure now through IaaS. It’s easier, faster, cheaper and scales better than the previous PaaS deployment. Four out of four criteria.
 
-While we didn’t test scaling to the full extent so far CPU utilization is flat/low. This architecture would probably scale much better than app engine ever did. Google sells App Engine as a “Google Scale” solution but anyone who worked with it will know that this only applies if you can spend “Google Sums” to pay for that. App Engine tries to scale by adding computing resources instead of just slowing down.
+While we didn’t test scaling to the full extent so far CPU utilization is flat/low. This architecture would probably scale much better than app engine ever did. Google sells App Engine as a "Google Scale" solution but anyone who worked with it will know that this only applies if you can spend "Google Sums" to pay for that. App Engine tries to scale by adding computing resources instead of just slowing down.
 
 That means that if you have 10k active users you’d pay for a lot of servers to handle them. Our current solution can handle 10k concurrent users easily. It would slow down but wouldn’t crash. It would still be cheap thanks to [Linode](https://www.linode.com/?r=57ffeef90ab49b35f5bdc2a8658a413515d8b3ca).
 
@@ -127,7 +127,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Lukman Javalove Idealist Jaji says:
 >
 > Fantastic read and kudos to you and the team.  
-> “Higher build quotas for free users including features such as push notification etc”…  
+> "Higher build quotas for free users including features such as push notification etc"…  
 > Does this mean we may get push features with basic subscription at least?
 >
 
@@ -141,11 +141,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > – JPA – I like JPA. It exposes SQL etc. but doesn’t seem to promote JPA. I’m sure I can integrate hibernate etc. but that would already mean more work than Spring Boot.
 >
-> – It “isn’t opinionated” – I think that’s conceptually wrong. I don’t think a framework can be everything to everyone and still be good. You need to have opinions and optimize to those opinions otherwise you provide a sub par experience to everyone
+> – It "isn’t opinionated" – I think that’s conceptually wrong. I don’t think a framework can be everything to everyone and still be good. You need to have opinions and optimize to those opinions otherwise you provide a sub par experience to everyone
 >
-> – Legacy – one of the cool things I have with Spring Boot is support for legacy code and features. I could just stick an old servlet “as is” without rewriting the very sensitive code I had there. It’s really convenient
+> – Legacy – one of the cool things I have with Spring Boot is support for legacy code and features. I could just stick an old servlet "as is" without rewriting the very sensitive code I had there. It’s really convenient
 >
-> – Deployment – deploying a Spring Boot app in linux as a service is amazing. It generates a special JAR that works as a Linux service… The whole story “just works”.
+> – Deployment – deploying a Spring Boot app in linux as a service is amazing. It generates a special JAR that works as a Linux service… The whole story "just works".
 >
 > Again, I’m writing this without spending one minute playing with vertx so I might be completely wrong.
 >

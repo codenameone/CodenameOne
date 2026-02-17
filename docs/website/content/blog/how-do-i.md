@@ -13,11 +13,11 @@ author: Shai Almog
 
   
 
-Answering common question is what a FAQ is usually for, but usually that’s just not enough. A common presentation tip is: “Show, don’t tell”.  
+Answering common question is what a FAQ is usually for, but usually that’s just not enough. A common presentation tip is: "Show, don’t tell".  
   
 Which is why we launched the  
 [  
-“How Do I?”  
+"How Do I?"  
 ](http://www.codenameone.com/how-do-i.html)  
 section in the Codename One website, this section contains short video tutorials demonstrating how to do small things in Codename One from creating your first Codename One application to monetizing and debugging it (upcoming).  
   

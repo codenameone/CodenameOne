@@ -30,9 +30,9 @@ There are many Codename One resources for building native mobile apps but they a
   * 
 
   * [• Using Icon Fonts Such as Fontello](/blog/using-icon-fonts-such-as-fontello.html) – in this tutorial we review icon font usage in Codename One. These are very useful for resolution independent images.
-  *   * [• Avoiding Lists](/blog/avoiding-lists.html) – A common question is how to use a “List” in Codename One. In this tutorial we explain why lists in Codename One are problematic and the strategies you can use to create a list interface.
+  *   * [• Avoiding Lists](/blog/avoiding-lists.html) – A common question is how to use a "List" in Codename One. In this tutorial we explain why lists in Codename One are problematic and the strategies you can use to create a list interface.
   *   * [• Understanding the Table Component](/blog/understanding-the-table-component.html) – this tutorial is pretty self explanatory.
-  *   * [• Understanding device density](/blog/i-am-your-density.html) – in a tutorial written for “back to the future day” Steve covers the nuances of device densities.
+  *   * [• Understanding device density](/blog/i-am-your-density.html) – in a tutorial written for "back to the future day" Steve covers the nuances of device densities.
   *   * [• CSS Support](/blog/rounded-corners-shadows-and-gradients-with-css.html) – in this tutorial Steve talks about the CSS support he built for Codename One. There is also a [followup article on new CSS capabilities.](/blog/using-css-to-import-images.html)
   *   * [• Dynamic Autocomplete](/blog/dynamic-autocomplete.html) – in this tutorial we discuss the usage of an auto-complete text field and how we can use a webservice to provide suggestions to users.
   *   * [• Local notifications on iOS & Android](/blog/local-notifications.html) – covered the support for firing local notifications when the app is in the background.
@@ -62,7 +62,7 @@ Notice that a while back, we shifted most of our effort to the Codename One Acad
   *   * [• Cordova/PhoneGap compatibility](/blog/phonegap-cordova-compatibility-for-codename-one.html) – this isn’t just a video but it covers a lot of the ideas behind the Cordova support we added to Codename One a while back.
   *   * [• Debug a Codename One app on an Android Device](/blog/debug-a-codename-one-app-on-an-android-device.html) – this is technically a How Do I? video but it’s a really good one so it’s listed here.
   *   * [• Codename One Webinar](/blog/java-mobile-dev-webinar-recap.html) – Steve did a couple of Codename One webinars, the second one is [here](/blog/java-mobile-dev-webinar-sequel-recap.html). Those were both very interesting and covered multiple different topics.
-  *   * [• Dr. Sbaitso](/blog/dr-sbaitso.html) & [Property Cross](/blog/propertycross-demo.html) – this is effectively the same content as the “by example” course above but on YouTube.
+  *   * [• Dr. Sbaitso](/blog/dr-sbaitso.html) & [Property Cross](/blog/propertycross-demo.html) – this is effectively the same content as the "by example" course above but on YouTube.
   *   * [• LTS Talk](https://www.youtube.com/watch?v=dDu8BpsGfPk) – a talk I gave to LTS over cross mobile device programming.
   *   * [• JavaZone 2013 talk](http://vimeo.com/74440476) – a lecture covering the basic principals of Codename One.
   *   * [• Lecture from Mateja Opacic](https://www.youtube.com/watch?v=NNYvyNmPDq4) – Mateja gave a lecture at the Coding Serbia Conference and discussed Codename One.
@@ -70,7 +70,7 @@ Notice that a while back, we shifted most of our effort to the Codename One Acad
 
 ### More?
 
-We hope to produce more content as we move forward both to replace older/outdated content and to provide more “ready made” starting points.
+We hope to produce more content as we move forward both to replace older/outdated content and to provide more "ready made" starting points.
 
 Our property cross and chat tutorials were very successful mostly because they represent real world types of applications developers want unlike the kitchen sink which is abstract.
 

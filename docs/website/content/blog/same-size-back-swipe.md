@@ -45,19 +45,18 @@ So we can effectively do something like Component.setSameWidth(cmp1, cmp2, cmp3,
   
   
   
-One of our enterprise developers pointed out functionality in iOS7 that allows swiping back a form to the previous form. This is pretty hard to accomplish in Codename One because we expect transitions to be non-interactive. However, we decided to pick up that challenge since we want to upgrade transitions for iOS/Android to more closely match the new designs (e.g. Material) so we added a new API to enable back swipe transition: SwipeBackSupport.bindBack(Form currentForm, LazyValue<Form> destination);  
+One of our enterprise developers pointed out functionality in iOS7 that allows swiping back a form to the previous form. This is pretty hard to accomplish in Codename One because we expect transitions to be non-interactive. However, we decided to pick up that challenge since we want to upgrade transitions for iOS/Android to more closely match the new designs (e.g. Material) so we added a new API to enable back swipe transition: `SwipeBackSupport.bindBack(Form currentForm, LazyValue<Form> destination);`  
   
   
   
   
 That one command will enable swiping back from currentForm. LazyValue is a new interface that we will probably use quite often moving forward, its defined as:  
   
-  
-public interface LazyValue<T> {  
-  
-public T get(Object… args);  
-  
-}  
+```java
+public interface LazyValue<T> {
+    public T get(Object… args);
+}
+```  
   
   
   
@@ -153,17 +152,17 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > title = new Label(); 
 >
-> title.setUIID(“MyLabel”); 
+> title.setUIID("MyLabel"); 
 >
 > setLayout(new BorderLayout()); 
 >
 > addComponent(BorderLayout.WEST, title); 
 >
-> setUIID(“Underline”); 
+> setUIID("Underline"); 
 >
-> focus = new Label(“”); 
+> focus = new Label(""); 
 >
-> focus.setUIID(“UnderlineSelected”); 
+> focus.setUIID("UnderlineSelected"); 
 >
 > } 
 >
@@ -178,7 +177,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > It takes account of DPI (when applicable) but keep in mind that DPI != font size. E.g. TV is at least 40 inches thus even though its theoretically HD its really low DPI since you sit very far from it. A watch has a ridiculously high DPI on the other hand. 
 >
-> Hardcoding 8 might not look good in all the ranges you want to size these things based on the content and the content is determined by the renderingPrototype. Your renderer wouldn’t matter and you won’t need to change the preferred size, it would “just work”.
+> Hardcoding 8 might not look good in all the ranges you want to size these things based on the content and the content is determined by the renderingPrototype. Your renderer wouldn’t matter and you won’t need to change the preferred size, it would "just work".
 >
 
 
@@ -196,9 +195,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> FYI – each time I press “Submit” here I get this message: 
+> FYI – each time I press "Submit" here I get this message: 
 >
-> “There was an error submitting your comment. Please try again”
+> "There was an error submitting your comment. Please try again"
 >
 
 

@@ -11,9 +11,9 @@ author: Shai Almog
 
 ![Header Image](/blog/restaurant-app-builder/full-stack-java-bootcamp.jpg)
 
-In the bootcamp we didn’t build just one big app, we built two…​ Or infinity…​ The first app was a restaurant ordering system that allows you to pick dishes from a menu and add them to a shopping cart. The second app was an “app builder” that allows you to customize the first app and then generate a native app based on that for your specific restaurant.
+In the bootcamp we didn’t build just one big app, we built two…​ Or infinity…​ The first app was a restaurant ordering system that allows you to pick dishes from a menu and add them to a shopping cart. The second app was an "app builder" that allows you to customize the first app and then generate a native app based on that for your specific restaurant.
 
-I kept that under wraps because I wanted to do a big “launch” and release the app to the wild based on that but I ended up being so busy after the bootcamp completed that this just didn’t materialize. So instead of doing a big launch I’m doing the softest possible launch for this app. This is how the restaurant app looks, I cover its creation in the [upcoming courses](/blog/new-online-courses-coming-soon.html) too:
+I kept that under wraps because I wanted to do a big "launch" and release the app to the wild based on that but I ended up being so busy after the bootcamp completed that this just didn’t materialize. So instead of doing a big launch I’m doing the softest possible launch for this app. This is how the restaurant app looks, I cover its creation in the [upcoming courses](/blog/new-online-courses-coming-soon.html) too:
 
 ![Main menu selection](/blog/restaurant-app-builder/restaurant-app-main.png)
 

@@ -18,26 +18,26 @@ In-app purchase is a helpful tool for making app development profitable. Codenam
 
 ## The SKU
 
-In-app purchase support is centered around your set of SKUs that you want to sell. Each product that you sell, whether it be a 1-month subscription, an upgrade to the “Pro” version, “10 disco credits”, will have a SKU (stock-keeping-unit). Ideally you will be able to use the same SKU across all of the stores that you sell your app in.
+In-app purchase support is centered around your set of SKUs that you want to sell. Each product that you sell, whether it be a 1-month subscription, an upgrade to the "Pro" version, "10 disco credits", will have a SKU (stock-keeping-unit). Ideally you will be able to use the same SKU across all of the stores that you sell your app in.
 
 ## Types of Products
 
 There are generally 4 classifications for products:
 
-  1. **Non-consumable Product** – This is a product that the user purchases once, and they “own” it. They cannot re-purchase it. One example is a product that upgrades your app to a “Pro” version.
+  1. **Non-consumable Product** – This is a product that the user purchases once, and they "own" it. They cannot re-purchase it. One example is a product that upgrades your app to a "Pro" version.
 
-  2. **Consumable Product** – This is a product that the user can purchase multiple times. E.g. You might have a product for “10 Credits” that allow the user to buy things in a game.
+  2. **Consumable Product** – This is a product that the user can purchase multiple times. E.g. You might have a product for "10 Credits" that allow the user to buy things in a game.
 
-  3. **Non-Renewable Subscription** – A subscription that is purchased once, and will not be “auto-renewed” by the app store. These are almost identical to consumable products, except that subscriptions need to be transferable across all of the user’s devices. This means that non-renewable subscriptions require that you have a server server to keep track of the subscriptions.
+  3. **Non-Renewable Subscription** – A subscription that is purchased once, and will not be "auto-renewed" by the app store. These are almost identical to consumable products, except that subscriptions need to be transferable across all of the user’s devices. This means that non-renewable subscriptions require that you have a server server to keep track of the subscriptions.
 
   4. **Renewable Subscriptions** – A subscription that is completely managed by the app store. The user will be automatically billed when the subscription period ends, and the subscription will be renewed.
 
 __ |  These subscription categories may not be explicitly supported by a given store, or they may be called different things. However each type of product can be implemented in a Codename One app in a cross-platform way. E.g. In Google Play there is no distinction between consumable products and non-renewable subscriptions, but in iTunes there is a distinction.   
 ---|---  
   
-## The “Hello World” of In-App Purchase
+## The "Hello World" of In-App Purchase
 
-Let’s start with a simple example of an app that sells “Worlds”. The first thing we do is pick the SKU for our product. I’ll choose “com.codename1.world” for the SKU.
+Let’s start with a simple example of an app that sells "Worlds". The first thing we do is pick the SKU for our product. I’ll choose `com.codename1.world` for the SKU.
     
     
     public static final String SKU_WORLD = "com.codename1.world";
@@ -131,7 +131,7 @@ When the app first opens we see our button:
 
 ![In-app purchase demo app](/blog/intro-to-in-app-purchase/iap-demo-1.png)
 
-In the simulator, clicking on the “Buy World” button will bring up a prompt to ask you if you want to approve the purchase.
+In the simulator, clicking on the "Buy World" button will bring up a prompt to ask you if you want to approve the purchase.
 
 ![Approving the purchase in the simulator](/blog/intro-to-in-app-purchase/iap-demo2.png)
 
@@ -141,7 +141,7 @@ Now if I try to buy the product again, it pops up the dialog to let me know that
 
 ## Making it Consumable
 
-In the “Buy World” example above, the “world” product was non-consumable, since it could only be purchased once. We could easily change it to a consumable product by simply disregarding whether it had been purchased before and keeping track of how many times it had been purchased.
+In the "Buy World" example above, the "world" product was non-consumable, since it could only be purchased once. We could easily change it to a consumable product by simply disregarding whether it had been purchased before and keeping track of how many times it had been purchased.
 
 We’ll use storage to keep track of the number of worlds that have been purchased. We need two methods to manage this count. One to get the number of worlds that we currently own, and another to add a world to this count.
     

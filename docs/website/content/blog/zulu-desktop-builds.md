@@ -13,11 +13,11 @@ author: Shai Almog
 
 Sometimes you pick up a task and know in advance it’s going to be hell to implement it. Sometimes, the hell you were expecting turns out to be **WAY** worse than you anticipated. This is the case for modern Java desktop deployment. Amazingly, Java was able to take one of the worse deployment processes possible and make it **MUCH** worse than before.
 
-If you haven’t used the Codename One desktop port I’ll sum it up to you. We use `javapackager` (formerly `javafxpackager`) to essentially wrap the jar file as a DMG/pkg on Mac OS and as an EXE/MSI on Windows. This “worked” in the broad sense of the word. It had a lot of issues and we had to create a lot of workarounds.
+If you haven’t used the Codename One desktop port I’ll sum it up to you. We use `javapackager` (formerly `javafxpackager`) to essentially wrap the jar file as a DMG/pkg on Mac OS and as an EXE/MSI on Windows. This "worked" in the broad sense of the word. It had a lot of issues and we had to create a lot of workarounds.
 
-However, Oracle effectively killed Java 8. This left us in a bind with an out of date VM that we need to maintain. Some Java advocates came out a while back with an open document claiming that [“Java is still free”](https://docs.google.com/document/d/1nFGazvrCvHMZJgFstlbzoHjpAVwv5DEdnaBr_5pKuHo/edit#heading=h.p3qt2oh5eczi)…​
+However, Oracle effectively killed Java 8. This left us in a bind with an out of date VM that we need to maintain. Some Java advocates came out a while back with an open document claiming that ["Java is still free"](https://docs.google.com/document/d/1nFGazvrCvHMZJgFstlbzoHjpAVwv5DEdnaBr_5pKuHo/edit#heading=h.p3qt2oh5eczi)…​
 
-If you think that a 23 page document explaining that something is “free” sounds problematic…​ Well, you have a point.
+If you think that a 23 page document explaining that something is "free" sounds problematic…​ Well, you have a point.
 
 ### ZuluFX
 

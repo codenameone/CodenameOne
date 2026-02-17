@@ -50,7 +50,7 @@ for a button in all of its states I need to do this:
 If I need to set more than one property this becomes a huge pain and I’d want to refactor this into a method that  
 accepts a `Style` object etc… Painful!  
 So to simplify this common use case we finally came up with something simple: `getAllStyles()`.  
-This new method returns a special “fake” style object that will implicitly call all the above setters in a single go.  
+This new method returns a special "fake" style object that will implicitly call all the above setters in a single go.  
 **Important:** the getters for this style return meaningless values and should never be used,  
 we would have added an exception for them but this would create a performance penalty.  
 To use this new style for the above use case just do: 
@@ -69,7 +69,7 @@ To use this new style for the above use case just do:
 
 #### Creating A Scrollbar in Codename One
 
-Codename One has always been “mobile first” and while we do have a desktop/web port it still feels like  
+Codename One has always been "mobile first" and while we do have a desktop/web port it still feels like  
 a mobile app even there which is normally fine by us.   
 In the past some guys asked for scrollbar functionality and we thought it would be a bit tough, but recently  
 a [discussion in the forums](https://groups.google.com/d/msg/codenameone-discussions/l-PIHO3CAEw/tO56K-p0DgAJ)  

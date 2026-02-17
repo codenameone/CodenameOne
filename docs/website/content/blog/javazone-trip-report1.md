@@ -34,7 +34,7 @@ a couple of weeks ago
   
 On the right you can see a picture of me on the  
 [  
-“Game Of Code”  
+"Game Of Code"  
 ](http://www.codenameone.com/blog/game-of-code)  
 throne, its hard to make out the details with my awful Nexus camera but these are actually quite a few real keyboards dyed in silver that are used to form a chair.  
   
@@ -152,11 +152,11 @@ Here are the ones I went to mostly in order of appearance:
   
   
 
-Cliff Click (great name for the tech industry) gave on the first talks in the conference: ”  
+Cliff Click (great name for the tech industry) gave on the first talks in the conference: "  
 [  
 Building A Big Data Machine Learning Platform  
 ](http://2014.javazone.no/presentation.html?id=2f5fd65c)  
-“. I was highly conflicted between this and the Docker talk and eventually picked this talk. Normally its less of a subject I care about since we have our big data App Engine backend but the talk was really interesting, the way in which the data is held in memory and partitioned across devices/VM’s is fascinating. Normally I thought in-memory DB’s were limited by machine RAM and it seems this is untrue.  
+". I was highly conflicted between this and the Docker talk and eventually picked this talk. Normally its less of a subject I care about since we have our big data App Engine backend but the talk was really interesting, the way in which the data is held in memory and partitioned across devices/VM’s is fascinating. Normally I thought in-memory DB’s were limited by machine RAM and it seems this is untrue.  
   
   
   
@@ -164,15 +164,15 @@ Building A Big Data Machine Learning Platform
   
 ---|---  
   
-Neal Ford had a talk titled ”  
+Neal Ford had a talk titled "  
 [  
 Continuous Delivery for Architects  
 ](http://2014.javazone.no/presentation.html?id=cce167fb)  
-“. His talk was great and very complimentary to the talk given by his colleague Sam Newman later on. His presentation visualizes a lot of the complexities of dealing with hugely complex architectures, which is something I don’t really run into as much so while it was very interesting it was mostly on an academic level.  
+". His talk was great and very complimentary to the talk given by his colleague Sam Newman later on. His presentation visualizes a lot of the complexities of dealing with hugely complex architectures, which is something I don’t really run into as much so while it was very interesting it was mostly on an academic level.  
   
   
   
-I did enjoy this presentation tremendously as a guide for “how to present a highly technical set of ideas visually”. I’m a less visual person by my nature so these presentations help me present in a way other people understand.  
+I did enjoy this presentation tremendously as a guide for "how to present a highly technical set of ideas visually". I’m a less visual person by my nature so these presentations help me present in a way other people understand.  
   
   
   
@@ -213,20 +213,20 @@ with Nathaniel Schutta and Matthew McCullough. All 3 are amazing speakers with r
   
 ---|---  
   
-Sam Newman practically had me rolling on the floor laughing at ”  
+Sam Newman practically had me rolling on the floor laughing at "  
 [  
 Practical Considerations For Microservice Architectures  
 ](http://2014.javazone.no/presentation.html?id=96a5fd40)  
-“, over his joke in the first few minutes (maybe its the dry British humor I like so much). I’m still conflicted about how practical it is for our type of organization to adopt such an architecture, but as we grow up this does seem like a reasonable approach.  
+", over his joke in the first few minutes (maybe its the dry British humor I like so much). I’m still conflicted about how practical it is for our type of organization to adopt such an architecture, but as we grow up this does seem like a reasonable approach.  
 |    
   
 ---|---  
   
-I missed most of the talk ”  
+I missed most of the talk "  
 [  
 50 new features of Java EE 7  
 ](http://2014.javazone.no/presentation.html?id=7f6e0518)  
-” from Arun Gupta and only got the end of it, that’s OK because I’ll probably be able to check the full thing at JavaOne. I’m checking out the full talk on Vimeo right now just in case JavaOne has bad scheduling (JavaZone is so great in that regard). Check out the talk to learn about Java EE 7 or better yet check out his book on  
+" from Arun Gupta and only got the end of it, that’s OK because I’ll probably be able to check the full thing at JavaOne. I’m checking out the full talk on Vimeo right now just in case JavaOne has bad scheduling (JavaZone is so great in that regard). Check out the talk to learn about Java EE 7 or better yet check out his book on  
 [  
 Java EE 7  
 ](http://www.amazon.com/Java-EE-Essentials-Arun-Gupta/dp/1449370179)  
@@ -239,7 +239,7 @@ Probably the highlight of the show was
 [  
 Kent Beck  
 ](http://2014.javazone.no/presentation.html?id=5bfa5b7e)  
-. If you don’t know who that is then go to your library, hopefully “Design Patterns” is there… When you have a chance to listen to someone who had such an impact on the industry give a talk you should take it no matter what the subject is and I was quite happy I did.  
+. If you don’t know who that is then go to your library, hopefully "Design Patterns" is there… When you have a chance to listen to someone who had such an impact on the industry give a talk you should take it no matter what the subject is and I was quite happy I did.  
   
   
 The talk was a bit too high level dealing with design as an overly abstract word, but his basic axioms were non-religious about the position of design and a lot of his insights were spot on and enlightening.    
@@ -248,11 +248,11 @@ The talk was a bit too high level dealing with design as an overly abstract word
   
 ---|---  
   
-Ken Sipe gave a talk titled ”  
+Ken Sipe gave a talk titled "  
 [  
 Future of Development and the Cloud  
 ](http://2014.javazone.no/presentation.html?id=986ca62a)  
-” where he talked about  
+" where he talked about  
 [  
 mesos  
 ](http://mesosphere.io/)  
@@ -265,11 +265,11 @@ I’m blissfully unaware of some of the complexity involved in this field thanks
   
 ---|---  
   
-Nathaniel Schutta is someone you should see talk, he gives these fluid hilarious presentations that are always fun to watch even if you disagree. He makes the talk seem effortless which it might be with that level of experience. His talk this year was titled ”  
+Nathaniel Schutta is someone you should see talk, he gives these fluid hilarious presentations that are always fun to watch even if you disagree. He makes the talk seem effortless which it might be with that level of experience. His talk this year was titled "  
 [  
 Mind the Gap: Architecting UIs in the Era of Diverse Devices  
 ](http://2014.javazone.no/presentation.html?id=6038cb37)  
-” and had talked about the difficulty of dealing with all these devices.  
+" and had talked about the difficulty of dealing with all these devices.  
   
   
 Wisely Nate doesn’t leave time for Q&A but that was not something I was willing to accept so I grabbed him immediately after for a long hard talk about Codename One and getting rid of his JavaScript obsession. I don’t think his armor is cracked but judging from the obvious pain and suffering that shows thru his presentation he has no choice but to pickup Codename One eventually.  

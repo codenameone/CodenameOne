@@ -37,7 +37,7 @@ Pisces is a rendering engine developed at Sun that was designed to be very porta
   
   
   
-We are working on adding “native” support for advanced graphics capabilities that will use hardware acceleration to bring this level of graphics to all use cases. This is obviously a tall order and would only work on smartphones so the utility of the Pisces port will remain even when we provide such an API.  
+We are working on adding "native" support for advanced graphics capabilities that will use hardware acceleration to bring this level of graphics to all use cases. This is obviously a tall order and would only work on smartphones so the utility of the Pisces port will remain even when we provide such an API.  
   
   
   

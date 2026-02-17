@@ -29,7 +29,7 @@ Hamburger Menu
   
 So lets get started with the features, first is one of the newer features up our sleeve, the ability to place a side menu on the right, top or on both sides of the title (as in the facebook app). You can  
   
-accomplish this by using something like cmd.putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT);
+accomplish this by using something like `cmd.putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT);`
 
   
 Or as you might see in this more detailed example where you can just swap menu placements on the fly:  
@@ -46,7 +46,7 @@ This is remarkably useful but its also somewhat problematic for some developers,
   
 The first is actionable which you enable by just turning it on as such: cmd  
   
-.putClientProperty(“Actionable”, Boolean.TRUE); 
+.putClientProperty("Actionable", Boolean.TRUE); 
 
   
 This effectively means that the custom  
@@ -54,19 +54,19 @@ This effectively means that the custom
 component will look exactly the same, but when its touched/clicked it will act like any other command on the list. This uses a lead component trick to make the hierarchy (or component) in customCmp act as a single action.
 
   
-There are several additional options that allow you to just bind action events and then “manage” the SideMenuBar e.g.:  
+There are several additional options that allow you to just bind action events and then "manage" the SideMenuBar e.g.:  
   
 
   *   
 SideMenuBar.  
   
 isShowing() – useful for writing generic code that might occur when the SideMenuBar is on the form. 
-  * SideMenuBar.closeCurrentMenu() – allows you to close the menu, this is useful if you are not navigating to another form.  
+  * `SideMenuBar.closeCurrentMenu()` – allows you to close the menu, this is useful if you are not navigating to another form.  
   
 
   * SideMenuBar.closeCurrentMenu(Runnable) – just like closeCurrentMenu() however it will invoke the run() method when complete. This allows you to navigate to another form after the menu close animation completed.  
 
-The TitleCommand property allows you to flag a command as something you would want to see in the right hand title area and not within the SideMenu area. Just place it into a component using cmd.putClientProperty(“TitleCommand”, Boolean.TRUE);
+The TitleCommand property allows you to flag a command as something you would want to see in the right hand title area and not within the SideMenu area. Just place it into a component using `cmd.putClientProperty("TitleCommand", Boolean.TRUE);`
 
   
 Last but not least w  

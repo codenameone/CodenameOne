@@ -31,7 +31,7 @@ This gets translated seamlessly so if you set the key from the bundle as the tex
 
 You can obviously invoke the localize method of UIManager if you have a special case but you don’t need to for most cases.
 
-One of the big things we omitted from Codename One is message format. That class solves some complex edge case formatting but is also a half baked solution. A sentence like “This is your 3rd try” will not work well with message format so we think there are probably better ways to implement that functionality rather than repeat over engineered mistakes from Java SE.
+One of the big things we omitted from Codename One is message format. That class solves some complex edge case formatting but is also a half baked solution. A sentence like "This is your 3rd try" will not work well with message format so we think there are probably better ways to implement that functionality rather than repeat over engineered mistakes from Java SE.
 
 One of the important aspects of localization is culture. A great example in this sense is color which especially in oriental cultures has very different meanings. An example would be red which means stop or problem in the west but it might mean something different in the east. We can extract that into the resource bundle.
 
@@ -46,7 +46,7 @@ But first check out the buttons in the bottom. With these you can add, remove or
 Moving on to the code lets review this line by line.  
 We get the language from the localization manager tool, this is a short iso code for the language and not the actual string name  
 It should be lower case and non-null by default but I’m just playing safe here…  
-The locale sometimes changes iso codes so some platforms might still be using the old “he” code instead of the newer “iw” code.  
+The locale sometimes changes iso codes so some platforms might still be using the old "he" code instead of the newer "iw" code.  
 There are two important methods here. First is set bundle, we set the key value pairs for the current language. The second is getL10N where we get the localization bundle for iw from the theme.  
 Notice we ignore English as that is the default language for the application.
 
@@ -59,7 +59,7 @@ L10NManager has multiple format methods that make the process of formatting numb
 
 I mentioned RTL before but I didn’t explain it well. Some languages such as Hebrew and Arabic are written from right to left. Probably because they are so ancient that they were mostly carved on rock and it was easier holding the hammer in the right hand. In modern times this is a source of great pain from smearing of ink while writing to the basic bidi problem.
 
-Bidi represents mixing an RTL language with a left to right language or numbers. Numbers are still drawn from left to right in these languages so when you type text in a text field the cursor will literally “jump” to accommodate the reverse flow in such a case…. This makes the problem not just a right to left problem but rather a bi-directional problem or bidi for short.
+Bidi represents mixing an RTL language with a left to right language or numbers. Numbers are still drawn from left to right in these languages so when you type text in a text field the cursor will literally "jump" to accommodate the reverse flow in such a case…. This makes the problem not just a right to left problem but rather a bi-directional problem or bidi for short.
 
 One of the core expectations of working in such languages is UI reversal. Books in RTL languages are the mirror images of latin books in the sense that you turn the pages in the opposite direction. Text is aligned to the right and everything should be flipped. The same is true for a UI we expect alignment in reverse as well as reverse order for the components within the layouts. This is handled mostly seamlessly by Codename One layouts. They reverse the element order and flip sides when RTL mode is active, so if you add something to border layout EAST in RTL it would act like you added it to WEST and so forth. Aligning an object to the left in RTL would be like aligning it to the right and visa versa.
 

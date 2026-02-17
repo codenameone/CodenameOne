@@ -278,43 +278,43 @@ After the constant pool, we see each of the methods of the class written out as 
           16: ldc           #8                  // String Hello Kotlin
           etc...
 
-In the above snippet, the first instruction is `aload_0` (which adds `this` to the stack). The 2nd instruction is `ldc`, (which loads constant #8 — the string “Hello Kotlin” to the stack). The 3rd instruction is `invokestatic` which calls the static method define by Constant #14 from the constant pool, with the two parameters that had just been added to the stack.
+In the above snippet, the first instruction is `aload_0` (which adds `this` to the stack). The 2nd instruction is `ldc`, (which loads constant #8 — the string "Hello Kotlin" to the stack). The 3rd instruction is `invokestatic` which calls the static method define by Constant #14 from the constant pool, with the two parameters that had just been added to the stack.
 
 __ |  You don’t need to understand what all of these instructions do. You just need to look for instructions that may be problematic.   
 ---|---  
   
-The only instruction that I **think** might be problematic is “invokedynamic”. All other instructions should work find in Codename One. (I don’t know for a fact that invokedynmic won’t work – I just suspect it might not work on some platforms).
+The only instruction that I **think** might be problematic is "invokedynamic". All other instructions should work find in Codename One. (I don’t know for a fact that invokedynmic won’t work – I just suspect it might not work on some platforms).
 
 **Summary of Byte-code Assessment**
 
 So to summarize, the byte-code assessment phase, we’re basically just looking to make sure that the compiler doesn’t tend to add dependencies to parts of the JDK that Codename One doesn’t currently support. And we want to make sure that it doesn’t use invokedynamic.
 
-If you find that the compiler does use invokedynamic or add references to classes that Codename One doesn’t support, don’t give up just yet. You might be able to create your own “porting” runtime library that will provide these dependencies at runtime.
+If you find that the compiler does use invokedynamic or add references to classes that Codename One doesn’t support, don’t give up just yet. You might be able to create your own "porting" runtime library that will provide these dependencies at runtime.
 
 #### Assessing the Runtime Library
 
-The process for assessing the runtime library is pretty similar to the process for the bytecodes. You’ll want to get your hands on the language’s runtime library, and use `javap` to inspect the .class files. You’re looking for the same things as you were looking for in the compiler’s output: “invokedynamic” and classes that aren’t supported in Codename One.
+The process for assessing the runtime library is pretty similar to the process for the bytecodes. You’ll want to get your hands on the language’s runtime library, and use `javap` to inspect the .class files. You’re looking for the same things as you were looking for in the compiler’s output: "invokedynamic" and classes that aren’t supported in Codename One.
 
 ### Step 2: Convert the Runtime Library into a CN1Lib
 
 Once you have assessed the language and are optimistic that it is a good candidate for porting, you can proceed to port the runtime library into Codename One. Usually that language’s runtime library will be distributed in .jar format. You need to convert this into a cn1lib so that it can be used in a Codename One project. If you can get your hands on the source code for the runtime library then the best approach is to paste the source files into a Codename One Library project, and try to build it. This has the advantage that it will validate the source during compile to ensure that it doesn’t depend on any classes that Codename One doesn’t support.
 
-If you can’t find the sources of the runtime library or they don’t seem to be easily “buildable”, then the next best thing is to just get the binary distribution’s jar file and convert it to a cn1lib. This is what I did for the [Kotlin runtime library](https://github.com/shannah/codenameone-kotlin).
+If you can’t find the sources of the runtime library or they don’t seem to be easily "buildable", then the next best thing is to just get the binary distribution’s jar file and convert it to a cn1lib. This is what I did for the [Kotlin runtime library](https://github.com/shannah/codenameone-kotlin).
 
-This procedure exploits the fact that a cn1lib file is just a zip file with a specific file structure inside it. The cross-platform Java .class files are all contained inside a file named “main.zip”, inside the zip file. This is the only **mandatory** file that must be inside a cn1lib.
+This procedure exploits the fact that a cn1lib file is just a zip file with a specific file structure inside it. The cross-platform Java .class files are all contained inside a file named "main.zip", inside the zip file. This is the only **mandatory** file that must be inside a cn1lib.
 
-To make the library easier to use the cn1lib file can also contain a file named “stubs.zip” which includes stubs of the Java sources. When you build a cn1lib using a Codename One Library project, it will automatically generate stubs of the source so that the IDE will have access to nice things like Javadoc when using the library. The kotlin distribution includes a separate jar file with the runtime sources, named “kotlin-runtime-sources.jar”, so I used this as the “stubs”. It contains full sources, which isn’t necessary, but it also doesn’t hurt.
+To make the library easier to use the cn1lib file can also contain a file named "stubs.zip" which includes stubs of the Java sources. When you build a cn1lib using a Codename One Library project, it will automatically generate stubs of the source so that the IDE will have access to nice things like Javadoc when using the library. The kotlin distribution includes a separate jar file with the runtime sources, named "`kotlin-runtime-sources.jar`", so I used this as the "stubs". It contains full sources, which isn’t necessary, but it also doesn’t hurt.
 
-So now that I had my two jar files: kotlin-runtime.jar and kotlin-runtime-sources.jar, I created a new empty directory, and copied them inside. I renamed the jars “main.zip” and “stubs.zip” respectively. Then I zipped up the directory and renamed the zip file “kotlin-runtime.cn1lib”.
+So now that I had my two jar files: `kotlin-runtime.jar` and `kotlin-runtime-sources.jar`, I created a new empty directory, and copied them inside. I renamed the jars "main.zip" and "stubs.zip" respectively. Then I zipped up the directory and renamed the zip file "`kotlin-runtime.cn1lib`".
 
 __ |  Building cn1libs manually in this way is a **very** bad habit, as it bypasses the API verification step that normally occurs when building a library project. It is possible, even likely, that the jar files that you convert depend on classes that aren’t in the Codename One library, so your library will fail at runtime in unexpected ways. The only reason I could do this with kotlin’s runtime (with some confidence) is because I already analyzed the bytecodes to ensure that they didn’t include anything problematic.   
 ---|---  
   
 ### Step 3: Hello World
 
-For our “Hello World” test we will need to create a separate project in our JVM language and produce class files that we will **manually** copy into an appropriate location of our project. We’ll want to use the **normal** tools for the language and not worry about how it integrates with Codename One. For Kotlin, I just followed the getting started tutorial on the Kotlin site to create a new Kotlin project in IntelliJ. When I ported Mirah, I just used a text editor and the mirahc command-line compiler to create my Hello World class. The tools and process will depend on the language.
+For our "Hello World" test we will need to create a separate project in our JVM language and produce class files that we will **manually** copy into an appropriate location of our project. We’ll want to use the **normal** tools for the language and not worry about how it integrates with Codename One. For Kotlin, I just followed the getting started tutorial on the Kotlin site to create a new Kotlin project in IntelliJ. When I ported Mirah, I just used a text editor and the mirahc command-line compiler to create my Hello World class. The tools and process will depend on the language.
 
-Here is the “hello world” I created in Kotlin:
+Here is the "hello world" I created in Kotlin:
     
     
     package com.mycompany.myapp
@@ -326,13 +326,13 @@ Here is the “hello world” I created in Kotlin:
         }
     }
 
-After building this, I have a directory that contains “com/mycompany/myapp/HelloKotlin.class”.
+After building this, I have a directory that contains "com/mycompany/myapp/HelloKotlin.class".
 
 It also produced a .jar file that contains this class.
 
-I have found that the easiest way to integrate external code into a Codename One project, is just to wrap it as a cn1lib file and place it into my Codename One project’s lib directory. That way I don’t have to mess with any of the build files. So, using roughly the same procedure as I used to create the kotlin-runtime.cn1lib, I wrap my hellokotlin.jar as a cn1lib to produce “hellokotlin.cn1lib” and copy it to the “lib” directory of a Codename One project.
+I have found that the easiest way to integrate external code into a Codename One project, is just to wrap it as a cn1lib file and place it into my Codename One project’s lib directory. That way I don’t have to mess with any of the build files. So, using roughly the same procedure as I used to create the `kotlin-runtime.cn1lib`, I wrap my `hellokotlin.jar` as a cn1lib to produce "`hellokotlin.cn1lib`" and copy it to the "lib" directory of a Codename One project.
 
-__ |  Remember to select “Codename One” → “Refresh CN1Libs” after placing the cn1lib in your lib directory or it won’t get picked up.   
+__ |  Remember to select "Codename One" → "Refresh CN1Libs" after placing the cn1lib in your lib directory or it won’t get picked up.   
 ---|---  
   
 Finally, I call my library from the start() method of my app:
@@ -341,13 +341,13 @@ Finally, I call my library from the start() method of my app:
     HelloKotlin hello = new HelloKotlin();
     hello.hello();
 
-If I run this in the Simulator, it should print “Hello from Kotlin” in the output console. If I get an error, then I dig in and try to figure out what went wrong using my standard debugging techniques. **EXPECT** an error on the first run. Hopefully it will just be a missing import or something simple.
+If I run this in the Simulator, it should print "Hello from Kotlin" in the output console. If I get an error, then I dig in and try to figure out what went wrong using my standard debugging techniques. **EXPECT** an error on the first run. Hopefully it will just be a missing import or something simple.
 
 ### Step 4: A More Complex Hello World
 
 In the case of Kotlin, the hello world example app would actually run without the runtime library because it was so simple. So it was necessary to add a more complex example to prove the need for the runtime library. It doesn’t matter what you do with your more complex example, as long as it doesn’t require classes that aren’t in Codename One.
 
-If you want to use the Codename One inside your project, you should add the CodenameOne.jar (found inside any Codename One project) to your classpath so that it will compile.
+If you want to use the Codename One inside your project, you should add the `CodenameOne.jar` (found inside any Codename One project) to your classpath so that it will compile.
 
 ### Step 5: Automation and Integration
 
@@ -365,7 +365,7 @@ At this point we already have a manual process for incorporating files built wit
 
 When I first developed Mirah support I just automated this process using an [ANT script](https://github.com/shannah/CN1MirahNBM/blob/master/src/ca/weblite/codename1/mirah/build.xml). I also automatically generated some bootstrap code so that I could develop the whole app in Mirah and I woudn’t have to write any Java. However, I soon found that this level of integration has limitations.
 
-For example, with this approach alone, I couldn’t have two-way dependencies between Java source and Mirah source. Yes, my Mirah code could use Java libraries (and it did depend on CodenameOne.jar), and my Java code could use my Mirah code. However, my Mirah **source** code could not depend on the Java **source** code in my project. This has to do with the order in which code is compiled. It’s a bit of a chicken and egg issue. If we are building a project that has Java source code and Mirah source code, we are using two different compilers: mirahc to compile the Mirah files, and javac to compile the Java files. If we are starting from a clean build, and we run mirahc first, then the .java files haven’t yet been compiled to .class files – and thus mirahc can’t **reference** them – and any mirah code that depends on those uncompiled Java classes will fail. If we compile the .java files first, then we have the opposite problem.
+For example, with this approach alone, I couldn’t have two-way dependencies between Java source and Mirah source. Yes, my Mirah code could use Java libraries (and it did depend on `CodenameOne.jar`), and my Java code could use my Mirah code. However, my Mirah **source** code could not depend on the Java **source** code in my project. This has to do with the order in which code is compiled. It’s a bit of a chicken and egg issue. If we are building a project that has Java source code and Mirah source code, we are using two different compilers: mirahc to compile the Mirah files, and javac to compile the Java files. If we are starting from a clean build, and we run mirahc first, then the .java files haven’t yet been compiled to .class files – and thus mirahc can’t **reference** them – and any mirah code that depends on those uncompiled Java classes will fail. If we compile the .java files first, then we have the opposite problem.
 
 I worked around this problem in Mirah by writing [my own pseudo-compiler](https://github.com/shannah/mirah-ant/blob/master/src/ca/weblite/asm/JavaExtendedStubCompiler.java) that produced stub class files for the java source that would be referenced by mirahc when compiling the Mirah files. In this way I was able to have two-way dependencies between Java and Mirah in the same project.
 
@@ -378,7 +378,7 @@ For both the Kotlin and Mirah support, I wanted integration to be seamless. I di
     
     <withKotlin/>
 
-And it would automatically handle Kotlin and Java files together: Seamlessly. There are a few places in a Codename One’s build.xml file where we call “javac” so we just needed to inject these tags in those places. This injection is performed automatically by the Codename One IntelliJ plugin.
+And it would automatically handle Kotlin and Java files together: Seamlessly. There are a few places in a Codename One’s `build.xml` file where we call "javac" so we just needed to inject these tags in those places. This injection is performed automatically by the Codename One IntelliJ plugin.
 
 For Mirah, I developed my own [ANT plugins](https://github.com/shannah/mirah-ant) and [Netbeans module](https://github.com/shannah/mirah-nbm) that do something similar in Netbeans.
 

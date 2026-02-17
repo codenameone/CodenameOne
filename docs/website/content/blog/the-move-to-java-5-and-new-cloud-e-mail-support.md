@@ -33,7 +33,7 @@ We also added
 Map/Collection support to the Util write object classes and Storage serialization code. So if you pass a vector or hashtable to the code it will act like before, however if you pass a different collection (e.g. ArrayList) or Map (e.g. HashMap) it will be stored properly as well. Right now when we unmarshal (read) the data for a Map or Collection we will always create as HashMap or ArrayList never creating the actual concrete class, the reason we can’t do that is that if we saved the class name and it was obfuscated this might break between revisions.
 
   
-So this was the “low hanging fruit” now comes the tough part… Some developers have asked us in the past to generify some interfaces e.g. EventDispatcher, ListCellRenderer & DefaultListModel. To be honest I’m not so sure how well this will work but I understand the value of being able to do that. I have some concerns about binary compatibility for these cases but from my understanding it should be possible.  
+So this was the "low hanging fruit" now comes the tough part… Some developers have asked us in the past to generify some interfaces e.g. EventDispatcher, ListCellRenderer & DefaultListModel. To be honest I’m not so sure how well this will work but I understand the value of being able to do that. I have some concerns about binary compatibility for these cases but from my understanding it should be possible.  
 
   
 How important would this be to you guys?  

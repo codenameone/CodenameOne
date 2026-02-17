@@ -109,7 +109,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You can check out the code of ImageViewer which does most of this and also implements pinching/panning etc. 
 >
-> Personally I’d just have an image viewer in a layered layout and place a styled overlay for the cropped area with a “Crop” button below. When the user presses the crop just do it based on the current state of the ImageViewer. The main challenge might be some changes you might need from the image viewer to get its current state.
+> Personally I’d just have an image viewer in a layered layout and place a styled overlay for the cropped area with a "Crop" button below. When the user presses the crop just do it based on the current state of the ImageViewer. The main challenge might be some changes you might need from the image viewer to get its current state.
 >
 
 

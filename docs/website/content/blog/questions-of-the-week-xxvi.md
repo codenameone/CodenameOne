@@ -13,7 +13,7 @@ author: Shai Almog
 
 As you may recall [most of us are on vacation](/blog/merged-peer-october-vacations-india-trip.html) and the  
 few of us who are not have to work even harder than usual to keep things chugging along. I’m in India for  
-October (not on vacation) which slows down my work even further outside of my “home base”.
+October (not on vacation) which slows down my work even further outside of my "home base".
 
 We’re releasing a much needed plugin update today with huge GUI builder changes, new round border support  
 in the designer and many bug fixes in the settings etc.

@@ -118,9 +118,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Señor Sentinel says:
 >
-> Yep, I tried it all. It works just fine launching the designer using “java -jar guibuilder.jar”. I don’t have an XML file in the .guiBuilder directory. The only file I got there is a file called “CN1Preferences”, a binary files 151 bytes. (Also, the .guiBuilder dir itself has rights 777.)
+> Yep, I tried it all. It works just fine launching the designer using "java -jar guibuilder.jar". I don’t have an XML file in the .guiBuilder directory. The only file I got there is a file called "CN1Preferences", a binary files 151 bytes. (Also, the .guiBuilder dir itself has rights 777.)
 >
-> (As a side note I find it confusing getting support from Codename One. It’s a mix of commenting on blog posts, Stack Overflow, Google Groups and Intercom chat. Plus that I’ve requested twice last week that someone email me regarding your service “Client side development” to help me make an app – I never hear back from anyone. It’s a bit frustrating.)
+> (As a side note I find it confusing getting support from Codename One. It’s a mix of commenting on blog posts, Stack Overflow, Google Groups and Intercom chat. Plus that I’ve requested twice last week that someone email me regarding your service "Client side development" to help me make an app – I never hear back from anyone. It’s a bit frustrating.)
 >
 
 
@@ -142,7 +142,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Señor Sentinel says:
 >
-> No, I only have a CN1Preferences file (binary, 151 bytes) in the .guiBuilder directory. Just to be sure I did a “find . ~ | grep -i guibuilder.input” and found nothing anywhere in my home path.
+> No, I only have a CN1Preferences file (binary, 151 bytes) in the .guiBuilder directory. Just to be sure I did a "find . ~ | grep -i guibuilder.input" and found nothing anywhere in my home path.
 >
 
 
@@ -191,8 +191,8 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > 1\. Installed IntelliJ  
 > 2\. Installed CN1 from the built-in plugin repo  
 > 3\. Created a standard CN1 Hello World project, explored the old GUI Builder a bit. Discovered there was a new GUI Builder.  
-> 4\. Added a “Codename One Form” to the “src” folder (I remember getting an alert saying it should be in there).  
-> 5\. Right-clicked the new form and tried “Codename One > GUI Builder”. Failed with error in SO link, googled – found nothing other than the recent error with chars in paths, which seems not applicable here.  
+> 4\. Added a "Codename One Form" to the "src" folder (I remember getting an alert saying it should be in there).  
+> 5\. Right-clicked the new form and tried "Codename One > GUI Builder". Failed with error in SO link, googled – found nothing other than the recent error with chars in paths, which seems not applicable here.  
 > 6\. Manually downloaded 3.5.3 from Jetbrains and installed using the function in IntelliJ (I didn’t copy files or anything – I have no idea where they go)  
 > 7\. Tried, failed, googled again – found nothing that seemed relevant.  
 > 8\. At next launch IntelliJ wanted to update plugin to 3.6.2, which I let it do.  
@@ -214,7 +214,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Señor Sentinel says:
 >
-> Ok, so I tried putting it inside a package instead, and now I didn’t get the same error anymore. But it did complain that my packagename couldn’t be found in the res/guibuilder/-path. So I created an empty directory there with the requested name and tried again. Now it complains “Couldn’t find GUI file matching: <path to=”” my=”” file=””>”. I’ve double checked the path in the error message, and that’s the exact file that I’m trying to use the GUI Builder on.
+> Ok, so I tried putting it inside a package instead, and now I didn’t get the same error anymore. But it did complain that my packagename couldn’t be found in the res/guibuilder/-path. So I created an empty directory there with the requested name and tried again. Now it complains "Couldn’t find GUI file matching: <path to="" my="" file="">". I’ve double checked the path in the error message, and that’s the exact file that I’m trying to use the GUI Builder on.
 >
 
 

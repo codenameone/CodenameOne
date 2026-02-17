@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/questions-of-the-week-45/qanda-friday2.jpg)
 
-We had some painful downtime due the the big Amazon S3 crash that brought down a huge amount of services with it. I’ve been toying with the idea of improving the system so it doesn’t fully depend on S3 (mostly for performance as S3 isn’t as fast as one would expect). But right now we are so busy with “real work” that this probably won’t happen.
+We had some painful downtime due the the big Amazon S3 crash that brought down a huge amount of services with it. I’ve been toying with the idea of improving the system so it doesn’t fully depend on S3 (mostly for performance as S3 isn’t as fast as one would expect). But right now we are so busy with "real work" that this probably won’t happen.
 
 This weeks update will again replace the push servers with a newer version that deals with encoding the push key on the newer supported platforms as well as support for UWP.
 

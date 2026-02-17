@@ -81,7 +81,7 @@ There are limitations of mobile native OS’s at play and you hit them sooner th
 
 ### How to avoid that swiping a SwipeableContainer also creates an event in the top container?
 
-This includes some “black magic” to get this working…​
+This includes some "black magic" to get this working…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39558166/how-to-avoid-that-swiping-a-swipeablecontainer-also-creates-an-event-in-the-top)
 

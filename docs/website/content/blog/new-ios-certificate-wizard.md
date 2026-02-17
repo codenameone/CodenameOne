@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > ThomasH99 says:
 >
-> Hello, it’s great with this kind of improvements, the certificate wizard is a huge help. However, I just tried this new version to regenerate my certificates and the first steps work fine, I confirm the access with the 6 digit code and it’s running, but then I get an error “Certification generation failed. null”. First I thought it was because my credit card had expired, but it’s fixed and I still can’t generate. Any suggestions for what may be going wrong?
+> Hello, it’s great with this kind of improvements, the certificate wizard is a huge help. However, I just tried this new version to regenerate my certificates and the first steps work fine, I confirm the access with the 6 digit code and it’s running, but then I get an error "Certification generation failed. null". First I thought it was because my credit card had expired, but it’s fixed and I still can’t generate. Any suggestions for what may be going wrong?
 >
 
 

@@ -22,7 +22,7 @@ This question has come up quite a few times in the forums and most recently agai
 [on stackoverflow](http://stackoverflow.com/questions/39505331/managing-demo-full-version-of-my-app-in-codename-one).  
 It’s something we need to document better so here is a brief tutorial.
 
-### How does the Appstore “Know”?
+### How does the Appstore "Know"?
 
 The first thing we need to understand is how the appstore identifies your application.
 

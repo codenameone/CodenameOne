@@ -27,13 +27,13 @@ so it can arrange them based on that constraint. However, when nesting starts th
 A child container needs its parent to allocate space for it before it knows the amount of available space. But here  
 lies the paradox, how much space does it need?
 
-For that we have the preferred size, in the case of an image this is trivial: “the image size”. In case of a `Label`  
-this is trivial: “the string width”. In the case of multi-line this is hard!
+For that we have the preferred size, in the case of an image this is trivial: "the image size". In case of a `Label`  
+this is trivial: "the string width". In the case of multi-line this is hard!
 
 Preferred size for multi-line text depends on the size we are given. E.g. if we have enough width available we won’t  
 need to break another line but if we don’t then we’d want more height. The problem is that we decide on the space  
-before layout is done so we don’t know the available space yet. This is called “reflow”, we ask for a specific amount of  
-space and have to “reflow” to fit what is given us.
+before layout is done so we don’t know the available space yet. This is called "reflow", we ask for a specific amount of  
+space and have to "reflow" to fit what is given us.
 
 Browsers handle reflow accurately which is a major reason for their slow performance as reflow is pretty  
 expensive since we have to recursively re-allocate space based on parents siblings etc.
@@ -51,20 +51,20 @@ __ |  Don’t invoke `revalidate()` on UI that isn’t shown, it’s redundant a
 So up to here we understood how hard it is to do layout properly…​ But the kicker is that just calling an API like  
 `stringWidth` in pretty much every platform on earth is surprisingly slow…​
 
-To be fair this isn’t “horribly” slow but if you invoke the code as many times as you need to it becomes a problem.  
+To be fair this isn’t "horribly" slow but if you invoke the code as many times as you need to it becomes a problem.  
 The complexity of font rendering is tremendous and while we do cache a lot of values related to text width  
 in the various implementations it is challenging since this varies a lot based on font, size and content.
 
-E.g. say I want to render the phrase: “Mary had a little lamb” over multiple lines. A stupid algorithm  
-would do something like checking the width of “M” then of “Ma” and “Mar” etc.
+E.g. say I want to render the phrase: "Mary had a little lamb" over multiple lines. A stupid algorithm  
+would do something like checking the width of "M" then of "Ma" and "Mar" etc.
 
-A slightly smarter algorithm would have a simple optimization to check if “Mary had a little lamb” fits in the space  
+A slightly smarter algorithm would have a simple optimization to check if "Mary had a little lamb" fits in the space  
 available and go backwards but that might be an advantage for only some of the cases.
 
 We have a lot of optimizations to deal with those computational complexities and they mostly hide that issue while  
 providing some benefits but also some penalties.
 
-### “Faking” Preferred Width
+### "Faking" Preferred Width
 
 `TextArea` effectively fakes preferred width.
 

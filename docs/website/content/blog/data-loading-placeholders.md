@@ -11,7 +11,7 @@ author: Steve Hannah
 
 ![Header Image](/blog/data-loading-placeholders/new-features-2.jpg)
 
-In my last post I introduced the new CN.invokeWithoutBlocking() method as a means of ensuring that your UI construction code doesn’t run into any “blocking” that could negatively affect user experience. In cases where you need to perform a network request to help build your UI, I offered some recommendations for moving blocking code out of the critical paths. One recommended pattern was to insert placeholder content into your components, which you replace with the actual data once it has been received from the server. That pattern goes something like:
+In my last post I introduced the new `CN.invokeWithoutBlocking()` method as a means of ensuring that your UI construction code doesn’t run into any "blocking" that could negatively affect user experience. In cases where you need to perform a network request to help build your UI, I offered some recommendations for moving blocking code out of the critical paths. One recommended pattern was to insert placeholder content into your components, which you replace with the actual data once it has been received from the server. That pattern goes something like:
     
     
     Form f = new Form("Hello", BoxLayout.y());

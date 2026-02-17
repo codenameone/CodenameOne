@@ -22,7 +22,7 @@ that form a larger platform evolution arch.
 ____New GUI Builder (technology preview)
 
 The new GUI builder is a big departure from our existing  
-designer tool. This tool is now in “technology preview” status meaning that its not quite ready for  
+designer tool. This tool is now in "technology preview" status meaning that its not quite ready for  
 prime time but we want feedback on its direction and issues.  
 Read more about this work in [this blog post](/blog/new-gui-builder.html). 
 
@@ -63,9 +63,9 @@ getAllStyles() allows writing code that is more concise to perform an operation 
 style objects at once.  
 Read more about this work in [this blog post](/blog/permanent-sidemenu-getAllStyles-scrollbar-and-more.html). 
 
-____Added Support For Facebooks “Invite A Friend”
+____Added Support For Facebooks "Invite A Friend"
 
-New integration for Facebooks “invite a friend” feature that simplifies  
+New integration for Facebooks "invite a friend" feature that simplifies  
 viral marketing for your app.  
 Read more about this work in [this blog post](/blog/invite-friends-websockets-windows-phone-more.html). 
 
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > My build always fail whenever I send a build using 1.8, I got a message that codenameone supports up to 1.7 java version… Does the build server support 1.8 now?
 >
-> And may I ask if “background process while app is not running” would be implemented anytime soon?
+> And may I ask if "background process while app is not running" would be implemented anytime soon?
 >
 
 
@@ -159,7 +159,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Hi,  
 > adding multi-images is part of the theme which is a separate feature altogether. You need to still do that with the old designer and it will be accessible then. The same is true for creating/manipulating UIID’s. We’ll replace the theme generating functionality in the old designer using a different tool, it was a mistake mixing everything into a single tool.
 >
-> Single clicking a component in the UI opens its properties on the left side. If you pick it from the tree then it will be selected as you change the tabs. Notice that properties are now split into “Basic”, “Advanced” & “Events” (at the bottom of the tab). There is also a separate tab to control layout.
+> Single clicking a component in the UI opens its properties on the left side. If you pick it from the tree then it will be selected as you change the tabs. Notice that properties are now split into "Basic", "Advanced" & "Events" (at the bottom of the tab). There is also a separate tab to control layout.
 >
 > If you get crashes or errors a log would be nice, we will add some better crash logging for the next update and hopefully start fixing these bugs quickly.
 >
@@ -209,7 +209,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Yaakov Gesher says:
 >
-> After upgrading to 3.2, using the old GUI Builder, every time I make a change in a form I get a little popup saying “GUI Builder error – undoing”, but it doesn’t actually undo the changes made.
+> After upgrading to 3.2, using the old GUI Builder, every time I make a change in a form I get a little popup saying "GUI Builder error – undoing", but it doesn’t actually undo the changes made.
 >
 
 

@@ -15,7 +15,7 @@ We will release Codename One 3.6 on the 16th of January, this means we will ente
 
 With 3.6 we are fine tuning the 4 releases per year approach we took in the past to a more convenient 3 – release per year cycle. This will allow us to deliver more refined releases while still **delivering them** which is harder to do without a fixed roadmap.
 
-Over the past few weeks we had to postpone many issues that we wanted to have in 3.6 due to the pressures of the looming release. We hope to address these issues early in the 3.7 release cycle. One such pain point is the support for z-ordering in peer components on iOS and other platforms (besides Android). This is a challenging feature and we just couldn’t justify something “half baked” so close to a stable release.
+Over the past few weeks we had to postpone many issues that we wanted to have in 3.6 due to the pressures of the looming release. We hope to address these issues early in the 3.7 release cycle. One such pain point is the support for z-ordering in peer components on iOS and other platforms (besides Android). This is a challenging feature and we just couldn’t justify something "half baked" so close to a stable release.
 
 ---
 

@@ -17,7 +17,7 @@ You can also read the full transcript within this blog post and use the captions
 
 ### Transcript
 
-In this video I’m going to explain “what is Codename One” but I’m going to take the scenic route…​ I’m going to go through the full history of our platform and I’m going to explain the underlying technology. How it works. What makes it different from other tools at least at a high level. If you want a 3 minute hello world video this isn’t it, go to the download section of Codename One dot com and check out the 3 minute videos there. Here I try to go deeper.
+In this video I’m going to explain "what is Codename One" but I’m going to take the scenic route…​ I’m going to go through the full history of our platform and I’m going to explain the underlying technology. How it works. What makes it different from other tools at least at a high level. If you want a 3 minute hello world video this isn’t it, go to the download section of Codename One dot com and check out the 3 minute videos there. Here I try to go deeper.
 
 Let’s start with the historic timeline of Codename One.
 
@@ -31,7 +31,7 @@ This proved successful at least on a technical level as more than 100M apps were
 
 As the platform matured we expanded the scope of Codename One further and today we target not just Android & iOS. We target Universal Windows Platform which is the Microsoft standard for unified apps on Arm & intel. We target JavaScript which allows you to compile the Java applications into a JavaScript application including threads and everything so it can run in the browser. We even support desktop development which started as a curiosity due to user requirements and has picked up so well we use it ourselves. Recently we added Kotlin support and are adding new features on a weekly basis.
 
-So I gave all of that background but still didn’t get to “what the hell is it?”. The problem is that it’s so big and hard to explain so lets break it into 6 pieces and I’ll go over each one of these pieces in great detail soon.  
+So I gave all of that background but still didn’t get to "what the hell is it?". The problem is that it’s so big and hard to explain so lets break it into 6 pieces and I’ll go over each one of these pieces in great detail soon.  
 First: It’s a virtual machine for all devices. The virtual machine is the environment that lets Java run on the device in a portable way.
 
 It’s an API for all devices. The Application Programming Interface provides us with functionality that is distilled commonality from the various devices.
@@ -42,10 +42,10 @@ It’s a set of tools from device simulators to theme designer, GUI builder etc.
 
 The cloud based system is the most confusing part. No, you don’t need the cloud to run a Codename One app. The resulting app is native. However, to build iOS apps you need a Mac and xcode which is Apples development tool. To build a Windows UWP application you need a Windows machine and Visual Studio which is Microsofts development tool. Well, we have Macs and Windows and Linux machines in the cloud. We seamlessly translate your Java bytecode to native projects and compile them using the official tools such as xcode then return the binary directly to you so you can install it on your phone or upload it to apple, Microsoft, google etc. Cool right?
 
-Here’s a fun fact. When we started pitching the company to investors we just stuck Codename One in the slides as a placeholder and investors liked it. We later on came up with the “idea” that these 6 different pieces constitute “one” product for “one code base” and that made sense as a company name.
+Here’s a fun fact. When we started pitching the company to investors we just stuck Codename One in the slides as a placeholder and investors liked it. We later on came up with the "idea" that these 6 different pieces constitute "one" product for "one code base" and that made sense as a company name.
 
 But first lets start with the more in depth explanation of our VM’s. We currently have 3 virtual machines that we work with. Android has it’s own native Java support and we just use that. For desktop we use standard Java too. iOS doesn’t have a virtual machine and doesn’t allow JIT compilation which is a common practice in most virtual machines. Furthermore, historic attempts to build iOS virtual machines ran into issues of size and into problems with Apples frequent changes to their development toolchain. Our open source Parpar VM solves this problem by avoiding compilation. It translates Java bytecode to C which is one of the officially supported languages in iOS and much faster than Objective-C or Swift. We can then compile this C code using Apples compiler which guarantees that every change Apple makes will be easy to adapt to.  
-This isn’t just a “theoretical claim”. Since we released our VM Apple migrated from 32 bit to 64 bit and added support for bitcode compilation. All of these worked out of the box with ParparVM with no change from us. Even native developers struggled with some of those changes which were mostly seamless to Codename One developers.  
+This isn’t just a "theoretical claim". Since we released our VM Apple migrated from 32 bit to 64 bit and added support for bitcode compilation. All of these worked out of the box with ParparVM with no change from us. Even native developers struggled with some of those changes which were mostly seamless to Codename One developers.  
 ParparVM is very performant and can reach C levels of performance in some cases. It also produces a very small binary clocking under 5mb for applications which is very small for an iOS app. Similar attempts at JVM’s often produce binaries that exceed the 100mb limit… One of the cool things you can do with ParparVM is run the code using Apples xcode and debug or profile on the device. This is a very powerful way to discover things about the application and work with native OS code.
 
 The UWP port uses iKVM which is a project that brought Java bytecode support to .net. Initially this project didn’t work with UWP but we worked with community members to update iKVM and published our iKVM fork as open source. This again means that we use native .net support when building windows applications.
@@ -59,14 +59,14 @@ The trick with the API is our internal porting layer which is very clearly defin
 The user interface uses a lightweight UI approach which is a common term used to define Swing widgets. you might recall that Codename One was heavily inspired by Swing…  
 Lightweight UI means Codename One draws most of its widgets itself and uses the native platform mostly as a canvas and event handling environment. I’ll discuss this more in depth later on…
 
-The API tries to be simple and unified so it does the “right thing” when possible. We can do that because the API is statically linked. That means that when an app is compiled our API becomes a part of the application. This means that if we change the API it will never impact apps in production. This isn’t true for native OS API’s who need to change very carefully so they won’t break applications that might rely on edge case functionality.
+The API tries to be simple and unified so it does the "right thing" when possible. We can do that because the API is statically linked. That means that when an app is compiled our API becomes a part of the application. This means that if we change the API it will never impact apps in production. This isn’t true for native OS API’s who need to change very carefully so they won’t break applications that might rely on edge case functionality.
 
 Codename One ships plugins for the 3 top Java IDE’s specifically IntelliJ, Eclipse and NetBeans.
 
 The plugin literally includes everything that’s a part of Codename One. Since the build happens in the cloud servers you don’t need to install native OS tools or anything like that.
 
-Essentially the plugins are relatively “stupid” as they mostly invoke Ant and our tools such as the simulator etc. This is a good thing. I use NetBeans as I’m used to it from my years at Sun. However, almost everything I do here is identical if you do it in Eclipse or IntelliJ.  
-Recently we started making them even “dumber” by moving the settings from the IDE specific settings UI to the Codename One Settings tool which is common between all 3 IDE’s. This allowed us to move much faster.
+Essentially the plugins are relatively "stupid" as they mostly invoke Ant and our tools such as the simulator etc. This is a good thing. I use NetBeans as I’m used to it from my years at Sun. However, almost everything I do here is identical if you do it in Eclipse or IntelliJ.  
+Recently we started making them even "dumber" by moving the settings from the IDE specific settings UI to the Codename One Settings tool which is common between all 3 IDE’s. This allowed us to move much faster.
 
 The tools include 4 major groups. The first is the group of build tools which is really the ant script you have in the project and some extensions for that.
 
@@ -76,13 +76,13 @@ The resource editor also known as the Codename One Designer is our workhorse too
 
 The new GUI builder is far more powerful and more closely matches common Java GUI builders in terms of functionality and technology.
 
-I’ve discussed the cloud build before but it’s important enough to recap. We have Macs, Windows and Linux machines that do the build for you. This is more than just having the build platforms. Setting up the native environments and all the prerequisites for a proper build is a nightmare. The cloud build servers essentially mask this whole process completely. Notice that we have an offline build feature that allows you to skip the cloud build but we don’t recommend that. It’s mostly for government or highly regulated industries where the word cloud is a synonym to “no management approval”. In those cases offline build becomes a lesser of two evils.
+I’ve discussed the cloud build before but it’s important enough to recap. We have Macs, Windows and Linux machines that do the build for you. This is more than just having the build platforms. Setting up the native environments and all the prerequisites for a proper build is a nightmare. The cloud build servers essentially mask this whole process completely. Notice that we have an offline build feature that allows you to skip the cloud build but we don’t recommend that. It’s mostly for government or highly regulated industries where the word cloud is a synonym to "no management approval". In those cases offline build becomes a lesser of two evils.
 
 The cloud is mostly abstracted, you just right click the project and send a build. Everything else is seamless thanks to the tie in between the build tools and the build severs.
 
-You don’t need to install anything other than the plugin. Not for Android or iOS. You can work with Mac, Windows or Linux and everything should “just work”.
+You don’t need to install anything other than the plugin. Not for Android or iOS. You can work with Mac, Windows or Linux and everything should "just work".
 
-This is a huge contributor to the seamlessness and simplicity of Codename One that allows you to get started “right away”.
+This is a huge contributor to the seamlessness and simplicity of Codename One that allows you to get started "right away".
 
 Codename One’s UI uses a lightweight UI approach which is a common term used to define Swing widgets.  
 As I mentioned before Codename One draws most of its widgets itself and uses the native platform mostly as a canvas and event handling environment.  
@@ -149,7 +149,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We don’t have a standard build dedicated to that although it’s technically trivial.
 >
-> You can generate a JAR file relatively easily which will work for “other” desktop platforms. Packaging for Linux is a bit more challenging since there are so many potential targets, dependencies etc.
+> You can generate a JAR file relatively easily which will work for "other" desktop platforms. Packaging for Linux is a bit more challenging since there are so many potential targets, dependencies etc.
 >
 
 

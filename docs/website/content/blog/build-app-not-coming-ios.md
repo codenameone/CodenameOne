@@ -23,7 +23,7 @@ After spending ages back and forth with Apples bureaucrats over this requirement
 
 ### Web is Sometimes Better
 
-I’m strongly in the “native first” camp as this is our core business: we sell a cross platform native development tool. While it supports targeting web UI’s as well, that’s a secondary function and not its primary value.
+I’m strongly in the "native first" camp as this is our core business: we sell a cross platform native development tool. While it supports targeting web UI’s as well, that’s a secondary function and not its primary value.
 
 However, in this specific case, Apples restrictions make no sense. Amazingly, web provides the same level of functionality as the native app. It also has a couple of other advantages:
 
@@ -31,13 +31,13 @@ However, in this specific case, Apples restrictions make no sense. Amazingly, we
 
   * No restrictions about mentioning other platforms
 
-  * Subscriptions – Without the “Apple tax”
+  * Subscriptions – Without the "Apple tax"
 
 The disadvantages for our case are:
 
   * No appstore discoverability - This isn’t a big deal as there are so many apps in the stores today
 
-  * No in-app-subscriptions - This is a benefit and a curse. In app purchase is a “low touch” solution for subscriptions but the cost and restrictions are prohibitive
+  * No in-app-subscriptions - This is a benefit and a curse. In app purchase is a "low touch" solution for subscriptions but the cost and restrictions are prohibitive
 
   * No push – This is the most painful downside of this, it seems all browsers on iOS don’t support push at this time
 
@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Francesco Galgani says:
 >
 > Dear Shai,  
-> I understand the problem: I have an app with high votes on Android (4.8/5) and +1000 installations, but Apple rejected the same identical app multiple times because the reviewers consider it “useless”…
+> I understand the problem: I have an app with high votes on Android (4.8/5) and +1000 installations, but Apple rejected the same identical app multiple times because the reviewers consider it "useless"…
 >
 
 

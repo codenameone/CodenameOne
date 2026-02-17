@@ -15,29 +15,29 @@ If you have an existing Codename One app that uses the designer for its theme, t
 
 I don’t blame you if you don’t feel like converting your theme.res file into CSS. After years of customization, a theme.res file may contain hundreds of images and styles. In addition, if your app is using the old GUI Builder, your theme.res file may include actual form designs, which can’t be migrated to CSS.
 
-Fortunately, there is a way to add CSS support for your application without having to lose all of your work. Codename One allows you to “layer” themes over top of each other, thus allowing you to use multiple themes. It does this, for example, if you are using the native theme in your app. It uses the native theme for the platform as a base, but overrides it with the styles in your app’s theme.
+Fortunately, there is a way to add CSS support for your application without having to lose all of your work. Codename One allows you to "layer" themes over top of each other, thus allowing you to use multiple themes. It does this, for example, if you are using the native theme in your app. It uses the native theme for the platform as a base, but overrides it with the styles in your app’s theme.
 
 **Steps:**
 
   1. Before you begin, make sure that your theme.res is not currently opened in the designer.
 
-  2. Rename your “theme.res” file to “theme_legacy.res” (This is found in the src directory)
+  2. Rename your "theme.res" file to "theme_legacy.res" (This is found in the src directory)
 
 ![Change theme.res to theme_legacy.res](/blog/migrating-legacy-applications-to-css/image4.png)
 
-  3. Delete the res/theme directory, and the res/theme.xml file from your project.
+  3. Delete the `res/theme` directory, and the `res/theme.xml` file from your project.
 
 ![Delete the res/theme directory and res/theme.xml file](/blog/migrating-legacy-applications-to-css/image1.png)
 
   4. Open the theme_legacy.res file in the designer.
 
-  5. Under theme constants, add the constant “OverlayThemes”, with a value of “theme”.
+  5. Under theme constants, add the constant "OverlayThemes", with a value of "theme".
 
 ![Set OverlayThemes constant](/blog/migrating-legacy-applications-to-css/image10.png)
 
 Then Save
 
-  6. Open your app’s main file, and find where the “theme.res” file is loaded. Look for a line like:
+  6. Open your app’s main file, and find where the "theme.res" file is loaded. Look for a line like:
 
 `theme = UIManager.initFirstTheme("/theme");`
 
@@ -45,7 +45,7 @@ And change it to
 
 `theme = UIManager.initFirstTheme("/theme_legacy");`
 
-If your app is an old GUI Builder app, then it might be `new StateMachine(“/theme”)` instead.
+If your app is an old GUI Builder app, then it might be `new StateMachine("/theme")` instead.
 
 ![Change the theme reference in you app main class](/blog/migrating-legacy-applications-to-css/image9.png)
 
@@ -55,18 +55,18 @@ Save
 
 ![Click on CSS support](/blog/migrating-legacy-applications-to-css/image6.png)
 
-  8. Click on “CSS Support”
+  8. Click on "CSS Support"
 
 ![Activate CSS now](/blog/migrating-legacy-applications-to-css/image8.png)
 
-  9. Click “Activate CSS Now”
+  9. Click "Activate CSS Now"
 
 The screen should then change to a menu as shown here:
 
 ![CSS menu after activating CSS](/blog/migrating-legacy-applications-to-css/image11.png)
 
-  10. Press “Open CSS File For Editing”  
-Open the CSS file for editing, and make a change that you’ll definitely notice, for testing. Here I’ll just change the color of labels to “Green”.
+  10. Press "Open CSS File For Editing"  
+Open the CSS file for editing, and make a change that you’ll definitely notice, for testing. Here I’ll just change the color of labels to "Green".
 
 ![Editing CSS File](/blog/migrating-legacy-applications-to-css/image3.png)
 
@@ -78,7 +78,7 @@ You should see the CSS take effect. In my example, my label is now green.
 
 ### What did all this do?
 
-This tells the app to load your theme_legacy.res file instead of theme.res. Because of the “OverlayThemes” constant in your theme_legacy.res, Your app will automatically load the theme.res file’s styles over top of your legacy theme. The theme.res file will then be generated from your css/theme.css file, and kept in sync.
+This tells the app to load your theme_legacy.res file instead of theme.res. Because of the "OverlayThemes" constant in your theme_legacy.res, Your app will automatically load the theme.res file’s styles over top of your legacy theme. The theme.res file will then be generated from your css/theme.css file, and kept in sync.
 ---
 
 ## Archived Comments

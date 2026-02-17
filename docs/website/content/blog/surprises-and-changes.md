@@ -24,7 +24,7 @@ He has a great presentation & demo.
 
   
   
-We added a few interesting features and fixes this past week, we now support adding array arguments for connection requests e.g. it would now be possible to do something like myConnectionReuest.addArgument(“key”, new String[] {“val1”, “val2”}); this will essentially add two key entries e.g. key=val1 and key=val2.
+We added a few interesting features and fixes this past week, we now support adding array arguments for connection requests e.g. it would now be possible to do something like myConnectionReuest.addArgument("key", new String[] {"val1", "val2"}); this will essentially add two key entries e.g. key=val1 and key=val2.
 
   
 The LocationManager’s getCurrentLocation  
@@ -47,7 +47,7 @@ I’m about to commit a slightly compatibility wrecking change to Storage. We ha
   
   
   
-This should work rather seamlessly for most use cases, however if you have existing files that use illegal characters or you rely on behavior related to these problematic characters you might run into problems e.g. saving “x?” then listing the storage will return “x_” instead.  
+This should work rather seamlessly for most use cases, however if you have existing files that use illegal characters or you rely on behavior related to these problematic characters you might run into problems e.g. saving "x?" then listing the storage will return "x_" instead.  
   
   
   

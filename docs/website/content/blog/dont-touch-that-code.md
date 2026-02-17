@@ -15,7 +15,7 @@ Last week scrolling broke and we had a few relatively complex regressions. This 
 
 So why did we even do a change to a method that’s so deep in the code and so risky?
 
-The logic behind that is to prevent situations like this. `getComponentAt(x, y)` is a remarkably important method which is used all over the place to implement touch interface logic. Unfortunately, as one of those methods that evolved it became “unwieldy” and because it’s so deep we tried to avoid changing it…​
+The logic behind that is to prevent situations like this. `getComponentAt(x, y)` is a remarkably important method which is used all over the place to implement touch interface logic. Unfortunately, as one of those methods that evolved it became "unwieldy" and because it’s so deep we tried to avoid changing it…​
 
 > Don’t touch it! It works! 
 

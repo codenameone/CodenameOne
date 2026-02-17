@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/obfuscated-constants/security.jpg)
 
-One of the first things a hacker will do when compromising an app is look at it. E.g. if I want to exploit a bank’s login UI I would look at the label next to the login and then search for it in the decompiled code. So if the UI has the String “enter user name and password” I can search for that.
+One of the first things a hacker will do when compromising an app is look at it. E.g. if I want to exploit a bank’s login UI I would look at the label next to the login and then search for it in the decompiled code. So if the UI has the String "enter user name and password" I can search for that.
 
 It won’t lead directly to a hack or exploit but it will show you the approximate area of the code where we should look and it makes the first step that much easier. Obfuscation helps as it removes descriptive method names but it can’t hide the Strings we use in constants. So if an app has a secret encoding it even slightly can make a difference…​
 

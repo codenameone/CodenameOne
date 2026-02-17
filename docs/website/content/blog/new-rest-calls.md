@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Mohamed Selim says:
 >
 > Hello Mr Shai,  
-> I’m a student and i’m working in project, could help me please i didn’t found the link of API Message Codename One and i didn’t know how to put web service “reponses by JSON” to use it in the form at my application in Codename One? Best Regards.
+> I’m a student and i’m working in project, could help me please i didn’t found the link of API Message Codename One and i didn’t know how to put web service "reponses by JSON" to use it in the form at my application in Codename One? Best Regards.
 >
 
 
@@ -138,7 +138,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Mohamed Selim says:
 >
-> Thank you sir, i didn’t know to use the webservice “CRUD” values from symfony to put it in CodenameOne is there any document have a good exemple for it?
+> Thank you sir, i didn’t know to use the webservice "CRUD" values from symfony to put it in CodenameOne is there any document have a good exemple for it?
 >
 
 
@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > am getting an authentication error 401 after implementing the code below. Where am i getting it wrong
 >
-> ` Map<string, object=””> shiftTimes = (Map<string, object=””>) Rest.get(new UrlManager().getShiftTimes())  
+> ` Map<string, object=""> shiftTimes = (Map<string, object="">) Rest.get(new UrlManager().getShiftTimes())  
 > .basicAuth(urlManager.getAuthname(), manager.getVerifyDriverCode() + id)  
 > .acceptJson().getAsJsonMap().getResponseData(); `
 >

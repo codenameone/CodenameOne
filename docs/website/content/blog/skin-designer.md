@@ -38,7 +38,7 @@ The skin designer tool allows you to visually design and save a Codename One ski
 use to simulate a custom device type. To use this tool you need two pictures of the device in portrait  
 and landscape mode. The screen area of these pictures must match the device screen size!
 
-__ |  To find files like that just search for the name of the device you are looking for followed by “mockup”.  
+__ |  To find files like that just search for the name of the device you are looking for followed by "mockup".  
 This will bring up device mockups you can often use. FYI be sure to read the license of the graphic you use  
 if you intend to publish this, many creators require attribution!   
 ---|---  
@@ -47,7 +47,7 @@ if you intend to publish this, many creators require attribution!
 
 You will need to select the device image in portrait/landscape, you can then enter the screen dimensions  
 in pixels that should match the area within the graphic.  
-You can enter the X/Y position or use the hand “pan tool” to visually position the screen within the graphic.
+You can enter the X/Y position or use the hand "pan tool" to visually position the screen within the graphic.
 
 Check out the help page within the application for detailed explanation of the skin creation process.
 

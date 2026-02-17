@@ -22,7 +22,7 @@ are happy, but its only a good margin not a great margin and in this post I’d 
 
 My goal here is to explain how we internalize your very valuable feedback and convert it into something we  
 can work with. I’d also like to explain why some things happen, e.g. what tradeoffs we took that lead us  
-to this position. I’ll try to focus on proactive responses and reduce the “excuses” to a minimum but  
+to this position. I’ll try to focus on proactive responses and reduce the "excuses" to a minimum but  
 I do make some excuses for Codename One below since… well I’m biased. 
 
 One observation I had when reading the responses was that IntelliJ/IDEA developers were far more critical  
@@ -51,7 +51,7 @@ Stability and our fast update cycles are a problem as expressed in the comments 
 We just made 3 HUGE compatibility related changes  
 with our gradle migration, performance optimization & animation framework rewrite. This obviously impacted  
 the results but the feedback is indeed a valid one and this isn’t the first time this happens.  
-We have a standard reply for pro users: “[use the versioned builds]()“. Unfortunately that reply  
+We have a standard reply for pro users: "[use the versioned builds]()". Unfortunately that reply  
 doesn’t work for basic/free users and even for pro users who might need the latest and greatest.   
 As a side note I’d like to mention that we see a very clear migration path of free/basic subscribers up to pro/enterprise  
 tiers. So we care deeply about platform stability even for basic/free subscribers! You are (quite literally)  
@@ -105,7 +105,7 @@ with that.
 
 > will be good to have an small code section to show the classes ussage.
 
-> The samples often do not use the “Visual” approach so a lot of time is spent translating the code.  
+> The samples often do not use the "Visual" approach so a lot of time is spent translating the code.  
 >  For Example: The Validator-Component.
 
 > Dislike the learning curve.
@@ -118,7 +118,7 @@ We had a sense that people weren’t using the developer guide as much as they a
 it dawned on us that this was a misconception. We need to work on the documentation  
 more thoroughly and keep changing it while working on Codename One itself rather than at the code freeze  
 week. However, the original chart we posted turned out to be based on a smaller sample than our final result,  
-it seems the “How Do I” videos do occupy a large segment of the docs. 
+it seems the "How Do I" videos do occupy a large segment of the docs. 
 
 ![What form of documentation/help do you value the most?](/blog/what-sucks-in-codename-one-how-can-we-fix-it/what-form-of-documentation-help-do-you-value-the-most-2.png)
 
@@ -190,7 +190,7 @@ a public repository as part of the cn1lib section). Accessing native API’s/lib
 manual work from the developer or from us. I’d love to have more automation on that but I doubt its technically  
 feasible. 
 
-> What worries the most my boss is the fact that we are “bound” to a build server to compile the apps.  
+> What worries the most my boss is the fact that we are "bound" to a build server to compile the apps.  
 >  He would prefer that we could be indipendent in that phase. On the other hand programming in java for all the  
 >  platforms and with the same set of APIs is wonderful! 
 
@@ -215,14 +215,14 @@ Bluetooth is something we got asked quite a few times for.
 Then when the time came to implement it we contacted several developers and asked for specific use cases  
 for bluetooth. E.g. which of the many bluetooth API’s do you actually need and for what purpose? 
 
-It turns out that 3 out of 3 developers didn’t really know what they wanted but had a requirement to “support bluetooth”  
+It turns out that 3 out of 3 developers didn’t really know what they wanted but had a requirement to "support bluetooth"  
 without any actual information. Normally when we are faced with a situation like this we look at similar products  
 and try to create a similar API to something like Cordova. However, we couldn’t find any WORA tool  
 that implemented bluetooth so we don’t have anything to go on.   
 Notice that you can always use a cn1lib to build bluetooth support without our help. 
 
 The lesson here though is: you need to be clear about what you are asking for. Asking for bluetooth is like  
-asking for “internet”. You need to ask more specific things e.g. bluetooth discovery and serial API’s. You  
+asking for "internet". You need to ask more specific things e.g. bluetooth discovery and serial API’s. You  
 need to file an official request as a pro/enterprise developer and give proper details.  
 Otherwise these things just get buried under the amount of work we have piled up. 
 
@@ -244,7 +244,7 @@ that an issue wasn’t resolved. You also should ask for a specific enhancement 
 this probably won’t make it into the queue of tasks.  
 We should work better on communicating this. 
 
-> Your very core and idea are cool. Your CN1 implementation has quality of “proof of concept”, i.e.  
+> Your very core and idea are cool. Your CN1 implementation has quality of "proof of concept", i.e.  
 >  alpha, i.e. minimalistic albeit working core. It’s ok for me, because I’m like you, but current spoilt generation of  
 >  programmers needs more comfortable conditions, so they don’t shoot themselves into foot each time. Invest  
 >  more money, hire more developers (or, if you think you have enough, hire quality manager, he will return you to  
@@ -256,7 +256,7 @@ We should work better on communicating this.
 >  propertycross app – this all because of broken padding/marging based on 4 styles concept, i had the same in  
 >  my apps), you did not implement high-level ui concepts like those found in material design, and you don’t have  
 >  StyledTextView control!! In other words, you didn’t advance much since J2ME means of expression, And at  
->  the same time you advertise it all, just to get more people raising their eyebrows, and causing “shai, relogin”  
+>  the same time you advertise it all, just to get more people raising their eyebrows, and causing "shai, relogin"  
 >  after any positive words towards cn1 on forums.
 
 Our designer is based on an official product from Sun Microsystems and is actually far improved over that but  
@@ -273,7 +273,7 @@ a while back based on an HTML editor component (notice that unlike Swing/FX we h
 This is actually something we looked into quite a lot and  
 would love to have but you would be shocked at the state of native support for styled input…  
 There is no unifying logic or even support for styled input in iOS/Android, its possible but remarkably hard on  
-both platforms and integrating the native input into our logic of this would be “difficult” to say the least. 
+both platforms and integrating the native input into our logic of this would be "difficult" to say the least. 
 
 > Lets start by creating a really nice theme that looks and works great on all platforns.
 
@@ -321,7 +321,7 @@ push notification can also include hidden payloads.
 > 1) Better GUI editor, I really like the current one but it has some problems with reordering in the  
 >  filetree, and some confusing usability issues. 2) Ability to somehow send off a build and get a notification on  
 >  the device automatically that you tap to install, the email to yourself and click link approach slows down  
->  productivity imho. 3) “native simulators” would be good, ie it can launch an (existing) real android emulator  
+>  productivity imho. 3) "native simulators" would be good, ie it can launch an (existing) real android emulator  
 >  and a real iphone emulator [or EVEN a real device plugged into usb!] (this is a pipe dream on windows since  
 >  no one can emulate iphone which sucks, been using macincloud recently, would probably gladly have that  
 >  open to see it launch in an iphone emulator rather than needing to send a build and install each time) – the  
@@ -357,13 +357,13 @@ a great direction. Also links to usage samples on github would probably go a lon
 
 > Write more unit tests
 
-I tend to agree with that a lot but the problem isn’t “more”. The problem is “better”.  
+I tend to agree with that a lot but the problem isn’t "more". The problem is "better".  
 The big hard to detect in advance issues are usually device compatibility issues and those won’t  
 be detected by unit tests with our current feature set. 
 
 We would love to have feature such as automated on-device testing within device farms, once we have  
 that we can obviously use that internally for our own deployments. Currently this isn’t one of our top priorities  
-since its a pretty big feature that doesn’t “sell” so its very hard to justify that effort in the short term. However,  
+since its a pretty big feature that doesn’t "sell" so its very hard to justify that effort in the short term. However,  
 we would like to add that in the slightly longer term vision. 
 
 > Some emulation devices don’t work properly. For example, I have bug on HTC where the bottom  
@@ -395,7 +395,7 @@ Based on those objective measures pro doesn’t seem to be too expensive althoug
 
 The list, table & tree classes are MVC and those are the hardest classes to deal with in all of Codename One.  
 Swing over did MVC by applying it to components that made no sense for that e.g. Buttons. Our goal was to create  
-something that’s simpler in a “good way” and avoid over abstracting some notions. 
+something that’s simpler in a "good way" and avoid over abstracting some notions. 
 
 I would even go further by saying that we are removing some of the Swing like MVC usages that are over the top.  
 E.g. copying Swing’s approach to building List was a mistake in retrospect and we are now focusing on a  
@@ -414,7 +414,7 @@ platform but this has to be something we feel is stable and in demand.
 The feedback we got here is great! It matches a lot of our feelings yet contradicts other assumptions we held  
 onto.  
 I think this is a good time to show the final version  
-of the answers to “Which of the following is the most important to you?” and “Which of the following is the second most important to you?”.  
+of the answers to "Which of the following is the most important to you?" and "Which of the following is the second most important to you?".  
 Both of these changed significantly: 
 
 ![Which of the following is most important to you?](/blog/what-sucks-in-codename-one-how-can-we-fix-it/which-of-the-following-is-the-most-important-to-you-2.png)
@@ -451,7 +451,7 @@ simplify the work that the plugin does today.
 on-device-debugging. This is something we wanted to do for quite a while and its hard to get to with our  
 current set of limited manpower. If we get thru the list above this is solid on my personal wish list…
 
-You will notice some important tasks that are missing from the “top priorities list”.  
+You will notice some important tasks that are missing from the "top priorities list".  
 E.g. a complete rewrite of the theme designer or a CSS alternative are missing. This has been a part of our TODO  
 list for quite a while but we left it out of the current priorities. We want to evaluate the reception of the new  
 GUI builder as well as the reception to the CSS plugin from Steve before making any long term decisions here. 
@@ -521,7 +521,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > Thanks for the feedback. This is a point that came out a few times before so I posted a blog entry covering this here: [https://www.codenameone.com…](</blog/why-we-dont-import-android-native-code/>)  
-> The gist of it is “we’d like to do it but it’s damn hard so we might get to it one day…”.
+> The gist of it is "we’d like to do it but it’s damn hard so we might get to it one day…".
 
 ---
 

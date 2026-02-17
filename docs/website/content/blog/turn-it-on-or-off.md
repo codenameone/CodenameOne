@@ -19,7 +19,7 @@ We just added a new On/Off switch to Codename One that should allow you to use t
 This component will be a part of the next library update (couple of weeks) and will be available in the GUI builder as well as using code (as usual) it will carry the name OnOffSwitch.  
 
   
-Initially I wanted the component to be a “drop in replacement” for checkbox by deriving from that class in order to implement this feature. However, the animation abilities of animated layout (which do lots of the effects you see on the Android version) drew me to using a Container. So you won’t be able to use the exact same code as a CheckBox.   
+Initially I wanted the component to be a "drop in replacement" for checkbox by deriving from that class in order to implement this feature. However, the animation abilities of animated layout (which do lots of the effects you see on the Android version) drew me to using a Container. So you won’t be able to use the exact same code as a CheckBox.   
 
 Notice: This post was automatically converted using a script from an older blogging system. Some elements might not have come out as intended…. If that is the case please let us know via the comments section below.
 

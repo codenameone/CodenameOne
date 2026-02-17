@@ -21,7 +21,7 @@ I’ve constructed this post as a set of questions/answers.
 
 Every time Google releases a new version of Android it updates the API level e.g. currently Oreo (8.1) is API level 27.
 
-When we build a native Android application we need to declare the “target” this means we compiled the project against this given API level. This is a double edged sword…​ When we pick a higher API level we can target new features of newer OS’s but we are also subject to new restrictions and changes.
+When we build a native Android application we need to declare the "target" this means we compiled the project against this given API level. This is a double edged sword…​ When we pick a higher API level we can target new features of newer OS’s but we are also subject to new restrictions and changes.
 
 E.g. when we migrated to API level 23 we had to change the way permissions are processed in applications. For Codename One code this was mostly seamless but if you relied on native code this sometimes triggered issues.
 
@@ -84,7 +84,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Francesco Galgani says:
 >
-> I’ve done some tests with “android.buildToolsVersion=27” in Android 7 and Android 5 devices and I didn’t notice any difference 🙂  
+> I’ve done some tests with "android.buildToolsVersion=27" in Android 7 and Android 5 devices and I didn’t notice any difference 🙂  
 > However, I don’t understand why the target API level doesn’t restrict older devices: if the API 27 is for Android 8.1, how is it possible that the older devices are supported? Is it possible because Codename One build servers don’t generate code that is supported only by recent devices?
 >
 
@@ -100,7 +100,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > When we use a feature from API 27 we check if the device supports API 27 first then call it. This means it will still work on an API 15 device without a problem.
 >
-> This is a “statement” from the app to the runtime environment saying we tested on an Android 8 device. That means that Google will enable small incompatible changes to Android once this is set. A good example is background behavior which will now be more aggressive.
+> This is a "statement" from the app to the runtime environment saying we tested on an Android 8 device. That means that Google will enable small incompatible changes to Android once this is set. A good example is background behavior which will now be more aggressive.
 >
 > E.g. In API 23 (Andoid 6) Google introduced a new permission system.
 >
@@ -178,7 +178,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > codename1.arg.android.licenseKey=XXXXXXXXXXXXXXX  
 > codename1.arg.android.release=true  
 > codename1.arg.android.statusbar_hidden=true  
-> codename1.arg.android.xapplication=<meta-data android:name=”com.google.android.gms.version” android:value=”@integer/google_play_services_version”/><activity android:name=”com.google.android.gms.ads.AdActivity” android:configchanges=”keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize”/>  
+> codename1.arg.android.xapplication=<meta-data android:name="com.google.android.gms.version" android:value="@integer/google_play_services_version"/><activity android:name="com.google.android.gms.ads.AdActivity" android:configchanges="keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize"/>  
 > codename1.arg.ios.add_libs=AdSupport.framework;SystemConfiguration.framework;CoreTelephony.framework  
 > codename1.arg.ios.newStorageLocation=true  
 > codename1.arg.ios.objC=true  
@@ -234,7 +234,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> If you edit [codenameone_settings.proper…](<http://codenameone_settings.properties>) you need to prefix it with codename1.arg. I suggest using the Codename One Setting UI under “Build Hints” to edit these and not edit the file directly.
+> If you edit [codenameone_settings.proper…](<http://codenameone_settings.properties>) you need to prefix it with codename1.arg. I suggest using the Codename One Setting UI under "Build Hints" to edit these and not edit the file directly.
 >
 
 
@@ -246,7 +246,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > I have added android.sdkVersion=27 to Build hints via corresponding UI, it appears as codename1.arg.android.sdkVersion=27 in [codenameone_settings.proper…](<http://codenameone_settings.properties>),  
 > but still the same warning in Google Play Console, app targeted to API 23, any ideas ?
 >
-> also I can’t see “[android.playService.ads](<http://android.playService.ads>)=true” in Build Hints UI, it only appears in [codenameone_settings.proper…](<http://codenameone_settings.properties>), is it ok ?
+> also I can’t see "[android.playService.ads](<http://android.playService.ads>)=true" in Build Hints UI, it only appears in [codenameone_settings.proper…](<http://codenameone_settings.properties>), is it ok ?
 >
 
 

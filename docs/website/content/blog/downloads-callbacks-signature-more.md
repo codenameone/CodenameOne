@@ -83,7 +83,7 @@ Simple usage of the `SignatureComponent` class looks like this:
 
 ### Small Changes
 
-#### Component.remove()
+#### `Component.remove()`
 
 We added the ability to do [Component.remove()](/javadoc/com/codename1/ui/Component/#remove--).  
 This is really shorthand syntax for the somewhat contrived `getParent()` syntax but it’s also pretty helpful when  
@@ -174,7 +174,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> It was released yesterday. Just do an Update Client Libs to get the latest and it will “just work”.
+> It was released yesterday. Just do an Update Client Libs to get the latest and it will "just work".
 >
 
 

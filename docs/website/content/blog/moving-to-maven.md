@@ -15,13 +15,13 @@ Codename One is migrating to Maven. This will simplify some aspects of our build
 
 As the headline states, we’re moving to Maven, and leaving the ant-infested old build system behind. To be honest, I love using Ant. It is quick and dirty, and let’s me assemble ad-hoc build workflows with little effort.
 
-Migrating to Maven, at times, felt like strapping on a pair of cement boots. It is much more rigid than Ant, and much more opinionated. It’s the “Maven” way, or you’re in for a world of pain.
+Migrating to Maven, at times, felt like strapping on a pair of cement boots. It is much more rigid than Ant, and much more opinionated. It’s the "Maven" way, or you’re in for a world of pain.
 
 ### Why Maven?
 
-So, you may ask, if Maven is so opinionated and painful, why are we adopting it? The reason is simply because it is worth it. Maven’s rigidity encourages better project hygiene — Builds that “just work“, without having to read through a page of build instructions, or embarking on a dependency scavenger hunt. Once you agree to surrender some of the flexibility that Ant provided, you can begin to enjoy a better developer experience, all round.
+So, you may ask, if Maven is so opinionated and painful, why are we adopting it? The reason is simply because it is worth it. Maven’s rigidity encourages better project hygiene — Builds that "just work", without having to read through a page of build instructions, or embarking on a dependency scavenger hunt. Once you agree to surrender some of the flexibility that Ant provided, you can begin to enjoy a better developer experience, all round.
 
-Dependencies can be added as XML snippets to the pom.xml file rather than downloaded manually. And they can be removed, or upgraded to new versions just as easily.
+Dependencies can be added as XML snippets to the `pom.xml` file rather than downloaded manually. And they can be removed, or upgraded to new versions just as easily.
 
 The Maven eco-system is mature and diverse, providing all kinds of plugins to augment your build process. Maven’s rigidity helps all of these plugins work together as if on an assembly line.
 
@@ -55,7 +55,7 @@ This is made possible by improvements to our compile-time compliance check which
 
 ## Publish your Libraries on Maven Central
 
-You can now deploy your Codename One Library projects to Maven central so that others can use them by pasting a dependency snippet into the the pom.xml file of their Application projects. Cn1libs listed in Codename One Settings can now include a Maven dependency snippet which will be used when adding the library to a Maven project.
+You can now deploy your Codename One Library projects to Maven central so that others can use them by pasting a dependency snippet into the the `pom.xml` file of their Application projects. Cn1libs listed in Codename One Settings can now include a Maven dependency snippet which will be used when adding the library to a Maven project.
 
 ### A Small Change in the Workflow
 
@@ -85,9 +85,9 @@ The transition to Maven should be nearly seamless, but you will notice a few cha
 
 The old Ant workflow worked as follows:
 
-1. Install the Codename One Plugin in your IDE via the “Install Plugin” mechanism in the IDE. We provide plugins for IntelliJ, NetBeans, and Eclipse.
+1. Install the Codename One Plugin in your IDE via the "Install Plugin" mechanism in the IDE. We provide plugins for IntelliJ, NetBeans, and Eclipse.
 
-2. Create a new **Codename One Application** project using the “New Project” option in your IDE.
+2. Create a new **Codename One Application** project using the "New Project" option in your IDE.
 
 3. Use the IDE’s editor to develop and debug your application.
 
@@ -127,7 +127,7 @@ So the workflow (with IDE) becomes:
 
 3. Use the IDE’s editor to develop and debug your application.
 
-4. Add cn1libs (plugins) to your project using **Codename One Settings** – ****or by pasting a regular Maven dependency snippet into your pom.xml file****.
+4. Add cn1libs (plugins) to your project using **Codename One Settings** – ****or by pasting a regular Maven dependency snippet into your `pom.xml` file****.
 
 5. Use the provided configuration options in the IDE to build the project for various platforms such as iOS, Android, etc…​
 
@@ -279,12 +279,12 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I removed my android sdk deps. Now I am stuck here (android sdk error no longer shows):
 >
-> “Failed to merge properties from library com.some.package:SomeApp-GoogleMaps. Property codename1.arg.ios.glAppDelegateHeader has a conflict”
+> "Failed to merge properties from library com.some.package:SomeApp-GoogleMaps. Property codename1.arg.ios.glAppDelegateHeader has a conflict"
 >
 > I use the GooglMaps cn1lib. My delegate’s header already contains something and is as follows:  
-> \#include “com\_some\_something.h” \#import “com\_some\_more\_something.h”
+> \#include "com\_some\_something.h" \#import "com\_some\_more\_something.h"
 >
-> GoogleMaps cn1lib’s del header appends: \n\#import “GoogleMaps/GoogleMaps.h”
+> GoogleMaps cn1lib’s del header appends: \n\#import "GoogleMaps/GoogleMaps.h"
 >
 > If I remove my del. header’s build hint, the error goes away. But the same error then appears but complaining about the pods build hint. Is Maven having trouble merging build hints from cn1libs with the app’s?
 >
@@ -312,10 +312,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > On NetBeans:
 >
 > 1. Select main project.  
-> 2. Select “Android App” from the config dropdown.  
+> 2. Select "Android App" from the config dropdown.  
 > 3. Press build or run
 >
-> I just tried “Clean and Rebuild” and now my project doesn’t detect Android native code anymore. I think I’ll have to re-run the migration later today and see if something changes
+> I just tried "Clean and Rebuild" and now my project doesn’t detect Android native code anymore. I think I’ll have to re-run the migration later today and see if something changes
 
 
 ### **Javier Anton** — March 31, 2021 at 7:25 pm ([permalink](/blog/moving-to-maven/#comment-24432))
@@ -327,9 +327,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > -Can compile local javase fine  
 > -Can run simulator  
 > -Can’t compile Android because it looks for android package in native sources and then it fails:  
-> >”com/namespace/SomeActivity.java:[8,19] package android.app does not exist”  
+> >"com/namespace/SomeActivity.java:[8,19] package android.app does not exist"  
 > -Can’t compile iOS because it complains about build hints conflict as stated before:  
-> >”Failed to merge properties from library com.groups:NewId-GoogleMaps. Property codename1.arg.ios.glAppDelegateHeader has a conflict”
+> >"Failed to merge properties from library com.groups:NewId-GoogleMaps. Property codename1.arg.ios.glAppDelegateHeader has a conflict"
 >
 > The command used for the migration is as follows (PowerShell):  
 > SET CN1\_VERSION=7.0.17  

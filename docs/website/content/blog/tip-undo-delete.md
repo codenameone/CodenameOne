@@ -11,9 +11,9 @@ author: Shai Almog
 
 ![Header Image](/blog/tip-undo-delete/tip.jpg)
 
-One of my pet peeves is the “Are you sure?” dialog. I’ve used it a lot myself because it’s the “easy way out”, but when possible I try to avoid it. This is especially important in mobile where constant prompts really slow down the workflow.
+One of my pet peeves is the "Are you sure?" dialog. I’ve used it a lot myself because it’s the "easy way out", but when possible I try to avoid it. This is especially important in mobile where constant prompts really slow down the workflow.
 
-The trick that lets us avoid the “Are you sure?” dialog is the undo option. Once you can undo an operation you can move fast and let users reconsider later. With file deletion this is a bit harder. Most OS’s provide a trash can abstraction. This doesn’t exist in mobile devices where apps are effectively segregated from one another. However, implementing our own trash can is pretty trivial.
+The trick that lets us avoid the "Are you sure?" dialog is the undo option. Once you can undo an operation you can move fast and let users reconsider later. With file deletion this is a bit harder. Most OS’s provide a trash can abstraction. This doesn’t exist in mobile devices where apps are effectively segregated from one another. However, implementing our own trash can is pretty trivial.
 
 These are methods I use in one of our util classes, they aren’t public API’s because they are too high level for the API. But they might be useful for you. First we need copy and move operations. Notice, I didn’t use file system rename since different file systems might be isolated on the device and might not allow a rename:
     
@@ -106,7 +106,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> This was specifically designed for file system storage but can easily be adapted to support Storage. E.g. moveToTrash can check if the file is in storage by checking if startsWith(“file://”) that would only change the opening of the file code. The Trash directory would still be in the file system storage.
+> This was specifically designed for file system storage but can easily be adapted to support Storage. E.g. moveToTrash can check if the file is in storage by checking if startsWith("file://") that would only change the opening of the file code. The Trash directory would still be in the file system storage.
 >
 > copyFile and deleteFile can be similarly adapted to detect a storage file and use the storage API instead of the FileSystemStorage API.
 >

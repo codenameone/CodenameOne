@@ -200,7 +200,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Michael du Plessis** — April 10, 2017 at 1:36 pm ([permalink](/blog/building-a-chat-app-with-codename-one-part-1/#comment-23332))
 
-> I notice in the documentation that you recommend not using .getTitleArea().setUIID(“Container”); anymore because it allowed hacks.  
+> I notice in the documentation that you recommend not using .getTitleArea().setUIID("Container"); anymore because it allowed hacks.  
 > How can we remove the TitleArea now?
 
 
@@ -220,7 +220,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Francesco Galgani** — November 28, 2017 at 8:58 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-1/#comment-23834))
 
-> About “FontImage.create(” ue96c “, iconFontStyle)”, what is the meaning of ” ue96c “? How is chosen or generated this string? Thank you.
+> About "FontImage.create(" ue96c ", iconFontStyle)", what is the meaning of " ue96c "? How is chosen or generated this string? Thank you.
 
 
 ### **Shai Almog** — November 29, 2017 at 6:50 am ([permalink](/blog/building-a-chat-app-with-codename-one-part-1/#comment-23771))

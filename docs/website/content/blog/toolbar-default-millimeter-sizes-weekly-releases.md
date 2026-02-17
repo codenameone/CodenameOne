@@ -43,7 +43,7 @@ we are moving too quickly with the docs and don’t have time to release minor c
 
 E.g. newer samples in the docs already use the API’s mentioned above as well as some other newer API’s. This  
 causes a situation where developers can’t compile our samples when working against the latest version. One  
-solution for this is to make a weekly release schedule instead of our current “ad hoc” updates which are problematic.  
+solution for this is to make a weekly release schedule instead of our current "ad hoc" updates which are problematic.  
 This way we can both update the docs and the binary in the same time and also have a clearer schedule of  
 library updates (notice that library updates don’t necessarily include a plugin update).
 
@@ -88,7 +88,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > We need to update all demos to Java 8 as most of them are currently out of date. Since the docs are now mostly targeted at Java 8 we need to do the same there.
 >
-> We also need new demos that are more refined, the kitchen sink is REALLY old by now and we need a new version of that. We consider all of that work as “documentation” which is currently one of our top 4 priorities.
+> We also need new demos that are more refined, the kitchen sink is REALLY old by now and we need a new version of that. We consider all of that work as "documentation" which is currently one of our top 4 priorities.
 
 ---
 

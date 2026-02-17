@@ -12,10 +12,10 @@ author: Shai Almog
 ![Header Image](/blog/building-a-chat-app-with-codename-one-part-3/facebook-login-blue.png)
 
 In the previous section we went over the login with Google process, in this section we’ll go over the login with Facebook.  
-At this time we’ll skip the “invite friends” option since that is blog post all on its own and we can just add that functionality  
+At this time we’ll skip the "invite friends" option since that is blog post all on its own and we can just add that functionality  
 to the completed application.
 
-Facebook has a “get friends” API call that we can use, the downside of that is that it will only return our  
+Facebook has a "get friends" API call that we can use, the downside of that is that it will only return our  
 friends that have already joined the app so we won’t be able to contact anyone on an arbitrary basis.
 
 ### Getting Started – Configuration
@@ -62,7 +62,7 @@ using the same keytool approach using the command line:
 
 ![Hash](/blog/building-a-chat-app-with-codename-one-part-3/chat-app-tutorial-facebook-login-8.png)
 
-Lastly you need to publish the Facebook app by flipping the switch in the apps “Status & Review” page as such:
+Lastly you need to publish the Facebook app by flipping the switch in the apps "Status & Review" page as such:
 
 ![Enable The App](/blog/building-a-chat-app-with-codename-one-part-3/chat-app-tutorial-facebook-login-9.png)
 

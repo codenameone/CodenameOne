@@ -11,9 +11,9 @@ author: Shai Almog
 
 ![Header Image](/blog/build-hint-variables/build-hints.png)
 
-This is a feature Steve added way back in June but I didn’t get around to documenting it. Build hints can sometimes get “unwieldy” e.g. in the case of `ios.plistInject` or `android.xapplication` we sometimes have pretty verbose values.
+This is a feature Steve added way back in June but I didn’t get around to documenting it. Build hints can sometimes get "unwieldy" e.g. in the case of `ios.plistInject` or `android.xapplication` we sometimes have pretty verbose values.
 
-We now have a way to define a “build hint variable” which the build server substitutes seamlessly. This is useful for “key” values required by API’s that sometimes require boilerplate e.g. the [Google Maps support](https://github.com/codenameone/codenameone-google-maps/) has this:
+We now have a way to define a "build hint variable" which the build server substitutes seamlessly. This is useful for "key" values required by API’s that sometimes require boilerplate e.g. the [Google Maps support](https://github.com/codenameone/codenameone-google-maps/) has this:
     
     
     android.xapplication=<meta-data android_name="com.google.android.maps.v2.API_KEY" android_value="YOUR_ANDROID_API_KEY"/>

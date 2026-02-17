@@ -37,7 +37,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > Hi,  
-> sure. You can add any component to the “list” and you can subclass any component to override longPointerPress
+> sure. You can add any component to the "list" and you can subclass any component to override longPointerPress
 >
 
 
@@ -48,7 +48,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thank Shai, one more question on lists.
 >
-> After scrolling and pressing an item that navigates you away from a list(e.g. to another form or page), how do you get back to a list to previously displayed list? In my case, the form usually in another class. Is it achievable and what can I do to my code to add this “remember last position” feature onto a list? The use case is when you have a long list and you need to go back and forth without having to keep scrolling from the top to get back to where you had last clicked.
+> After scrolling and pressing an item that navigates you away from a list(e.g. to another form or page), how do you get back to a list to previously displayed list? In my case, the form usually in another class. Is it achievable and what can I do to my code to add this "remember last position" feature onto a list? The use case is when you have a long list and you need to go back and forth without having to keep scrolling from the top to get back to where you had last clicked.
 >
 
 

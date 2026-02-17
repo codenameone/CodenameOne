@@ -113,7 +113,7 @@ Your app looks great except that on desktop, the fonts are a little too small. I
 
 ## Solution
 
-You can use font-scaling constants to scale all of the fonts in your stylesheet by a constant factor. You can use a “media-query-like” syntax to apply this scaling only on particular platforms, devices, or densities.
+You can use font-scaling constants to scale all of the fonts in your stylesheet by a constant factor. You can use a "media-query-like" syntax to apply this scaling only on particular platforms, devices, or densities.
 
 ## Example: Scaling Fonts to be 25% larger on desktop
 

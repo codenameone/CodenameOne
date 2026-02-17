@@ -18,25 +18,25 @@ that decision.
 
 ### Should we Support Android Native Code?
 
-Ignoring the technical issues involved this might seem like a “no brainer” for Android developers. But history teaches  
+Ignoring the technical issues involved this might seem like a "no brainer" for Android developers. But history teaches  
 us otherwise…​
 
 Quite often when a platform offers compatibility it serves to make it irrelevant rather than promote it. A famous  
-example of such a platform is OS/2 which was marketed as: “Better Windows than Windows and better DOS than DOS”.
+example of such a platform is OS/2 which was marketed as: "Better Windows than Windows and better DOS than DOS".
 
 __ |  It is debatable whether OS/2 failed because or despite its choice to focus on compatibility.   
 ---|---  
   
 The question becomes more muddled if we do a lousy job of importing. Compatibility to Android is not realistically  
 feasible for elaborate apps. Android is remarkably complex and nuanced, activities have no equivalent in other  
-OS’s and the UI paradigms of Android are “unique”.
+OS’s and the UI paradigms of Android are "unique".
 
-#### Would an import that is “bad” be better than nothing?
+#### Would an import that is "bad" be better than nothing?
 
-We are currently at the “probably mindset”.
+We are currently at the "probably mindset".
 
-So while we can’t say that this is a “good thing” we’d rather have something  
-in place. Even if that “something” is broken, partial and problematic.
+So while we can’t say that this is a "good thing" we’d rather have something  
+in place. Even if that "something" is broken, partial and problematic.
 
 We already support importing Android string bundles into the localization section in the Codename One designer,  
 this is quite useful as you can send string bundles to localization services rather easily.
@@ -45,7 +45,7 @@ __ |  Most localization services also support Java properties files but do so ba
 read the spec   
 ---|---  
   
-We think the “right thing” to do in the case of Android is to import only the XML files and resources and ignore  
+We think the "right thing" to do in the case of Android is to import only the XML files and resources and ignore  
 the Java code which you would need to migrate manually (as there are no activities etc.). Codename One has  
 the theoretically perfect destinations, the resource files can serve as a great destination for the res files.
 
@@ -62,7 +62,7 @@ While todays product looks completely different from its original version a lot 
 different and hard to adapt. Android’s layout system has many parallels to our layout system as both are inspired  
 by previous work in the same field, but Android’s layouts are far more complex with many small nuances.
 
-Specifically we chose to keep the layout system as simple as possible telling the users to “just nest”. Android  
+Specifically we chose to keep the layout system as simple as possible telling the users to "just nest". Android  
 developers took the opposite approach of adding flags to customize layout behaviors deeply. This means that  
 a lot of Android layouts have no direct Codename One equivalents…​ So we would need to translate a flat layout  
 into a hierarchy which isn’t always trivial and might result in issues.

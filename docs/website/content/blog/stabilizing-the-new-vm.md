@@ -32,7 +32,7 @@ Currently resolved are:
 [  
 Issue 1149  
 ](https://code.google.com/p/codenameone/issues/detail?id=1149)  
-: ios.newVM causes exception on Calender.getTime()  
+: ios.newVM causes exception on `Calender.getTime()`  
   
 [  
 Issue 1151  
@@ -46,7 +46,7 @@ Still open is:
 [  
 Issue 1245  
 ](https://code.google.com/p/codenameone/issues/detail?id=1245)  
-: Strange System.currentTimeMillis() behavior with iOS new VM
+: Strange `System.currentTimeMillis()` behavior with iOS new VM
 
 We hope to resolve that soon as well. All VM related issues are getting the most attention possible from us and we currently seem to be on track to a very stable release.  
   

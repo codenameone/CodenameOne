@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Clement Levallois says:
 >
 > hello,  
-> great stuff as usual. May I suggest that the workflow allows for a “all without coding” route? Your demo showed that 2 lines of code had to be added when a new “GUi form” was created, in order to make it displayed. A tick box in the wizard at the moment of Form creation could do it.  
+> great stuff as usual. May I suggest that the workflow allows for a "all without coding" route? Your demo showed that 2 lines of code had to be added when a new "GUi form" was created, in order to make it displayed. A tick box in the wizard at the moment of Form creation could do it.  
 > Essentially, it is key to allow beginners to use the designer much before they have to write even one line of code, as is the case now.
 >
 
@@ -131,7 +131,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Good point. We should have some better project templates, ideally with ready made projects that already include some forms.  
 > We did that with the old designer (e.g. with the Tabs based application) but it wasn’t used much so we need to get more refined use cases for this.
 >
-> Right now I’d like to stabilize the designer so we can start building on top of it both tutorials and things such as this. At the moment this is somewhat of a regression for a “no coding” approach since some things like navigating from one form to the next aren’t supported in the new GUI builder. Naturally, we want to fix that.
+> Right now I’d like to stabilize the designer so we can start building on top of it both tutorials and things such as this. At the moment this is somewhat of a regression for a "no coding" approach since some things like navigating from one form to the next aren’t supported in the new GUI builder. Naturally, we want to fix that.
 >
 
 
@@ -231,7 +231,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Dan says:
 >
-> Thanks for this overview, Shai – and thanks for including it in the latest CodenameOne release. Downloaded it today and have started playing with it. Thanks for the tip about the XML file – for some reason, dragging and dropping a textfield (for me at least) kept it as type “Label”. so if i go into the XML and change the type to “TextField” it seems to come out ok. Keep up the good work! – dan
+> Thanks for this overview, Shai – and thanks for including it in the latest CodenameOne release. Downloaded it today and have started playing with it. Thanks for the tip about the XML file – for some reason, dragging and dropping a textfield (for me at least) kept it as type "Label". so if i go into the XML and change the type to "TextField" it seems to come out ok. Keep up the good work! – dan
 >
 
 

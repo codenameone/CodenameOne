@@ -9,7 +9,7 @@ date: '2020-10-23'
 author: Steve Hannah
 ---
 
-A while back we added a new [TestRunnerComponent](/javadoc/com/codename1/testing/TestRunnerComponent/) that provides a visual UI for running unit tests inside an app. Sometimes, while I’m developing unit tests, I find it easier to write them inside a regular app project instead of in the “tests” directory. This allows me to debug the unit tests in the IDE more easily, just like I debug regular apps. The TestRunner component makes it simple to do this.
+A while back we added a new [TestRunnerComponent](/javadoc/com/codename1/testing/TestRunnerComponent/) that provides a visual UI for running unit tests inside an app. Sometimes, while I’m developing unit tests, I find it easier to write them inside a regular app project instead of in the "tests" directory. This allows me to debug the unit tests in the IDE more easily, just like I debug regular apps. The TestRunner component makes it simple to do this.
 
 All you need to do is create some unit tests in your app (i.e. a class that extends [AbstractTest](/javadoc/com/codename1/testing/AbstractTest/). E.g.
     
@@ -58,7 +58,7 @@ You can then just add an instance of each Test class to your TestRunnerComponent
         runner.showForm();
     }
 
-When you run the app, it will display a form with single button “Run Tests”.
+When you run the app, it will display a form with single button "Run Tests".
 
 ![](/blog/new-testrunner-component/new-testrunner-component-1-1.png)
 

@@ -309,7 +309,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Notice the observability section above:
 >
-> meet.subject.addChangeListener((p) -> Log.p(“New property value is: ” + p.get()));
+> meet.subject.addChangeListener((p) -> Log.p("New property value is: " + p.get()));
 >
 
 
@@ -319,7 +319,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Mark Daniel Henning says:
 >
 > Quick question: Is there a concept of a virtual property? For instance, Say I have a PropertyBusinessObject called Length with a Property defined as  
-> public final Property<double,length> metre = new Property<>(“metre”);
+> public final Property<double,length> metre = new Property<>("metre");
 >
 > It would be useful to have a virtual property km such that Length.km.get() would return Length.metre.get() * .001  
 > and Length.km.set(val) would call Length.metre.set(val * 1000)

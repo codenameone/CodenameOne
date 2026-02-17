@@ -24,11 +24,11 @@ Writing native code in Codename One is pretty simple, however one piece is relat
 
 A common trick for calling back is to just define a static method and then trigger it from native code. This works nicely for Android, J2ME & Blackberry however mapping this to iOS requires some basic understanding of how the iOS VM works. Worse, due to the changes we made in the new VM if you are using such code you will need to adapt it as we migrate to the new VM or your code will stop working.
 
-For the purpose of this explanation lets pretend we have a class called NativeCallback in the src hierarchy under the package com.mycompany that has the method: public static void callback().  
+For the purpose of this explanation lets pretend we have a class called NativeCallback in the src hierarchy under the package `com.mycompany` that has the method: public static void callback().  
   
 So if we want to invoke that method from Objective-C we normally would have just done the following. Added an include as such:  
   
-#include “com_mycompany_NativeCallback.h”
+#include "com_mycompany_NativeCallback.h"
 
 Then when we want to trigger the method just do:  
   
@@ -36,13 +36,13 @@ com_mycompany_NativeCallback_callback__();
 
 This will not compile with the new VM. The new VM now passes the thread context along method calls to save on API calls (thread context is heavily used in Java for synchronization, gc and more). However, to keep code compatible we added a few macros that allow us to maintain XMLVM/newVM portability and they are defined as blank when running under XMLVM. So to do something like this in the new VM all we need to do is add an include for CodenameOne_GLViewController.h as such:  
   
-#include “CodenameOne_GLViewController.h”
+#include "CodenameOne_GLViewController.h"
 
 Then we can invoke the method like this:  
   
 com_mycompany_NativeCallback_callback__(CN1_THREAD_STATE_PASS_SINGLE_ARG);
 
-But what if we defined the method as such: public static void callback(int arg)
+But what if we defined the method as such: `public static void callback(int arg)`
 
 This would map under XMLVM to something like this:  
   
@@ -54,9 +54,9 @@ com_mycompany_NativeCallback_callback___int(CN1_THREAD_GET_STATE_PASS_ARG intVal
 
 Notice that there is no comma between the CN1_THREAD_GET_STATE_PASS_ARG and the value! This is important since under XMLVM CN1_THREAD_GET_STATE_PASS_ARG is defined as nothing, yet under the new VM it will include the necessary comma. Its not an ideal solution but it solves the portability issue as we slowly migrate to the new VM.
 
-Many of you have been passing string values to the Java side, or really NSString* which is iOS equivalent. So assuming a method like this: public static void callback(String arg)
+Many of you have been passing string values to the Java side, or really NSString* which is iOS equivalent. So assuming a method like this: `public static void callback(String arg)`
 
-You would need to convert the NSString value you already have to a java.lang.String which the callback expects. We used to do this as such:  
+You would need to convert the NSString value you already have to a `java.lang.String` which the callback expects. We used to do this as such:  
   
 com_mycompany_NativeCallback_callback___int(fromNSString(nsStringValue));
 
@@ -64,7 +64,7 @@ However, the from NSString method also needs this special argument so you will n
   
 com_mycompany_NativeCallback_callback___int(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG nsStringValue));
 
-And finally you might want to return a value from callback as such: public static int callback(int arg)
+And finally you might want to return a value from callback as such: `public static int callback(int arg)`
 
 This is tricky since we had to change the method signatures to support covariant return types and so the signature of that method under XMLVM would be:  
   
@@ -78,11 +78,11 @@ The upper case R allows us to differentiate between void callback(int,int) and i
   
 #ifdef NEW_CODENAME_ONE_VM  
   
-JAVA_INT val = com_mycompany_NativeCallback_callback___int_R_int(intValue);  
+`JAVA_INT val = com_mycompany_NativeCallback_callback___int_R_int(intValue);`  
   
 #else  
   
-JAVA_INT val = com_mycompany_NativeCallback_callback___int(intValue);  
+`JAVA_INT val = com_mycompany_NativeCallback_callback___int(intValue);`  
   
 #endif
 
@@ -140,7 +140,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > For example in iOSPort/nativeSources/CodenameOne_GLViewController.m line 334 is like this: 
 >
-> str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @”next”), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @”Next”)); 
+> str = com_codename1_ui_plaf_UIManager_localize___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG obj, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"next"), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Next")); 
 >
 > does it mean, that sometimes we need to use CN1_THREAD_GET_STATE_PASS_ARG even when threadStateData variable is available in current context?
 >

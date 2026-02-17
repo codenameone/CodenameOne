@@ -14,7 +14,7 @@ This is the second is a series of blog posts hightlighting some of the component
 __ |  A second-order UI component is a complex UI component, usually composed of multiple basic components, which is designed for a specific type of application. Some examples of second-order UI components are login forms, contacts lists, chat room components, news lists, etc..   
 ---|---  
   
-In this post I share a much simpler, first-order component: The [HelpButton](https://shannah.github.io/CodeRAD/javadoc/ca/weblite/shared/components/HelpButton.html). The HelpButton is just a button that displays a “Help” or “Error” icon. When the user clicks on this button, it pops up with some “help” text.
+In this post I share a much simpler, first-order component: The [HelpButton](https://shannah.github.io/CodeRAD/javadoc/ca/weblite/shared/components/HelpButton.html). The HelpButton is just a button that displays a "Help" or "Error" icon. When the user clicks on this button, it pops up with some "help" text.
 
 ![](/blog/helpbutton-component/help-button-animated.gif)
 

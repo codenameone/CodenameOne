@@ -15,7 +15,7 @@ Opening a demo or sample code from GIT is relatively easy if you are an experien
 
 First before we begin with the step by step guide let’s explain what is happening…​
 
-### Why Doesn’t a Project “Just Work”?
+### Why Doesn’t a Project "Just Work"?
 
 There are two major reasons:
 
@@ -73,7 +73,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **ThomasH99** — September 19, 2021 at 2:44 pm ([permalink](/blog/tip-setup-codename-one-demo-from-git/#comment-24483))
 
-> I just posted this comment under the post “TIP: Using Git for Codename One Projects” but I think I should have posted it here instead:  
+> I just posted this comment under the post "TIP: Using Git for Codename One Projects" but I think I should have posted it here instead:  
 > ———————  
 > Hi, is this approach is still the right way to use Git for CN1 projects using maven? (I’m no expert on either so maybe this is a basic question 🙂)
 >
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **ThomasH99** — September 19, 2021 at 2:44 pm ([permalink](/blog/tip-setup-codename-one-demo-from-git/#comment-24484))
 
-> I just posted this comment under the post “TIP: Using Git for Codename One Projects” but I think I should have posted it here instead:  
+> I just posted this comment under the post "TIP: Using Git for Codename One Projects" but I think I should have posted it here instead:  
 > ———————  
 > Hi, is this approach is still the right way to use Git for CN1 projects using maven? (I’m no expert on either so maybe this is a basic question 🙂)
 >

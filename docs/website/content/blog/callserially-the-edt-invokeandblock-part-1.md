@@ -27,7 +27,7 @@ We last explained some of the concepts behind the EDT in 2008 so its high time w
 
 One of the nice things about the EDT is that many of the concepts within it are similar to the concepts in pretty much every other GUI environment (Swing/FX, Android, iOS etc.). So if you can understand this explanation this might help you when working in other platforms too.
 
-Codename One can have as many threads as you want, however there is one thread created internally in Codename One named “EDT” for Event Dispatch Thread. This name doesn’t do the thread justice since it handles everything including painting etc. 
+Codename One can have as many threads as you want, however there is one thread created internally in Codename One named "EDT" for Event Dispatch Thread. This name doesn’t do the thread justice since it handles everything including painting etc. 
 
 You can imagine the EDT as a loop such as this:  
   

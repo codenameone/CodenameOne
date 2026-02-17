@@ -30,9 +30,9 @@ The new project structure is based on the [cn1app-archetype](https://github.com/
 3. The includes NetBeans and IntelliJ configuration files to provide better integration with those IDEs.
   
   
-****4. The “common” module contains all of the cross-platform stuff****, and is the most direct successor to the old Ant project structure.
+****4. The "common" module contains all of the cross-platform stuff****, and is the most direct successor to the old Ant project structure.
 
-i. codenameone\_settings.properties is found in the common module.
+i. `codenameone_settings.properties` is found in the common module.
   
   
        ii. CSS files are in common/src/main/css.
@@ -95,7 +95,7 @@ Module where legacy cn1libs will be installed the cn1:install-cn1lib goal.
 
 ### Shell Scripts
 
-The archetype project includes run.sh and build.sh shell scripts, as well as their Windows counterparts run.bat and build.bat. These scripts are convenience wrappers for common commands that you may wish to perform on the Command-line. e.g.
+The archetype project includes `run.sh` and `build.sh` shell scripts, as well as their Windows counterparts run.bat and build.bat. These scripts are convenience wrappers for common commands that you may wish to perform on the Command-line. e.g.
 
 ## Running project in the Codename One Simulator
 
@@ -185,7 +185,7 @@ The archetype project includes run.sh and build.sh shell scripts, as well as the
 The Codename One Maven plugin includes several goals, some of which are executed internally at the appropriate phase of the Maven lifecycle. Others are meant to be executed by you. Typically, you would run the Maven goals in the root module.
   
   
-By default, only the “common” module is activated. You can activate other modules by specifying them with the codename1.platform property. e.g. If you wanted to build the javase module, you would do:
+By default, only the "common" module is activated. You can activate other modules by specifying them with the codename1.platform property. e.g. If you wanted to build the javase module, you would do:
 
 ```java
 				
@@ -233,11 +233,11 @@ And to build for Windows Desktop, you would run:
 
 ## Why 2 Properties?
 
-You might be wondering why we need to include both codename1.platform and codename1.buildTarget properties explicitly. The codename1.buildTarget property should correspond to a unique codename1.platform value (e.g. codename1.buildTarget=mac-os-x-desktop implies codename1.platform=javase), so why can’t we just omit the codename1.platform property and let the build system “figure it out”? Indeed!
+You might be wondering why we need to include both codename1.platform and codename1.buildTarget properties explicitly. The codename1.buildTarget property should correspond to a unique codename1.platform value (e.g. codename1.buildTarget=mac-os-x-desktop implies codename1.platform=javase), so why can’t we just omit the codename1.platform property and let the build system "figure it out"? Indeed!
 
 The reason is because Maven doesn’t allow you to do this in a way that will support our needs. The codename1.platform property is used for more than just activating the correct module. It is used by cn1lib projects that are listed as dependencies also to include the correct artifacts for the current build. If this property isn’t provided on the command-line, then it won’t be available early enough in the Maven reactor process to activate all of the needed modules and artifacts.
 
-If you know a clever solution to this issue, I’m all ears. My solution was to just provide the build.sh and build.bat scripts to wrap the common goals and include the needed properties at that level.
+If you know a clever solution to this issue, I’m all ears. My solution was to just provide the `build.sh` and build.bat scripts to wrap the common goals and include the needed properties at that level.
 
 Check out the [build.sh script source](https://github.com/shannah/cn1-maven-archetypes/blob/00729f9f03b1952eafcd425abbb6a64879242a89/cn1app-archetype/src/main/resources/archetype-resources/build.sh) for a list of the most-common build commands.
 
@@ -245,7 +245,7 @@ Check out the [build.sh script source](https://github.com/shannah/cn1-maven-arch
 
 As mentioned above, we’ve done some work to add better integration than default to IntelliJ and NetBeans. If you open the project in IntelliJ, the Configuration menu will include options for all of the common commands including building the project for each target platform, running in the simulator, opening Codename Settings, and updating Codename One.
 
-NetBeans includes similar support, and we plan to add “special” support for Eclipse and VSCode in the near future.
+NetBeans includes similar support, and we plan to add "special" support for Eclipse and VSCode in the near future.
 
 See [Getting Started with the Bare-bones Java App Project](https://shannah.github.io/cn1-maven-archetypes/cn1app-archetype-tutorial/getting-started.html) for more in-depth coverage of each IDE including screenshots.
 
@@ -295,22 +295,22 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for all this great information. I completed watching the introductory free course from the academy and Shai told me that you guys are now using maven and css instead of old way with the IDE plugins. So I follow this instructions and the developer guide to try the new way of creating projects with maven. I ran into a couple of problems that took me some time to figure out since I’m new to this. If it helps I’m using OpenJDK 17 on puppy linux and vim as my lightweight IDE and running everything in the terminal. I’m really impress how well everything works on my 7 year old laptop.
 >
-> I used the Bare-bones Java App with the option “Other” for the IDE maven starter project. When I tried to run the project the simulator would not launch because the ‘MaxPermSize=128M’ VM option was unrecognized. I was able to fix this problem by commenting out line 612 from the pom.xml file in the javase folder.
+> I used the Bare-bones Java App with the option "Other" for the IDE maven starter project. When I tried to run the project the simulator would not launch because the ‘MaxPermSize=128M’ VM option was unrecognized. I was able to fix this problem by commenting out line 612 from the pom.xml file in the javase folder.
 >
-> ”  
+> "  
 > [INFO] — exec-maven-plugin:3.0.0:exec (run-in-simulator) @ learningapp-javase —  
 > Unrecognized VM option ‘MaxPermSize=128M’  
 > Error: Could not create the Java Virtual Machine.  
 > Error: A fatal exception has occurred. Program will exit.  
 > [ERROR] Command execution failed.  
 > org.apache.commons.exec.ExecuteException: Process exited with an error: 1 (Exit value: 1)  
-> ”
+> "
 >
-> The second problem I had was when trying to open the settings by using the command run.sh settings. I kept getting an error message stating that no plugin was found for prefix ‘cn’ in the current project and in the plugin groups. Eventually I figured out the problem was in the run.sh file so I had to append a 1 to cn on line 14 so it would call “cn1:settings”.
+> The second problem I had was when trying to open the settings by using the command run.sh settings. I kept getting an error message stating that no plugin was found for prefix ‘cn’ in the current project and in the plugin groups. Eventually I figured out the problem was in the run.sh file so I had to append a 1 to cn on line 14 so it would call "cn1:settings".
 >
-> ”  
+> "  
 > [ERROR] No plugin found for prefix ‘cn’ in the current project and in the plugin groups [org.apache.maven.plugins, org.codehaus.mojo] available from the repositories [local (/root/.m2/repository), central (<https://repo.maven.apache.org/maven2>)] -> [Help 1]  
-> “
+> "
 >
 
 

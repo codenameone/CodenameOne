@@ -24,7 +24,7 @@ VM’s usually use low level signaling to detect things like null pointer except
 
 This also means you might get a null pointer exception or a runtime exception from a native OS failure and it can also mean that crash protection will become more effective as OS level crashes would translate to standard exceptions.
 
-That’s a HUGE change in the way the VM works, it has one drawback: this doesn’t happen in the xcode debugger as the debug environment overrides the signals. So if you run into a null in the debugger you will get a crash and breakpoint instead of the exception. This isn’t a “bad thing” but the behavior difference is something you should be aware of. We hope this will improve the reliability & stability of Codename One and bring it to the next level. We also hope this will improve performance by eliminating null checks from our code.
+That’s a HUGE change in the way the VM works, it has one drawback: this doesn’t happen in the xcode debugger as the debug environment overrides the signals. So if you run into a null in the debugger you will get a crash and breakpoint instead of the exception. This isn’t a "bad thing" but the behavior difference is something you should be aware of. We hope this will improve the reliability & stability of Codename One and bring it to the next level. We also hope this will improve performance by eliminating null checks from our code.
 
 #### New Allocator
 

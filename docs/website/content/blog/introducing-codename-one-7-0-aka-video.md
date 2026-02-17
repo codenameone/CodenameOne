@@ -23,7 +23,7 @@ This is probably one of the biggest challenges we took to date. We now have one 
 
 ### Build App
 
-With the new build app we want to change the process of building/working with Codename One. Right now it’s “just” a more unified settings/build experience but we plan to make it central to Codename One development. This will reduce the importance of the IDE plugins and of the build app.
+With the new build app we want to change the process of building/working with Codename One. Right now it’s "just" a more unified settings/build experience but we plan to make it central to Codename One development. This will reduce the importance of the IDE plugins and of the build app.
 
 ### CEF Migration
 

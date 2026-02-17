@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/tip-edit-docs-fun-profit/tip.jpg)
 
-On occasion I answer a question on stackoverflow, the discussion forum or elsewhere and I get a response of the form of: “this wasn’t clear from the docs”. We improved the docs but befitting a huge project run by engineers without a technical writer in sight this is a bit of a problem…​ The thing is that this is a problem you can fix regardless of your level in engineering or in English.
+On occasion I answer a question on stackoverflow, the discussion forum or elsewhere and I get a response of the form of: "this wasn’t clear from the docs". We improved the docs but befitting a huge project run by engineers without a technical writer in sight this is a bit of a problem…​ The thing is that this is a problem you can fix regardless of your level in engineering or in English.
 
 The benefits are pretty cool:
 
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Are the wiki modifications by users automatically converted to the manual pages in the Codename One site without any check by the Codename One team?
 >
 > I’ve seen few errors and several incompleteness in the manual and in the API about the code examples, I’ll try to contribute the next time that I’ll find something strange.  
-> Of course, I’m only an user of Codename One and I’m studying it, so at the moment I feel better to tell a problem in the “Issues page” of GitHub than to try to do changes by myself.
+> Of course, I’m only an user of Codename One and I’m studying it, so at the moment I feel better to tell a problem in the "Issues page" of GitHub than to try to do changes by myself.
 >
 
 

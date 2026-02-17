@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/using-the-new-gui-builder/gui-builder-chrome.png)
 
-We had a couple of posts in the past about the new GUI builder but we didn’t have a “how to” guide yet. In this  
+We had a couple of posts in the past about the new GUI builder but we didn’t have a "how to" guide yet. In this  
 post we’ll try to go step by step over the process of using the GUI builder and understanding its inner workings.  
 We’ll also try to clarify conclusively the role the new GUI builder plays in the toolchain and the migrations process  
 from the old GUI builder.
@@ -36,7 +36,7 @@ Why two GUI Builders?
 
 The original old GUI builder has it’s roots in our work at Sun Microsystems. We developed it as part of the  
 designer tool and we store it’s data in the resource file. When creating an application for the old GUI  
-builder you must define it as a “visual application” which will make it use the old GUI builder.
+builder you must define it as a "visual application" which will make it use the old GUI builder.
 
 The roots of this GUI builder are pretty old. When we initially built it we still had to support feature phones with  
 2mb of RAM and the iPad wasn’t announced yet. Due to that we picked an architecture that made sense for those  
@@ -161,12 +161,12 @@ __ |  You can add an image to the resource file using the designer tool as cover
 [this video](http://www.codenameone.com/how-do-i---fetch-an-image-from-the-resource-file---add-a-multiimage.html)  
 ---|---  
   
-For things like setting the text on the component we can use a convenient “long click” on the component to  
+For things like setting the text on the component we can use a convenient "long click" on the component to  
 edit the text in place as such:
 
 ![Use the long click to edit the text ](/blog/using-the-new-gui-builder/gui-builder-in-place-edit.png)
 
-Figure 19. Use the long click to edit the text “in place”
+Figure 19. Use the long click to edit the text "in place"
 
 #### Events
 
@@ -344,7 +344,7 @@ to the new GUI builder possible. This file triggers the following Java source fi
 __ |  Don’t touch the code within the DON’T EDIT comments…​   
 ---|---  
   
-The GUI builder uses the “magic comments” approach where code is generated into those areas to match the  
+The GUI builder uses the "magic comments" approach where code is generated into those areas to match the  
 XML defined in the GUI builder. The IDE’s generate that code at different times. Some IDE’s will generate it when you  
 run the app while others will generate it as you save the GUI in the builder.
 
@@ -363,8 +363,8 @@ is very stable (since we inherited it from the old GUI builder) and should thus 
 run into issues in the tool itself you can probably workaround most of them thru the XML code which is already  
 easier to work with than it was with the old GUI builder.
 
-Currently, NetBeans and Eclipse have a migration wizard from the old GUI builder. It is flaky as it tries to “fake”  
-the “statemachine navigation” and does it rather badly. So the assumption is that you would need to use that  
+Currently, NetBeans and Eclipse have a migration wizard from the old GUI builder. It is flaky as it tries to "fake"  
+the "statemachine navigation" and does it rather badly. So the assumption is that you would need to use that  
 as a starting point and adapt the logic of the application.
 
 If your app is very complex it might be a difficult task so we would suggest dedicating some time to evaluating this  
@@ -461,14 +461,14 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > On the very right side of the toolbar (top) you will see 3 vertical dots (overflow) pressing that will allow you to change the theme.
 >
-> CSS is a plugin and not a part of Codename One “proper” this works with the res files which CSS is supposed to generate.
+> CSS is a plugin and not a part of Codename One "proper" this works with the res files which CSS is supposed to generate.
 >
 
 
 
 ### **Yngve Moe** — September 4, 2016 at 3:29 pm ([permalink](/blog/using-the-new-gui-builder/#comment-24226))
 
-> Ok, that sound reasonable. However I can’t find the vertical dots. The rightmost items on my toolbar are “Save” and “Preview Design”. Am I looking in the wrong place? I can’t find that button anywhere on this page, either.
+> Ok, that sound reasonable. However I can’t find the vertical dots. The rightmost items on my toolbar are "Save" and "Preview Design". Am I looking in the wrong place? I can’t find that button anywhere on this page, either.
 >
 
 
@@ -485,7 +485,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Adebisi Oladipupo** — September 5, 2016 at 6:28 pm ([permalink](/blog/using-the-new-gui-builder/#comment-22963))
 
-> Thanks Shai and sorry for not being clear. I am trying to adopt the new GUI builder since that’s the future. I am having difficult time nesting containers as you showed in the calculator example. I am not asking to be told “drag this here and there”.  
+> Thanks Shai and sorry for not being clear. I am trying to adopt the new GUI builder since that’s the future. I am having difficult time nesting containers as you showed in the calculator example. I am not asking to be told "drag this here and there".  
 > It would be great if one can drag components in the component tree to structure the layout rather than dragging elements into their outlines on the right side of the screen (an action that is more of a trial and error). Doing so has actually resulted in deleting or making components disappear from the tree. I applaud you and your team for a great product. I am not being critical but rather providing input for making it better.  
 > A quick refinement could be having the component tree visible while dragging new components into the project.
 >
@@ -523,9 +523,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Thanks. We are aware of some issues related to nesting that trigger exceptions. These exceptions are hard to recover from…
 >
-> We had such issues in the old GUI builder as well and we worked around them over time. The problem with fixing these is in producing reliable test cases as it’s pretty hard to do this for GUI builder where the test case consists of “drag this here” then “that here” etc. making the effort pretty big.
+> We had such issues in the old GUI builder as well and we worked around them over time. The problem with fixing these is in producing reliable test cases as it’s pretty hard to do this for GUI builder where the test case consists of "drag this here" then "that here" etc. making the effort pretty big.
 >
-> If you have such a test case that would be helpful. Regardless we have some ideas on improving the robustness of the GUI builder so it acts in a more reliable way. If you used the old GUI builder extensively you might recall that when it failed it presented an error then would “undo” that error essentially stabilizing the development process. We’ll try to introduce similar behavior to the new GUI builder with this or the next update.
+> If you have such a test case that would be helpful. Regardless we have some ideas on improving the robustness of the GUI builder so it acts in a more reliable way. If you used the old GUI builder extensively you might recall that when it failed it presented an error then would "undo" that error essentially stabilizing the development process. We’ll try to introduce similar behavior to the new GUI builder with this or the next update.
 >
 
 
@@ -534,7 +534,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Thanks again Shai. One more question.
 >
-> Can a form designed in JFormdesigner be used in a codenameone application? If so, how? I know I can start a form so designed from the main class with: ” new LoginForm().show()” ; but not sure if the generated codes by JFormdesigner can be used and work with codenaeone.
+> Can a form designed in JFormdesigner be used in a codenameone application? If so, how? I know I can start a form so designed from the main class with: " new LoginForm().show()" ; but not sure if the generated codes by JFormdesigner can be used and work with codenaeone.
 >
 
 
@@ -562,7 +562,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Yngve Moe** — September 13, 2016 at 6:56 pm ([permalink](/blog/using-the-new-gui-builder/#comment-22995))
 
-> Found a bug: if I try to add a “DataChange Event” to a Slider, the emitted Java code calls “addDataChangeListener(…)”, which is a syntax error (should be “addDataChangedListener(…)”).
+> Found a bug: if I try to add a "DataChange Event" to a Slider, the emitted Java code calls "addDataChangeListener(…)", which is a syntax error (should be "addDataChangedListener(…)").
 >
 
 
@@ -594,7 +594,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Michael du Plessis** — April 6, 2017 at 3:03 pm ([permalink](/blog/using-the-new-gui-builder/#comment-23503))
 
-> Hi! I’m really keen on using CodeNameOne, I’ve got Java down fine, I’m just needing to get used to the GUI Builder. The code you mentioned for the GUI elements being generated within the “magical comments” aren’t generating. I notice this is post is about 9 months old and have seen there are updates to the new GUI Builder, it looks slightly different to the above screenshots.  
+> Hi! I’m really keen on using CodeNameOne, I’ve got Java down fine, I’m just needing to get used to the GUI Builder. The code you mentioned for the GUI elements being generated within the "magical comments" aren’t generating. I notice this is post is about 9 months old and have seen there are updates to the new GUI Builder, it looks slightly different to the above screenshots.  
 > I followed the instructions but like I said, even created a complete new project to make sure, but the code isn’t generating on it’s own within the .java file. The XML file is fine though. Any advice forward would be majorly appreciated, I’m very excited since I discovered this and wouldn’t want my excitement and motivation to wane because of a slight mishap.
 >
 
@@ -633,11 +633,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Michael du Plessis says:
 >
-> I’ve figured out the issue. Netbeans requires me to manually right-click on the .java file for the GuiBuilder class and click on “Compile File”. Might be worth adding to the above instructions. 🙂  
+> I’ve figured out the issue. Netbeans requires me to manually right-click on the .java file for the GuiBuilder class and click on "Compile File". Might be worth adding to the above instructions. 🙂  
 > I’m so glad it works now, and thank you for your responses! 🙂  
 > I also noted during my trial and error, when I tried checking to see if my plugin tool was maybe out of date, that it said the following:  
-> “Unable to connect to the CodenameOnePlugin Update Center because of  
-> [https://codenameone.googlec…](<https://codenameone.googlecode.com/svn/trunk/CodenameOne/repo/netbeans/updates.xml>) ”  
+> "Unable to connect to the CodenameOnePlugin Update Center because of  
+> [https://codenameone.googlec…](<https://codenameone.googlecode.com/svn/trunk/CodenameOne/repo/netbeans/updates.xml>) "  
 > Thought I’d just query about it anyway.
 >
 
@@ -688,8 +688,8 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > [EDT] 0:0:0,1 – Trying to load the Codename One GUI builder file: file:/Users/Jean/IdeaProjects/TryAgain/res/guibuilder/com/mycompany/myapp/SecondForm.gui  
 > [EDT] 0:0:0,1 – Successfully loaded the form XML:
 >
-> <component type=”Form” layout=”FlowLayout” title=”SecondForm” name=”SecondForm”></component>  
-> [EDT] 0:0:0,63 – createComponent for element: <component name=”SecondForm” type=”Form” layout=”FlowLayout” title=”SecondForm”>  
+> <component type="Form" layout="FlowLayout" title="SecondForm" name="SecondForm"></component>  
+> [EDT] 0:0:0,63 – createComponent for element: <component name="SecondForm" type="Form" layout="FlowLayout" title="SecondForm">  
 > </component>
 >
 > dyld: lazy symbol binding failed: Symbol not found: ___sincos_stret  
@@ -730,7 +730,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > and then tried to run the GUI Builder again:
 >
 > Jeans-MacBook-Pro:.codenameone Jean$ java -jar guibuilder.jar  
-> Exception in thread “main” java.lang.UnsupportedClassVersionError: com/codename1/apps/guibuilder/desktop/GUIBuilderMain : Unsupported major.minor version 52.0  
+> Exception in thread "main" java.lang.UnsupportedClassVersionError: com/codename1/apps/guibuilder/desktop/GUIBuilderMain : Unsupported major.minor version 52.0  
 > at java.lang.ClassLoader.defineClass1(Native Method)  
 > at java.lang.ClassLoader.defineClassCond([ClassLoader.java](<http://ClassLoader.java>):637)  
 > at java.lang.ClassLoader.defineClass([ClassLoader.java](<http://ClassLoader.java>):621)  
@@ -789,7 +789,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Ch Hjelm says:
 >
-> How do you remove/delete a GUI Builder file from a Netbeans project? I tried creating one to try out the new GUI Builder but it has compilation errors (“error: illegal character: ‘u00b4′” which I cannot see in the GUI builder) and when I delete the generated Java file it just gets recreated every time I build the application.
+> How do you remove/delete a GUI Builder file from a Netbeans project? I tried creating one to try out the new GUI Builder but it has compilation errors ("error: illegal character: ‘u00b4′" which I cannot see in the GUI builder) and when I delete the generated Java file it just gets recreated every time I build the application.
 >
 
 
@@ -838,7 +838,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Jill M says:
 >
-> I would like to change my layout; however, when I try to click on another layout I get an error message that says “Auto layout mode currently on. The root layout manager must be Layered Layout.” How can I remove auto layout without having to start all over. I read the article below, but I did not find the answer I was looking for. Please help 🙂
+> I would like to change my layout; however, when I try to click on another layout I get an error message that says "Auto layout mode currently on. The root layout manager must be Layered Layout." How can I remove auto layout without having to start all over. I read the article below, but I did not find the answer I was looking for. Please help 🙂
 >
 
 

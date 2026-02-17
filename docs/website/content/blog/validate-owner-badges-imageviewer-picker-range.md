@@ -11,11 +11,11 @@ author: Shai Almog
 
 ![Header Image](/blog/validate-owner-badges-imageviewer-picker-range/new-features-1.jpg)
 
-I’ve been pretty busy over the past few weeks and didn’t get a chance to write a “what’s new” post. This caused a huge backlog of new features which I’ll try to cut down in this post.
+I’ve been pretty busy over the past few weeks and didn’t get a chance to write a "what’s new" post. This caused a huge backlog of new features which I’ll try to cut down in this post.
 
 ### UI Validation
 
-This is a feature that’s coming in the Friday update. Component inspector has a new “Validate” button that checks the UI for common mistakes. Right now it only checks for nested scrollables on the Y axis but ideally we should include additional checks.
+This is a feature that’s coming in the Friday update. Component inspector has a new "Validate" button that checks the UI for common mistakes. Right now it only checks for nested scrollables on the Y axis but ideally we should include additional checks.
 
 This could be a pretty useful tool to diagnose common programming errors in the UI.
 
@@ -38,7 +38,7 @@ Here’s the problem. Let’s say you have an animation running and you invoke `
 
 While this broke some edge case behaviors this was relatively compatible and worked reasonably well.
 
-The problem is we didn’t change `revalidate()`. We left it “as is” and didn’t think it was a problem. It’s a complex method which impacts a lot of core functionality so leaving it in place was probably a good call.
+The problem is we didn’t change `revalidate()`. We left it "as is" and didn’t think it was a problem. It’s a complex method which impacts a lot of core functionality so leaving it in place was probably a good call.
 
 However, for most cases you might want to use the new `revalidateWithAnimationSafety()` which makes sure animations aren’t disrupted by `revalidate()`.
 

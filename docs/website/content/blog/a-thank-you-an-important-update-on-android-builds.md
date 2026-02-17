@@ -58,7 +58,7 @@ The last two are a bit confusing so just to clarify if you do this:
     android.playService.plus=true
 
 The only play service included will be plus. However, if you don’t define any build hints specifically the above list  
-of play services will be included. This is a “sensible default mode” that we picked to make the transition easier. 
+of play services will be included. This is a "sensible default mode" that we picked to make the transition easier. 
 
 The list of supported hints follows, they all accept true/false as arguments for inclusion/exclusion. 
     

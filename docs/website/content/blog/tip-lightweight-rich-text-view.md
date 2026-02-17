@@ -13,7 +13,7 @@ author: Shai Almog
 
 A very common request is support for rich text in Codename One, this is hard to do in a generic/performant cross platform way but can be done as I explained in my answer [here](http://stackoverflow.com/questions/42288518/html-link-for-one-word-in-label-text-in-codename-one). This is pretty common though so it might be worth it doing this in a generic way.
 
-Building a “proper” rich text view would take some work as there are many edge cases & complexities. However, since we already have an XML parser that’s perfectly capable of parsing HTML I decided to try a very simple HTML based syntax just to show how easy it would be to create something generic like this. I avoided the “link” use case as that would require some link handler code and I avoided font sizes/colors as I didn’t want to go into attributes and related complexities.
+Building a "proper" rich text view would take some work as there are many edge cases & complexities. However, since we already have an XML parser that’s perfectly capable of parsing HTML I decided to try a very simple HTML based syntax just to show how easy it would be to create something generic like this. I avoided the "link" use case as that would require some link handler code and I avoided font sizes/colors as I didn’t want to go into attributes and related complexities.
 
 Instead I just added support for bold and italic while demonstrating that simple things like line breaks still work:
     
@@ -119,7 +119,7 @@ Figure 1. The demo above running in the simulator
 
 ### Moving On
 
-The obvious question is “why isn’t this in Codename One?”.
+The obvious question is "why isn’t this in Codename One?".
 
 This is a proof of concept, the devil is in the details with things such as this and once we start going into them this will drag us down a huge rabbit hole. However, your personal use case might not be as extensive as ours would need to be. With this as a starting point I’m sure most use cases could be adapted to handle some form of rich text within your app.
 
@@ -133,12 +133,12 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Francesco Galgani** — April 6, 2018 at 10:17 pm ([permalink](/blog/tip-lightweight-rich-text-view/#comment-23789))
 
-> Thank you Shai, your “proof of concept” (as you definited it) is exactly what I was looking for. In some simple circumstances, it can be a good replacement for SpanLabel and an easier and better solution than BrowserComponent (expecially if I need a text that should be automatically internationalized like in Label and SpanLabel). However, I found two issues in your code, that are easy to fix. The first one is that the font size is zero, so no text is shown. To solve, I changed the fonts definitions so:
+> Thank you Shai, your "proof of concept" (as you definited it) is exactly what I was looking for. In some simple circumstances, it can be a good replacement for SpanLabel and an easier and better solution than BrowserComponent (expecially if I need a text that should be automatically internationalized like in Label and SpanLabel). However, I found two issues in your code, that are easy to fix. The first one is that the font size is zero, so no text is shown. To solve, I changed the fonts definitions so:
 >
 > int fontSize = Display.getInstance().convertToPixels(3);  
-> final Font defaultFont = Font.createTrueTypeFont(“native:MainRegular”, “native:MainRegular”).derive(fontSize, Font.STYLE_PLAIN);  
-> final Font boldFont = Font.createTrueTypeFont(“native:MainBold”, “native:MainBold”).derive(fontSize, Font.STYLE_PLAIN);  
-> final Font italicFont = Font.createTrueTypeFont(“native:ItalicRegular”, “native:ItalicRegular”).derive(fontSize, Font.STYLE_PLAIN);
+> final Font defaultFont = Font.createTrueTypeFont("native:MainRegular", "native:MainRegular").derive(fontSize, Font.STYLE_PLAIN);  
+> final Font boldFont = Font.createTrueTypeFont("native:MainBold", "native:MainBold").derive(fontSize, Font.STYLE_PLAIN);  
+> final Font italicFont = Font.createTrueTypeFont("native:ItalicRegular", "native:ItalicRegular").derive(fontSize, Font.STYLE_PLAIN);
 >
 > The second issue is that the text is not internationalized. To solve, at the start of the method setText I added the code:
 >

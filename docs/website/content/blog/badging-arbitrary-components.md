@@ -54,7 +54,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **João Bastos** — November 3, 2016 at 8:47 am ([permalink](/blog/badging-arbitrary-components/#comment-22949))
 
-> createBadge error. Is it missing “public” statement in the method? or i´m missing something here?
+> createBadge error. Is it missing "public" statement in the method? or i´m missing something here?
 >
 
 

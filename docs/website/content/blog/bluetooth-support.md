@@ -12,8 +12,8 @@ author: Shai Almog
 ![Header Image](/blog/bluetooth-support/bluetooth.jpg)
 
 Bluetooth is one of those specs that makes me take a step back…​ It’s nuanced, complex and multi-layered.  
-That isn’t necessarily bad, it solves a remarkably hard problem. Unfortunately when people say the words “bluetooth  
-support” it’s rare to find two people who actually mean the same thing!
+That isn’t necessarily bad, it solves a remarkably hard problem. Unfortunately when people say the words "bluetooth  
+support" it’s rare to find two people who actually mean the same thing!
 
 So while we did have a lot of requests for bluetooth support over the years most of them were too vague and when  
 we tried to follow thru we usually reached a dead end where the customers themselves often didn’t really know  
@@ -23,7 +23,7 @@ Normally when something is so huge and vague we try to look at what the native O
 very different routes to bluetooth.
 
 Another approach is to look at what other companies in the field did to support bluetooth and historically there  
-wasn’t much. Most “Write Once Run Anywhere” solutions just ignored that feature.
+wasn’t much. Most "Write Once Run Anywhere" solutions just ignored that feature.
 
 However, recently we became aware of [this bluetooth plugin for Cordova](https://github.com/randdusing/cordova-plugin-bluetoothle)  
 which Chen and Steve adapted to a Codename One cn1lib [here](https://github.com/chen-fishbein/bluetoothle-codenameone).

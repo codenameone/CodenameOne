@@ -16,7 +16,7 @@ it’s probably an important subject. Especially because we made this exact mist
 I’ve spent the better part of the day tracking this with no result…​
 
 I’ve worked on extracting UI’s from PSD files for a while now and I was on my way to build a new UI when suddenly  
-I noticed my theme file was **HUGE**. Not just “big”, **HUGE**.
+I noticed my theme file was **HUGE**. Not just "big", **HUGE**.
 
 Looking at the images I’ve noticed they were ridiculously big so I started doing the typical things (bluring, scaling,  
 reducing quality) all of which didn’t work until I was able to come up with an odd workaround by saving as  
@@ -29,7 +29,7 @@ That’s when the hex editor came up and showed that something was really broken
 meta-data that I was able to find in the photoshop UI but there is no place to edit this data.
 
 I was eventually able to find [this](https://forums.adobe.com/thread/1596435) and several other sources that confirmed  
-that this behavior is “by design” which is insane…​ I found no way to remove the meta-data or edit it after the fact.  
+that this behavior is "by design" which is insane…​ I found no way to remove the meta-data or edit it after the fact.  
 Even OptiPNG wouldn’t remove it!
 
 So the solution is simple if a bit obtuse, when you are ready to export an image always use File → Export &  

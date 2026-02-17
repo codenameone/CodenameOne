@@ -30,15 +30,15 @@ Boehm can’t really avoid stalling since it needs to stop all executing threads
 
 Unlike C, we can make a lot of assumptions in a Java application thanks to the type safety and clearly defined VM. This makes the process of collecting comparatively easy and makes it possible to collect without stopping the world. We do however need that threads yield the CPU shortly otherwise the GC will be blocked, this is generally a good practice and the EDT makes sure to follow that practice however if you do something like this:
 
-while(true) {  
-  
-System.out.println(‘WHeee”);  
-  
+```java
+while(true) {
+    System.out.println(“WHeee”);
 }
+```
 
-It would block our new GC from running unless you add a Thread.yield/sleep or wait() call (besides draining the CPU/battery). This might be considered a flaw but we mitigated that to some degree by incorporating a reference counting collector as well (similar to ARC) which deals with the “low hanging garbage” thus making the actual GC process far less important so our GC sweeps don’t need to be very fast. 
+It would block our new GC from running unless you add a Thread.yield/sleep or wait() call (besides draining the CPU/battery). This might be considered a flaw but we mitigated that to some degree by incorporating a reference counting collector as well (similar to ARC) which deals with the "low hanging garbage" thus making the actual GC process far less important so our GC sweeps don’t need to be very fast. 
 
-But this post is titled “beating the ARC”… How can we be faster than ARC?  
+But this post is titled "beating the ARC"… How can we be faster than ARC?  
   
 Simple, we don’t de-allocate. All objects that our reference counter deems to be garbage are sent to the garbage heap and finalized/deleted on the GC thread (as is custom in Java) hence we get the benefit of multi-core parallel cleanup logic on top of the fast performance. 
 

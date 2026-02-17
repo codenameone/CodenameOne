@@ -24,7 +24,7 @@ The guys at LTS just
 [  
 published a post I wrote in their blog  
 ](http://www.luxoft.com/blog/salmog/cross-platform-mobile-development-recap/)  
-, if you are reading this thinking “I’d like to read another 5,000 words from that guy” then head to  
+, if you are reading this thinking "I’d like to read another 5,000 words from that guy" then head to  
 [  
 their blog  
 ](http://www.luxoft.com/blog/salmog/cross-platform-mobile-development-recap/)  

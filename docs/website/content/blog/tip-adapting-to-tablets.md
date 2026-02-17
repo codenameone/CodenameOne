@@ -13,7 +13,7 @@ author: Shai Almog
 
 A while back someone asked on stackoverflow [how to adapt a Codename One app to tablets](https://stackoverflow.com/questions/54269508/how-to-structure-the-cn1-code-for-a-tablet-form-layout). I provided quite a few references in the answer and following discussion but I think a better approach is to explain what we did with the recent Codename One Build app because that’s what I’ve been doing in all recent apps I worked on.
 
-I call this approach the “phone first” approach for universal app development. It starts by forgetting about the tablet and focusing on building a good looking phone app. In this app I usually subclass `Form` for all the classes which instantly creates an app that’s very suitable for phones.
+I call this approach the "phone first" approach for universal app development. It starts by forgetting about the tablet and focusing on building a good looking phone app. In this app I usually subclass `Form` for all the classes which instantly creates an app that’s very suitable for phones.
 
 When this is done I give some thought to how I would like the app to work as a tablet app. In general I want the app to have a [permanent side menu](/blog/permanent-sidemenu-getAllStyles-scrollbar-and-more/) and one `Form` where the content is replaced.
 
@@ -95,7 +95,7 @@ Once we do this there would be compilation errors for various methods of `Form` 
 
 #### Generalization via API
 
-I tried to generalize this process through a standardized API multiple times in the past and failed. It’s easy to solve the simple use cases but converting a “best practice” into an API is more challenging.
+I tried to generalize this process through a standardized API multiple times in the past and failed. It’s easy to solve the simple use cases but converting a "best practice" into an API is more challenging.
 
 If you have thoughts or ideas on how this approach can be adapted to create a more versatile API I’m open to suggestions.
 

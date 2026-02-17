@@ -15,15 +15,15 @@ Tuesday morning I held a webinar on Java mobile development using Codename One. 
 
 Since most of the people who signed up for the webinar indicated that they had no experience with Codename One, I spent the first 10 minutes or so introducing the framework, and showing some demos of some existing apps to give participants an idea of the possibilities.
 
-The rest of the presentation was spent building custom social media app similar to facebook. I created a simple PHP/MySQL server-side application before hand and deployed it on the internet so that the mobile app would be able to connect to it from anywhere in the world. Therefore, the finished result, is actually a usable social network – though it is only “demo” grade, and I’ll probably take it down in a few months.
+The rest of the presentation was spent building custom social media app similar to facebook. I created a simple PHP/MySQL server-side application before hand and deployed it on the internet so that the mobile app would be able to connect to it from anywhere in the world. Therefore, the finished result, is actually a usable social network – though it is only "demo" grade, and I’ll probably take it down in a few months.
 
 Here are some screenshots of the app:
 
 ![Screen shots](/blog/java-mobile-dev-webinar-recap/social-app-screenshots.png)
 
-The tutorial was structured like a cooking show, where I break the development of the app down into 12 “steps”. By the end of it we have a working app.
+The tutorial was structured like a cooking show, where I break the development of the app down into 12 "steps". By the end of it we have a working app.
 
-Since there were technical difficulties with the actual webinar, I “refilmed” it afterwards using Screenflow, and I am quite happy with the results. It has been posted on YouTube [here](https://youtu.be/8D-CEtWAgHk).
+Since there were technical difficulties with the actual webinar, I "refilmed" it afterwards using Screenflow, and I am quite happy with the results. It has been posted on YouTube [here](https://youtu.be/8D-CEtWAgHk).
 
 And you can access the source of the app (both client and server) [here](https://github.com/shannah/social-network).
 

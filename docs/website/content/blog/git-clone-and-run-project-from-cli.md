@@ -11,7 +11,7 @@ author: Steve Hannah
 
 ![Header Image](/blog/git-clone-and-run-project-from-cli/tip.jpg)
 
-We have loads of demo Codename One apps hosted on Github, however cloning and running a project can be a little tricky because we generally don’t publish the dependent jar files (e.g. CodenameOne.jar) in the Github repository. This helps keep the repository lean, but it adds some steps to the process of cloning and running the project.
+We have loads of demo Codename One apps hosted on Github, however cloning and running a project can be a little tricky because we generally don’t publish the dependent jar files (e.g. `CodenameOne.jar`) in the Github repository. This helps keep the repository lean, but it adds some steps to the process of cloning and running the project.
 
 For use cases like this, you may want to try the [Codename One CLI tool](https://www.npmjs.com/package/codenameone-cli), as it provides many useful functions directly on the command line. In this post I’ll demonstrate how you can easily clone a Codename One project from Github and run it in the Codename One simulator using a single line of code.
 
@@ -31,7 +31,7 @@ The `cn1 git-clone` command is a thin wrapper around `git clone` (which implies 
 
 **Running the Demo**
 
-Now that the project is cloned, we can run the demo in the Codename One simulator by running the “run” target of the project. E.g.
+Now that the project is cloned, we can run the demo in the Codename One simulator by running the "run" target of the project. E.g.
     
     
     $ cd KitchenSink
@@ -53,7 +53,7 @@ You can also use the `cn1 list-demos` command to find existing Codename One demo
     
     $ cn1 list-demos
 
-This will produce a list of all of the repositories on Github that are tagged with both the “codenameone” topic, and the “demo” topic. The output will look like
+This will produce a list of all of the repositories on Github that are tagged with both the "codenameone" topic, and the "demo" topic. The output will look like
     
     
     shannah/GeoVizDemo            : A demo app using the Codename One GeoViz Library

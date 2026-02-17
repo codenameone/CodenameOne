@@ -41,7 +41,7 @@ I’m not sure how crucial this will be as the core focus is on the client side 
 
 ### From Zero to Millions of Downloads
 
-One of the main things I want to focus on is “real life” and the transformational effect of this approach. One of my best examples for this is Ram Nathaniel who is probably one of the first developers using our platform.
+One of the main things I want to focus on is "real life" and the transformational effect of this approach. One of my best examples for this is Ram Nathaniel who is probably one of the first developers using our platform.
 
 ![Ram Nathaniel](/blog/spring-template-more-about-bootcamp/Ram.jpg)
 
@@ -214,7 +214,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> I mostly agree with what you said and want to keep the “hot stuff” down so most people can apply this instantly.
+> I mostly agree with what you said and want to keep the "hot stuff" down so most people can apply this instantly.
 >
 > Having said that, I’d like to move thru the material quickly and focus on the client side. If I end up writing low level webservice code or persistence code on the server I might end up spending too much time on the server tier and too little time in the client tier. I’m also trying to focus around what people actually use in the field today and spring boot is pretty common by now.
 >
@@ -238,7 +238,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Sure, I don’t assume developers know this. It’s relatively simple and localized otherwise I wouldn’t consider using it.
 >
-> Since the bootcamp is very interactive unlike a course I’d expect more “back & forth” in case I go to quickly or don’t cover something properly.
+> Since the bootcamp is very interactive unlike a course I’d expect more "back & forth" in case I go to quickly or don’t cover something properly.
 >
 
 

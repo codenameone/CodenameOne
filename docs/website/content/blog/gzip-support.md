@@ -29,14 +29,7 @@ project, we ported their work into the project class hierarchy and added a GZCon
   
 By default this class doesn’t request gzipped data but its pretty easy to do so just add the HTTP header  
   
-Accept-Encoding: gzip e.g.:  
-  
-GZConnectionRequest con = new GZConnectionRequest();  
-  
-  
-con.  
-  
-addRequestHeader(“Accept-Encoding”, “gzip”);
+Accept-Encoding: gzip e.g.: `GZConnectionRequest con = new GZConnectionRequest();` then `con.addRequestHeader("Accept-Encoding", "gzip");`
 
   
 Do the rest as usual and you should have smaller responses by potential.  
@@ -79,7 +72,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Since the web browser uses native connections and doesn’t go thru connection request gzip should “just work” for that case.
+> Since the web browser uses native connections and doesn’t go thru connection request gzip should "just work" for that case.
 >
 
 

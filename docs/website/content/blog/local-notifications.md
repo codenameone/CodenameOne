@@ -108,7 +108,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Cool.
 >
-> Is it possible to reset an scheduled notification? I’m thinking on something like “Hey, it’s been a while since you last visited us”. So if the user opens the app before the notification is triggered, the scheduled time gets back to zero. I haven’t checked the api so I don’t know if something like this is possible.
+> Is it possible to reset an scheduled notification? I’m thinking on something like "Hey, it’s been a while since you last visited us". So if the user opens the app before the notification is triggered, the scheduled time gets back to zero. I haven’t checked the api so I don’t know if something like this is possible.
 >
 
 
@@ -225,7 +225,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Chen Fishbein says:
 >
 > From the code above :  
-> n.setAlertSound(“beep-01a.mp3”);
+> n.setAlertSound("beep-01a.mp3");
 >
 
 
@@ -304,7 +304,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Chibuike Mba says:
 >
 > How can I reschedule my LocalNotification on device reboot?  
-> Android has this user permission <uses-permission android_name=”android.permission.RECEIVE_BOOT_COMPLETED”/>  
+> Android has this user permission <uses-permission android_name="android.permission.RECEIVE_BOOT_COMPLETED"/>  
 > which invokes a BroadcastReceiver but I can’t figure out how to use it with my LocalNotification.
 >
 

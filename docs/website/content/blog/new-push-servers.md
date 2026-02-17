@@ -163,7 +163,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > How can I do this with more than one device if I use cn1 ConnectionRequest instead of Java SE URLConnection?  
 > Can I pass the argument just like this?  
-> “&device=” + deviceId1 + “&device=” + deviceId2 + “&device=” + deviceId3
+> "&device=" + deviceId1 + "&device=" + deviceId2 + "&device=" + deviceId3
 >
 
 
@@ -227,11 +227,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Gerben Kegel says:
 >
 > `[  
-> {“id”=”deviceId”,”status”=”error”,”message”=”Invalid Device ID”},  
-> {“id”=”cn1-gcm-nativegcmkey”,”status”=”updateId” newId=”cn1-gcm-newgcmkey”},  
-> {“id”=”cn1-gcm-okgcmkey”,”status”=”OK”},  
-> {“id”=”cn1-gcm-errorkey”,”status”=”error” message=”Server error message”},  
-> {“id”=”cn1-ios-iphonekey”,”status”=”inactive” },  
+> {"id"="deviceId","status"="error","message"="Invalid Device ID"},  
+> {"id"="cn1-gcm-nativegcmkey","status"="updateId" newId="cn1-gcm-newgcmkey"},  
+> {"id"="cn1-gcm-okgcmkey","status"="OK"},  
+> {"id"="cn1-gcm-errorkey","status"="error" message="Server error message"},  
+> {"id"="cn1-ios-iphonekey","status"="inactive" },  
 > ]`
 >
 > You use = instead of : and not always doublequote the key (newId and message)

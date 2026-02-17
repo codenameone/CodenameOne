@@ -135,19 +135,19 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Chibuike Mba says:
 >
-> “Nice looking app!” Thanks.
+> "Nice looking app!" Thanks.
 >
-> “Is it in the gallery?” Yes, but this particular screen is part of new version currently under development and will be out before the end of August.
+> "Is it in the gallery?" Yes, but this particular screen is part of new version currently under development and will be out before the end of August.
 >
-> “1. I don’t see that issue, am I missing something in the image?” Sorry, the images reordered from the way I uploaded them.
+> "1. I don’t see that issue, am I missing something in the image?" Sorry, the images reordered from the way I uploaded them.
 >
-> “It looks like you are using title hiding too, is it possible it collides with that?” No, am not using Title hidden, that is where the issue lies, the StickyHeader component just collides with and covers the Toolbar while scrolling (as you can see in the image without back icon) and this occurs only when I add any component to the Form’s LayeredPane (link FAB).
+> "It looks like you are using title hiding too, is it possible it collides with that?" No, am not using Title hidden, that is where the issue lies, the StickyHeader component just collides with and covers the Toolbar while scrolling (as you can see in the image without back icon) and this occurs only when I add any component to the Form’s LayeredPane (link FAB).
 >
 > If I did not add any component to the Form’s LayeredPane (as you can see in the image without FAB button at the bottomright side of the screen) the StickyHeader component will behave well and stick below the Toolbar while scrolling.
 >
 > The StickyHeader component dimension is highlighted with black bordered rectangle in on of the images.
 >
-> “2. Can you reproduce this in a standalone testcase?” Ok, I will try to reproduce it this weekend.
+> "2. Can you reproduce this in a standalone testcase?" Ok, I will try to reproduce it this weekend.
 >
 > Am suspecting that LayeredPane components conflicts with GlassPane components in the same Form.
 >
@@ -234,7 +234,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > pushToHeader();  
 > }  
 > }else{  
-> ArrayList stack = (ArrayList) getParent().getClientProperty(“sticky”);  
+> ArrayList stack = (ArrayList) getParent().getClientProperty("sticky");  
 > if (stack != null && !stack.isEmpty()&& stack.get(0) == this && position<0) {  
 > popFromHeader();  
 > }  
@@ -248,7 +248,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > }
 >
 > private void popFromHeader() {  
-> ArrayList stack = (ArrayList) getParent().getClientProperty(“sticky”);  
+> ArrayList stack = (ArrayList) getParent().getClientProperty("sticky");  
 > stack.remove(0);
 >
 > if(!stack.isEmpty()){  
@@ -261,10 +261,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > }
 >
 > private void pushToHeader() {  
-> ArrayList stack = (ArrayList) getParent().getClientProperty(“sticky”);  
+> ArrayList stack = (ArrayList) getParent().getClientProperty("sticky");  
 > if (stack == null) {  
 > stack = new ArrayList();  
-> getParent().putClientProperty(“sticky”, stack);  
+> getParent().putClientProperty("sticky", stack);  
 > }  
 > if(!stack.isEmpty()){  
 > StickyHeader h = (StickyHeader) stack.get(0);  
@@ -331,7 +331,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Container con = BoxLayout.encloseY(fabNewsletter, fabAdd, fabMark, fabClear);
 >
 > Dialog f = new Dialog();  
-> f.setDialogUIID(“Container”);
+> f.setDialogUIID("Container");
 >
 > f.getLayeredPane().removeAll();  
 > f.showPacked(BorderLayout.CENTER, false);  
@@ -391,7 +391,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Ch Hjelm says:
 >
-> Thanks, but on Chen’s github page ([https://github.com/chen-fis…](<https://github.com/chen-fishbein/stickyheaders-codenameone>)) it says “Important – make sure the class stays in the com.codename1.ui package.” And when I put the [StickyHeader.java](<http://StickyHeader.java>) file there (in my copy of the CN1 sources), I can compile on my machine, but the build for devices fails, saying that [StickyHeaders.java](<http://StickyHeaders.java>) is missing. So, I don’t understand how it can be used?
+> Thanks, but on Chen’s github page ([https://github.com/chen-fis…](<https://github.com/chen-fishbein/stickyheaders-codenameone>)) it says "Important – make sure the class stays in the com.codename1.ui package." And when I put the [StickyHeader.java](<http://StickyHeader.java>) file there (in my copy of the CN1 sources), I can compile on my machine, but the build for devices fails, saying that [StickyHeaders.java](<http://StickyHeaders.java>) is missing. So, I don’t understand how it can be used?
 >
 > I also tried Chibuike’s version below, but it caused some other problems. And I’d obviously prefer to benefit from the existing implementation to not have to get into the source code myself 🙂
 >

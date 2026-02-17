@@ -15,7 +15,7 @@ We have added Android App Bundle support which will become the required format f
 
 A few months ago, we added Android App Bundle support and forgot to tell anyone... These things sometimes happen in a fast-moving startup… Well, better late than never.
 
-To try the App Bundle support, use the build hint: android.appBundle=true
+To try the App Bundle support, use the build hint: `android.appBundle=true`
 
 This will produce the regular APK and the app bundle file which you should be able to upload to Google.
 
@@ -48,7 +48,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> I won’t say “always” since things change but as long as AAB isn’t installable you will need an APK and we’ll provide it.
+> I won’t say "always" since things change but as long as AAB isn’t installable you will need an APK and we’ll provide it.
 >
 
 
@@ -58,7 +58,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Chris Vorster says:
 >
 > Trying to upload a new version of the AAB on Google Dev Console results in signing error. Cannot find a way to fix this, tried support also.  
-> “Your Android App Bundle is signed with the wrong key. Ensure that your App Bundle is signed with the correct signing key and try again. Your App Bundle is expected to be signed with the certificate with fingerprint:…”
+> "Your Android App Bundle is signed with the wrong key. Ensure that your App Bundle is signed with the correct signing key and try again. Your App Bundle is expected to be signed with the certificate with fingerprint:…"
 >
 > Can’t seem to find any solutions on how to deal with this.
 >

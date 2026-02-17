@@ -81,7 +81,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Can you please file an issue on this?  
 > Since this is a lightweight component we’ll localize it with the rest of the localization logic. All of this should be declared in the javadoc to the class to make it easier to do.  
-> It should be possible to embed this but right now it’s not a priority so we hid/deprecated those internal API’s as they are still not mature enough for use. Notice that there are small nuances with embedding e.g. if you have a text field followed by a picker you’d expect the “next” cycle to include the picker (that currently doesn’t work in the picker) but it would be hard to do with embedding.
+> It should be possible to embed this but right now it’s not a priority so we hid/deprecated those internal API’s as they are still not mature enough for use. Notice that there are small nuances with embedding e.g. if you have a text field followed by a picker you’d expect the "next" cycle to include the picker (that currently doesn’t work in the picker) but it would be hard to do with embedding.
 >
 
 

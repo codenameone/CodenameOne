@@ -13,7 +13,7 @@ author: Shai Almog
 
 If you aren’t using properties with Codename One, you probably should. Here’s a [post I wrote a while back covering them](/blog/properties-are-amazing.html), it should give you a lot of reasons for this. We are slowly integrating them into API’s such as `Rest` and as a result the code is simpler. A huge bonus is the type safety and flexibility that comes with this API.
 
-Up until now binding in properties was mostly limited to “simple” classes such as `TextField`. Complex structures such as `Table` weren’t supported. This is no longer the case.
+Up until now binding in properties was mostly limited to "simple" classes such as `TextField`. Complex structures such as `Table` weren’t supported. This is no longer the case.
 
 With the coming update `UIBinding` now includes a new API to bind a list of `PropertyBusinessObject` to a `TableModel`. This effectively allows the creation of table matching list of objects without writing any code!
 

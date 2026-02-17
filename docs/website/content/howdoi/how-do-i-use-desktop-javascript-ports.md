@@ -47,7 +47,7 @@ Shipping is where these differ a great deal. It’s hard to ship the desktop app
 
 License requirements from you vary a great deal, desktop requires pro. JavaScript requires enterprise and UWP is available for everyone. Notice that even if you cancel your subscription, your distribution license isn’t revoked! So you are legally allowed to upgrade to enterprise, build a JavaScript version and cancel your subscription.
 
-And finally native interfaces are a crucial way to extend a port and hugely important. The desktop port uses JavaSE under the hood. That means you can just invoke any feature in Java including JNI when you need a native interface. This is very convenient and has been a deciding factor for many developers. The “native” for the JavaScript port is JavaScript. This allows you to access JavaScript functionality that isn’t exposed but even when you use native within the JavaScript port you are still stuck in the sandbox of the browser due to the inherent limitations of the web platform.
+And finally native interfaces are a crucial way to extend a port and hugely important. The desktop port uses JavaSE under the hood. That means you can just invoke any feature in Java including JNI when you need a native interface. This is very convenient and has been a deciding factor for many developers. The "native" for the JavaScript port is JavaScript. This allows you to access JavaScript functionality that isn’t exposed but even when you use native within the JavaScript port you are still stuck in the sandbox of the browser due to the inherent limitations of the web platform.
 
 The UWP port uses C# as the native language. Notice that this is the UWP variant of C# which has a few restrictions and limitations.
 

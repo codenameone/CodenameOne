@@ -29,8 +29,8 @@ The new integration is quite simple.
   1. First get yourself an account from their [portal](http://www.startapp.com/)
   2. Create 2 apps on their portal – one for Android and another for iOS 
   3. Grab the cn1lib from [here](https://github.com/chen-fishbein/startapp-codenameone/tree/master/CN1StartApp/dist)
-  4. Place the CN1StartApp.cn1lib under your projects lib folder 
-  5. Right click on your project and select “Codename One->Refresh Libs” 
+  4. Place the `CN1StartApp.cn1lib` under your projects lib folder 
+  5. Right click on your project and select "Codename One->Refresh Libs" 
   6. Now follow the Usage instructions [here](https://github.com/chen-fishbein/startapp-codenameone)
 ---
 
@@ -58,11 +58,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > ….  
 > public void init(Object context) {  
 > try{  
-> Resources theme = Resources.openLayered(“/beer”);  
+> Resources theme = Resources.openLayered("/beer");  
 > UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));  
 > //init the startapp SDK  
 > manager = new StartAppManager();  
-> manager.initAndroidSDK(“000000000”, “00000000”, true);  
+> manager.initAndroidSDK("000000000", "00000000", true);  
 > }catch(IOException e){  
 > e.printStackTrace();  
 > }}  

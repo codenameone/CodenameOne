@@ -49,10 +49,10 @@ you will have an option to create a Java 8 project instead of a Java 5 project. 
 projects to Java 8 but that will require some effort: 
 
   1. Make sure you have Java 8 installed and that your IDE is running under Java 8
-  2. Change all “source” and “target” values for Javac calls in build.xml from 1.5 to 1.8.
+  2. Change all "source" and "target" values for Javac calls in `build.xml` from 1.5 to 1.8.
   3. Update the IDE build settings for the project (in the project properties menu) to use Java 8 source level
   4. Add the build hint `java.version=8`
-  5. Update CLDC11.jar to the latest version using the Update Client Libs button in the project preferences
+  5. Update `CLDC11.jar` to the latest version using the Update Client Libs button in the project preferences
 
 The post mostly covered lambdas but other newer Java features such as String based switch cases (from Java 7)  
 try with resources etc. should work just fine however we didn’t do enough tests for the various features on all the  

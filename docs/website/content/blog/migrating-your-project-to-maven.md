@@ -26,7 +26,7 @@ The following 5-minute video shows you how to use this tool to convert your exis
 
 ### TLDW (Too Long Didn’t Watch)
 
-I begin the video by downloading the [latest release](https://github.com/shannah/maven-migration-tool/releases) of the Codename One Migration tool. At the time of writing, the latest release is 1.0.1, so I downloaded the file named “migrationtool-javase-1.0.1.zip” from the “Assets” for the release:
+I begin the video by downloading the [latest release](https://github.com/shannah/maven-migration-tool/releases) of the Codename One Migration tool. At the time of writing, the latest release is 1.0.1, so I downloaded the file named "migrationtool-javase-1.0.1.zip" from the "Assets" for the release:
 
 ![download-links](https://www.codenameone.com/wp-content/uploads/2021/04/download-links.png)
 
@@ -34,7 +34,7 @@ I begin the video by downloading the [latest release](https://github.com/shannah
 
 > The Migration Tool should work on any computer with Java8 or higher installed. I have tested it on Windows, Mac, and Linux. Other than Java, it has no dependencies. It doesn’t require Maven to be installed, as it uses the Maven wrapper to download the correct version of Maven as required.
 
-After downloading and extracting the Zip file, I open the “migrationtool-javase-1.0.1.jar” file contained inside.
+After downloading and extracting the Zip file, I open the "`migrationtool-javase-1.0.1.jar`" file contained inside.
 
 If you have Java installed, you should be able to double-click this jar file to open the app.
 
@@ -57,7 +57,7 @@ The app’s main window looks like the following:
 
 ![migration-tool-main-window](https://www.codenameone.com/wp-content/uploads/2021/04/migration-tool-main-window-1024x808.png)
 
-The first text field allows you to specify the version of the [Codename One plugin](https://search.maven.org/search?q=codenameone-maven-plugin) that you wish to use to perform the migration. If you leave this field blank or with the special value “LATEST”, then it will automatically use the latest version from Maven central.
+The first text field allows you to specify the version of the [Codename One plugin](https://search.maven.org/search?q=codenameone-maven-plugin) that you wish to use to perform the migration. If you leave this field blank or with the special value "LATEST", then it will automatically use the latest version from Maven central.
 
 ## Tip:
 
@@ -67,7 +67,7 @@ The first text field allows you to specify the version of the [Codename One plug
 
 To demonstrate the process for migrating an application project, I download the [KitchenSink project](https://github.com/codenameone/KitchenSink/releases/tag/v1.0-cn7.0.11) from Github.
 
-I then (at approx 1:45) press the “Browse…​” button next to the “Source Project” field.
+I then (at approx 1:45) press the "Browse…​" button next to the "Source Project" field.
 
 ![source-project-field](https://www.codenameone.com/wp-content/uploads/2021/04/source-project-field.png)
 
@@ -75,7 +75,7 @@ And select the **Kitchen Sink** project folder in the file dialog.
 
 ![select-kitchen-sink-project](https://www.codenameone.com/wp-content/uploads/2021/04/select-kitchen-sink-project-1024x501.png)
 
-Next, I select the destination directory by pressing the “Browse…​” button next to the **Destination Directory** field.
+Next, I select the destination directory by pressing the "Browse…​" button next to the **Destination Directory** field.
 
 I select the **Downloads** directory here for my destination.
 
@@ -95,7 +95,7 @@ This takes a few seconds, and when it is done, it pops up a success dialog:
 
 ![success-kitchen-sink](https://www.codenameone.com/wp-content/uploads/2021/04/success-kitchen-sink.png)
 
-When you click “OK”, it will also open the new project directory in the Finder or equivalent.
+When you click "OK", it will also open the new project directory in the Finder or equivalent.
 
 ![kitchen-sink-project-window](https://www.codenameone.com/wp-content/uploads/2021/04/kitchen-sink-project-window.png)
 
@@ -109,7 +109,7 @@ Find our more about the project structure, including running, building, and modi
 
 To demonstrate the process for migrating a library project, I download the CN1FileChooser library from Github and try to convert it, at approximately 3:45 of the video.
 
-I select a new source project by pressing the “Browse…​” button next to the **Source Project** field. Then I select the CN1FileChooser library in the dialog:
+I select a new source project by pressing the "Browse…​" button next to the **Source Project** field. Then I select the CN1FileChooser library in the dialog:
 
 ![select-cn1filechooser](https://www.codenameone.com/wp-content/uploads/2021/04/select-cn1filechooser.png)
 
@@ -117,7 +117,7 @@ Notice, that as soon as we select this project, it reveals a new section on the 
 
 ![maven-details](https://www.codenameone.com/wp-content/uploads/2021/04/maven-details.png)
 
-In this example, I entered “com.codenameone” for **groupId** and “filechooser” for **artifactId**. You would enter values appropriate for your project instead.
+In this example, I entered "`com.codenameone`" for **groupId** and "filechooser" for **artifactId**. You would enter values appropriate for your project instead.
 
 From there I press the **Create Project** button again, and watch the output in the console. When it is finished, it will open my project in the finder window, just as it did for the application project migration.
 
@@ -137,7 +137,7 @@ The Codename One Maven plugin provides a Maven goal that will generate a new app
 
 > For the purposees of this post, I’m going to use a tag I created for the KitchenSink repository so that the examples here continue to work in the future, even if the KitchenSink app structure is changed.
 
-Download the [source code](https://github.com/codenameone/KitchenSink/archive/refs/tags/v1.0-cn7.0.11.zip) for the Kitchen Sink project and extract it. Once extracted you’ll have the project in a directory named “KitchenSink-1.0-cn17.0.11”
+Download the [source code](https://github.com/codenameone/KitchenSink/archive/refs/tags/v1.0-cn7.0.11.zip) for the Kitchen Sink project and extract it. Once extracted you’ll have the project in a directory named "KitchenSink-1.0-cn17.0.11"
 
   
 
@@ -163,7 +163,7 @@ mvn com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-project
 
 > This command is formatted for the bash prompt (e.g. Linux or Mac). It will work on Windows also if you use bash. If you are on Windows and are using PowerShell or the regular command prompt, then you’ll need to modiy the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
 
-This will generate a new Maven project in a directory named “kitchensink”, because of the -DartifactId=kitchensink option.
+This will generate a new Maven project in a directory named "kitchensink", because of the -DartifactId=kitchensink option.
 
 ## Tip:
 
@@ -175,7 +175,7 @@ For an introduction to this new project structure, you should start with [this t
 
 ## Converting an Existing Library Project to Maven
 
-We used the “generate-app-project” Maven goal to migrate our app project. For a library project, we’ll use the “generate-cn1lib-project”
+We used the "generate-app-project" Maven goal to migrate our app project. For a library project, we’ll use the "generate-cn1lib-project"
 
 As an example, I’ll Migrate the [CodeRAD library project](https://github.com/shannah/CodeRAD) to Maven.
 
@@ -203,7 +203,7 @@ mvn com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-cn1lib-proj
 			
 ```
 
-If all went well, it should have created the project in a directory named “coderad” (because of the -DartifactId=coderad argument).
+If all went well, it should have created the project in a directory named "coderad" (because of the -DartifactId=coderad argument).
 
 ## Tip:
 
@@ -271,7 +271,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > So the process:  
 > 1. Download the zip file.  
 > 2. Extract the zip file (i.e. right click > Extract All)  
-> 3. Open the directory that was extracted. It will have the jar file and a “libs” directory.
+> 3. Open the directory that was extracted. It will have the jar file and a "libs" directory.
 >
 > Do all of those steps correspond to your steps? What does the error look like?
 >
@@ -286,7 +286,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Running in command line works, thanks.
 >
-> BTW, “Post Comment” on this WebPage is sometimes hidden and only shows when you hover.
+> BTW, "Post Comment" on this WebPage is sometimes hidden and only shows when you hover.
 
 
 ### **Steve Hannah** — April 15, 2021 at 12:07 pm ([permalink](/blog/migrating-your-project-to-maven/#comment-24453))
@@ -295,7 +295,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > > Running in command line works.
 >
-> Probably double-clicking was choosing Java6 or Java7 to run it then. If you right click the jar, and select “Open With”, it may allow you to select a specific version of Java to run it.
+> Probably double-clicking was choosing Java6 or Java7 to run it then. If you right click the jar, and select "Open With", it may allow you to select a specific version of Java to run it.
 >
 > I guess this is why best practice is to distribute with bundled JRE. The first release of this tool I generated native apps for (on Mac and Windows) using the build server, but decided to forego that as the jar distribution seemed to work just as well. Perhaps I need to generate launch scripts for the jar executable to help choose an appropriate JRE.
 
@@ -306,7 +306,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I’m finally getting around to try out this migration, but when executing the migrationtool jar (on Mac Big Sur, and using the Open as recommended which by default is JavaLauncher.app)
 >
-> I get an error “Java Application launch failed.” asking me to look in the Console for error messages but I can’t find any references to migrationtool. Any idea what might be wrong? (java –version says openjdk 15.0.1, but in System Preferences I see Oracle Java build 1.8.0\_301-b09).
+> I get an error "Java Application launch failed." asking me to look in the Console for error messages but I can’t find any references to migrationtool. Any idea what might be wrong? (java –version says openjdk 15.0.1, but in System Preferences I see Oracle Java build 1.8.0\_301-b09).
 >
 > However, afterwards I tried with the command line ike Diamond and that works, but still it might indicate an issue you’d want to fix.
 >
@@ -326,7 +326,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > ThomasH99 says:
 >
-> Small usability suggestion: if you indicate a Destination Directory that doesn’t exist you get an error message in red saying “Specified directory could not be found”. However, if you then enter a correct directory, the error message doesn’t go away, making you think the new value is also wrong.
+> Small usability suggestion: if you indicate a Destination Directory that doesn’t exist you get an error message in red saying "Specified directory could not be found". However, if you then enter a correct directory, the error message doesn’t go away, making you think the new value is also wrong.
 >
 
 

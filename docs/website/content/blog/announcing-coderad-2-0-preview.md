@@ -115,7 +115,7 @@ This example is just the tip of the iceberg, however, as CodeRAD’s XML views a
 
 ### Hot Reload
 
-When building user interfaces, the biggest pain point, by far, is the “test-edit-reload” cycle. e.g. Load app in simulator, add label to your form, reload app in simulator, navigate back to form, repeat…​
+When building user interfaces, the biggest pain point, by far, is the "test-edit-reload" cycle. e.g. Load app in simulator, add label to your form, reload app in simulator, navigate back to form, repeat…​
 
 Having to wait while the app is recompiled, and the simulator is reloaded each time you make a change is an excruciating productivity killer.
 
@@ -124,7 +124,7 @@ CodeRAD 2 takes a giant step toward alleviating this problem with its introducti
 There are two modes for Hot Reload:
   
   
-1. ****Reload Simulator**** – This will restart your app at your “start form” when changes are detected.
+1. ****Reload Simulator**** – This will restart your app at your "start form" when changes are detected.
   
   
 2. ****Reload Current Form**** – This will restart your app, and automatically load the current Form, to save you from having to manually navigate there.
@@ -141,7 +141,7 @@ This introduction to CodeRAD 2 video is a good starting point if you want to lea
 
 ### Getting Started
 
-We have added a “CodeRAD (MVC) Starter Project” option to the [Codename One initializr](https://start.codenameone.com/), which will give you a starting point for developing apps with CodeRAD 2.
+We have added a "CodeRAD (MVC) Starter Project" option to the [Codename One initializr](https://start.codenameone.com/), which will give you a starting point for developing apps with CodeRAD 2.
 
 ![](/blog/announcing-coderad-2-0-preview/initializr-rad-mvc-dropdown.png) 
 

@@ -30,7 +30,7 @@ Therefore the screen origin is at the top left corner of the screen. Given this 
 
 Where would this rectangle be drawn on the screen?
 
-If you answered something something like “10 pixels from the top, and 10 pixels from the left of the screen”, you  
+If you answered something something like "10 pixels from the top, and 10 pixels from the left of the screen", you  
 _might_ be right. It depends on whether the graphics has a translation or transform applied to it. If there is  
 currently a translation of `(20,20)` (i.e. 20 pixels to the right, and 20 pixels down), then the rectangle would be rendered at `(30, 30)`. 
 

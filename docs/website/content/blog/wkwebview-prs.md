@@ -17,7 +17,7 @@ This mostly went unnoticed by most developers as it should. But if your browser 
 
 ### Video Library
 
-[Francesco Galgani](https://github.com/jsfan3/) created an impressive [cn1lib for low level video access](https://github.com/jsfan3/CN1Libs-VideoOptimizer/) named “VideoOptimizer”.  
+[Francesco Galgani](https://github.com/jsfan3/) created an impressive [cn1lib for low level video access](https://github.com/jsfan3/CN1Libs-VideoOptimizer/) named "VideoOptimizer".  
 It supports compressing video files for distribution, grabbing video frame screenshots, getting the duration of a video etc.
 
 This is pretty cool and also a pretty difficult task as it involved integrating the ffmpeg native library in an Android build with an AAR to package the whole thing.

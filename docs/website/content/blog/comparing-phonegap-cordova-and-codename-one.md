@@ -20,7 +20,7 @@ In fact, one of the big problems we had when describing Codename One was disting
 solutions like Cordova.
 
 One of the things we’d like to clarify before delving into the comparison is that our goal isn’t to proclaim Codename One  
-as the “end all” of WORA…​  
+as the "end all" of WORA…​  
 We are biased so the comparison might be flawed. However, we think Cordova/PhoneGap are remarkably  
 innovative tools that changed the marketplace significantly. The goal of this comparison is to highlight the  
 differences/tradeoffs of each solution. In fact we rather like Cordova and even offer some  
@@ -93,7 +93,7 @@ app. This allows them to sell the app within the standard markets as if it was t
 quite common and very hard to catch/enforce.
 
 This is not feasible in Codename One where the source code is compiled together and obfuscated by default  
-on Android making it even more “secure”. A Codename One application can be decompiled but this would be  
+on Android making it even more "secure". A Codename One application can be decompiled but this would be  
 a far harder process than doing the same for a PhoneGap/Cordova application.
 
 #### VM Ownership
@@ -128,15 +128,15 @@ One of the core powers of HTML has been it’s complex support for dynamic reflo
 components using a very elaborate box model. However, this power is also the source of HTML’s greatest performance  
 challenges. Some HTML frameworks choose to position elements absolutely and lay them out thru code  
 logic, which is pretty close to what Codename One does in it’s layout managers. However, this forces the  
-JavaScript developer into a custom environment that won’t “play nicely” with everything else within the ecosystem.
+JavaScript developer into a custom environment that won’t "play nicely" with everything else within the ecosystem.
 
-Frameworks like Ionic have taken up the lightweight approach to creating native “themes” in a similar way to  
+Frameworks like Ionic have taken up the lightweight approach to creating native "themes" in a similar way to  
 Codename One. This provides Ionic with many of the advantages Codename One enjoys but also some of the  
 drawbacks/advantages inherent from layering on top of Cordova.
 
 One of the core capabilities of Codename One is in embedding native widgets directly into the app. This is demonstrated  
 in Codename One thru the native Google Maps support and other such capabilities. Since embedding an OS  
-native widget into HTML is “problematic” that level of platform extension can’t be accomplished in Cordova.
+native widget into HTML is "problematic" that level of platform extension can’t be accomplished in Cordova.
 
 #### Size Overhead
 
@@ -240,7 +240,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the headsup, I actually did see this when it was announced and it totally slipped my mind. I wonder how well it works with the native HTML rendering?
 >
-> Codename One is totally different from LWUIT by now, we even have some CSS support. Although the “giving CSS to a designer” line is a bit… I’ve worked a lot with designers and never got anything remotely close to a usable CSS snippet from them. The best they could offer is the CSS photoshop produces for a layer which isn’t much…
+> Codename One is totally different from LWUIT by now, we even have some CSS support. Although the "giving CSS to a designer" line is a bit… I’ve worked a lot with designers and never got anything remotely close to a usable CSS snippet from them. The best they could offer is the CSS photoshop produces for a layer which isn’t much…
 >
 > In mobile where the design needs to be aware of screen size, density, orientation, font constraints etc. the design requires proper programming skills. I’ve yet to see a designer produce something half decent for a website and I can’t imagine one producing something workable for cross platform mobile devices…
 >

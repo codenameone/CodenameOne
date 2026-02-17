@@ -2,6 +2,7 @@ baseURL = 'https://www.codenameone.com/'
 languageCode = 'en-us'
 title = 'Codename One'
 theme = "PaperMod"
+enableRobotsTXT = true
 
 [outputFormats.Feed]
 mediaType = "application/rss+xml"
@@ -17,8 +18,18 @@ term = ["HTML"]
 
 [params]
 defaultTheme = "dark"
-disableThemeToggle = true
+disableThemeToggle = false
 mainSections = ["blog"]
+author = "Codename One"
+homeTitle = "Codename One: Cross-Platform App Development with Java/Kotlin"
+description = "Open-source cross-platform mobile app development framework to build native iOS, Android, Desktop and Web apps with a single Java or Kotlin codebase."
+keywords = [
+  "codename one",
+  "cross platform app development",
+  "cross platform mobile development",
+  "write once run anywhere",
+  "java",
+]
 
 [params.label]
 text = "CODENAME ONE"

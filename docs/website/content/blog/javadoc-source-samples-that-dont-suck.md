@@ -13,7 +13,7 @@ author: Shai Almog
 
 JavaDoc source code embeds suck!  
 I love JavaDoc but it didn’t age well. When you work with other tools (e.g. in the Microsoft world) suddenly the  
-embedded samples look amazing and “search” functionality is just built in!  
+embedded samples look amazing and "search" functionality is just built in!  
 **Why can’t we have that?**  
 JDK 9 is [introducing new support for search](http://mail.openjdk.java.net/pipermail/jdk9-dev/2016-January/003362.html)  
 but source embeds can be so much better and are a crucial learning tool… 
@@ -22,13 +22,13 @@ Since documentation and proper code samples are so crucial we decided to revisit
 the ground up, to that point we created the new open source project:  
 [JavaDoc Source Embed](https://github.com/codenameone/JavaDocSourceEmbed). 
 
-The goal of this project is to allow using github “gist” in JavaDoc which allows you to create JavaDoc that looks  
+The goal of this project is to allow using github "gist" in JavaDoc which allows you to create JavaDoc that looks  
 like [this](/javadoc/com/codename1/location/LocationManager/)  
 instead of the normally anemic source embeds.   
 If you are unfamiliar with [github gists](https://gist.github.com/) its essentially  
 a code snippet hosting service that both formats the code nicely and allows you to easily maintain it thru  
 github (fork, star, watch etc.).  
-The central hosting is the true “killer feature”, it allows you to embed the sample everywhere that’s applicable  
+The central hosting is the true "killer feature", it allows you to embed the sample everywhere that’s applicable  
 instead of copying and pasting it. E.g. the [LocationManager](/javadoc/com/codename1/location/LocationManager/)  
 is a good place to hold the sample but so is the [Geofence](http://codenameone.com/javadoc/com/codename1/location/Geofence.html) class.  
 In those cases we only had to copy this small snippet in the javadoc: 
@@ -38,7 +38,7 @@ In those cases we only had to copy this small snippet in the javadoc:
 
 The only two problems with gist are its lack of searchability and the fact that it won’t appear in IDE’s that don’t  
 render JavaScript. The [JavaDoc Source Embed](https://github.com/codenameone/JavaDocSourceEmbed)  
-project effectively solves that by automatically generating a “noscript” tag with the latest version of the gist  
+project effectively solves that by automatically generating a "noscript" tag with the latest version of the gist  
 so it appears properly everywhere it is referenced. 
 
 We’ll try to update our javadocs but would be happy for pull requests and issues pointing at missing samples  
@@ -60,7 +60,7 @@ which is far more useful. Notice that this shouldn’t affect things like code b
 specific class. From this point on we’ll try to interconnect the documentation to produce a more coherent  
 experience with the docs.  
 I’d open source the script we used for the links but its mostly a bunch of very specific `sed`  
-commands which probably won’t be useful for anyone. We won’t run it again since its a “one off” script,  
+commands which probably won’t be useful for anyone. We won’t run it again since its a "one off" script,  
 we’ll just need to keep the linking going. 
 
 #### Feedback

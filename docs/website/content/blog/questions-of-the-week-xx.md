@@ -61,13 +61,13 @@ Features related to background execution are sensitive so it’s important to ve
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39089139/codename-one-background-fetch-not-firing-on-ios)
 
-### Are there “helpers” in Codename One to write Material Design apps as in Android
+### Are there "helpers" in Codename One to write Material Design apps as in Android
 
 There are several classes that provide material design look in Codename One but the most important thing to do is understand the goals
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/39087345/are-there-helpers-in-codename-one-to-write-material-design-apps-as-in-android)
 
-### Are there “helpers” in Codename One to write Material Design apps as in Android
+### Are there "helpers" in Codename One to write Material Design apps as in Android
 
 ### Apple Developer and AppStore Cert Not generated in codename one
 

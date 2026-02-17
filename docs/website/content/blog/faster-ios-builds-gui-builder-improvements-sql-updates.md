@@ -18,7 +18,7 @@ debug builds include both the 64bit and 32bit code which is redundant during deb
 We made some changes that should apply for the next update this Friday that might double build speed for some of  
 you as it will do less work during compiling but also produce a smaller binary.
 
-__ |  I would also recommend unchecking “include source” which slows down the build as the zip and upload of  
+__ |  I would also recommend unchecking "include source" which slows down the build as the zip and upload of  
 a huge file slows down the whole process   
 ---|---  
   

@@ -19,11 +19,11 @@ This regression was caused by new features in the `Command` class that now has t
 
 With the shift to Xcode 9, which is the default version on the Codename One build servers as of [February 2018](/blog/xcode-9-on-by-default/), it is now possible to use a launch-screen storyboard as the splash screen instead of launch images. This will potentially solve the issue of the proliferation of screenshots, as you can supply a single storyboard which will work on all devices. Launch storyboards are disabled by default at this time, but we will flip the switch for 5.0 so they will be the default. You can enable the LaunchScreen storyboard by adding the `ios.multitasking=true` build hint and explicitly disable them by setting it to `false`.
 
-The build hint is called “multitasking”, because iOS’ split-screen and multi-tasking feature **requires** that the app uses a launch storyboard rather than launch images.
+The build hint is called "multitasking", because iOS’ split-screen and multi-tasking feature **requires** that the app uses a launch storyboard rather than launch images.
 
 Besides the advantage of multi-tasking support the launch screen storyboards have a few advantages:
 
-  * It’s the official direction – Apple is clearly heading in this direction instead of splash screens so it’s more “future proof”
+  * It’s the official direction – Apple is clearly heading in this direction instead of splash screens so it’s more "future proof"
 
   * Faster builds – by now we need to generate 16 screenshots per build, this can slow down builds noticeably
 

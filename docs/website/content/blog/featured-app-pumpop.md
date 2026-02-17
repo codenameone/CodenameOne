@@ -16,7 +16,7 @@ all over the world. One of its major draws is it’s portability which will soon
 
 Pumpop uses social login controls such as native Facebook login as well as email activation.
 
-__ |  If you are in a committed relationship I suggest notifying your spouse that you are “just testing this app for work”,  
+__ |  If you are in a committed relationship I suggest notifying your spouse that you are "just testing this app for work",  
 to avoid unpleasantness and suspicion…​   
 ---|---  
   
@@ -42,7 +42,7 @@ Profile Details
 
 ### Contributions
 
-One of the things that should be mentioned about the guys from Pumpop is that they “walk the walk”.  
+One of the things that should be mentioned about the guys from Pumpop is that they "walk the walk".  
 Fabricio of [pmovil](http://www.pmovil.com) (the company behind Pumpop) has contributed a great deal of code  
 to the Codename One community most of which is shown in their [github profile](https://github.com/Pmovil/).
 

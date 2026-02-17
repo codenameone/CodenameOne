@@ -77,7 +77,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Francesco Galgani says:
 >
-> Thank you Shai, I understood what you wrote, however I have some dubts. I’m trying to expose my doubts in this comment. Because your current API can send emails only to the email account of the developer who sent the app to your build servers, I have difficult to understand that “sendMessageViaCloudSync” can be used to spam (assuming that a developer cannot spam to theirself). Moreover, this API is available only to Pro accounts, so I suppose that is virtually impossible that somebody pays a Pro account to send unwanted emails to theirself. In my experience, it’s very difficult to buy an IP that it’s not already inserted in one or more spam blacklists, so it’s normal that the IPs of your servers can be in one or more blacklists. Because all these facts, I don’t see a conceptual issue in your API… of course, I can be wrong. Thank you for any further clarification.
+> Thank you Shai, I understood what you wrote, however I have some dubts. I’m trying to expose my doubts in this comment. Because your current API can send emails only to the email account of the developer who sent the app to your build servers, I have difficult to understand that "sendMessageViaCloudSync" can be used to spam (assuming that a developer cannot spam to theirself). Moreover, this API is available only to Pro accounts, so I suppose that is virtually impossible that somebody pays a Pro account to send unwanted emails to theirself. In my experience, it’s very difficult to buy an IP that it’s not already inserted in one or more spam blacklists, so it’s normal that the IPs of your servers can be in one or more blacklists. Because all these facts, I don’t see a conceptual issue in your API… of course, I can be wrong. Thank you for any further clarification.
 >
 
 
@@ -86,7 +86,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> We just customize the from field. We don’t actually send an email as “you” since we use our servers to do so. That means the reputation for sending is shared with every Codename One user out there as the SMTP server IP address is what counts for a lot of spam filtering solutions e.g. Spam Cop.
+> We just customize the from field. We don’t actually send an email as "you" since we use our servers to do so. That means the reputation for sending is shared with every Codename One user out there as the SMTP server IP address is what counts for a lot of spam filtering solutions e.g. Spam Cop.
 >
 > Otherwise every spammer could just randomly change the from field and spam away from one server (they actually do that but it’s useless). That means that if one Codename One user sends bad emails and his users flag them as spam we all pay…
 >

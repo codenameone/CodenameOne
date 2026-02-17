@@ -47,7 +47,7 @@ The biggest piece we need to do is migrate the documentation to the developer gu
 
 Another big missing piece with CSS support is localization. It’s not a CSS feature but rather something we would expect to have within the generated resource file. So java properties files would be implicitly added to the resource file during CSS compile. Personally I think we can make localization **much** easier by detecting unlocalized strings in the simulator & automatically adding them to the resource bundle.
 
-We need some more demos & tutorials that cover CSS and ideally we would want this exposed in the “new project wizard”.
+We need some more demos & tutorials that cover CSS and ideally we would want this exposed in the "new project wizard".
 
 If we could automate the conversion of res files to CSS it would be great for things like this as we could instantly make all of our demos work both ways.
 
@@ -91,7 +91,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Francesco Galgani says:
 >
 > Is this the only available documentation at the moment? [https://github.com/shannah/…](<https://github.com/shannah/cn1-css/wiki>)  
-> Is it complete about “Fonts”, “Images”, “Supported CSS Selectors”, “Supported Properties”?
+> Is it complete about "Fonts", "Images", "Supported CSS Selectors", "Supported Properties"?
 >
 
 
@@ -111,7 +111,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Hi Shai,
 >
-> I can’t enable CSS in Codename One Properries (version 4.31), it says “failed to activate CSS plugin due to IO error. See the console log for details”, but console log is empty, and I even don’t know where to start troubleshooting this, can you please advise ?
+> I can’t enable CSS in Codename One Properries (version 4.31), it says "failed to activate CSS plugin due to IO error. See the console log for details", but console log is empty, and I even don’t know where to start troubleshooting this, can you please advise ?
 >
 > Thanks,  
 > Denis
@@ -124,7 +124,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > Hi,  
-> console might be confusing. It means the console where the settings app is running. To check the output go to your home directory then enter the “.codenameone” directory. In it execute “java -jar guibuilder_1.jar -settings path-to-project/[codenameone_settings.proper…](<http://codenameone_settings.properties>)”.
+> console might be confusing. It means the console where the settings app is running. To check the output go to your home directory then enter the ".codenameone" directory. In it execute "java -jar guibuilder_1.jar -settings path-to-project/[codenameone_settings.proper…](<http://codenameone_settings.properties>)".
 >
 > This should launch settings. Reproduce the issue and see the logs in that console. Make sure you are running under Oracle JDK 8 when doing that.
 >
@@ -156,7 +156,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > at [com.codename1.ui.RunnableWr…](<http://com.codename1.ui.RunnableWrapper.run)([RunnableWrapper.java](http://RunnableWrapper.java)>:120)  
 > at [com.codename1.impl.Codename…](<http://com.codename1.impl.CodenameOneThread.run)([CodenameOneThread.java](http://CodenameOneThread.java)>:176)
 >
-> There is indeed nothing about “pre-compile” in build.xml in projects directory, how to fix that ? is it some build-hint that I need to add to project ?
+> There is indeed nothing about "pre-compile" in build.xml in projects directory, how to fix that ? is it some build-hint that I need to add to project ?
 >
 > thanks !  
 > Denis
@@ -216,7 +216,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Denis says:
 >
-> thanks Shai, just for test I have created new codenameone project using “Hello World Vusial” template and “business” theme and tried to enable CSS for it, faced the same issue, I was worried if it’s problem particularly with my project, but looks like it’s general
+> thanks Shai, just for test I have created new codenameone project using "Hello World Vusial" template and "business" theme and tried to enable CSS for it, faced the same issue, I was worried if it’s problem particularly with my project, but looks like it’s general
 >
 
 
@@ -259,7 +259,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > just tried to update Project Libs, I was not aware that they weren’t updated during plugin update, but it stuck on following error:
 >
-> Exception in thread “main” java.io.FileNotFoundException: C:UsersDenis.codenameone[CodenameOne_SRC.zip](<http://CodenameOne_SRC.zip>)  
+> Exception in thread "main" java.io.FileNotFoundException: C:UsersDenis.codenameone[CodenameOne_SRC.zip](<http://CodenameOne_SRC.zip>)  
 > at com.codename1.apps.updater.UpdateCodenameOne.runUpdate([UpdateCodenameOne.java](<http://UpdateCodenameOne.java>):228)  
 > at com.codename1.apps.updater.UpdateCodenameOne.main([UpdateCodenameOne.java](<http://UpdateCodenameOne.java>):310)
 >
@@ -347,7 +347,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > thanks,  
 > Denis
 >
-> p.s. I also noticed that some UTF symbols are not displaying while includeNativeBool is enabled, for example “→” symbol, looks like there is a different font ?
+> p.s. I also noticed that some UTF symbols are not displaying while includeNativeBool is enabled, for example "→" symbol, looks like there is a different font ?
 >
 
 
@@ -364,7 +364,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > return false;  
 > }
 >
-> Don’t set a title to the form (or set it to “”) and don’t add commands.
+> Don’t set a title to the form (or set it to "") and don’t add commands.
 >
 
 
@@ -373,7 +373,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Denis says:
 >
-> thanks Shai, but this doesn’t worked, override shouldPaintStatusBar to return false, commented all form related commands, including setTitlle (also tried to set it to “”) toolbar is still there (in emulator, haven’t sent to real device yet), removed toolbar related theme constants and build hints, the same, any ideas ?)
+> thanks Shai, but this doesn’t worked, override shouldPaintStatusBar to return false, commented all form related commands, including setTitlle (also tried to set it to "") toolbar is still there (in emulator, haven’t sent to real device yet), removed toolbar related theme constants and build hints, the same, any ideas ?)
 >
 
 
@@ -382,18 +382,18 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Sorry I forgot to mention you also need to remove the padding from the Toolbar. It has some default padding that leaves it visible you can do that with this simple trick as Container has no padding/margin: fullScreen.getToolbar().setUIID(“Container”);
+> Sorry I forgot to mention you also need to remove the padding from the Toolbar. It has some default padding that leaves it visible you can do that with this simple trick as Container has no padding/margin: fullScreen.getToolbar().setUIID("Container");
 >
 > Full sample:
 >
-> Form fullScreen = new Form(“”, new BorderLayout()) {  
+> Form fullScreen = new Form("", new BorderLayout()) {  
 > [https://uploads.disquscdn.c…](<https://uploads.disquscdn.com/images/d294ce1fce8a9085744ce424c3283624bd2004dc52ea58e72acf701ae6baeda6.png>) @Override  
 > protected boolean shouldPaintStatusBar() {  
 > return false;  
 > }  
 > };  
-> fullScreen.getToolbar().setUIID(“Container”);  
-> SpanLabel fullScreenLabel = new SpanLabel(“Takes up the whole screen!”);  
+> fullScreen.getToolbar().setUIID("Container");  
+> SpanLabel fullScreenLabel = new SpanLabel("Takes up the whole screen!");  
 > Style s = fullScreenLabel.getAllStyles();  
 > s.setBgColor(0xff00);  
 > s.setBgTransparency(0xff);  
@@ -420,16 +420,16 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > TableLayout mainTableLayout = (TableLayout) getLayout();
 >
 > // Form parameters  
-> getToolbar().setUIID(“Container”);  
-> //setTitle(“”);  
+> getToolbar().setUIID("Container");  
+> //setTitle("");  
 > //setScrollable(false);  
-> //getAllStyles().setBgImage(theme.getImage(“background.jpg”));  
+> //getAllStyles().setBgImage(theme.getImage("background.jpg"));  
 > //getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_ALIGNED_CENTER);
 >
 > I also tried this:
 >
 > MenuForm menuForm = new MenuForm(theme, this);  
-> menuForm.getToolbar().setUIID(“Container”);  
+> menuForm.getToolbar().setUIID("Container");  
 > [menuForm.show](<http://menuForm.show)(>);
 >
 > both lead to this
@@ -491,7 +491,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Denis says:
 >
-> the only thing left is the issue with some unicode symbols support when includeNativeBool is enabled, for example “→” symbol, is there a way to switch to font that used when includeNativeBool is off ?
+> the only thing left is the issue with some unicode symbols support when includeNativeBool is enabled, for example "→" symbol, is there a way to switch to font that used when includeNativeBool is off ?
 >
 
 
@@ -500,7 +500,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> I would strongly suggest you don’t do that. The font that “works” is the system font as opposed to the native: font. But it looks bad and is less flexible both on the device and on the simulator.
+> I would strongly suggest you don’t do that. The font that "works" is the system font as opposed to the native: font. But it looks bad and is less flexible both on the device and on the simulator.
 >
 > The thing is that these issues might not happen on the device. The simulator uses the downloadable Roboto font or builtin helvetica both of which have limits. However, on the device their behavior and supported character range is better. You should be able to use Emojiis and everything when working on the device.
 >
@@ -614,7 +614,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> So you don’t see something like “CSS> Changed detected in /Users/shai/temp/TestApp/css/theme.css. Recompiling” ?  
+> So you don’t see something like "CSS> Changed detected in /Users/shai/temp/TestApp/css/theme.css. Recompiling" ?  
 > Did you change something about the project?  
 > Did you activate CSS via preferences?  
 > If you create a new project, update it (using Codename One Settings) and activate CSS. Does the problem still happen?

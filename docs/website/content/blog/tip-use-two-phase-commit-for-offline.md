@@ -52,7 +52,7 @@ That’s where the key ideas of two phase commit become applicable.
 
 Don’t be confused with the Codename One `Command` class. The GoF `Command` pattern represents a queue of tasks that allow us to perform the tasks in order. Assuming your server contains a set of REST calls a command would probably map to each call.
 
-So if we proceed with the bank account transfer analogy I’ll have a command that says “transfer $5 from account X to account Y”. The implementation of said command could just invoke the REST API. However, when we are offline we can just log the command to run later when we are online.
+So if we proceed with the bank account transfer analogy I’ll have a command that says "transfer $5 from account X to account Y". The implementation of said command could just invoke the REST API. However, when we are offline we can just log the command to run later when we are online.
 
 We can create a queue of offline commands and wait for the moment we get a stable server connection so we can send the commands in queue.
 

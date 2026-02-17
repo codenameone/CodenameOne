@@ -32,7 +32,7 @@ the native functionality but the default should be reasonably secure.
 
 ### What are the differences between CodenameOne getCurrentLocation methods
 
-This question didn’t get much of an answer as much as “for your use case you should use neither”…​
+This question didn’t get much of an answer as much as "for your use case you should use neither"…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37332769/what-are-the-differences-between-codenameone-getcurrentlocation-methods/37337673)
 
@@ -53,7 +53,7 @@ stack overflow to line up his thought process. That’s a good way to ask a ques
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37304600/codename-one-data-upload-works-on-android-phone-but-fails-on-iphone-4)
 
-### How intercept the “Cancel” and “OK” actions belonging to the native IOS picker component?
+### How intercept the "Cancel" and "OK" actions belonging to the native IOS picker component?
 
 One of the problems with native widgets is that they differ so much both in subtle and obvious ways. I can’t think of  
 a component that gave us more grief than the picker.
@@ -62,8 +62,8 @@ a component that gave us more grief than the picker.
 
 ### Warning paint queue size exceeded, please watch the amount of repaint calls Error
 
-This is a warning call we wrote when we coded LWUIT back in 2007. It was one of those failsafe “no one will ever  
-get this warning” things…​
+This is a warning call we wrote when we coded LWUIT back in 2007. It was one of those failsafe "no one will ever  
+get this warning" things…​
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/37253460/warning-paint-queue-size-exceeded-please-watch-the-amount-of-repaint-calls-erro)
 
@@ -120,7 +120,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> 1\. Is this on iOS devices or everywhere? If you don’t want anything to appear set the title to “” and make sure there are no commands.
+> 1\. Is this on iOS devices or everywhere? If you don’t want anything to appear set the title to "" and make sure there are no commands.
 >
 > 2/3. Good questions. We already support everything in terms of the code but we are currently still compiling on an older version of xcode due to logistical reasons that would require a painful migration. We’re announcing a migration process to the newest version of xcode this week so keep an eye on the blog. Once we have the newest version of xcode in the new build servers we’ll be able to address a lot of feature requests.
 >
@@ -133,7 +133,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 1\. Thanks! I have found a solution. I have to set the margins in the theme to 0, too.  
 > 2\. I’m writing a business app and this app needs a master/detail view on tablets like this: [https://apppie.files.wordpr…]([https://apppie.files.wordpress.com/2015/03/screenshot-2015-03-08-20-20-24.png?w=474&h=393](https://apppie.files.wordpress.com/2015/03/screenshot-2015-03-08-20-20-24.png?w=474&h=393)) and this [https://developer.xamarin.c…](<https://developer.xamarin.com/recipes/ios/content_controls/split_view/Images/Picture_1.png>)  
-> “Translated” to Codename One I need to place two “forms” side by side each with a title and actions/menus. The left form is the masterview and must have a constant(!) width on both landscape and portrait-mode. The problem is, that placing two forms in a (super-)form, it is not possible to set the widths and the menus don’t work.
+> "Translated" to Codename One I need to place two "forms" side by side each with a title and actions/menus. The left form is the masterview and must have a constant(!) width on both landscape and portrait-mode. The problem is, that placing two forms in a (super-)form, it is not possible to set the widths and the menus don’t work.
 >
 
 

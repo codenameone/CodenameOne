@@ -56,7 +56,7 @@ here
   
 its a Codename One Library project so you just compile it in NetBeans then add it to the lib directory of either Eclipse or NetBeans. Then right click the project  
   
-and press refresh libs and it should “just work”.  
+and press refresh libs and it should "just work".  
   
 This is a brand new project and Chen would love some contributions and collaborations there so feel free to contribute.
 
@@ -74,7 +74,7 @@ here
 **  
 Notice:  
 **  
-for this code to work properly you will need a “proper” browser component, so you will need Java 7 to be configured properly with FX so the browser component will work as expected on the simulator.  
+for this code to work properly you will need a "proper" browser component, so you will need Java 7 to be configured properly with FX so the browser component will work as expected on the simulator.  
   
   
   

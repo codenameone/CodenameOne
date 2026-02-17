@@ -14,10 +14,10 @@ author: Shai Almog
 I’ve spent a lot of time working with and reviewing other cross platform tools this past month, mostly with Cordova  
 due to [our recent announcement that  
 we support Cordova](/blog/phonegap-cordova-compatibility-for-codename-one.html).   
-I hope it doesn’t come off as too arrogant but our “onboarding” experience is pretty amazing in comparison  
+I hope it doesn’t come off as too arrogant but our "onboarding" experience is pretty amazing in comparison  
 to pretty much everything else. Just install IDE, type in Codename One and follow wizard for new app.  
 The only tools that are simpler than that are the rather limited web based solutions.  
-But we do fall short in one major way, our “hello world” apps look bad by default when compared to pretty much  
+But we do fall short in one major way, our "hello world" apps look bad by default when compared to pretty much  
 any tool out there. There are a lot of reasons for this but none of them are good reasons and this gives a horrible  
 first impression to any developer picking up Codename One for the first time. 
 
@@ -33,7 +33,7 @@ changing the defaults:
 ![Codename One Hello World](/blog/good-looking-by-default-native-fonts-simulator-detection-more/hello-codenamene.png)
 
 I think picking the flat blue theme as the default would be a slight improvement but this is not an inviting  
-first impression. We created this because we think like developers (“get a hello world out”) but we should  
+first impression. We created this because we think like developers ("get a hello world out") but we should  
 think like a product where the end result matters.  
 Several things need fixing here: 
 
@@ -42,13 +42,13 @@ Several things need fixing here:
   * We need a more animated/image based output
   * We still want to keep the code short and simple
 
-So right now this is what we have in terms of a new “hello” world, the Apple logo in dukes hand  
+So right now this is what we have in terms of a new "hello" world, the Apple logo in dukes hand  
 is replaced dynamically with android/windows logos: 
 
 ![New Codename One Hello World](/blog/good-looking-by-default-native-fonts-simulator-detection-more/new-hello-codenamene.png)
 
 The code for this entire thing is pretty small as well so it should be really easy.  
-Notice that we will still have the plain hello world app, “we’ll just rename it to “barebones” which is more  
+Notice that we will still have the plain hello world app, "we’ll just rename it to "barebones" which is more  
 representative of its function/use. 
 
 #### Simpler Fonts
@@ -58,7 +58,7 @@ problem is that even if we want to support something like truetype fonts only on
 to change rather complex API’s and the designer UI. 
 
 We normally just recommend that people embed a TTF file which solves the problem for some use cases, but  
-its often not intuitive and doesn’t work well for the “good looking by default” goals stated above. Modern Android  
+its often not intuitive and doesn’t work well for the "good looking by default" goals stated above. Modern Android  
 devices have roboto font builtin to them and modern iOS devices have HelveticaNeue both are gorgeous fonts  
 that can really make a huge difference to an app.   
 So we introduced a new scheme into the `Font.createTrueTypeFont` method, if you use one of  
@@ -116,7 +116,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > The new ‘hello world’ is definitely more attractive… Personally though, if feels less ‘CN1-like’. Why not the image/animation in the kitchen sink demo splashscreen? [http://www.codenameone.com/…](<http://www.codenameone.com/demos/KitchenSink/>) That includes the CN1 logo, a nice animation and is also pretty in my opinion.
 >
-> BTW: There’s a typo in the text: “Lets” should be “Let’s”
+> BTW: There’s a typo in the text: "Lets" should be "Let’s"
 >
 
 
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I liked the usage of the mascot that Cordova did and I always liked Duke, I think he is more recognizable than our logo. Being at JavaOne you see grown men stand in line for a photo-op with duke (and James Gosling who I guess is the human version of Duke). I did think about photoshopping a Codename One Tattoo on his belly though and I might just do it.
 >
-> The beaker says to me that this is a Lab (like the kitchen sink was), its also a “one off” animation so if you run it and go get some coffee you come back and the animation is gone.
+> The beaker says to me that this is a Lab (like the kitchen sink was), its also a "one off" animation so if you run it and go get some coffee you come back and the animation is gone.
 >
 
 

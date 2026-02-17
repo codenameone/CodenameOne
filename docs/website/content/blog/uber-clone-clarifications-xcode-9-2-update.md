@@ -37,11 +37,11 @@ As you may recall I guaranteed a new app 4 times a year which means 8 new apps w
 
 Next month I will publish two new modules into the academy.
 
-The first I’m pretty clear about and it’s currently tentatively titled: “Working with the Codename One Source code: working without the build servers”.
+The first I’m pretty clear about and it’s currently tentatively titled: "Working with the Codename One Source code: working without the build servers".
 
 It will walk through the process of setting up an environment based mostly on the source code without using the build servers. It will continue where [include the source](/blog/tutorial-include-source/) left off by going into device build complexities without the servers.
 
-I’m still open for suggestions about second module so feel free to comment below. A good suggestion I received was “performance” which I think I can probably spend hours talking about…​
+I’m still open for suggestions about second module so feel free to comment below. A good suggestion I received was "performance" which I think I can probably spend hours talking about…​
 
 ### Xcode 9.2 Update
 

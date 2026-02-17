@@ -15,7 +15,7 @@ A few years back [I wrote an article for O`Reilly](http://radar.oreilly.com/2013
 covering the advantages of cross platform over native OS code. Almost 3 years have passed and a lot has changed  
 in our industry so I wanted to re-examine how this impacts my perspective on cross platform vs. native.
 
-I can sum up the sentiment in a single sentence: “Cross platform is both more essential & more practical than ever before!”.
+I can sum up the sentiment in a single sentence: "Cross platform is both more essential & more practical than ever before!".
 
 ### Flat Design Simplified Portability
 
@@ -34,16 +34,16 @@ Users would often complain about sub-par performance of WORA tools. This has bee
 The tools themselves have improved by leaps and bounds, Codename One is far better than it was in 2013 and  
 other tools in the field have also improved tremendously.
 
-But the bigger change is in user sentiment, for every user who complains about “nativeness” you have another  
+But the bigger change is in user sentiment, for every user who complains about "nativeness" you have another  
 user complaining vigorously about their platform not getting the same treatment. E.g. dropbox who has pretty good  
-native iOS/Android apps recently released an iOS app update that included a great feature: “Scan to PDF”.
+native iOS/Android apps recently released an iOS app update that included a great feature: "Scan to PDF".
 
 This feature would be very useful for me on Android but a quick search revealed that it isn’t available yet and that  
 the [community is pretty mad about this](https://www.dropboxforum.com/hc/en-us/community/posts/206158043-Document-scanning-not-for-android-).  
 This is about an Android port from a unicorn company that doesn’t lack for resources!
 
 Some people will always complain about an app that doesn’t look good or isn’t responsive but a lot of users  
-who don’t understand the technical details associate the word native with “fast, good looking & responsive”  
+who don’t understand the technical details associate the word native with "fast, good looking & responsive"  
 which you can achieve without recoding the app 2-4 times…​
 
 ### Rise of Windows 10
@@ -87,22 +87,22 @@ Let’s be clear, if you pick a WORA solution. Any WORA solution. Some purists w
 
 If you miss a feature or even an entire platform people will complain.
 
-In the past a customer asked me “lets assume I have all the money in the world and no restrictions, should I use  
-native or Codename One?”.
+In the past a customer asked me "lets assume I have all the money in the world and no restrictions, should I use  
+native or Codename One?".
 
 I gave the obvious answer and it stems from the [Tao of programming](http://huffman.sourceforge.net/tao/tao-of-programming.html) :
 
-> A manager went to the master programmer and showed him the requirements document for a new application. The manager asked the master: “How long will it take to design this system if I assign five programmers to it?”
+> A manager went to the master programmer and showed him the requirements document for a new application. The manager asked the master: "How long will it take to design this system if I assign five programmers to it?"
 > 
-> “It will take one year,” said the master promptly.
+> "It will take one year," said the master promptly.
 > 
-> “But we need this system immediately or even sooner! How long will it take if I assign ten programmers to it?”
+> "But we need this system immediately or even sooner! How long will it take if I assign ten programmers to it?"
 > 
-> The master programmer frowned. “In that case, it will take two years.”
+> The master programmer frowned. "In that case, it will take two years."
 > 
-> “And what if I assign a hundred programmers to it?”
+> "And what if I assign a hundred programmers to it?"
 > 
-> The master programmer shrugged. “Then the design will never be completed,” he said.
+> The master programmer shrugged. "Then the design will never be completed," he said.
 
 — Tao of programming – 3.14 
 

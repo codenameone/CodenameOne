@@ -31,14 +31,14 @@ For example:
         form.show();
     });
 
-The intention is that the user presses the “Show Details” button, and they are shown some sort of details form. But what if, somewhere in the construction of the `DetailsForm`, there is a call to `invokeAndBlock()`? A common reason for this is if a network call is performed during the building of the form. For example:
+The intention is that the user presses the "Show Details" button, and they are shown some sort of details form. But what if, somewhere in the construction of the `DetailsForm`, there is a call to `invokeAndBlock()`? A common reason for this is if a network call is performed during the building of the form. For example:
     
     
     DetailsModel model = loadDetailsFromServer();  // A synchronous call to the server
     nameField.setText(model.getName());
     ...
 
-That `loadDetailsFromTheServer()` is a synchronous call to the server, so it uses `invokeAndBlock()` to be able to “block” control flow without actually blocking the EDT. It’s great that it doesn’t block the EDT, but it still blocks our ability to deliver the details form that the user is expecting. The form won’t be built until after the network request complete, then the user will experience a short delay before transitioning to the new form.
+That `loadDetailsFromTheServer()` is a synchronous call to the server, so it uses `invokeAndBlock()` to be able to "block" control flow without actually blocking the EDT. It’s great that it doesn’t block the EDT, but it still blocks our ability to deliver the details form that the user is expecting. The form won’t be built until after the network request complete, then the user will experience a short delay before transitioning to the new form.
 
 A better way is to build and show the `DetailsForm`, perform an asynchronous network request, and then update the details form with the data received when the network request completes. E.g.
     
@@ -79,7 +79,7 @@ This is guaranteed to show the form instantly, or it will throw a `BlockingDisal
 
 ### Background: When to Block the EDT
 
-Synchronous programming is easier to write and understand than asynchronous programming. You can follow the flow of the code line by line, knowing that line n is run after line n-1, and before line n+1. The problem with synchronous programming is that it causes problems for long-running tasks on threads that can never block. Threads like the event dispatch thread (EDT), which is where most application code runs since it is the only thread that is authorized to interact with the UI. Codename One’s `invokeAndBlock()` method is a nifty tool which allows you to “block” the current event dispatch, without blocking any other event dispatches. Other events and callSerially blocks will continue to be processed while this event is blocked.
+Synchronous programming is easier to write and understand than asynchronous programming. You can follow the flow of the code line by line, knowing that line n is run after line n-1, and before line n+1. The problem with synchronous programming is that it causes problems for long-running tasks on threads that can never block. Threads like the event dispatch thread (EDT), which is where most application code runs since it is the only thread that is authorized to interact with the UI. Codename One’s `invokeAndBlock()` method is a nifty tool which allows you to "block" the current event dispatch, without blocking any other event dispatches. Other events and callSerially blocks will continue to be processed while this event is blocked.
 
 This allows us to do cool things like:
     

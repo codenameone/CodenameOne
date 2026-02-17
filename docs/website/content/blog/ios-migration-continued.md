@@ -64,9 +64,9 @@ E.g. notice the `targetType="iphone_old"` line below:
 On Sunday June 19th we will switch to the new build servers so all standard `iphone` builds will reach the new  
 servers. We will also setup the old servers as iphone_old servers.
 
-On that day some builds might get “lost” in the ether of migration so if a build gets stuck cancel it…​
+On that day some builds might get "lost" in the ether of migration so if a build gets stuck cancel it…​
 
-This will be a trial run, if everything will “just work” which is a possibility (however unlikely) this will be it.
+This will be a trial run, if everything will "just work" which is a possibility (however unlikely) this will be it.
 
 However, if issues are reported we will probably revert back to the old servers.
 

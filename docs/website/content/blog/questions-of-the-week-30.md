@@ -15,7 +15,7 @@ author: Shai Almog
 idea.  
 This has been a really busy week with the new [Phoenix demo](/blog/template-phoenix-ui.html) and quite  
 a few other developments. October is finally over and we are all back home from vacations & travels. We are still  
-in “recovery mode” but looking at the pipeline we have pretty exciting things coming up!
+in "recovery mode" but looking at the pipeline we have pretty exciting things coming up!
 
 Chen has made huge strides with the new GUI builder, to such an extent that we decided to release a plugin update  
 and not just a regular update. We’ll write more next week about some of the changes that are included in this update.
@@ -46,7 +46,7 @@ Setting properties for browser options in a device dependent and we allow doing 
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40364417/button-from-an-iframe-in-webbrowser-does-not-work)
 
-### New Gui does not accept placement “Right” on a command
+### New Gui does not accept placement "Right" on a command
 
 This was a bug that Chen solved really quick, please report GUI builder bugs otherwise we can’t possibly refine the tool
 
@@ -72,7 +72,7 @@ Server certificates and JavaSE are pretty confusing
 
 ### No animation with snapToGrid scrolling and tensileDragEnabled set to false
 
-I’m not so sure why this would happen but if my suggested workaround “works” then we might be able to fix this
+I’m not so sure why this would happen but if my suggested workaround "works" then we might be able to fix this
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40342090/no-animation-with-snaptogrid-scrolling-and-tensiledragenabled-set-to-false)
 

@@ -13,7 +13,7 @@ author: Shai Almog
 
 We’ve released a burst of small new features that piled up during the code freeze and release cycle, we also have a couple of interesting  
 3rd party efforts such as an independent Windows Phone port and websockets implementation. But first lets start with  
-Facebooks “invite friends” feature. Historically with the Facebook API you could just use the Graph API to query  
+Facebooks "invite friends" feature. Historically with the Facebook API you could just use the Graph API to query  
 Facebook for the list of friends. This will return an empty list now and will only expose friends who are already using the  
 app. You can use the standard share button or Facebook share both of which are great options to promote your app.  
 However, Facebook also has a special native API allowing the user to invite his friends into the app… 
@@ -24,7 +24,7 @@ Facebook login and want to promote your app socially.
 
 #### Windows Phone Port
 
-As you may recall, we are taking a [“wait and see”  
+As you may recall, we are taking a ["wait and see"  
 approach for the future of the Windows Phone port](/blog/login-tutorials-future-of-windows-phone.html) based on MS’s historical flakyness when committing to  
 technologies. However, some developers need to release a version to Windows Phone now and Fabricio who is one such developer  
 took it upon himself to improve the current port with some interesting results. You can check out his companies project  

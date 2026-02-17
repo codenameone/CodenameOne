@@ -30,7 +30,7 @@ To understand the problem of 2D arrays we need to understand how they work. When
         {7, 8, 9}
     };
 
-What we are “effectively” doing is this:
+What we are "effectively" doing is this:
     
     
     int[]  a1 =  {1, 2, 3};
@@ -38,7 +38,7 @@ What we are “effectively” doing is this:
     int[]  a3 =  {7, 8, 9};
     Object[] myArray = {a1, a2, a3};
 
-That sounds like a “small” semantic difference but it’s a huge one!
+That sounds like a "small" semantic difference but it’s a huge one!
 
 That means we have 4 arrays where we should have had just 1. That’s far more objects to GC & allocate. That  
 also means that every array lookup has to happen twice. The problem here is that these semantics are often  

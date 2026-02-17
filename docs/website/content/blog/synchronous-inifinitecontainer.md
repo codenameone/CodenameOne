@@ -18,8 +18,8 @@ sets of components and this is no longer the case.
 
 However, `InfiniteContainer` has a controversial feature even within out team. It violates the EDT **on purpose** …​
 
-`InfiniteContainer` allows you to “fetch” data dynamically into the container as the user scrolls down. The definition  
-of “fetch” is problematic though. Up until now the [fetch](/javadoc/com/codename1/ui/InfiniteContainer/#fetchComponents-int-int-)  
+`InfiniteContainer` allows you to "fetch" data dynamically into the container as the user scrolls down. The definition  
+of "fetch" is problematic though. Up until now the [fetch](/javadoc/com/codename1/ui/InfiniteContainer/#fetchComponents-int-int-)  
 method was invoked in a separate thread. This was documented in the class but it is pretty problematic as the  
 method returns an array of components.
 

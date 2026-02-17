@@ -12,7 +12,7 @@ author: Shai Almog
 ![Header Image](/blog/building-a-chat-app-with-codename-one-part-2/google-sign-in.png)
 
 In the second part of this tutorial we will cover the login process for Google and getting a unique id. We’ll try to  
-write generic code that we can later reuse for the Facebook login process. But first lets cover what “signing in”  
+write generic code that we can later reuse for the Facebook login process. But first lets cover what "signing in"  
 actually means…​
 
 When you handle your own user list and a user signs in thru registration, you can generally ask that user anything.  
@@ -22,7 +22,7 @@ default when logging in. It is sometimes accessible in Facebook but only for use
 
 Worse, one of the main reasons for using such a service is to access the contacts…​ However, Facebook no longer  
 allows developers access to your Facebook friends. A Facebook app developer can only access the list of friends  
-who have the app installed and to accomplish that we will need to “invite” people to use/install the app.
+who have the app installed and to accomplish that we will need to "invite" people to use/install the app.
 
 ### Getting Started – Configuration
 
@@ -35,7 +35,7 @@ Create a new app by pressing the create button:
 
 ![Create New Project](/blog/building-a-chat-app-with-codename-one-part-2/chat-app-tutorial-google-login-1.png)
 
-Just enter the name of the app e.g. for this case its SocialChat and press “Create”:
+Just enter the name of the app e.g. for this case its SocialChat and press "Create":
 
 ![Create New Project](/blog/building-a-chat-app-with-codename-one-part-2/chat-app-tutorial-google-login-2.png)
 
@@ -43,7 +43,7 @@ Now can select the API’s section where you should see the new project page:
 
 ![New Project Page](/blog/building-a-chat-app-with-codename-one-part-2/chat-app-tutorial-google-login-3.png)
 
-In that project you should click the Google+ API in the “Social” section:
+In that project you should click the Google+ API in the "Social" section:
 
 ![Google+ API Section](/blog/building-a-chat-app-with-codename-one-part-2/chat-app-tutorial-google-login-4.png)
 
@@ -53,7 +53,7 @@ everything other than iOS & Android:
 
 ![Google+ API Section](/blog/building-a-chat-app-with-codename-one-part-2/chat-app-tutorial-google-login-5.png)
 
-The consent screen is used to prompt users for permissions, you should normally fill it up properly for a “real world” application  
+The consent screen is used to prompt users for permissions, you should normally fill it up properly for a "real world" application  
 but in this case we left it mostly empty for simplicities sake:
 
 ![Consent screen](/blog/building-a-chat-app-with-codename-one-part-2/chat-app-tutorial-google-login-6.png)
@@ -67,7 +67,7 @@ an Android certificate you can use our visual wizard or use the command line men
 
 Now that you have a certificate you need two values for your app, the first is the package name which must match  
 the package name of your main class (the one with the start, stop methods). It should be listed in the Codename One properties  
-section. Make sure to use a name that is 100% unique to you and using your own domain, don’t use the com.codename1 prefix or  
+section. Make sure to use a name that is 100% unique to you and using your own domain, don’t use the `com.codename1` prefix or  
 anything such as that…​
 
 You also need the SHA1 value for your certificate, this is explained by Google here: <https://developers.google.com/+/mobile/android/getting-started>
@@ -196,12 +196,12 @@ that we then parse and set to the right variables.
 
 The `JSONParser` class returns the JSON data as a tree of lists & maps that we can traverse thru to extract the data we need.
 
-One value that might not be clear to the casual observer is the `token`, this is a string that contains a “key” to the users  
+One value that might not be clear to the casual observer is the `token`, this is a string that contains a "key" to the users  
 account. Facebook/Google etc. keep the passwords for their users hashed in their database (effectively meaning  
 even they don’t know the passwords), so to prove that we got permission from the user to access their data we  
 get a unique token that looks like a long string of gibberish and we can use that when accessing their respective API’s  
 thus validating ourselves. This is a very common practice…​ However, tokens expire occasionally and thus you might  
-need to “refresh” your token by logging in again as demonstrated in the next block of code.
+need to "refresh" your token by logging in again as demonstrated in the next block of code.
 
 Now we can go to the actual login process which is generic for both Google & Facebook login thanks to the class above  
 and the builtin abstractions in Codename One:

@@ -61,7 +61,7 @@ take advantage of newer features such as offline build…​
 
 This update will eliminate your changes so you will need to reintegrate them. If you have many changes just move them  
 to an external file that you can include in the right spot so re-integrating changes is easy. Also make sure to keep  
-the build.xml in version control so an accidental overwrite won’t destroy your work.
+the `build.xml` in version control so an accidental overwrite won’t destroy your work.
 ---
 
 ## Archived Comments
@@ -83,9 +83,9 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > Here is a neat trick you can do:  
-> Press the edit icon on the top right and just insert your comments or even “can you explain this?” comments. Once done just click the pull request button.
+> Press the edit icon on the top right and just insert your comments or even "can you explain this?" comments. Once done just click the pull request button.
 >
-> I will merge the pull request and then fix the “explain this” comments… You don’t even need to check out the project.
+> I will merge the pull request and then fix the "explain this" comments… You don’t even need to check out the project.
 >
 
 

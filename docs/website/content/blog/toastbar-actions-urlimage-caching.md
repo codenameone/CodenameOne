@@ -13,7 +13,7 @@ author: Shai Almog
 
 I [wrote on the Friday](/blog/questions-of-the-week-42.html) post about a few cool pull requests from Diamond but I didn’t provide a usage example for that API. Probably the best usage example is gmail style undo. If you are not a gmail user then the gmail app essentially never prompts for confirmation!
 
-It just does whatever you ask and pops a “toast message” with an option to undo. So if you clicked by mistake you have 3-4 seconds to take that back!
+It just does whatever you ask and pops a "toast message" with an option to undo. So if you clicked by mistake you have 3-4 seconds to take that back!
 
 This is great and I wanted it for a while in Codename One. Diamond beat me to it by adding the ability to [have an action on a Toast message](https://github.com/codenameone/CodenameOne/pull/2033). This simple example shows you how you can undo any addition to the UI in a similar way to gmail:
     
@@ -40,7 +40,7 @@ That’s a pretty cool feature. I’m sure there are other use cases people can 
 
 `URLImage` is great, it really changed the way we do some things in Codename One and I’m a bit shocked it took us **years** to introduce it…​
 
-However, when we introduced it we didn’t have support for [cache filesystem](/blog/cache-sorted-properties-preferences-listener.html) or for the JavaScript port. The cache filesystem is probably the best place for images of `URLImage` so supporting that as a target is a “no brainer” but JavaScript seems to work so why would it need a special case?
+However, when we introduced it we didn’t have support for [cache filesystem](/blog/cache-sorted-properties-preferences-listener.html) or for the JavaScript port. The cache filesystem is probably the best place for images of `URLImage` so supporting that as a target is a "no brainer" but JavaScript seems to work so why would it need a special case?
 
 Well, JavaScript already knows how to download and cache images from the web. `URLImage` is actually a step back from the things a good browser can do so why not use the native abilities of the browser when we are running there and fallback to using the cache filesystem if it’s available and as a last resort go to storage…​
 

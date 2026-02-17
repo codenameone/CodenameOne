@@ -173,49 +173,49 @@ In the end, I settled on the following classes for my the app:
 
 ### Step By Step : Creating the Data Model
 
-#### Creating the “User” class
+#### Creating the "User" class
 
-  1. In the “Data” section of the “Core” tab, click on “Add Class”:
+  1. In the "Data" section of the "Core" tab, click on "Add Class":
 
 ![Add class button](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/c0310d16-4d66-11e5-8e21-509e44e4f3bb.png)
 
-  2. Select “User” from the dialog, and click “Create Class”:
+  2. Select "User" from the dialog, and click "Create Class":
 
 ![Create user class](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/d83039dc-4d66-11e5-8c00-7d19b3ba56e3.png)
 
-  3. **Create screen_name column**. Click the “+ Col” button on the top menu.
+  3. **Create screen_name column**. Click the "+ Col" button on the top menu.
 
 ![User class details](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/e530ac48-4d66-11e5-8e78-eb23f5ac216a.png)
 
-Then select type = “String” and name = “screen_name”:
+Then select type = "String" and name = "screen_name":
 
 ![Create screen_name column](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/fa79f3e8-4d66-11e5-8d80-f76b0bd0ca10.png)
 
-  4. **Create avatar column** of type “File”:
+  4. **Create avatar column** of type "File":
 
 ![Create avatar column](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/0d569200-4d67-11e5-89dc-4cb5397bfaf8.png)
 
-  5. **Add “friends” and “pendingFriendRequests” relations.**. Add them as columns of type “Relation”:
+  5. **Add "friends" and "pendingFriendRequests" relations.**. Add them as columns of type "Relation":
 
 ![Add friends column](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/1f6f2ff6-4d67-11e5-94ef-99c25a29fb5e.png)
 
 ![Add pendingFriendRequests column](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/33edbb64-4d67-11e5-8902-936c82ee7658.png)
 
-#### Creating the “Post” class
+#### Creating the "Post" class
 
-  1. Create a new class named “Post”:
+  1. Create a new class named "Post":
 
 ![New post class](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/4bad51a6-4d67-11e5-982d-171387d2cb83.png)
 
-  2. Add “comment” column.
+  2. Add "comment" column.
 
 ![Add comment column](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/59b01482-4d67-11e5-9f3e-5597adb48fc4.png)
 
-  3. Add “photo” column with type “File”:
+  3. Add "photo" column with type "File":
 
 ![Add photo column](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/6d7ea848-4d67-11e5-875b-e041168d5671.png)
 
-  4. Add “postedBy” column as type “Pointer” to the “_User” class:
+  4. Add "postedBy" column as type "Pointer" to the "_User" class:
 
 ![Add postedBy column](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/7fb2cc74-4d67-11e5-9fb7-0a439670a154.png)
 
@@ -235,11 +235,11 @@ How did we reduce a database down from 6 tables to only 2 classes? Well:
 
 ### Relations
 
-As I mentioned above, relations are handled a little differently in Parse than in a relational database. Parse provides two column types for “pointing” to other records in the database:
+As I mentioned above, relations are handled a little differently in Parse than in a relational database. Parse provides two column types for "pointing" to other records in the database:
 
-  1. **Pointer** – A type you can use for adding a reference to a single record in that column. E.g. If you wanted to track if a User was the parent of another User, you might add a column named “parent” to the “User” class with type “Pointer”.
+  1. **Pointer** – A type you can use for adding a reference to a single record in that column. E.g. If you wanted to track if a User was the parent of another User, you might add a column named "parent" to the "User" class with type "Pointer".
 
-  2. **Relation** – A type used for storing references to multiple records in that column. E.g. If you wanted to track all of the children of a User, you might add a column to the “User” class named “children” with type “Relation”.
+  2. **Relation** – A type used for storing references to multiple records in that column. E.g. If you wanted to track all of the children of a User, you might add a column to the "User" class named "children" with type "Relation".
 
 In our data model, we needed to track two relationships between user records:
 
@@ -247,9 +247,9 @@ In our data model, we needed to track two relationships between user records:
 
   2. Whether there is a pending friend request from one to the other.
 
-So I added a columns named “friends” and “pendingFriendRequests” to the “User” class, both with type “Relation”.
+So I added a columns named "friends" and "pendingFriendRequests" to the "User" class, both with type "Relation".
 
-__ |  Relationships are one-way only. E.g. If you add “Steve” to the friends relation of “Doug”, then that does not automatically add “Doug” to “Steve”‘s friends relation. For the “pendingFriendRequests” relationship this is what we want anyways, but for the “friends” relationship we wanted it to be two-way, so we need to add Steve to Doug and Doug to Steve when making them friends.   
+__ |  Relationships are one-way only. E.g. If you add "Steve" to the friends relation of "Doug", then that does not automatically add "Doug" to "Steve"‘s friends relation. For the "pendingFriendRequests" relationship this is what we want anyways, but for the "friends" relationship we wanted it to be two-way, so we need to add Steve to Doug and Doug to Steve when making them friends.   
 ---|---  
   
 ## Accessing the Database from Codename One
@@ -260,7 +260,7 @@ Now that we have our database set up, let’s try to connect to it from our Code
 
 The first thing that we need to do is download and install the `parse4cn1` library. You can download it from [here](https://github.com/sidiabale/parse4cn1).
 
-Copy the `parse4cn1.cn1lib` file into your project’s `lib` directory, then select “Refresh” libs (i.e. right click on the project > “Codename One” > Refresh Libs).
+Copy the `parse4cn1.cn1lib` file into your project’s `lib` directory, then select "Refresh" libs (i.e. right click on the project > "Codename One" > Refresh Libs).
 
 You will also need to install the [CN1JSON library](https://github.com/shannah/CN1JSON/raw/master/dist/CN1JSON.cn1lib) which the parse4cn1 library depends on.
 
@@ -273,9 +273,9 @@ Before we do anything else, we need to initialize the Parse API by calling `Pars
         Parse.initialize("<APP ID>", "<CLIENT KEY>");
     }
 
-The Application ID and client key can be found in the “Keys” tab when logged in to Parse.com.
+The Application ID and client key can be found in the "Keys" tab when logged in to Parse.com.
 
-__ |  Make sure to use the “Client Key” and not the “REST API Key” or “Master Key” when connecting to Parse from a client device, as is most likely the case with Codename One apps. The REST API key and Master Key provide full permissions to your database and should not be embedded anywhere in your app for security reasons. These keys are for use in secure settings like a server-side application that connects to your parse application.   
+__ |  Make sure to use the "Client Key" and not the "REST API Key" or "Master Key" when connecting to Parse from a client device, as is most likely the case with Codename One apps. The REST API key and Master Key provide full permissions to your database and should not be embedded anywhere in your app for security reasons. These keys are for use in secure settings like a server-side application that connects to your parse application.   
 ---|---  
   
 ### Logging In
@@ -343,7 +343,7 @@ The Parse API provides support for CRUD (Create-Read-Update-Delete) directly fro
 
 ### Cloud Code
 
-Parse allows you to implement server-side REST web services, known as “cloud code”. Because this code is running on the server side, you can allow them to run with the master key – so you don’t have to rely on ACLs to limit access to records and classes. You can use your own logic to decide who can do what. This model maps more closely to running your own server and provides more control. AND it allows you to lock down your database so you don’t need to provide direct access to clients.
+Parse allows you to implement server-side REST web services, known as "cloud code". Because this code is running on the server side, you can allow them to run with the master key – so you don’t have to rely on ACLs to limit access to records and classes. You can use your own logic to decide who can do what. This model maps more closely to running your own server and provides more control. AND it allows you to lock down your database so you don’t need to provide direct access to clients.
 
 Cloud code uses the [Parse Javascript API](https://parse.com/docs/js/guide) – which is equivalent to the REST and Java APIs. In order to use them, you need to install the [parse command-line tools](https://parse.com/apps/quickstart#cloud_code).
 
@@ -378,7 +378,7 @@ It allows you to create a local version of the Parse app, in so much as developi
      -d '{}' 
      https://api.parse.com/1/functions/hello
 
-This creates a scaffold for my app project in the directory “social-demo-parse-2”. The directory structure is:
+This creates a scaffold for my app project in the directory "social-demo-parse-2". The directory structure is:
     
     
     ./cloud
@@ -388,7 +388,7 @@ This creates a scaffold for my app project in the directory “social-demo-parse
     ./public
     ./public/index.html
 
-The only file that matters here is the `./cloud/main.js` file, which will include all of the cloud code. It starts you off with a nice sample “hello” function that can be called via the REST API. Its contents are as follows:
+The only file that matters here is the `./cloud/main.js` file, which will include all of the cloud code. It starts you off with a nice sample "hello" function that can be called via the REST API. Its contents are as follows:
     
     
     // Use Parse.Cloud.define to define as many cloud functions as you want.
@@ -397,7 +397,7 @@ The only file that matters here is the `./cloud/main.js` file, which will includ
       response.success("Hello world!");
     });
 
-This is a simple function that simply returns the string “Hello world!”. You can call this function directly from your Codename One app by simply calling:
+This is a simple function that simply returns the string "Hello world!". You can call this function directly from your Codename One app by simply calling:
     
     
     String result = (String)ParseCloud.callFunction("hello", null);
@@ -457,7 +457,7 @@ In order to remain consistent with the PHP/MySQL REST API in the previous versio
     // For successes
     {code : 200, ... }
 
-That way the client can always check the “code” property to find out if the action was successful.
+That way the client can always check the "code" property to find out if the action was successful.
 
 For successful operations, there may be three types of return values:
 
@@ -575,7 +575,7 @@ This omits all of the logic and is massively simplified, but the key here is tha
 
 ### Sending, Getting, & Accepting Friend Requests
 
-Recall from our database design that friends and friend requests are supported via the “friends” and “pendingFriendRequests” relations in the users table. Sending a friend request to a user involves, adding the current user to the “pendingFriendRequests” relation of that user. Accepting a friend request from a user involves adding the current user to that user’s “friends” relation, adding that user to the current user’s “friends” relation, and removing that user from the current user’s “pendingFriendRequests” relation. The code for `send_friend_request` is as follows:
+Recall from our database design that friends and friend requests are supported via the "friends" and "pendingFriendRequests" relations in the users table. Sending a friend request to a user involves, adding the current user to the "pendingFriendRequests" relation of that user. Accepting a friend request from a user involves adding the current user to that user’s "friends" relation, adding that user to the current user’s "friends" relation, and removing that user from the current user’s "pendingFriendRequests" relation. The code for `send_friend_request` is as follows:
     
     
     Parse.Cloud.define("send_friend_request", function(request, response) {
@@ -596,11 +596,11 @@ Recall from our database design that friends and friend requests are supported v
 
   2. `(new Parse.Query(Parse.User)).equalTo("username", request.params.username).each(function(friend) {`
 
-Creates a query on the User class for all users with “username” equal to the “username” parameter passed as part of the request. The `each()` method then iterates over the results with the provided callback.
+Creates a query on the User class for all users with "username" equal to the "username" parameter passed as part of the request. The `each()` method then iterates over the results with the provided callback.
 
   3. `friend.relation("pendingFriendRequests").add(Parse.User.current());`
 
-Adds the current user to the “pendingFriendRequests” relation of the found user.
+Adds the current user to the "pendingFriendRequests" relation of the found user.
 
   4. `friend.save().then(function(result) {`
 
@@ -692,20 +692,20 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > I completely agree that the client should never be trusted (that’s also why parse4cn1 by design does not include any operations requiring the master key). However, I’m not convinced that it’s always a better/more secure idea (or even necessary) to write cloud code.
 >
-> The combination of ACLs, CLP (class level permissions) and the new pointer permissions [http://blog.parse.com/learn…](<http://blog.parse.com/learn/secure-your-app-from-the-data-browser-with-pointer-permissions/>) is quite powerful and should be used when applicable. Applying that the CRUD, my feeling so far is that if the primary operation is “Read”, in-buit parse security measures are more than sufficient. For the “C”, “U”, and “D”, a per-case judgment is needed. Always reverting to cloud code might be a pitfall from other paradigms where such security measures as are present in Parse were missing. And it may slow down development with little or no added value. Of course, I’m neither a security expert nor a Parse expert so what am saying might not be completely correct; just food for thought 🙂
+> The combination of ACLs, CLP (class level permissions) and the new pointer permissions [http://blog.parse.com/learn…](<http://blog.parse.com/learn/secure-your-app-from-the-data-browser-with-pointer-permissions/>) is quite powerful and should be used when applicable. Applying that the CRUD, my feeling so far is that if the primary operation is "Read", in-buit parse security measures are more than sufficient. For the "C", "U", and "D", a per-case judgment is needed. Always reverting to cloud code might be a pitfall from other paradigms where such security measures as are present in Parse were missing. And it may slow down development with little or no added value. Of course, I’m neither a security expert nor a Parse expert so what am saying might not be completely correct; just food for thought 🙂
 >
 
 
 
 ### **shannah78** — September 9, 2015 at 3:57 pm ([permalink](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/#comment-21560))
 
-> “Security is inconvenient”, said Ashley Madison. The difficulty in securing an application increases exponentially with the number of access points. If you allow CRUD directly client side — or even just “R” — then you effectively have hundreds or thousands of access points (or millions depending on how you count). If your app has only a handful of “functions” though, you can limit the access point to just that handful and you can easily secure each point manually.
+> "Security is inconvenient", said Ashley Madison. The difficulty in securing an application increases exponentially with the number of access points. If you allow CRUD directly client side — or even just "R" — then you effectively have hundreds or thousands of access points (or millions depending on how you count). If your app has only a handful of "functions" though, you can limit the access point to just that handful and you can easily secure each point manually.
 >
 > Take the social network example. Even if the app were only read only (and it’s not), we have the challenge of allowing users to see only news items that were posted by their friends. Using the ACL method, every post would need to have an ACL entry for every friend of the poster. And when a friend is added or removed, the ACL entries for all posts of both friends would need to be modified accordingly. This, in itself is expensive and challenging, …. And it’s still easy to miss something.
 >
 > Further, you generally don’t want profile information to be readable by anyone other than someone’s friends. How would you provide this sort of limitation securely without cloud code? You can’t make the profiles table readable by everyone, so you would need to add ACLs at the record level – same problem as with the posts. The ACLs need to be added when profiles become friends, but
 >
-> Basically if you are doing *any* filtering client side for the purpose of security, your app is probably vulnerable to unauthorized access. That doesn’t mean that there aren’t occasions where you can get away with direct client-side CRUD. But you have to do a lot more thinking at each step. Or one day you’ll be “that guy” .. the guy who has to explain to his boss that the database was breached and client information was stolen. Don’t be that guy!
+> Basically if you are doing *any* filtering client side for the purpose of security, your app is probably vulnerable to unauthorized access. That doesn’t mean that there aren’t occasions where you can get away with direct client-side CRUD. But you have to do a lot more thinking at each step. Or one day you’ll be "that guy" .. the guy who has to explain to his boss that the database was breached and client information was stolen. Don’t be that guy!
 >
 
 
@@ -726,7 +726,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **shannah78** — September 9, 2015 at 4:54 pm ([permalink](/blog/cloud-powered-mobile-apps-with-parse-and-codenameone/#comment-22471))
 
-> Definitely agree that level of interest to hackers should be taken into consideration. The question I usually ask myself is “how bad would it be if this database were leaked to the world”. If the answer is anything worse than “it would be perfectly fine”, then designing for security should be top priority. That said, it *is* possible to write a secure app using the client-side CRUD API. It is just much harder. It requires a comprehensive understanding of Parse’s system – and also a lot more thought at each step of database design.
+> Definitely agree that level of interest to hackers should be taken into consideration. The question I usually ask myself is "how bad would it be if this database were leaked to the world". If the answer is anything worse than "it would be perfectly fine", then designing for security should be top priority. That said, it *is* possible to write a secure app using the client-side CRUD API. It is just much harder. It requires a comprehensive understanding of Parse’s system – and also a lot more thought at each step of database design.
 >
 > I actually considered writing an ANT task to be able to write and deploy cloud code using TeaVM, but that would just be proof of concept. Most access point functions were trivial, and their Javascript API is quite nice to work with directly.
 >

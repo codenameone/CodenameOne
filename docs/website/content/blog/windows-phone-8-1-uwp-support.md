@@ -31,7 +31,7 @@ as it might mean that sideloading over the air might finally be supported on Win
 __ |  Windows Phone is the only mobile platform we worked with that didn’t support installing files over the air!   
 ---|---  
   
-This means we will need to make some changes to all IDE plugins and to the build.xml file in order to support the  
+This means we will need to make some changes to all IDE plugins and to the `build.xml` file in order to support the  
 UWP target, these changes will allow us to make the migration process much smoother and phase out the old  
 Windows phone target gradually. This also means the Windows section in the IDE will also include more options  
 such as the certificate required for UWP. We’ll keep you posted on this process as we setup the build servers  
@@ -43,7 +43,7 @@ This is probably the main question here and we still don’t have a final answer
 
 Until we start seeing builds going thru it’s hard to say what would work and what wouldn’t. We had a big issue with  
 iKVM this past week and needed help from Microsoft to resolve that (they were quite helpful here). We have  
-no way of knowing if this is the “last issue” we will run into. Setting up a Windows build server is the equivalent  
+no way of knowing if this is the "last issue" we will run into. Setting up a Windows build server is the equivalent  
 of a root canal without the pleasant bits or anesthesia!
 
 We literally had to get Microsoft tech support to help with basic things and are still struggling to get the build  
@@ -80,7 +80,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> I think Windows Phone is dead but some companies need to support “everything”. The value isn’t Windows on phones as much as on tablets/PC’s which the UWP already supports. Windows 10 store was already available on 250M devices quite a while back so it’s one of the bigger target markets out there and has a strong enterprise presence.
+> I think Windows Phone is dead but some companies need to support "everything". The value isn’t Windows on phones as much as on tablets/PC’s which the UWP already supports. Windows 10 store was already available on 250M devices quite a while back so it’s one of the bigger target markets out there and has a strong enterprise presence.
 >
 
 

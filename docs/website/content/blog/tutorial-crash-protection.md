@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/tutorial-crash-protection/learn-codenameone-2.jpg)
 
-Continuing the trend I revisited the old crash protection video in the “how do I” section and updated it with current information and details. The old video still featured an old flag that should be avoided…​  
+Continuing the trend I revisited the old crash protection video in the "how do I" section and updated it with current information and details. The old video still featured an old flag that should be avoided…​  
 The new video is relatively short and simple as the feature isn’t very complex, I hope to produce several more of these and bolster the video section further.
 
 On a different subject I also neglected to mention the new security related module in the [Codename One Academy courses](https://codenameone.teachable.com/p/build-real-world-full-stack-mobile-apps-in-java). I’ll drop additional videos there later in the month.
@@ -41,7 +41,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > 1\. Is there a code that automatically catches (and reports by e-mail) all exceptions in all threads, not only in the EDT?
 >
-> 2\. In the manual, section “Logging & Crash Protection”, at the page: [https://www.codenameone.com…](</manual/files-storage-networking/#_logging_crash_protection>) , there are the following two lines of code: I don’t understood if it makes sense use them in conjunction with Log.bindCrashProtection(true)
+> 2\. In the manual, section "Logging & Crash Protection", at the page: [https://www.codenameone.com…](</manual/files-storage-networking/#_logging_crash_protection>) , there are the following two lines of code: I don’t understood if it makes sense use them in conjunction with Log.bindCrashProtection(true)
 >
 > Log.setReportingLevel(Log.REPORTING_DEBUG);  
 > DefaultCrashReporter.init(true, 2);
@@ -64,7 +64,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> A comment goes directly to moderation if you include a link which disqus sometimes thinks are just strings with dots e.g. a stack trace is “links”.
+> A comment goes directly to moderation if you include a link which disqus sometimes thinks are just strings with dots e.g. a stack trace is "links".
 >
 > 1\. If you use the bind method this will happen implicitly and also send an email for other threads. I think I mentioned that in the video. I’d recommend using Display.startThread() instead of new Thread() to guarantee that.
 >

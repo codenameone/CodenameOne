@@ -52,7 +52,7 @@ as a partner – we needed a partner who is focused on Java (check), who has a b
 [  
 Java Code Geeks  
 ](http://javacodegeeks.com/)  
-are probably up to date with the latest technology, but their friends (and friends of friends) might not be. The true value of the promotion is social share which is why we made the contest require sharing. Initially we wanted the person with the most retweets/shares to “win” but  
+are probably up to date with the latest technology, but their friends (and friends of friends) might not be. The true value of the promotion is social share which is why we made the contest require sharing. Initially we wanted the person with the most retweets/shares to "win" but  
 [  
 Byron from Java Code Geeks  
 ](http://www.javacodegeeks.com/author/Byron-Kiourtzoglou/)  
@@ -182,7 +182,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > Thanks for the feedback, I’d really like to know more about the evaluation and whether the person responsible had any contact with us. 
 >
-> One point I’d like to clarify is that we know for a fact that our reach is to blame. Since our product is cloud based we can “see” the retention statistics rather easily and they exceed industry standards. The chart above showing the number of people who haven’t heard about Codename One in a survey directed at our community as well is a pretty strong indicator of that fact. 
+> One point I’d like to clarify is that we know for a fact that our reach is to blame. Since our product is cloud based we can "see" the retention statistics rather easily and they exceed industry standards. The chart above showing the number of people who haven’t heard about Codename One in a survey directed at our community as well is a pretty strong indicator of that fact. 
 >
 > About Windows Phone and BB10 you do have a point. We have a couple of users to whom BB10 is a target and they found the Android bridge to be sufficient. I’m not aware of any major company in our field doing native BB10 development, it doesn’t seem viable with the Android support. 
 >

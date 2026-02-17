@@ -24,7 +24,7 @@ In larger sets we can use infinite container or infinite scroll adapter. This al
 
 Lets start with a hello world for a box layout list. This is pretty standard Codename One code, lets go over the different pieces.
 
-First we create the list container, notice we set it to scroll on the Y axis. This allows us to scroll through the list which is crucial. Notice that by default a Form is already scrollable on the Y axis but I’ve set the layout to border layout which implicitly disables scrolling. It’s important that scrolling shouldn’t “nest” as it’s impossible to pick the right scrollbar with a touch interface.
+First we create the list container, notice we set it to scroll on the Y axis. This allows us to scroll through the list which is crucial. Notice that by default a Form is already scrollable on the Y axis but I’ve set the layout to border layout which implicitly disables scrolling. It’s important that scrolling shouldn’t "nest" as it’s impossible to pick the right scrollbar with a touch interface.
 
 In this case I just added a thousand entries to the list one by one. The list is relatively simple with no actual functionality other than counting the entries.
 
@@ -41,8 +41,8 @@ Up until now we did simple demos, this is a screenshot of a contacts list from m
 
 First we need a placeholder image for the common case where a contact doesn’t have a profile picture or when we are still loading the profile picture.
 
-When we are in the first element which will happen when the form loads or after a “pull to refresh” I load the contacts. Notice I could have used if contacts equals null but that would have done nothing in the case of pull to refresh as contacts would have been initialized already. By checking against zero I implicitly support the pull to refresh behavior which just calls the fetch method over again.  
-The contacts API can be a bit slow sometimes which is why you shouldn’t fetch “everything” with one request. That’s why the method accepts all of these boolean values to indicate what we need from the contact itself. Setting all of these to true will slow you down significantly so you should generally load just what you need which in this case is contacts with a phone number and full name.
+When we are in the first element which will happen when the form loads or after a "pull to refresh" I load the contacts. Notice I could have used if contacts equals null but that would have done nothing in the case of pull to refresh as contacts would have been initialized already. By checking against zero I implicitly support the pull to refresh behavior which just calls the fetch method over again.  
+The contacts API can be a bit slow sometimes which is why you shouldn’t fetch "everything" with one request. That’s why the method accepts all of these boolean values to indicate what we need from the contact itself. Setting all of these to true will slow you down significantly so you should generally load just what you need which in this case is contacts with a phone number and full name.
 
 The infinite container has no idea how many elements we might have. So we need to check if the amount of elements requested exceeds the total and if the index is out of bounds. If the former is true we need to reduce the amount and return a smaller array. If the latter is true we need to return null which will stop future calls to fetch components unless pull to refresh is triggered again.
 
@@ -51,7 +51,7 @@ The rest is pretty close to the code we had before where we loop and create mult
 However, you might recall we didn’t fetch the image for the contact and that might be pretty expensive to load… So the trick is to call this method on a button by button case where we fetch ONLY the image but we don’t just invoke that as it would kill performance.  
 For this we use the new `callSeriallyOnIdle()` method. This method works like `callSerially` by performing the code in the next event dispatch thread cycle. However, in this case the code will only occur when the phone is idle and there are no other urgent events.
 
-So if we are in idle state we can just ask for the contacts image using the specific API then fill up the UI. Since this is an infinite list this will only be invoked for the “amount” number of entries per cycle and that means it should be reasonably efficient.
+So if we are in idle state we can just ask for the contacts image using the specific API then fill up the UI. Since this is an infinite list this will only be invoked for the "amount" number of entries per cycle and that means it should be reasonably efficient.
 
 Moving to the next page we can see that not much is left, we just return the array and add the list to the center.  
 I didn’t spend much time on refinement and some of the nicer effects you can achieve but you can check out the kitchen sink demo where the contacts section features a swipe UI with many special effects such as generated icons per letter.

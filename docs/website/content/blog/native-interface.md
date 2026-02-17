@@ -24,7 +24,7 @@ Native interfaces allow developers to invoke platform native methods/functions/l
   
   
   
-Normally in Java we would use JNI to access “native” however, JNI is designed to access C and we need much more. Codename One allows developers to access Dalvik (Java) when running under Android and defines that as “native”, C# when running in Windows Phone and Objective-C when running under iOS. Because of that it is remarkably hard to map arbitrary objects, callbacks and functionality to a native call. So to simplify that work we placed many restrictions on the construction of a native interface, however you can still accomplish pretty spectacular things such as a  
+Normally in Java we would use JNI to access "native" however, JNI is designed to access C and we need much more. Codename One allows developers to access Dalvik (Java) when running under Android and defines that as "native", C# when running in Windows Phone and Objective-C when running under iOS. Because of that it is remarkably hard to map arbitrary objects, callbacks and functionality to a native call. So to simplify that work we placed many restrictions on the construction of a native interface, however you can still accomplish pretty spectacular things such as a  
 [  
 complete working socket implementation  
 ](https://github.com/shannah/CN1Sockets)  
@@ -97,8 +97,8 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> These things can be done in Codename One but “everything” is a bit of a big word.  
-> Furthermore, lets separate “can” from “should”. If a lot of your code is native and you need a big native interface abstraction this might become painful to the point where Codename One isn’t worth it. I can’t put my finger on an exact point since it varies and this depends on your needs.
+> These things can be done in Codename One but "everything" is a bit of a big word.  
+> Furthermore, lets separate "can" from "should". If a lot of your code is native and you need a big native interface abstraction this might become painful to the point where Codename One isn’t worth it. I can’t put my finger on an exact point since it varies and this depends on your needs.
 >
 
 

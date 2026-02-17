@@ -52,11 +52,11 @@ Figure 1. Component inspector highlights current selection
 [Francesco Galgani](https://github.com/jsfan3) contributed an implementation of  
 [AutoCompleteTextComponent](https://github.com/codenameone/CodenameOne/issues/2705) which allows you to use an auto-complete with the text component framework for a more fluid input UI.
 
-He also contributed [TextComponentPassword](https://github.com/codenameone/CodenameOne/issues/2654) which is a password field with the same convention. It carries the more modern “show password” icon convention which is far more convenient than the old “double type” approach.
+He also contributed [TextComponentPassword](https://github.com/codenameone/CodenameOne/issues/2654) which is a password field with the same convention. It carries the more modern "show password" icon convention which is far more convenient than the old "double type" approach.
 
 ### Error Callbacks for URLImage
 
-It’s hard to handle errors in `URLImage` objects. Because they are so “seamless” the point for exception handling is deep withing the class. To solve issue [2703](https://github.com/codenameone/CodenameOne/issues/2703) we had to do something different.
+It’s hard to handle errors in `URLImage` objects. Because they are so "seamless" the point for exception handling is deep withing the class. To solve issue [2703](https://github.com/codenameone/CodenameOne/issues/2703) we had to do something different.
 
 You can now use the static method `setExceptionHandler` on `URLImage`. It accepts the inner interface `ErrorCallback` which has a single method:
     

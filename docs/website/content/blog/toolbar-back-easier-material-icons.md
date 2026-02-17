@@ -53,7 +53,7 @@ to keep a consistent look across platforms.
 You will notice the usage of `BackCommandPolicy`, that is an enum with the following possible values:
 
   * `ALWAYS` – Show the back command always within the title bar on the left hand side. This will add the command  
-supplied “as is” but will give it the `BackCommand` UIID
+supplied "as is" but will give it the `BackCommand` UIID
 
   * `AS_REGULAR_COMMAND` – this is effectively the same as calling `addCommandToLeftBar` and setting the  
 hardware back command. This is identical to the `ALWAYS` option with the exception of using the `TitleCommand`  
@@ -134,7 +134,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Go to the preferences, under the Codename One section select “Update Client Libs”.
+> Go to the preferences, under the Codename One section select "Update Client Libs".
 
 
 ### **Mo** — May 31, 2016 at 9:01 pm ([permalink](/blog/toolbar-back-easier-material-icons/#comment-22933))
@@ -158,7 +158,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Mo says:
 >
-> Thank you for the speedy reply, and indeed, some of the strange behavior can be seen on the Kitchen Sink Input Demo via the Simulator after “updating the Project Libs” such as:
+> Thank you for the speedy reply, and indeed, some of the strange behavior can be seen on the Kitchen Sink Input Demo via the Simulator after "updating the Project Libs" such as:
 >
 > 1.On the Text Field, if you use the Tab key and returned , the original text cannot be removed and any new input will be visibly written on top of the previous.  
 > Please try a few times and you will see this behavior,

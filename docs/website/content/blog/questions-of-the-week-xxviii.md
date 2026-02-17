@@ -83,7 +83,7 @@ This should be fixed by now with the new update
 
 ### Autocomplete text field firing selection event on load
 
-This is related to text field events that are “over eager” and would fire twice rather than miss a change
+This is related to text field events that are "over eager" and would fire twice rather than miss a change
 
 [Read on stackoverflow…​](http://stackoverflow.com/questions/40076238/autocomplete-text-field-firing-selection-event-on-load)
 

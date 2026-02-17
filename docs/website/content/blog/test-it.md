@@ -118,7 +118,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Kumuda Garlapati says:
 >
-> I was able to record the tests but not able to run them as seeing some errors “java.lang.ClassCastException: class com.codename1.components.InfiniteProgress cannot be cast to class com.codename1.ui.Container (com.codename1.components.InfiniteProgress and com.codename1.ui.Container are in unnamed module of loader com.codename1.impl.javase.ClassPathLoader @6f539caf)”  
+> I was able to record the tests but not able to run them as seeing some errors "java.lang.ClassCastException: class com.codename1.components.InfiniteProgress cannot be cast to class com.codename1.ui.Container (com.codename1.components.InfiniteProgress and com.codename1.ui.Container are in unnamed module of loader com.codename1.impl.javase.ClassPathLoader @6f539caf)"  
 > Just a question do I need to use specific version of net beans to run tests? I’m not sure what I’m missing here. Thanks
 >
 
@@ -130,7 +130,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You need to edit the tests after recording. The recording process is imperfect by definition and generates code that might fail and might be too fragile (e.g. fail on a different simulator/device).
 >
-> In this case it seems that the failure is triggered by code that shows a progress indicator for a long running task. When recording this wasn’t caught since we skip delays. Otherwise your code would be littered with “sleep” commands. The code is running too quickly and is then running into the InfiniteProgress component which has taken over the form. You need to wait within the test code for the InfiniteProgress to complete.
+> In this case it seems that the failure is triggered by code that shows a progress indicator for a long running task. When recording this wasn’t caught since we skip delays. Otherwise your code would be littered with "sleep" commands. The code is running too quickly and is then running into the InfiniteProgress component which has taken over the form. You need to wait within the test code for the InfiniteProgress to complete.
 
 
 ### **Kumuda Garlapati** — May 8, 2024 at 5:16 pm ([permalink](/blog/test-it/#comment-24608))
@@ -145,7 +145,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > waitFor(202);  
 > pointerRelease(0.43809524f, 0.425f, new int[]{0, 1, 0, 2, 1, 2, 0, 0});  
 > return true;  
-> Whenever I try to run encountered error”java.lang.ClassCastException: class com.codename1.components.InfiniteProgress cannot be cast to class com.codename1.ui.Container (com.codename1.components.InfiniteProgress and com.codename1.ui.Container are in unnamed module of loader com.codename1.impl.javase.ClassPathLoader @6f539caf)”
+> Whenever I try to run encountered error"java.lang.ClassCastException: class com.codename1.components.InfiniteProgress cannot be cast to class com.codename1.ui.Container (com.codename1.components.InfiniteProgress and com.codename1.ui.Container are in unnamed module of loader com.codename1.impl.javase.ClassPathLoader @6f539caf)"
 >
 
 
@@ -181,7 +181,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Not seamlessly. We try to generate “logical code” but can’t always detect that correctly.
+> Not seamlessly. We try to generate "logical code" but can’t always detect that correctly.
 >
 
 

@@ -13,12 +13,12 @@ author: Shai Almog
 
 ![](/blog/easy-demos-flip-more/flip.png)
 
-One of the pains in Codename One is the access to the demos, yes we have the downloadable demo bundle and the SVN but for a compete novice to Codename One this isn’t front and center. Chen decided to address that by embedding the latest versions of the demos both into the Eclipse and the NetBeans plugins, now when you create a new Codename One project you can also create a demo project and “just run it”. This allows you to quickly learn/debug our sample code which should help with the Codename One learning curve. 
+One of the pains in Codename One is the access to the demos, yes we have the downloadable demo bundle and the SVN but for a compete novice to Codename One this isn’t front and center. Chen decided to address that by embedding the latest versions of the demos both into the Eclipse and the NetBeans plugins, now when you create a new Codename One project you can also create a demo project and "just run it". This allows you to quickly learn/debug our sample code which should help with the Codename One learning curve. 
 
 Chen and Steve also adapted the code built by Steve as part of the new graphics pipeline for [perspective transforms](http://www.codenameone.com/blog/perspective-transform)  
 and introduced a cool new [flip transition](/javadoc/com/codename1/ui/animations/FlipTransition.html) that you can see in the video below, its really trivial to use just set form.setTransitionOutAnimation(new FlipTransition()); and that’s it. This is already in the current plugin and you can play with it right now! 
 
-As part of ongoing support for customers we also introduced improved location support on Android which uses the new Google Play API’s that include hybrid location. This means location should be more accurate and return a result faster, this will only be used if you integrate the Google Play Services support (which you can now rely on if you write Android native interfaces). To do that just add the build hint android.includeGPlayServices=true and this will be used seamlessly. 
+As part of ongoing support for customers we also introduced improved location support on Android which uses the new Google Play API’s that include hybrid location. This means location should be more accurate and return a result faster, this will only be used if you integrate the Google Play Services support (which you can now rely on if you write Android native interfaces). To do that just add the build hint `android.includeGPlayServices=true` and this will be used seamlessly. 
 
 The [infinite adapter API](http://www.codenameone.com/blog/till-the-end-of-the-form) is sometimes  
 [less intuitive](/javadoc/com/codename1/components/InfiniteScrollAdapter.html)  

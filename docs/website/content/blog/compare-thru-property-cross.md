@@ -59,7 +59,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Chidiebere Okwudire says:
 >
-> Thanks for your response. It surprises me that there are not much objective comparisons in the dimensions that arguably matter most, some of which I’ve mentioned above (user experience, performance, costs). I know it’s not easy but it’s definitely possible albeit in a somewhat “academic” fashion.
+> Thanks for your response. It surprises me that there are not much objective comparisons in the dimensions that arguably matter most, some of which I’ve mentioned above (user experience, performance, costs). I know it’s not easy but it’s definitely possible albeit in a somewhat "academic" fashion.
 >
 > PropertyCross is one of the best initiatives I’ve found in this regard though it only scratches the surface and as you’ve mentioned, the maintainers are not as responsive as one would like. Apparently, they find it more important to change the layout of their homepage instead of incorporating the CN1 comparison (and other pending pull requests?)!
 >

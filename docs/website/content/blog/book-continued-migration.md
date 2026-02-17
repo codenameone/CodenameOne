@@ -24,7 +24,7 @@ We hope many of you purchase this book, if there is interest in it then it might
 #### App Engine Migration Part III
 
 This is going to be a long and winding saga covering the migration process of our backend servers from App Engine  
-to a more “hands on” architecture. The build servers storage aspect already migrated to S3 and seem to be functioning  
+to a more "hands on" architecture. The build servers storage aspect already migrated to S3 and seem to be functioning  
 reasonably well. We are now setting our focus on several different features, the first of which is  
 [crash reporting](/how-do-i---use-crash-protection-get-device-logs.html). 
 

@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/why-bootcamp/full-stack-java-bootcamp.jpg)
 
-I was chatting with one of the bootcamp attendants on the one on one calls and he asked me a question that I didn’t think you’d care about but I’m guessing it would be interesting: “Why are you doing the bootcamp?”.  
+I was chatting with one of the bootcamp attendants on the one on one calls and he asked me a question that I didn’t think you’d care about but I’m guessing it would be interesting: "Why are you doing the bootcamp?".  
 I was so focused on explaining the benefit to you that I neglected to explain what Codename One will gain from this bootcamp.
 
 This is probably something I should have explained before we closed registration as it would have explained why I have no intention of doing another bootcamp ever again. Bootcamps are hard work, they don’t scale & [I need to take a lot of time off](/blog/changes-2017-milestones-dst-hotfix.html) to get it done.

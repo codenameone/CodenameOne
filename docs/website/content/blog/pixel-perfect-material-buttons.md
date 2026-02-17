@@ -69,7 +69,7 @@ There is also a round button which is used in grouping scenarios mostly. I don�
 
 Figure 6. Grouped iOS Button
 
-So both iOS and Android use a “flat” button by default and we should align based on that. We also need to provide a way to show the Android raised button but that’s a special case that doesn’t exist in iOS.
+So both iOS and Android use a "flat" button by default and we should align based on that. We also need to provide a way to show the Android raised button but that’s a special case that doesn’t exist in iOS.
 
 ### Action Items
 
@@ -134,7 +134,7 @@ We have several big and small things we need to refine and a couple of tasks men
 
 I hope I’ll be able to address at least some of these next week and this is where you come in…​
 
-It’s not enough to complain about something missing or not functioning. We need issues but we also need “actionable” issues. Issues that we can look at and instantly see what needs fixing, e.g. if a button has the wrong default color, font or padding you can just provide a screenshot of a native app next to a screenshot from a simple Codename One application as part of the issue. This helps us make such fixes quickly.
+It’s not enough to complain about something missing or not functioning. We need issues but we also need "actionable" issues. Issues that we can look at and instantly see what needs fixing, e.g. if a button has the wrong default color, font or padding you can just provide a screenshot of a native app next to a screenshot from a simple Codename One application as part of the issue. This helps us make such fixes quickly.
 
 The [issue tracker](http://github.com/codenameone/CodenameOne/issues/) is the best place for these things. We appreciate comments here and please do comment, but these things get lost. Once an issue is assigned to a milestone it might get postponed but it won’t be forgotten. So if you think Codename One can use a facelift, please help us pull that off!
 ---
@@ -171,7 +171,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > What I’m saying is that design guidelines wouldn’t exist if there was a technical possibility to make them seamless. We currently bring you to a point of portability but we can bring you closer in terms of look (which is what this article is about).
 >
-> You already have your own theme, I’m saying you should pay attention to design and not just expect it to “look good” without any conscious effort on your part.
+> You already have your own theme, I’m saying you should pay attention to design and not just expect it to "look good" without any conscious effort on your part.
 >
 
 

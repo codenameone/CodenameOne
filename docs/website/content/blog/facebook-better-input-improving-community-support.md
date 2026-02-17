@@ -23,7 +23,7 @@ author: Shai Almog
 Facebook has changed the rules yet again, this time related to logging in to Facebook from 3rd party applications. Up until now we used the web based OAuth approach for logging into Facebook since that allowed us to keep the same implementation across Android, iOS, Blackberry etc. without changing anything. However, the new Facebook 2 factor authentication is a very complex process and Facebook really went overboard with a very elaborate mobile API. 
 
   
-So we had no choice but to integrate the native Facebook SDK when necessary (you will not “pay for it” if you don’t use it). This is currently in beta so the API is very likely to change which is why we are not docume  
+So we had no choice but to integrate the native Facebook SDK when necessary (you will not "pay for it" if you don’t use it). This is currently in beta so the API is very likely to change which is why we are not docume  
   
 nting it yet by writing a proper tutorial. This isn’t essential yet since the current Facebook API is still working and well documented. If you would like to take a look its within the social package, we would appreciate feedback, ideas and use cases.
 
@@ -65,7 +65,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Anonymous says:
 >
-> Can you elaborate on this line: (you will not “pay for it” if you don’t use it) 
+> Can you elaborate on this line: (you will not "pay for it" if you don’t use it) 
 >
 > Any idea on how much this will cost to use?
 >

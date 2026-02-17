@@ -50,7 +50,7 @@ at large.
 
 ### What’s Next?
 
-We will probably refine this process as it matures e.g. add more tagging based UI and make an “uninstall”  
+We will probably refine this process as it matures e.g. add more tagging based UI and make an "uninstall"  
 process as well…​
 
 However, this depends a lot on your involvement & feedback so let us know what you think and take part in the  
@@ -90,7 +90,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Notice that this isn’t the “actual” version number. It’s the version in our repo which is an integer. We use this to determine if there is an update only and this isn’t displayed to the user… So the number is fine in that sense.
+> Notice that this isn’t the "actual" version number. It’s the version in our repo which is an integer. We use this to determine if there is an update only and this isn’t displayed to the user… So the number is fine in that sense.
 
 
 ### **Chidiebere Okwudire** — June 17, 2016 at 8:30 am ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-22817))
@@ -113,7 +113,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Jérémy MARQUER says:
 >
-> Hey. I cannot access to the new Preferences UI of CN1 with eclipse. My cn1 plugin version is “1.0.0.201608062027”. Thanks.
+> Hey. I cannot access to the new Preferences UI of CN1 with eclipse. My cn1 plugin version is "1.0.0.201608062027". Thanks.
 
 
 ### **Shai Almog** — August 10, 2016 at 5:37 am ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-22470))
@@ -130,8 +130,8 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Jérémy MARQUER says:
 >
 > On a PC. Yes sure, I launch Eclipse with this flag  
-> “-vm  
-> C:/Program Files/Java/jre1.8.0_77/bin/javaw.exe”
+> "-vm  
+> C:/Program Files/Java/jre1.8.0_77/bin/javaw.exe"
 
 
 ### **Shai Almog** — August 11, 2016 at 4:41 am ([permalink](/blog/automatically-install-update-distribute-cn1libs-extensions/#comment-21456))

@@ -74,7 +74,7 @@ It’s a transition that morphs a component into another component using a circu
 The `BubbleTransition` accepts the component that will grow into the bubble effect as one of its arguments. It’s generally  
 designed for `Dialog` transitions although it could work for more creative use cases:
 
-__ |  The code below manipulates styles and look. This is done to make the code more “self contained”. Real world code should probably use the theme   
+__ |  The code below manipulates styles and look. This is done to make the code more "self contained". Real world code should probably use the theme   
 ---|---  
       
     
@@ -147,7 +147,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > This is part of the library not the plugin core. Libraries get updated every Friday since last Friday.
 >
-> So it’s already in although we made some improvements to the implementation which will go in this Friday. To get this just use “Update Client Libs” in the Codename One section in the preferences.
+> So it’s already in although we made some improvements to the implementation which will go in this Friday. To get this just use "Update Client Libs" in the Codename One section in the preferences.
 >
 
 

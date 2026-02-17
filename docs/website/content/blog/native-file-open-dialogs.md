@@ -17,7 +17,7 @@ Codename One has always provided access to the device’s photos and videos via 
 
 I recently developed an app that provided optical character recognition (OCR) on images and PDFs. As you might expect, an app like this needs to allow the user to select a PDF or an image to be converted by some mechanism. Using `Display.openGallery()` I could present the user with access to their images, but I also needed them to be able to select PDFs. The [cn1-filechooser library](https://github.com/shannah/cn1-filechooser) comes to the rescue in this case:
 
-After installing the cn1-filechooser library into my project, I added the following snippet to respond to the event where the user taps the “open” button:
+After installing the cn1-filechooser library into my project, I added the following snippet to respond to the event where the user taps the "open" button:
     
     
     ActionListener callback = e->{
@@ -50,7 +50,7 @@ When you open the file chooser it gives you a list of your device’s installed 
 
 In my case I have my iCloud drive (everyone will have this), and Dropbox because I have the Dropbox app installed on my phone. But if you have other apps have DocumentProvider extensions, then those will also be listed.
 
-It also includes an “Images” option that allows the user to browse their local images if they have included any “image” types in the call to `showOpenDialog()`
+It also includes an "Images" option that allows the user to browse their local images if they have included any "image" types in the call to `showOpenDialog()`
 
 __ |  On iOS, your App ID **must** include the iCloud entitlement, so, when you create your app ID in your apple developer account, make sure that you check this option.   
 ---|---  
@@ -96,7 +96,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > for the FileChooser, how do I make it so that it takes all types of file ?  
 > (instead of just the one listed in the param in example below)
 >
-> com.codename1.ext.filechooser.FileChooser.showOpenDialog(“.pdf,application/pdf,.gif,image/gif,.png,image/png,.jpg,image/jpg,.tif,image/tif,.jpeg”, callback);
+> com.codename1.ext.filechooser.FileChooser.showOpenDialog(".pdf,application/pdf,.gif,image/gif,.png,image/png,.jpg,image/jpg,.tif,image/tif,.jpeg", callback);
 >
 > Also I tried it in Simulator and real Android devices (OnePlus2, Nexus 5) and FileChooser.isAvailable() return false …. ?
 >
@@ -105,11 +105,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **shannah78** — November 18, 2016 at 5:45 pm ([permalink](/blog/native-file-open-dialogs/#comment-23095))
 
-> Use “*/*” for all mimetypes. Or.. you should be able to just pass null for the type.
+> Use "*/*" for all mimetypes. Or.. you should be able to just pass null for the type.
 >
 > Regarding it returning false in the simulator and on real android devices, there must be a problem in your project’s build.xml file. I’ve responded to your query in Codename One support.
 >
-> EDIT: I found that there is a bug in the current release. The Simulator doesn’t support “ALL” mimetypes right now. I have made some modifications, but it required changes in both the cn1 core and the lib. They’ll be available in the next plugin update. The cn1-filechooser extension is already updated, and all required changes are on GitHub. To get them before the next plugin update, you’ll need to build CN1 from source and use the modified JavaSE.jar in your project.
+> EDIT: I found that there is a bug in the current release. The Simulator doesn’t support "ALL" mimetypes right now. I have made some modifications, but it required changes in both the cn1 core and the lib. They’ll be available in the next plugin update. The cn1-filechooser extension is already updated, and all required changes are on GitHub. To get them before the next plugin update, you’ll need to build CN1 from source and use the modified JavaSE.jar in your project.
 >
 
 
@@ -117,7 +117,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 ### **Stefan Blomen** — January 18, 2017 at 11:33 am ([permalink](/blog/native-file-open-dialogs/#comment-23189))
 
 > 1.) The UWP build fails if FileChooser is used  
-> 2.) On some versions of Android (maybe < 5) files with extensions unknwon to the system (i.e. “[test.abc](<http://test.abc>)”) cannot be opened. The ActionEvent is null in this case. I tried several mime types including “*/*”. On an Android device with version 7 it works. Any clues?
+> 2.) On some versions of Android (maybe < 5) files with extensions unknwon to the system (i.e. "[test.abc](<http://test.abc>)") cannot be opened. The ActionEvent is null in this case. I tried several mime types including "*/*". On an Android device with version 7 it works. Any clues?
 >
 
 
@@ -126,11 +126,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > shannah78 says:
 >
-> “The UWP build fails if FileChooser is used”
+> "The UWP build fails if FileChooser is used"
 >
 > I have a couple of UWP apps using the file chooser, and they seem to build and work OK. Please open an issue on this and include a simple test case that I can try.
 >
-> “On some versions of Android (maybe < 5) files with extensions unknwon to the system (i.e. “[test.abc](<http://test.abc>)”) cannot be opened. ”
+> "On some versions of Android (maybe < 5) files with extensions unknwon to the system (i.e. "[test.abc](<http://test.abc>)") cannot be opened. "
 >
 > Please open an issue on this too so it won’t get lost. All of my test cases so far were for common extensions.
 >
@@ -151,7 +151,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > Shai Almog says:
 >
 > No.  
-> Mobile devices don’t allow that. Notice that if you receive a file from this chooser it might not be the “actual file” you picked but rather a copy of it within the area that your app is allowed to access.
+> Mobile devices don’t allow that. Notice that if you receive a file from this chooser it might not be the "actual file" you picked but rather a copy of it within the area that your app is allowed to access.
 >
 
 

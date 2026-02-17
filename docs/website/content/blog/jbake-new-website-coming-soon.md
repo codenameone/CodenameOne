@@ -35,7 +35,7 @@ Another plus is that the community is very open and supportive which is hugely i
 
 Currently the only struggle is in migrating everything over since our existing CMS really made a mess of all the data and I still have no idea how we will migrate the old blog comments… 
 
-Since JBake doesn’t have a logo file I chose to include a “teaser” to the  
+Since JBake doesn’t have a logo file I chose to include a "teaser" to the  
 [JavaScript port of Codename One](http://www.codenameone.com/blog/web-app-build-target)…
 
 ---

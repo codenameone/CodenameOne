@@ -95,7 +95,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 ### **Francesco Galgani** — December 8, 2018 at 11:14 am ([permalink](/blog/button-lists/#comment-24102))
 
-> Great! However, in this example, there is an issue: the “Add Option” works fine with iOS skin, but it doesn’t work as expected on Android skin (because it’s necessary to change the layout to see the new added Button). I done tests with “[iPhoneX.skin](<http://iPhoneX.skin>)” and “[GooglePixel2.skin](<http://GooglePixel2.skin>)”
+> Great! However, in this example, there is an issue: the "Add Option" works fine with iOS skin, but it doesn’t work as expected on Android skin (because it’s necessary to change the layout to see the new added Button). I done tests with "[iPhoneX.skin](<http://iPhoneX.skin>)" and "[GooglePixel2.skin](<http://GooglePixel2.skin>)"
 >
 
 

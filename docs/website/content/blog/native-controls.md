@@ -70,7 +70,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Ch Hjelm says:
 >
-> Hi, I tried to use this (I use a local copy of CN1 source, but updated yesterday, I used NTextField in my code, run “refresh cn1lib files”), but I get this error message:
+> Hi, I tried to use this (I use a local copy of CN1 source, but updated yesterday, I used NTextField in my code, run "refresh cn1lib files"), but I get this error message:
 >
 > ` error: cannot find symbol 
 >
@@ -98,7 +98,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Ch Hjelm says:
 >
-> Thanks Steve, I’ve done a clean build, but it doesn’t help. The library is in /lib as it should be, but when I run the “refresh cn1lib files” I get the below errors.
+> Thanks Steve, I’ve done a clean build, but it doesn’t help. The library is in /lib as it should be, but when I run the "refresh cn1lib files" I get the below errors.
 >
 > `Compiling 2 source files to /Users/user1/NetBeansProjects/myapp/native/internal_tmp  
 > /Users/user1/NetBeansProjects/myapp/lib/impl/native/javase/com/codename1/nui/NSelectNativeImpl.java:38: error: cannot find symbol  

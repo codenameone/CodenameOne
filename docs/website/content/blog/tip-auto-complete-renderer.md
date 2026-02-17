@@ -11,19 +11,19 @@ author: Shai Almog
 
 ![Header Image](/blog/tip-auto-complete-renderer/tip.jpg)
 
-I’m a bit conflicted about this tip. The `AutoCompleteTextField` is a problematic class that is in dire need of a rewrite. When we created it we still didn’t accept that [lists “need to go”](/blog/avoiding-lists.html). It also predated features like the `InteractionDialog` which would have made this component much easier to use.
+I’m a bit conflicted about this tip. The `AutoCompleteTextField` is a problematic class that is in dire need of a rewrite. When we created it we still didn’t accept that [lists "need to go"](/blog/avoiding-lists.html). It also predated features like the `InteractionDialog` which would have made this component much easier to use.
 
 **Check out a live preview of the demo on the right here thanks to our JavaScript port!**
 
 However, we have other priorities and rewriting `AutoCompleteTextField` isn’t even in the top 100…​ So we need to still live with it and with the renderer that it exposes.
 
-One question I got a few times is “How do you customize the results of the auto complete field”?
+One question I got a few times is "How do you customize the results of the auto complete field"?
 
 This sounds difficult to most people as we can only work with Strings so how do we represent additional data or format the date correctly?
 
 The answer is actually pretty simple, we still need to work with Strings because auto-complete is first and foremost a text field. However, that doesn’t preclude our custom renderer from fetching data that might be placed in a different location and associated with the result.
 
-The source below is annotated with a few comments below and you can see the “full repository” (which isn’t much more than that) [in github](https://github.com/codenameone/AutoCompleteWithImages).
+The source below is annotated with a few comments below and you can see the "full repository" (which isn’t much more than that) [in github](https://github.com/codenameone/AutoCompleteWithImages).
     
     
     final String[] characters = { "Tyrion Lannister", "Jaime Lannister", "Cersei Lannister", "Daenerys Targaryen",

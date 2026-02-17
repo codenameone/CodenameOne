@@ -16,7 +16,7 @@ of those API’s I didn’t know I needed and yet I became addicted to it…​
 Ever since Steve came out with the ToastBar I constantly catch myself typing `Display.show` only to delete that  
 to use the `ToastBar`. It’s both really easy to use and more consistent with modern mobile UI design.
 
-As a replacement for `Dialog` it really needed the static “show methods”, so we added a simpler `showErrorMessage`  
+As a replacement for `Dialog` it really needed the static "show methods", so we added a simpler `showErrorMessage`  
 which combined the `ToastBar` with the material font icons to create a proper error message. This allowed us to  
 show an error message with a single line of code, but these things shouldn’t be used only for errors which is  
 why we just added two new static methods: `showMessage(String msg, char icon, int timeout)` &  
@@ -55,7 +55,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Chris says:
 >
-> Thanks for the info. ToastBar.showErrorMessage() is displaying with empty box as image( ” ! ” mark in the example) instead of actual image in the front of the message. Something has been changed recently.
+> Thanks for the info. ToastBar.showErrorMessage() is displaying with empty box as image( " ! " mark in the example) instead of actual image in the front of the message. Something has been changed recently.
 
 
 ### **Shai Almog** — June 13, 2017 at 5:21 am ([permalink](/blog/toastbar-messages/#comment-23385))

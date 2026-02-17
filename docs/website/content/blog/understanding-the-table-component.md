@@ -46,7 +46,7 @@ Figure 1. Simple Table usage
 __ |  In the sample above the title area and first column aren’t editable. The other two columns are editable.   
 ---|---  
   
-The more “interesting” aspects of the `Table` class can be achieved via the `TableLayout`. You can use the layout constraints (also exposed in the table class) to create spanning and elaborate UI’s.
+The more "interesting" aspects of the `Table` class can be achieved via the `TableLayout`. You can use the layout constraints (also exposed in the table class) to create spanning and elaborate UI’s.
 
 E.g.:
     
@@ -79,7 +79,7 @@ E.g.:
 
 Figure 2. Table with spanning & fixed widths to 33%
 
-In order to customize the table cell behavior you can derive the `Table` to create a “renderer like” widget, however unlike the list this component is “kept” and used as is. This means you can bind listeners to this component and work with it as you would with any other component in Codename One.
+In order to customize the table cell behavior you can derive the `Table` to create a "renderer like" widget, however unlike the list this component is "kept" and used as is. This means you can bind listeners to this component and work with it as you would with any other component in Codename One.
 
 So lets fix the example above to include far more capabilities:
     
@@ -118,12 +118,12 @@ So lets fix the example above to include far more capabilities:
         }
     };
 
-__**1** | The `createCell` method is invoked once per component but is similar conceptually to the `List` renderer. Notice that it doesn’t return a “rubber stamp” though, it returns a full component.  
+__**1** | The `createCell` method is invoked once per component but is similar conceptually to the `List` renderer. Notice that it doesn’t return a "rubber stamp" though, it returns a full component.  
 ---|---  
 __**2** | We only apply the picker to one cell for simplicities sake.  
-__**3** | We need to set the value of the component manually, this is crucial since the `Table` doesn’t “see” this.  
+__**3** | We need to set the value of the component manually, this is crucial since the `Table` doesn’t "see" this.  
 __**4** | We need to track the event and update the model in this case as the `Table` isn’t aware of the data change.  
-__**5** | We set the “pinstripe” effect by coloring even rows. Notice that unlike renderers we only need to apply the coloring once as the `Components` are stateful.  
+__**5** | We set the "pinstripe" effect by coloring even rows. Notice that unlike renderers we only need to apply the coloring once as the `Components` are stateful.  
   
 ![Table with customize cells using the pinstripe effect](/blog/understanding-the-table-component/components-table-pinstripe.png)
 

@@ -24,12 +24,12 @@ or false to disable this. This is a big change so keep your eyes open to regress
 #### Performance Overhaul
 
 We used to always laugh at the Android team for whining over how difficult it is to optimize Android for devices with  
-“only” 64mb of RAM. We can work on devices that have 2mb of RAM and leave room to spare!  
+"only" 64mb of RAM. We can work on devices that have 2mb of RAM and leave room to spare!  
 The performance of Codename One has always been exceptional in this regard because we just didn’t have a choice  
 when running on feature phones. This was pretty true for quite a while but with recent changes to the underlying  
 implementation of Android basic things that were quite performant became slow so we had to replace the pipeline. 
 
-Android itself finally invested some effort in performance with their “project butter” and as a result the level of  
+Android itself finally invested some effort in performance with their "project butter" and as a result the level of  
 smoothness on newer Android devices is spectacular. Unfortunately, we haven’t kept up with that. Worse our  
 scrolling behavior was something we designed at Sun based on guesses of how the iPhone scrolling acts. These  
 guesses weren’t as good as some of the newer attempts in this field. 

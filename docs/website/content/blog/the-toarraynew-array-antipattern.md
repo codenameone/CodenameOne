@@ -29,25 +29,25 @@ A recent issue in the issue tracker on the new iOS VM reminded me of a serious p
 
 If you have a collection and you want to convert it to an array you can do something like:  
   
-Object[] myArray = c.toArray();
+`Object[] myArray = c.toArray();`
 
 Unfortunately, this will always be an array of objects and not of your desired type… So if the collection is one of String you would really want to do something like:  
   
-String[] array = new String[c.size()];  
+`String[] array = new String[c.size()];`  
   
 c.toArray(array);
 
 This works great but takes two lines… Which is why you can also do something like this:  
   
-String[] array = (String[])c.toArray(new String[c.size()]);
+`String[] array = (String[])c.toArray(new String[c.size()]);`
 
 So far so good… The problem is that this also works:  
   
-String[] array = (String[])c.toArray(new String[0]);
+`String[] array = (String[])c.toArray(new String[0]);`
 
 It will produce an array response that is equal to the size of c and is of type String[] and not Object[]. This will fail on the new iOS VM and should really never be used…
 
-Java usually takes the approach of “fail fast”, which means that if code fails it should do so ASAP and not “try to recover” which might cause bugs to remain hidden. This isn’t such a case.
+Java usually takes the approach of "fail fast", which means that if code fails it should do so ASAP and not "try to recover" which might cause bugs to remain hidden. This isn’t such a case.
 
 If the array past to the toArray method is too small, the code has a fallback. The problem is that the fallback is REALLY bad!  
   
@@ -55,7 +55,7 @@ It uses reflection to detect the array type and allocate a whole new array. This
   
 String[] array = (String[])c.toArray(new String[  
 **  
-c.size()  
+`c.size()`  
 **  
 ]);
 
@@ -87,7 +87,7 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 >
 > You are aware I worked for Sun and did quite a bit of JIT development 😉
 >
-> I am fully aware of what a high end JIT can do to code that’s repeated often. We are talking AOT mobile device compilation where those aren’t an option… Generally I don’t see a reason to “force” a JIT to do work, if I can write the original code correctly for the first pass of the JIT rather than just being lazy and passing 0 why not do that?
+> I am fully aware of what a high end JIT can do to code that’s repeated often. We are talking AOT mobile device compilation where those aren’t an option… Generally I don’t see a reason to "force" a JIT to do work, if I can write the original code correctly for the first pass of the JIT rather than just being lazy and passing 0 why not do that?
 >
 > Notice that newer versions of the JVM are talking about new language features such as the ability to use generics efficiently with primitives. This would also pose a problem with relying on behaviors like this…
 
@@ -103,11 +103,11 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 
 > Shai Almog says:
 >
-> Its interesting to read but I disagree with the conclusion as it hinges on micro-benchmarks which often give a wrong impression especially with a JIT as “insane” as hotspot.
+> Its interesting to read but I disagree with the conclusion as it hinges on micro-benchmarks which often give a wrong impression especially with a JIT as "insane" as hotspot.
 >
 > One thing that does make a lot of sense is that toArray without arguments is the fastest and that’s probably the best tip you can get here as it makes sense performance wise.
 >
-> Since hotspot takes a while to “warmup” and would do it for every call you make to toArray() I’m not so sure if this would still perform as nicely in real world scenarios. Every JIT engineer I know would recommend that you write code that is “correct” rather than optimize to a JIT. To me allocating a 0 size array as a “hint” is incorrect code and it does perform slower on anything other than a fully optimized hotspot path.
+> Since hotspot takes a while to "warmup" and would do it for every call you make to toArray() I’m not so sure if this would still perform as nicely in real world scenarios. Every JIT engineer I know would recommend that you write code that is "correct" rather than optimize to a JIT. To me allocating a 0 size array as a "hint" is incorrect code and it does perform slower on anything other than a fully optimized hotspot path.
 
 ---
 

@@ -39,10 +39,10 @@ _This post was automatically migrated from the legacy Codename One blog. The ori
 > MultiBtn.setTextLines(textline1,textline2,textline3,textline4);
 >
 > i keep doing this a lot:  
-> MultiBtn.setTextLine1(“name”);  
-> MultiBtn.setTextLine2(“address”);  
-> MultiBtn.setTextLine3(“city”);  
-> MultiBtn.setTextLine4(“phonenumber”);
+> MultiBtn.setTextLine1("name");  
+> MultiBtn.setTextLine2("address");  
+> MultiBtn.setTextLine3("city");  
+> MultiBtn.setTextLine4("phonenumber");
 >
 > Just a thought, dont know if it already exists, but havent found it.  
 > P.S.- I know i should get my feet wet…but lets go one step at a time

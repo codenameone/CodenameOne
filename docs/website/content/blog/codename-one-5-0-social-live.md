@@ -11,7 +11,7 @@ author: Shai Almog
 
 ![Header Image](/blog/codename-one-5-0-social-live/codenameone-5-release-banner.jpg)
 
-We are thrilled to announce the release of [Codename One](https://www.codenameone.com/) 5.0 – Social. Codename One is an open source “Write Once Run Anywhere” mobile platform for Java and Kotlin developers!  
+We are thrilled to announce the release of [Codename One](https://www.codenameone.com/) 5.0 – Social. Codename One is an open source "Write Once Run Anywhere" mobile platform for Java and Kotlin developers!  
 We postponed the release of this version since it’s so packed with big changes. We made CSS a first class citizen in Codename One and made CSS updates live (no recompile necessary). We moved from screenshots in iOS launches to storyboards. Added support for newer JDK’s. Migrated to Android API level 27. Moved our entire build server infrastructure. Redid push notification and so much more…​
 
 There is SO MUCH more, check out the details below.

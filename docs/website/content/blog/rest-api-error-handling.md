@@ -18,7 +18,7 @@ If you are unfamiliar with the `Rest` API check out this [older post](/blog/ters
 Another inherent problem which we ran into was processing errors differently. E.g. I have a JSON webservice but an error might return a String instead of JSON. With the existing API there was no way of handling this.
 
 This mostly impacted the asynchronous calls but was a problem with the synchronous calls too. Another problem was the `SuccessCallback` interface used through the API. In itself it’s fine but the callback method is named: `onSucess` which somehow slipped through…​  
-Unfortunately fixing interfaces is nearly impossible so we had to add a new interface [OnComplete](https://github.com/codenameone/CodenameOne/blob/master/CodenameOne/src/com/codename1/util/OnComplete.java). Like the [SuccessCallback](https://github.com/codenameone/CodenameOne/blob/master/CodenameOne/src/com/codename1/util/SuccessCallback.java) the interface is “lambda friendly” by featuring only one method.
+Unfortunately fixing interfaces is nearly impossible so we had to add a new interface [OnComplete](https://github.com/codenameone/CodenameOne/blob/master/CodenameOne/src/com/codename1/util/OnComplete.java). Like the [SuccessCallback](https://github.com/codenameone/CodenameOne/blob/master/CodenameOne/src/com/codename1/util/SuccessCallback.java) the interface is "lambda friendly" by featuring only one method.
 
 ### A Word About Deprecation
 

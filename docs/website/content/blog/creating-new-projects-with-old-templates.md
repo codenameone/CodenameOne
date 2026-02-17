@@ -17,7 +17,7 @@ Learn how to convert the old Codename One "ANT" project structure demos to Maven
 
 Since migrating to Maven, the recommended way to create a new Codename One project is using the [Codename One initializr](https://start.codenameone.com/) tool. It will generate a fresh, new Maven project for you based on a template of your choosing. In order to **not** overwhelm you, we have thus far kept the template selections in this tool to a minimum. At the time of this writing you can choose one of:
 
-1. ****Bare-bones template****: This will set you up with a simple “hello world” app, that you can customize as required. This is available in both Java and Kotlin flavours.
+1. ****Bare-bones template****: This will set you up with a simple "hello world" app, that you can customize as required. This is available in both Java and Kotlin flavours.
   
   
 2. ****GRUB****: A complete sample restaurant delivery app. (Java only)  
@@ -35,7 +35,7 @@ Figure 1. Demos listed in the Codename One demos section.
 
 Many other demos can be found amongst our [GitHub repositories](https://github.com/orgs/codenameone/repositories?q=demo&type=all&language=&sort=), and there are a smattering of older demos in the [codenameone-demos repository](https://github.com/codenameone/codenameone-demos) as well.
 
-Most of these use the old “ANT” project structure, so they require some surgery to convert them to the modern Maven structure. In this article I will describe how to convert these demos to Maven projects using the Maven Migration Tool.
+Most of these use the old "ANT" project structure, so they require some surgery to convert them to the modern Maven structure. In this article I will describe how to convert these demos to Maven projects using the Maven Migration Tool.
 
 ### Step 1: Install the Codename One Maven Migration Tool
 
@@ -51,7 +51,7 @@ Once you have installed the migration tool, you should download the demo project
 
 Figure 2. The MSUIKit demo
 
-You can download this demo by clicking the [Source link](https://github.com/codenameone/MaterialScreensUIKit), then click the “Code” menu in the upper right, and select “Download ZIP”.
+You can download this demo by clicking the [Source link](https://github.com/codenameone/MaterialScreensUIKit), then click the "Code" menu in the upper right, and select "Download ZIP".
 
 ![](/blog/creating-new-projects-with-old-templates/download-zip.png)
 
@@ -65,21 +65,21 @@ Open up the Maven migration tool application that you installed in Step 1.
 
 Figure 3. The Maven migration tool window
 
-You can select the project you want to convert by pressing the “Browse…​” button next to the “Source Project Path” field. Then select the “MaterialScreensUIKit” directory in the **file** dialog.
+You can select the project you want to convert by pressing the "Browse…​" button next to the "Source Project Path" field. Then select the "MaterialScreensUIKit" directory in the **file** dialog.
 
-After you have selected this project, the migration tool form should be updated to reveal fields to edit the “Main Class Name”, and “Package Name”. They will be pre-populated with the original values from the project you are migrating, but you can change these values as appropriate for your application.
+After you have selected this project, the migration tool form should be updated to reveal fields to edit the "Main Class Name", and "Package Name". They will be pre-populated with the original values from the project you are migrating, but you can change these values as appropriate for your application.
 
 ![](/blog/creating-new-projects-with-old-templates/migration-tool-2.png) 
 
 Figure 4. The "App Details" section allows you to enter a package name and Main class name for your application.
 
-Before moving on, you should check that the “Destination Directory” field is set to the location where you want your new project to be saved.
+Before moving on, you should check that the "Destination Directory" field is set to the location where you want your new project to be saved.
 
-If all of your settings look good, press the “Create Project” button. After about ten seconds, you should see a message indicating that your project was created successfully.
+If all of your settings look good, press the "Create Project" button. After about ten seconds, you should see a message indicating that your project was created successfully.
 
 ![](/blog/creating-new-projects-with-old-templates/success.png)
 
-When you click the “OK” button, it should open Finder (Mac) or Explorer (Windows) to the directory where the project was saved. You can now proceed to open this project in your preferred IDE. Personally I recommend IntelliJ, but NetBeans, Eclipse, and VSCode should all work fine also. For this article, I will use IntelliJ.
+When you click the "OK" button, it should open Finder (Mac) or Explorer (Windows) to the directory where the project was saved. You can now proceed to open this project in your preferred IDE. Personally I recommend IntelliJ, but NetBeans, Eclipse, and VSCode should all work fine also. For this article, I will use IntelliJ.
 
 ### Step 4: Open the Project in your IDE
 
@@ -93,15 +93,15 @@ idea
 			
 ```
 
-Alternatively, you can just open IntelliJ, and then use the “File” > “Open” menu to open the project directory.
+Alternatively, you can just open IntelliJ, and then use the "File" > "Open" menu to open the project directory.
 
-After the project opens, you should expand the “Maven” tab on the right side of the window to see all of the build targets available to you.
+After the project opens, you should expand the "Maven" tab on the right side of the window to see all of the build targets available to you.
 
 ![](/blog/creating-new-projects-with-old-templates/maven-sidebar.png) 
 
 Figure 5. The "Maven" side bar includes build targets available.
 
-You should also see these build targets listed in the “Run” menu on the toolbar. “Run in Simulator” will be selected by default. If you press the “Run” button on the toolbar, it should launch the project in the simulator as shown below:
+You should also see these build targets listed in the "Run" menu on the toolbar. "Run in Simulator" will be selected by default. If you press the "Run" button on the toolbar, it should launch the project in the simulator as shown below:
 
 ![](/blog/creating-new-projects-with-old-templates/simulator.png)
 
