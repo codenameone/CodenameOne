@@ -27,6 +27,13 @@
 /category / 301!
 /category/* / 301!
 
+# Generic legacy root page URLs from WordPress
+# Keep after specific retirements above so those continue to route to `/`.
+/blog.html /blog/ 301!
+/blog.html/ /blog/ 301!
+/:slug.html /:slug/ 301!
+/:slug.html/ /:slug/ 301!
+
 # Legacy blog URL shape: keep redirects host-relative so beta/staging stays on its own domain
 /blog/:slug.html /blog/:slug/ 301!
 /blog/:slug.html/ /blog/:slug/ 301!
