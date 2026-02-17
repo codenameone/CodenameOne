@@ -4,7 +4,13 @@
   <meta property="og:site_name" content="{{ . }}">
 {{- end }}
 
-{{- with or .Title site.Title site.Params.title | plainify }}
+{{- $ogTitle := "" -}}
+{{- if .IsHome -}}
+  {{- $ogTitle = (site.Params.homeTitle | default site.Title) -}}
+{{- else -}}
+  {{- $ogTitle = (or .Params.seoTitle .Title site.Title site.Params.title) -}}
+{{- end -}}
+{{- with $ogTitle | plainify }}
   <meta property="og:title" content="{{ . }}">
 {{- end }}
 

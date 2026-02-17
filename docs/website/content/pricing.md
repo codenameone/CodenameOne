@@ -3,6 +3,9 @@ title: "Pricing"
 date: 2020-09-02
 slug: "pricing"
 layout: "pricing"
+description: "Build unlimited number of cross-platform mobile apps with Java or Kotlin. No royalties, no restrictions!"
+keywords:
+  - "Codename One Pricing"
 ---
 
 ## FAQs
