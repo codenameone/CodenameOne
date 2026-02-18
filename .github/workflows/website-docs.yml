@@ -45,6 +45,11 @@ jobs:
         with:
           ruby-version: '3.3'
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Install Asciidoctor tooling
         run: |
           set -euo pipefail
@@ -71,6 +76,41 @@ jobs:
         env:
           WEBSITE_INCLUDE_JAVADOCS: "true"
           WEBSITE_INCLUDE_DEVGUIDE: "true"
+
+      - name: Validate redirects against local Pages runtime
+        run: |
+          set -euo pipefail
+          PORT=8788
+          cd docs/website
+          npx --yes wrangler@4 pages dev public \
+            --port "${PORT}" \
+            --ip 127.0.0.1 \
+            --compatibility-date=2026-02-18 > /tmp/wrangler-pages-dev.log 2>&1 &
+          WRANGLER_PID=$!
+          cleanup() {
+            kill "${WRANGLER_PID}" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          print_log_on_error() {
+            echo "wrangler pages dev log (tail):" >&2
+            tail -n 200 /tmp/wrangler-pages-dev.log >&2 || true
+          }
+          trap print_log_on_error ERR
+          for i in $(seq 1 60); do
+            if curl -sSf "http://127.0.0.1:${PORT}/" >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          if ! curl -sSf "http://127.0.0.1:${PORT}/" >/dev/null; then
+            echo "wrangler pages dev did not become ready on port ${PORT}" >&2
+            exit 1
+          fi
+          cd ../..
+          python3 scripts/website/test_redirects.py \
+            --base-url "http://127.0.0.1:${PORT}" \
+            --redirects-file docs/website/public/_redirects \
+            --skip-auto-cases
 
       - name: Validate internal links and images
         uses: lycheeverse/lychee-action@v2
