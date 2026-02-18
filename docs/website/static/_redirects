@@ -11,6 +11,9 @@
 /files/CodeNameOneBuildClient.jar https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar 302
 /files/developer-guide.pdf https://github.com/codenameone/CodenameOne/releases/latest/download/developer-guide.pdf 302
 /files/developer-guide.pdf/ https://github.com/codenameone/CodenameOne/releases/latest/download/developer-guide.pdf 302
+/developer-guide/ https://github.com/codenameone/CodenameOne/releases/latest/download/developer-guide.pdf 302
+/developer-guide.html https://github.com/codenameone/CodenameOne/releases/latest/download/developer-guide.pdf 302
+/developer-guide.html/ https://github.com/codenameone/CodenameOne/releases/latest/download/developer-guide.pdf 302
 
 # High-priority legacy URL redirects (Cloudflare)
 /videos.html /videos/ 301

@@ -69,6 +69,24 @@ REQUIRED_CASES = [
         ),
         label="required",
     ),
+    Case(
+        source="/developer-guide/",
+        expected_status=302,
+        expected_target=(
+            r"re:https://github\.com/codenameone/CodenameOne/releases/"
+            r"(latest/download|download/[^/]+)/developer-guide\.pdf"
+        ),
+        label="required",
+    ),
+    Case(
+        source="/developer-guide.html",
+        expected_status=302,
+        expected_target=(
+            r"re:https://github\.com/codenameone/CodenameOne/releases/"
+            r"(latest/download|download/[^/]+)/developer-guide\.pdf"
+        ),
+        label="required",
+    ),
 ]
 
 
