@@ -9,17 +9,15 @@
 /files/CN1Libs.xml/ https://raw.githubusercontent.com/codenameone/CodenameOneLibs/refs/heads/master/CN1Libs.xml 302
 /files/CodenameOneBuildClient.jar https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar 302
 /files/CodeNameOneBuildClient.jar https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar 302
-/files/developer-guide.pdf https://github.com/codenameone/CodenameOne/releases/latest/download/developer-guide.pdf 302
-/files/developer-guide.pdf/ https://github.com/codenameone/CodenameOne/releases/latest/download/developer-guide.pdf 302
-/developer-guide/ https://github.com/codenameone/CodenameOne/releases/latest/download/developer-guide.pdf 302
-/developer-guide.html https://github.com/codenameone/CodenameOne/releases/latest/download/developer-guide.pdf 302
-/developer-guide.html/ https://github.com/codenameone/CodenameOne/releases/latest/download/developer-guide.pdf 302
 
 # High-priority legacy URL redirects (Cloudflare)
 /videos.html /videos/ 301
 /videos.html/ /videos/ 301
 /video.html /videos/ 301
 /video.html/ /videos/ 301
+/developer-guide /developer-guide.html 301
+/developer-guide/ /developer-guide.html 301
+/developer-guide.html/ /developer-guide.html 301
 /blog.html /blog/ 301
 /blog.html/ /blog/ 301
 /contact-us.html / 301

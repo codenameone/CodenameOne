@@ -49,9 +49,11 @@ build_developer_guide_for_site() {
   local output_root="${REPO_ROOT}/build/website-developer-guide"
   local html_out="${output_root}/html"
   local manual_dir="${WEBSITE_DIR}/static/manual"
+  local guide_html_file="${WEBSITE_DIR}/static/developer-guide.html"
   local source_dir="${REPO_ROOT}/docs/developer-guide"
 
   rm -rf "${output_root}" "${manual_dir}"
+  rm -f "${guide_html_file}"
   mkdir -p "${html_out}" "${manual_dir}"
 
   (
@@ -64,6 +66,7 @@ build_developer_guide_for_site() {
   )
 
   cp "${html_out}/developer-guide.html" "${manual_dir}/index.html"
+  cp "${html_out}/developer-guide.html" "${guide_html_file}"
   # Keep assets next to /manual/index.html exactly where generated HTML resolves them.
   rsync -a \
     --exclude 'sketch/' \

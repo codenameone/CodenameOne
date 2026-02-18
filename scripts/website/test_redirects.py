@@ -64,27 +64,47 @@ REQUIRED_CASES = [
         source="/files/developer-guide.pdf",
         expected_status=302,
         expected_target=(
-            r"re:https://github\.com/codenameone/CodenameOne/releases/"
-            r"(latest/download|download/[^/]+)/developer-guide\.pdf"
+            r"re:(https://github\.com/codenameone/CodenameOne/releases/"
+            r"(latest/download|download/[^/]+)/developer-guide\.pdf|"
+            r"https://download\.codenameone\.com/developer-guide\.pdf)"
         ),
+        label="required",
+    ),
+    Case(
+        source="/manual",
+        expected_status=301,
+        expected_target="/developer-guide.html",
+        label="required",
+    ),
+    Case(
+        source="/manual/",
+        expected_status=301,
+        expected_target="/developer-guide.html",
+        label="required",
+    ),
+    Case(
+        source="/developer-guide",
+        expected_status=301,
+        expected_target="/developer-guide.html",
         label="required",
     ),
     Case(
         source="/developer-guide/",
-        expected_status=302,
-        expected_target=(
-            r"re:https://github\.com/codenameone/CodenameOne/releases/"
-            r"(latest/download|download/[^/]+)/developer-guide\.pdf"
-        ),
+        expected_status=301,
+        expected_target="/developer-guide.html",
         label="required",
     ),
     Case(
         source="/developer-guide.html",
-        expected_status=302,
-        expected_target=(
-            r"re:https://github\.com/codenameone/CodenameOne/releases/"
-            r"(latest/download|download/[^/]+)/developer-guide\.pdf"
-        ),
+        expected_status=200,
+        expected_target="",
+        label="required",
+        require_no_redirect=True,
+    ),
+    Case(
+        source="/developer-guide.html/",
+        expected_status=301,
+        expected_target="/developer-guide.html",
         label="required",
     ),
 ]
