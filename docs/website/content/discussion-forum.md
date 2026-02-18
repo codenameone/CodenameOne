@@ -4,31 +4,28 @@ date: 2020-09-12
 slug: "discussion-forum"
 ---
 
-- Home
-- Contact
-
 ## DISCUSSION FORUM
 
 ## Codename One engineers make sure all questions/queries have a response within 24 hours on business days.
 
-## Our Google Group is now deprecated.
+## Primary Community Support
 
-[Google Group](https://groups.google.com/g/codenameone-discussions/c/NoEjWDpJUKs)
+Use GitHub Discussions as the main place for community Q&A, troubleshooting, and feature discussions.
 
-## Join cn1 subreddit for open discussion and support.
+[Codename One GitHub Discussions](https://github.com/codenameone/CodenameOne/discussions)
 
-[Join r/cn1](https://www.reddit.com/r/cn1/)
+## Additional Community Channels (Secondary)
 
-## You can also ask questions on StackOverflow (and tag them as codenameone).
+Stack Overflow and Reddit are still available, but GitHub Discussions is the primary channel we monitor and recommend.
 
-[StackOverflow](https://stackoverflow.com/tags/codenameone)
+- [Stack Overflow (tag: codenameone)](https://stackoverflow.com/questions/tagged/codenameone)
+- [Reddit (r/cn1)](https://www.reddit.com/r/cn1/)
 
-- Home
-- Contact
+## Legacy Forums
 
-## DISCUSSION FORUM
+Our old Google Group is deprecated and kept only for historical context.
 
-## SUBSCRIBE TO OUR MONTHLY NEWSLETTER
+[Google Group (deprecated)](https://groups.google.com/g/codenameone-discussions/c/NoEjWDpJUKs)
 
 ## TWITTER
 
@@ -36,4 +33,4 @@ slug: "discussion-forum"
 
 ## OTHER RESOURCES
 
- [![](/uploads/JavaCodeGeek_Badge.png)](http://www.javacodegeeks.com/)[![](/uploads/dzone_mvb_button.jpg) ](https://www.dzone.com/)[STACKOVERFLOW](https://stackoverflow.com/tags/codenameone)
+ [![](/uploads/JavaCodeGeek_Badge.png)](http://www.javacodegeeks.com/)[![](/uploads/dzone_mvb_button.jpg) ](https://www.dzone.com/)[GitHub Discussions](https://github.com/codenameone/CodenameOne/discussions)
