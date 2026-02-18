@@ -8,7 +8,7 @@ export async function onRequest(context) {
   }
   if (path === "/developer-guide.html") {
     const guideUrl = new URL(url);
-    guideUrl.pathname = "/manual/";
+    guideUrl.pathname = "/developer-guide-content/";
     return context.next(new Request(guideUrl.toString(), context.request));
   }
 

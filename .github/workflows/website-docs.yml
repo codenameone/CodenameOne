@@ -151,6 +151,7 @@ jobs:
           set -euo pipefail
           test -f docs/website/public/_redirects
           test -f docs/website/public/developer-guide.html
+          test -f docs/website/public/developer-guide-content/index.html
           grep -Eq '^/files/developer-guide\.pdf https://github\.com/codenameone/CodenameOne/releases/download/.+/developer-guide\.pdf 302$' docs/website/public/_redirects
           grep -Eq '^/developer-guide /developer-guide\.html 301$' docs/website/public/_redirects
           grep -Eq '^/developer-guide/ /developer-guide\.html 301$' docs/website/public/_redirects
