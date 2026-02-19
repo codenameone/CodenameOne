@@ -68,7 +68,6 @@ build_developer_guide_for_site() {
       --require rouge \
       -a linkcss \
       -a copycss \
-      -a stylesheet=asciidoctor.css \
       -D "${html_out}" \
       -o developer-guide-full.html \
       docs/developer-guide/developer-guide.asciidoc
@@ -93,6 +92,14 @@ build_developer_guide_for_site() {
 
   if [ -f "${html_out}/asciidoctor.css" ]; then
     cp "${html_out}/asciidoctor.css" "${guide_dir}/asciidoctor.css"
+  elif command -v ruby >/dev/null 2>&1; then
+    ruby -rasciidoctor -e 'print Asciidoctor::Stylesheets.instance.primary_stylesheet_data' \
+      > "${guide_dir}/asciidoctor.css"
+  fi
+
+  if [ ! -s "${guide_dir}/asciidoctor.css" ]; then
+    echo "Asciidoctor stylesheet could not be generated for Developer Guide." >&2
+    exit 1
   fi
   # Keep guide assets under /developer-guide/ so relative image links (e.g. img/foo.png) resolve.
   rsync -a \

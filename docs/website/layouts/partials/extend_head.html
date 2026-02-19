@@ -3,8 +3,13 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 {{- if eq .Layout "developer-guide" -}}
-<link rel="stylesheet" href="/developer-guide/asciidoctor.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  {{- $asciidoctorCssPath := "static/developer-guide/asciidoctor.css" -}}
+  {{- if fileExists $asciidoctorCssPath -}}
+<style>
+{{ readFile $asciidoctorCssPath | safeCSS }}
+</style>
+  {{- end -}}
 {{- end -}}
 {{- with site.GetPage "section" "blog" -}}
   {{- with .OutputFormats.Get "RSS" -}}
