@@ -21,6 +21,14 @@ WEBSITE_INCLUDE_INITIALIZR="${WEBSITE_INCLUDE_INITIALIZR:-false}"
 CN1_USER="${CN1_USER:-}"
 CN1_TOKEN="${CN1_TOKEN:-}"
 
+if [ "${WEBSITE_INCLUDE_INITIALIZR}" = "auto" ]; then
+  if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
+    WEBSITE_INCLUDE_INITIALIZR="true"
+  else
+    WEBSITE_INCLUDE_INITIALIZR="false"
+  fi
+fi
+
 build_javadocs_for_site() {
   if [ "${WEBSITE_INCLUDE_JAVADOCS}" != "true" ]; then
     return

@@ -82,7 +82,7 @@ jobs:
         env:
           WEBSITE_INCLUDE_JAVADOCS: "true"
           WEBSITE_INCLUDE_DEVGUIDE: "true"
-          WEBSITE_INCLUDE_INITIALIZR: ${{ secrets.CN1_USER != '' && secrets.CN1_TOKEN != '' && 'true' || 'false' }}
+          WEBSITE_INCLUDE_INITIALIZR: "auto"
           CN1_USER: ${{ secrets.CN1_USER }}
           CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
 
@@ -92,10 +92,16 @@ jobs:
           test -f docs/website/public/initializr/index.html
 
       - name: Validate Initializr JS bundle output
-        if: ${{ secrets.CN1_USER != '' && secrets.CN1_TOKEN != '' }}
         run: |
           set -euo pipefail
-          test -f docs/website/public/initializr-app/index.html
+          if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
+            test -f docs/website/public/initializr-app/index.html
+          else
+            echo "CN1 credentials not configured; skipping Initializr JS bundle output validation."
+          fi
+        env:
+          CN1_USER: ${{ secrets.CN1_USER }}
+          CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
 
       - name: Validate redirects against local Pages runtime
         run: |
