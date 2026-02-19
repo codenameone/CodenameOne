@@ -34,11 +34,11 @@ jobs:
           hugo-version: 'latest'
           extended: true
 
-      - name: Set up Java 25
+      - name: Set up Java 8 for Initializr build
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: '8'
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -69,11 +69,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Set up Java 8 for Initializr build
+      - name: Set up Java 25 for website build
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '8'
+          java-version: '25'
 
       - name: Build website
         run: |
