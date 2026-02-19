@@ -1,13 +1,5 @@
 {{- define "main" -}}
 <article class="post-single post-single--developer-guide">
-  <header class="post-header">
-    <h1 class="post-title">{{ .Title }}</h1>
-    <div class="post-description">
-      {{ with .Description }}{{ . }}{{ else }}Codename One Developer Guide integrated into the website theme.{{ end }}
-      <a href="/files/developer-guide.pdf">Download PDF</a>
-    </div>
-  </header>
-
   <div class="post-content cn1-developer-guide" id="developer-guide">
     {{- $guideFragment := "generated/developer-guide-content.html" -}}
     {{- if fileExists $guideFragment -}}
