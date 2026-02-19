@@ -39,6 +39,8 @@ class Case:
     expected_target: str
     label: str
     require_no_redirect: bool = False
+    expected_final_status: int | None = None
+    expected_final_path: str | None = None
 
 
 @dataclasses.dataclass
@@ -73,38 +75,48 @@ REQUIRED_CASES = [
     Case(
         source="/manual",
         expected_status=301,
-        expected_target="/developer-guide.html",
+        expected_target="/developer-guide/",
+        expected_final_status=200,
+        expected_final_path="/developer-guide/",
         label="required",
     ),
     Case(
         source="/manual/",
         expected_status=301,
-        expected_target="/developer-guide.html",
+        expected_target="/developer-guide/",
+        expected_final_status=200,
+        expected_final_path="/developer-guide/",
         label="required",
     ),
     Case(
         source="/developer-guide",
         expected_status=301,
-        expected_target="/developer-guide.html",
+        expected_target="/developer-guide/",
+        expected_final_status=200,
+        expected_final_path="/developer-guide/",
         label="required",
     ),
     Case(
         source="/developer-guide/",
-        expected_status=301,
-        expected_target="/developer-guide.html",
-        label="required",
-    ),
-    Case(
-        source="/developer-guide.html",
         expected_status=200,
         expected_target="",
         label="required",
         require_no_redirect=True,
     ),
     Case(
+        source="/developer-guide.html",
+        expected_status=301,
+        expected_target="/developer-guide/",
+        label="required",
+        expected_final_status=200,
+        expected_final_path="/developer-guide/",
+    ),
+    Case(
         source="/developer-guide.html/",
         expected_status=301,
-        expected_target="/developer-guide.html",
+        expected_target="/developer-guide/",
+        expected_final_status=200,
+        expected_final_path="/developer-guide/",
         label="required",
     ),
 ]
@@ -205,6 +217,21 @@ def check_case(base_url: str, case: Case, timeout: float) -> CaseResult:
                 ok = status == case.expected_status and location_matches(
                     case.expected_target, location
                 )
+            if ok and case.expected_final_status is not None:
+                try:
+                    with urllib.request.urlopen(req, timeout=timeout) as final_resp:
+                        final_status = int(final_resp.getcode())
+                        final_url = final_resp.geturl()
+                    if final_status != case.expected_final_status:
+                        ok = False
+                    if ok and case.expected_final_path is not None:
+                        final_path_q = urllib.parse.urlunsplit(
+                            ("", "", urllib.parse.urlsplit(final_url).path, urllib.parse.urlsplit(final_url).query, "")
+                        )
+                        if final_path_q != case.expected_final_path:
+                            ok = False
+                except Exception:  # noqa: BLE001
+                    ok = False
             return CaseResult(
                 case=case,
                 ok=ok,
@@ -222,6 +249,21 @@ def check_case(base_url: str, case: Case, timeout: float) -> CaseResult:
             ok = status == case.expected_status and location_matches(
                 case.expected_target, location
             )
+        if ok and case.expected_final_status is not None:
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as final_resp:
+                    final_status = int(final_resp.getcode())
+                    final_url = final_resp.geturl()
+                if final_status != case.expected_final_status:
+                    ok = False
+                if ok and case.expected_final_path is not None:
+                    final_path_q = urllib.parse.urlunsplit(
+                        ("", "", urllib.parse.urlsplit(final_url).path, urllib.parse.urlsplit(final_url).query, "")
+                    )
+                    if final_path_q != case.expected_final_path:
+                        ok = False
+            except Exception:  # noqa: BLE001
+                ok = False
         return CaseResult(
             case=case,
             ok=ok,
