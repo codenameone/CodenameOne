@@ -1,0 +1,181 @@
+package com.codename1.initializr.model;
+
+import com.codename1.io.Util;
+import com.codename1.testing.AbstractTest;
+import com.codename1.util.StringUtil;
+import net.sf.zipme.ZipEntry;
+import net.sf.zipme.ZipInputStream;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+public class GeneratorModelMatrixTest extends AbstractTest {
+
+    @Override
+    public boolean runTest() throws Exception {
+        for (Template template : Template.values()) {
+            for (IDE ide : IDE.values()) {
+                validateCombination(template, ide);
+            }
+        }
+        return true;
+    }
+
+    private void validateCombination(Template template, IDE ide) throws Exception {
+        String mainClassName = "Demo" + template.ordinal() + ide.ordinal() + "App";
+        String packageName = "com.acme.t" + template.ordinal() + ".i" + ide.ordinal();
+
+        byte[] zipData = createProjectZip(ide, template, mainClassName, packageName);
+        Map<String, byte[]> entries = readZipEntries(zipData);
+
+        assertIdeFiles(ide, entries, mainClassName);
+        assertGitIgnore(entries);
+        assertRootPom(entries, packageName, mainClassName);
+        assertCommonPom(entries, template, packageName, mainClassName);
+        assertSettings(entries, template, packageName, mainClassName);
+        assertMainSourceFile(entries, template, packageName, mainClassName);
+        assertNoTemplatePlaceholders(entries, template);
+    }
+
+    private static byte[] createProjectZip(IDE ide, Template template, String appName, String packageName) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        GeneratorModel.create(ide, template, appName, packageName).writeProjectZip(output);
+        return output.toByteArray();
+    }
+
+    private static Map<String, byte[]> readZipEntries(byte[] zipData) throws IOException {
+        Map<String, byte[]> entries = new HashMap<String, byte[]>();
+        ByteArrayInputStream input = new ByteArrayInputStream(zipData);
+        ZipInputStream zis = new ZipInputStream(input);
+        try {
+            ZipEntry entry = zis.getNextEntry();
+            while (entry != null) {
+                if (!entry.isDirectory()) {
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                    Util.copyNoClose(zis, bos, 8192);
+                    entries.put(entry.getName(), bos.toByteArray());
+                    bos.close();
+                }
+                zis.closeEntry();
+                entry = zis.getNextEntry();
+            }
+        } finally {
+            zis.close();
+            input.close();
+        }
+        return entries;
+    }
+
+    private void assertIdeFiles(IDE ide, Map<String, byte[]> entries, String mainClassName) {
+        if (ide == IDE.INTELLIJ) {
+            assertNotNull(entries.get(".idea/workspace.xml"), "Missing IntelliJ workspace file");
+            return;
+        }
+        if (ide == IDE.ECLIPSE) {
+            assertNotNull(entries.get(mainClassName + " - Run Simulator.launch"), "Missing Eclipse launch file");
+            return;
+        }
+        if (ide == IDE.NETBEANS) {
+            assertNotNull(entries.get("nbactions.xml"), "Missing NetBeans actions file");
+            return;
+        }
+        if (ide == IDE.VS_CODE) {
+            assertNotNull(entries.get(".vscode/settings.json"), "Missing VS Code settings");
+        }
+    }
+
+    private void assertRootPom(Map<String, byte[]> entries, String packageName, String mainClassName) {
+        String pom = getText(entries, "pom.xml");
+        assertContains(pom, packageName, "Root pom should include package as groupId");
+        assertContains(pom, mainClassName.toLowerCase(), "Root pom should include app artifact/name");
+        assertContains(pom, "<cn1.plugin.version>7.0.224</cn1.plugin.version>", "Root pom should use current CN1 plugin version");
+        assertFalse(pom.indexOf("com.example.myapp") >= 0, "Root pom still contains placeholder package");
+        assertFalse(pom.indexOf("myappname") >= 0, "Root pom still contains placeholder app name");
+    }
+
+    private void assertCommonPom(Map<String, byte[]> entries, Template template, String packageName, String mainClassName) {
+        String pom = getText(entries, "common/pom.xml");
+        assertContains(pom, packageName, "Common pom should include package");
+        assertContains(pom, mainClassName.toLowerCase(), "Common pom should include app artifact");
+        assertContains(pom, "<artifactId>codenameone-javase</artifactId>", "Common pom should include codenameone-javase test dependency");
+        assertContains(pom, "<artifactId>serializer</artifactId>", "Common pom should include xalan serializer for CN1 generate-gui-sources");
+        assertContains(pom, "<version>2.7.3</version>", "Common pom should pin serializer version expected by CN1 plugin classpath");
+        if (template == Template.GRUB) {
+            assertContains(pom, "<artifactId>" + mainClassName.toLowerCase() + "-CodeRAD</artifactId>", "Grub common pom should include local CodeRAD cn1lib dependency");
+            assertContains(pom, "<version>1.0-SNAPSHOT</version>", "Grub common pom should use local snapshot CodeRAD cn1lib");
+        }
+        if (template == Template.TWEET) {
+            assertContains(pom, "tweet-app-ui-kit-lib", "Tweet common pom should include Tweet UI Kit dependency");
+            assertContains(pom, "<artifactId>coderad-annotation-processor</artifactId>", "Tweet common pom should include CodeRAD annotation processor path");
+            assertContains(pom, "<annotationProcessorPaths>", "Tweet common pom should configure annotation processors");
+        }
+        assertFalse(pom.indexOf("com.example.myapp") >= 0, "Common pom still contains placeholder package");
+        assertFalse(pom.indexOf("myappname") >= 0, "Common pom still contains placeholder app name");
+    }
+
+    private void assertSettings(Map<String, byte[]> entries, Template template, String packageName, String mainClassName) {
+        String settings = getText(entries, "common/codenameone_settings.properties");
+        assertContains(settings, "codename1.packageName=" + packageName, "Settings should include requested package");
+        assertContains(settings, "codename1.mainName=" + mainClassName, "Settings should include requested main class");
+        assertContains(settings, "codename1.displayName=" + mainClassName, "Settings should include requested display name");
+        assertContains(settings, "codename1.kotlin=" + String.valueOf(template.IS_KOTLIN), "Settings should include template kotlin flag");
+    }
+
+    private void assertMainSourceFile(Map<String, byte[]> entries, Template template, String packageName, String mainClassName) {
+        String packagePath = StringUtil.replaceAll(packageName, ".", "/");
+        String path;
+        if (template.IS_KOTLIN) {
+            path = "common/src/main/kotlin/" + packagePath + "/" + mainClassName + ".kt";
+        } else {
+            path = "common/src/main/java/" + packagePath + "/" + mainClassName + ".java";
+        }
+        String mainSource = getText(entries, path);
+        assertContains(mainSource, "package " + packageName, "Main source package was not refactored");
+        assertContains(mainSource, mainClassName, "Main source class was not renamed");
+        if (template == Template.GRUB) {
+            String grubModel = getText(entries, "common/src/main/java/" + packagePath + "/models/AccountModel.java");
+            assertContains(grubModel, "extends Entity", "Grub models should keep CodeRAD 1 Entity base class");
+            assertFalse(grubModel.indexOf("extends BaseEntity") >= 0, "Grub models should not be rewritten to BaseEntity");
+            assertNotNull(entries.get("cn1libs/pom.xml"), "Grub should include cn1libs parent module");
+            assertNotNull(entries.get("cn1libs/CodeRAD/pom.xml"), "Grub should include bundled CodeRAD cn1lib pom");
+            assertNotNull(entries.get("cn1libs/CodeRAD/jars/main.zip"), "Grub should include bundled CodeRAD common jar");
+            assertNotNull(entries.get("cn1libs/CodeRAD/jars/css.zip"), "Grub should include bundled CodeRAD css artifact");
+        }
+    }
+
+    private void assertNoTemplatePlaceholders(Map<String, byte[]> entries, Template template) {
+        for (String path : entries.keySet()) {
+            assertFalse(path.indexOf("com/example/myapp") >= 0, "Unrefactored placeholder path found: " + path);
+            if (template == Template.GRUB) {
+                assertFalse(path.indexOf("com/codename1/demos/grub") >= 0, "Unrefactored grub path found: " + path);
+            }
+        }
+        String javasePom = getText(entries, "javase/pom.xml");
+        assertFalse(javasePom.indexOf("<scope>provided</scope>") >= 0
+                        && javasePom.indexOf("<artifactId>codenameone-core</artifactId>") >= 0,
+                "javase/pom.xml should not contain duplicate provided codenameone-core dependency");
+        assertFalse(javasePom.indexOf("<scope>provided</scope>") >= 0
+                        && javasePom.indexOf("<artifactId>codenameone-javase</artifactId>") >= 0,
+                "javase/pom.xml should not contain duplicate provided codenameone-javase dependency");
+    }
+
+    private String getText(Map<String, byte[]> entries, String path) {
+        byte[] data = entries.get(path);
+        assertNotNull(data, "Missing expected entry: " + path);
+        return StringUtil.newString(data);
+    }
+
+    private void assertContains(String content, String expected, String message) {
+        assertTrue(content.indexOf(expected) >= 0, message + " | expected: " + expected);
+    }
+
+    private void assertGitIgnore(Map<String, byte[]> entries) {
+        String gitIgnore = getText(entries, ".gitignore");
+        assertContains(gitIgnore, "**/target/", "Generated project should ignore Maven targets");
+        assertContains(gitIgnore, ".idea/", "Generated project should ignore IntelliJ metadata");
+        assertContains(gitIgnore, "*.iml", "Generated project should ignore IntelliJ module files");
+    }
+}

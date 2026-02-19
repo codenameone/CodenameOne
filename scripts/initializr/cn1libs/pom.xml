@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>  <artifactId>initializr</artifactId>
+        <groupId>com.codename1.initializr</groupId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <groupId>com.codename1.initializr</groupId>
+    <artifactId>initializr-cn1libs</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>initializr-cn1libs</name>
+    <profiles>
+    <!-- Profile injected by install-cn1lib goal for ZipSupport cn1lib -->
+<profile>
+  <id>ZipSupport.cn1lib-cn1lib</id>
+  <activation>
+    <file><exists>${basedir}/ZipSupport/pom.xml</exists></file>
+  </activation>  <modules><module>ZipSupport</module></modules>
+</profile>
+<profile>
+  <id>ZipSupport.cn1lib-cn1lib-fromroot</id>
+  <activation>
+    <file><exists>${basedir}/cn1libs/ZipSupport/pom.xml</exists></file>
+  </activation>  <modules><module>ZipSupport</module></modules>
+</profile>
+
+<!-- Profile injected by install-cn1lib goal for CodeRAD cn1lib -->
+<profile>
+  <id>CodeRAD.cn1lib-cn1lib</id>
+  <activation>
+    <file><exists>${basedir}/CodeRAD/pom.xml</exists></file>
+  </activation>  <modules><module>CodeRAD</module></modules>
+</profile>
+<profile>
+  <id>CodeRAD.cn1lib-cn1lib-fromroot</id>
+  <activation>
+    <file><exists>${basedir}/cn1libs/CodeRAD/pom.xml</exists></file>
+  </activation>  <modules><module>CodeRAD</module></modules>
+</profile>
+
+</profiles>
+</project>

@@ -1,0 +1,15 @@
+# Maven build outputs
+**/target/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*~
+
+# Codename One simulator artifacts
+common/codenameone_settings.properties
+**/.cn1_css_checksums

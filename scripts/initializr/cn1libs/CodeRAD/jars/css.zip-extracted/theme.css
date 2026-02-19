@@ -1,0 +1,142 @@
+:root {
+    --rad-main-font: 'native:MainRegular';
+    --rad-main-font-light: 'native:MainLight';
+    --rad-main-font-bold: 'native:MainBold';
+    --rad-main-font-size: 2.5mm;
+    --rad-main-font-size-small: 1.5mm;
+}
+
+PopupMenu {
+    background-color: white;
+    border: 1px solid white;
+    border-radius: 1mm;
+    padding:0;
+    margin:0;
+}
+
+PopupMenuContent {
+    background-color:transparent;
+    margin: 0;
+    padding:2mm;
+    
+}
+
+PopupMenuTitle {
+    padding:0;
+    margin:0;
+    
+}
+
+SwipeableContainerButton {
+    color: white;
+    background-color: #f44336;
+    font-family: 'native:MainRegular';
+    font-size: 5mm;
+}
+
+ContactListLine1 {
+    cn1-derive: 'MultiLine1';
+    font-family: 'native:MainLight';
+    font-size: 5mm;
+    
+}
+
+ContactListLine2 {
+    cn1-derive: 'MultiLine2'; 
+    font-family: 'native:MainLight';
+    font-size: 4mm;
+}
+
+AccountAvatarsTitleComponentText {
+    font-family: 'native:MainLight';
+    font-size: 1.5mm;
+    color: #666666; 
+}
+
+
+
+
+SettingsForm {
+    padding:0;
+    margin:0;
+    
+}
+SettingsFormSection {
+    padding:0;
+    margin: 1mm 0 1mm 0;
+   
+}
+SettingsFormAction {
+    background-color:white;
+    margin:0;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    border-bottom: 1px solid #aaaaaa;
+    padding:2mm;
+}
+
+SettingsFormAction.pressed {
+    background-color: #cccccc;
+}
+
+SettingsFormActionLabel {
+    font-family: var(--rad-main-font);
+    font-size: var(--rad-main-font-size);
+    color: black;
+}
+
+SettingsFormActionValue {
+    font-family: var(--rad-main-font-light);
+    font-size: var(--rad-main-font-size);
+    color: #888888;
+}
+
+SettingsFormActionArrowButton {
+    font-family: var(--rad-main-font-light);
+    font-size: var(--rad-main-font-size);
+    color: #cccccc;
+}
+
+SettingsFormSectionLabel {
+    font-family: var(--rad-main-font-light);
+    font-size: var(--rad-main-font-size-small);
+    color: #666666;
+    
+    padding: 2mm 1mm 2mm 1mm;
+}
+
+SettingsFormActionDescriptionText {
+    font-size: 1.5mm;
+    font-family: var(--rad-main-font-light);
+    font-family: 1.5mm;
+    color: #888888;
+}
+
+SettingsFormActionDescription {
+    padding:0;
+    margin:0;
+}
+
+SettingsFormButtonList {
+	padding:0;
+	margin:0;
+}
+
+SettingsFormButtonListCell {
+	background-color:white;
+    margin:0;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    border-bottom: 1px solid #aaaaaa;
+    padding: 2mm;
+    font-size: var(--rad-main-font-size);
+    font-family: var(--rad-main-font);
+}
+
+FieldDescriptionText {
+    font-size: var(--rad-main-font-size);
+    font-family: var(--rad-main-font);
+    color: #666666;
+}
