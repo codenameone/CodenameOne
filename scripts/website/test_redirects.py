@@ -41,6 +41,8 @@ class Case:
     require_no_redirect: bool = False
     expected_final_status: int | None = None
     expected_final_path: str | None = None
+    expected_body_pattern: str | None = None
+    expected_final_body_pattern: str | None = None
 
 
 @dataclasses.dataclass
@@ -102,6 +104,7 @@ REQUIRED_CASES = [
         expected_target="",
         label="required",
         require_no_redirect=True,
+        expected_body_pattern=r"re:class=\"header cn1-header\"",
     ),
     Case(
         source="/developer-guide.html",
@@ -209,6 +212,9 @@ def check_case(base_url: str, case: Case, timeout: float) -> CaseResult:
         with NO_REDIRECT_OPENER.open(req, timeout=timeout) as resp:
             status = int(resp.getcode())
             location = normalize_location(resp.headers.get("Location"))
+            body = ""
+            if case.expected_body_pattern is not None:
+                body = resp.read().decode("utf-8", errors="ignore")
             if case.expected_status < 300:
                 ok = status == case.expected_status
                 if ok and case.require_no_redirect and location is not None:
@@ -217,11 +223,24 @@ def check_case(base_url: str, case: Case, timeout: float) -> CaseResult:
                 ok = status == case.expected_status and location_matches(
                     case.expected_target, location
                 )
+            if ok and case.expected_body_pattern is not None:
+                if case.expected_body_pattern.startswith("re:"):
+                    ok = (
+                        re.search(case.expected_body_pattern[3:], body, re.DOTALL)
+                        is not None
+                    )
+                else:
+                    ok = case.expected_body_pattern in body
             if ok and case.expected_final_status is not None:
                 try:
                     with urllib.request.urlopen(req, timeout=timeout) as final_resp:
                         final_status = int(final_resp.getcode())
                         final_url = final_resp.geturl()
+                        final_body = (
+                            final_resp.read().decode("utf-8", errors="ignore")
+                            if case.expected_final_body_pattern is not None
+                            else ""
+                        )
                     if final_status != case.expected_final_status:
                         ok = False
                     if ok and case.expected_final_path is not None:
@@ -230,6 +249,18 @@ def check_case(base_url: str, case: Case, timeout: float) -> CaseResult:
                         )
                         if final_path_q != case.expected_final_path:
                             ok = False
+                    if ok and case.expected_final_body_pattern is not None:
+                        if case.expected_final_body_pattern.startswith("re:"):
+                            ok = (
+                                re.search(
+                                    case.expected_final_body_pattern[3:],
+                                    final_body,
+                                    re.DOTALL,
+                                )
+                                is not None
+                            )
+                        else:
+                            ok = case.expected_final_body_pattern in final_body
                 except Exception:  # noqa: BLE001
                     ok = False
             return CaseResult(
@@ -254,6 +285,11 @@ def check_case(base_url: str, case: Case, timeout: float) -> CaseResult:
                 with urllib.request.urlopen(req, timeout=timeout) as final_resp:
                     final_status = int(final_resp.getcode())
                     final_url = final_resp.geturl()
+                    final_body = (
+                        final_resp.read().decode("utf-8", errors="ignore")
+                        if case.expected_final_body_pattern is not None
+                        else ""
+                    )
                 if final_status != case.expected_final_status:
                     ok = False
                 if ok and case.expected_final_path is not None:
@@ -262,6 +298,18 @@ def check_case(base_url: str, case: Case, timeout: float) -> CaseResult:
                     )
                     if final_path_q != case.expected_final_path:
                         ok = False
+                if ok and case.expected_final_body_pattern is not None:
+                    if case.expected_final_body_pattern.startswith("re:"):
+                        ok = (
+                            re.search(
+                                case.expected_final_body_pattern[3:],
+                                final_body,
+                                re.DOTALL,
+                            )
+                            is not None
+                        )
+                    else:
+                        ok = case.expected_final_body_pattern in final_body
             except Exception:  # noqa: BLE001
                 ok = False
         return CaseResult(
