@@ -65,14 +65,35 @@ build_developer_guide_for_site() {
   (
     cd "${REPO_ROOT}"
     asciidoctor \
-      --no-header-footer \
+      --require rouge \
+      -a linkcss \
+      -a copycss \
+      -a stylesheet=asciidoctor.css \
       -D "${html_out}" \
-      -o developer-guide-content.html \
+      -o developer-guide-full.html \
       docs/developer-guide/developer-guide.asciidoc
 
   )
 
-  cp "${html_out}/developer-guide-content.html" "${guide_fragment_path}"
+  awk '
+    BEGIN { in_body = 0 }
+    /<body[^>]*>/ {
+      in_body = 1
+      sub(/^.*<body[^>]*>/, "")
+      if (length($0) > 0) print
+      next
+    }
+    in_body && /<\/body>/ {
+      sub(/<\/body>.*/, "")
+      if (length($0) > 0) print
+      exit
+    }
+    in_body { print }
+  ' "${html_out}/developer-guide-full.html" > "${guide_fragment_path}"
+
+  if [ -f "${html_out}/asciidoctor.css" ]; then
+    cp "${html_out}/asciidoctor.css" "${guide_dir}/asciidoctor.css"
+  fi
   # Keep guide assets under /developer-guide/ so relative image links (e.g. img/foo.png) resolve.
   rsync -a \
     --exclude 'sketch/' \

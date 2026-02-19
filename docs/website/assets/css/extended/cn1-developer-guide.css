@@ -10,35 +10,3 @@
 .cn1-developer-guide {
   margin-top: 1rem;
 }
-
-.cn1-developer-guide #content {
-  max-width: 100%;
-}
-
-.cn1-developer-guide #toc,
-.cn1-developer-guide .toc {
-  background: var(--entry);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1rem 1.1rem;
-  margin-bottom: 1.2rem;
-}
-
-.cn1-developer-guide pre {
-  background: var(--code-block-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.85rem;
-  overflow-x: auto;
-}
-
-.cn1-developer-guide table {
-  display: block;
-  width: 100%;
-  overflow-x: auto;
-}
-
-.cn1-developer-guide img {
-  height: auto;
-  max-width: 100%;
-}
