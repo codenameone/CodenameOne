@@ -86,11 +86,16 @@ jobs:
           CN1_USER: ${{ secrets.CN1_USER }}
           CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
 
-      - name: Validate Initializr JS output
-        if: ${{ secrets.CN1_USER != '' && secrets.CN1_TOKEN != '' }}
+      - name: Validate Initializr page output
         run: |
           set -euo pipefail
           test -f docs/website/public/initializr/index.html
+
+      - name: Validate Initializr JS bundle output
+        if: ${{ secrets.CN1_USER != '' && secrets.CN1_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          test -f docs/website/public/initializr-app/index.html
 
       - name: Validate redirects against local Pages runtime
         run: |

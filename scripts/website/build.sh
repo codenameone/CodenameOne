@@ -300,7 +300,7 @@ build_initializr_for_site() {
       package
   )
 
-  local output_dir="${WEBSITE_DIR}/static/initializr"
+  local output_dir="${WEBSITE_DIR}/static/initializr-app"
   local result_zip="${REPO_ROOT}/scripts/initializr/javascript/target/result.zip"
   if [ ! -f "${result_zip}" ]; then
     result_zip="$(ls -1 "${REPO_ROOT}"/scripts/initializr/javascript/target/initializr-javascript-*.zip 2>/dev/null | head -n1 || true)"
