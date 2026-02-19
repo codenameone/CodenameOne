@@ -54,13 +54,13 @@ build_developer_guide_for_site() {
   local output_root="${REPO_ROOT}/build/website-developer-guide"
   local html_out="${output_root}/html"
   local guide_dir="${WEBSITE_DIR}/static/developer-guide"
-  local generated_data_dir="${WEBSITE_DIR}/data/generated"
-  local guide_fragment_path="${generated_data_dir}/developer-guide-content.html"
+  local generated_dir="${WEBSITE_DIR}/generated"
+  local guide_fragment_path="${generated_dir}/developer-guide-content.html"
   local source_dir="${REPO_ROOT}/docs/developer-guide"
 
   rm -rf "${output_root}" "${guide_dir}" "${WEBSITE_DIR}/static/manual" "${WEBSITE_DIR}/static/developer-guide-content"
   rm -f "${WEBSITE_DIR}/static/developer-guide.html"
-  mkdir -p "${html_out}" "${guide_dir}" "${generated_data_dir}"
+  mkdir -p "${html_out}" "${guide_dir}" "${generated_dir}"
 
   (
     cd "${REPO_ROOT}"

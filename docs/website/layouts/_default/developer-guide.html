@@ -9,7 +9,7 @@
   </header>
 
   <div class="post-content cn1-developer-guide" id="developer-guide">
-    {{- $guideFragment := "data/generated/developer-guide-content.html" -}}
+    {{- $guideFragment := "generated/developer-guide-content.html" -}}
     {{- if fileExists $guideFragment -}}
       {{- readFile $guideFragment | safeHTML -}}
     {{- else -}}
