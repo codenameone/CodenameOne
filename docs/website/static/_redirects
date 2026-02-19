@@ -15,9 +15,10 @@
 /videos.html/ /videos/ 301
 /video.html /videos/ 301
 /video.html/ /videos/ 301
-/developer-guide /developer-guide.html 301
-/developer-guide/ /developer-guide.html 301
-/developer-guide.html/ /developer-guide.html 301
+/manual /developer-guide/ 301
+/manual/ /developer-guide/ 301
+/developer-guide /developer-guide/ 301
+/developer-guide.html/ /developer-guide/ 301
 /blog.html /blog/ 301
 /blog.html/ /blog/ 301
 /contact-us.html / 301

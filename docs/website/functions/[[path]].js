@@ -2,16 +2,6 @@ export async function onRequest(context) {
   const url = new URL(context.request.url);
   const path = url.pathname;
 
-  // Keep /developer-guide.html as canonical public URL.
-  if (path === "/manual" || path === "/manual/") {
-    return Response.redirect(`${url.origin}/developer-guide.html`, 301);
-  }
-  if (path === "/developer-guide.html") {
-    const guideUrl = new URL(url);
-    guideUrl.pathname = "/developer-guide-content/";
-    return context.next(new Request(guideUrl.toString(), context.request));
-  }
-
   // Let static assets and _redirects run first.
   const response = await context.next();
   if (response.status !== 404) {
