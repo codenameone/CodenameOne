@@ -16,7 +16,7 @@ HUGO_MINIFY="${HUGO_MINIFY:-true}"
 HUGO_BASEURL="${HUGO_BASEURL:-https://www.codenameone.com/}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 WEBSITE_INCLUDE_JAVADOCS="${WEBSITE_INCLUDE_JAVADOCS:-false}"
-WEBSITE_INCLUDE_DEVGUIDE="${WEBSITE_INCLUDE_DEVGUIDE:-false}"
+WEBSITE_INCLUDE_DEVGUIDE="${WEBSITE_INCLUDE_DEVGUIDE:-auto}"
 
 build_javadocs_for_site() {
   if [ "${WEBSITE_INCLUDE_JAVADOCS}" != "true" ]; then
@@ -36,36 +36,44 @@ build_javadocs_for_site() {
 }
 
 build_developer_guide_for_site() {
-  if [ "${WEBSITE_INCLUDE_DEVGUIDE}" != "true" ]; then
+  local include_devguide="${WEBSITE_INCLUDE_DEVGUIDE}"
+  if [ "${include_devguide}" = "false" ]; then
     return
   fi
 
   if ! command -v asciidoctor >/dev/null 2>&1; then
-    echo "Asciidoctor tooling is required when WEBSITE_INCLUDE_DEVGUIDE=true." >&2
-    exit 1
+    if [ "${include_devguide}" = "true" ]; then
+      echo "Asciidoctor tooling is required when WEBSITE_INCLUDE_DEVGUIDE=true." >&2
+      exit 1
+    fi
+    echo "Asciidoctor not found; skipping Developer Guide generation (set WEBSITE_INCLUDE_DEVGUIDE=false to silence)." >&2
+    return
   fi
 
   echo "Building fresh Developer Guide for website..." >&2
   local output_root="${REPO_ROOT}/build/website-developer-guide"
   local html_out="${output_root}/html"
   local guide_dir="${WEBSITE_DIR}/static/developer-guide"
+  local generated_dir="${WEBSITE_DIR}/generated"
+  local guide_fragment_path="${generated_dir}/developer-guide-content.html"
   local source_dir="${REPO_ROOT}/docs/developer-guide"
 
   rm -rf "${output_root}" "${guide_dir}" "${WEBSITE_DIR}/static/manual" "${WEBSITE_DIR}/static/developer-guide-content"
   rm -f "${WEBSITE_DIR}/static/developer-guide.html"
-  mkdir -p "${html_out}" "${guide_dir}"
+  mkdir -p "${html_out}" "${guide_dir}" "${generated_dir}"
 
   (
     cd "${REPO_ROOT}"
     asciidoctor \
+      --no-header-footer \
       -D "${html_out}" \
-      -o developer-guide.html \
+      -o developer-guide-content.html \
       docs/developer-guide/developer-guide.asciidoc
 
   )
 
-  cp "${html_out}/developer-guide.html" "${guide_dir}/index.html"
-  # Keep assets next to /developer-guide/index.html exactly where generated HTML resolves them.
+  cp "${html_out}/developer-guide-content.html" "${guide_fragment_path}"
+  # Keep guide assets under /developer-guide/ so relative image links (e.g. img/foo.png) resolve.
   rsync -a \
     --exclude 'sketch/' \
     --exclude '*.asciidoc' \
