@@ -101,6 +101,163 @@ build_developer_guide_for_site() {
     echo "Asciidoctor stylesheet could not be generated for Developer Guide." >&2
     exit 1
   fi
+
+  "${PYTHON_BIN}" - "${guide_dir}/asciidoctor.css" "${guide_dir}/asciidoctor-scoped.css" <<'PY'
+import sys
+
+src_path, out_path = sys.argv[1], sys.argv[2]
+src = open(src_path, "r", encoding="utf-8").read()
+
+PREFIX = ".cn1-developer-guide"
+
+def split_selectors(text):
+    out, cur = [], []
+    depth_paren = depth_bracket = 0
+    in_string = None
+    escape = False
+    for ch in text:
+        if in_string:
+            cur.append(ch)
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == in_string:
+                in_string = None
+            continue
+        if ch in ("'", '"'):
+            in_string = ch
+            cur.append(ch)
+            continue
+        if ch == "(":
+            depth_paren += 1
+        elif ch == ")":
+            depth_paren = max(0, depth_paren - 1)
+        elif ch == "[":
+            depth_bracket += 1
+        elif ch == "]":
+            depth_bracket = max(0, depth_bracket - 1)
+        if ch == "," and depth_paren == 0 and depth_bracket == 0:
+            out.append("".join(cur))
+            cur = []
+            continue
+        cur.append(ch)
+    out.append("".join(cur))
+    return out
+
+def transform_selector(sel):
+    sel = sel.strip()
+    if not sel:
+        return sel
+    if PREFIX in sel:
+        return sel
+    if sel in ("html", "body", ":root"):
+        return PREFIX
+    return f"{PREFIX} {sel}"
+
+def extract_block(text, start):
+    depth = 1
+    i = start
+    n = len(text)
+    in_string = None
+    escape = False
+    while i < n:
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == in_string:
+                in_string = None
+            i += 1
+            continue
+        if ch in ("'", '"'):
+            in_string = ch
+            i += 1
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:i], i + 1
+        i += 1
+    return text[start:], n
+
+def process(css):
+    out = []
+    i = 0
+    n = len(css)
+    while i < n:
+        if css.startswith("/*", i):
+            j = css.find("*/", i + 2)
+            if j == -1:
+                out.append(css[i:])
+                break
+            out.append(css[i:j + 2])
+            i = j + 2
+            continue
+        j = i
+        depth_paren = depth_bracket = 0
+        in_string = None
+        escape = False
+        while j < n:
+            ch = css[j]
+            if in_string:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == in_string:
+                    in_string = None
+                j += 1
+                continue
+            if ch in ("'", '"'):
+                in_string = ch
+                j += 1
+                continue
+            if ch == "(":
+                depth_paren += 1
+            elif ch == ")":
+                depth_paren = max(0, depth_paren - 1)
+            elif ch == "[":
+                depth_bracket += 1
+            elif ch == "]":
+                depth_bracket = max(0, depth_bracket - 1)
+            if depth_paren == 0 and depth_bracket == 0 and ch in "{;":
+                break
+            j += 1
+        if j >= n:
+            out.append(css[i:])
+            break
+        prelude = css[i:j].strip()
+        term = css[j]
+        if term == ";":
+            out.append(css[i:j + 1])
+            i = j + 1
+            continue
+        block, next_i = extract_block(css, j + 1)
+        low = prelude.lower()
+        if low.startswith("@media") or low.startswith("@supports"):
+            out.append(f"{prelude}{{{process(block)}}}")
+        elif low.startswith("@"):
+            out.append(f"{prelude}{{{block}}}")
+        else:
+            selectors = [transform_selector(s) for s in split_selectors(prelude)]
+            out.append(f"{','.join(selectors)}{{{block}}}")
+        i = next_i
+    return "".join(out)
+
+scoped = process(src)
+with open(out_path, "w", encoding="utf-8") as f:
+    f.write(scoped)
+PY
+
+  if [ ! -s "${guide_dir}/asciidoctor-scoped.css" ]; then
+    echo "Scoped Asciidoctor stylesheet could not be generated for Developer Guide." >&2
+    exit 1
+  fi
   # Keep guide assets under /developer-guide/ so relative image links (e.g. img/foo.png) resolve.
   rsync -a \
     --exclude 'sketch/' \

@@ -10,3 +10,41 @@
 .cn1-developer-guide {
   margin-top: 1rem;
 }
+
+body.dark .cn1-developer-guide {
+  color: var(--primary);
+}
+
+body.dark .cn1-developer-guide #content,
+body.dark .cn1-developer-guide #header,
+body.dark .cn1-developer-guide #toc,
+body.dark .cn1-developer-guide .toc,
+body.dark .cn1-developer-guide .admonitionblock td.content,
+body.dark .cn1-developer-guide .listingblock > .content > pre,
+body.dark .cn1-developer-guide table.tableblock,
+body.dark .cn1-developer-guide .sidebarblock > .content {
+  background: var(--entry) !important;
+  color: var(--primary) !important;
+}
+
+body.dark .cn1-developer-guide p,
+body.dark .cn1-developer-guide li,
+body.dark .cn1-developer-guide td,
+body.dark .cn1-developer-guide th,
+body.dark .cn1-developer-guide code,
+body.dark .cn1-developer-guide pre,
+body.dark .cn1-developer-guide h1,
+body.dark .cn1-developer-guide h2,
+body.dark .cn1-developer-guide h3,
+body.dark .cn1-developer-guide h4,
+body.dark .cn1-developer-guide h5,
+body.dark .cn1-developer-guide h6,
+body.dark .cn1-developer-guide #toctitle,
+body.dark .cn1-developer-guide .admonitionblock td.content > .title {
+  color: var(--primary) !important;
+  opacity: 1 !important;
+}
+
+body.dark .cn1-developer-guide a {
+  color: #8ab4ff !important;
+}
