@@ -68,6 +68,7 @@ build_developer_guide_for_site() {
       --require rouge \
       -a linkcss \
       -a copycss \
+      -a rouge-css=style \
       -D "${html_out}" \
       -o developer-guide-full.html \
       docs/developer-guide/developer-guide.asciidoc

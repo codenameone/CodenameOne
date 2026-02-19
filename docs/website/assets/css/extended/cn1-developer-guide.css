@@ -9,42 +9,147 @@
 
 .cn1-developer-guide {
   margin-top: 1rem;
+  --dg-bg: #ffffff;
+  --dg-fg: #1f2937;
+  --dg-muted: #4b5563;
+  --dg-border: #d1d5db;
+  --dg-panel: #f8fafc;
+  --dg-inline-bg: #f3f4f6;
+  --dg-inline-fg: #111827;
+  --dg-code-bg: #0f172a;
+  --dg-code-fg: #e5e7eb;
+  --dg-link: #1d4ed8;
+  --dg-caption: #374151;
 }
 
 body.dark .cn1-developer-guide {
-  color: var(--primary);
+  --dg-bg: #111827;
+  --dg-fg: #e5e7eb;
+  --dg-muted: #cbd5e1;
+  --dg-border: #374151;
+  --dg-panel: #0b1220;
+  --dg-inline-bg: #1f2937;
+  --dg-inline-fg: #f3f4f6;
+  --dg-code-bg: #0b1020;
+  --dg-code-fg: #f9fafb;
+  --dg-link: #8ab4ff;
+  --dg-caption: #e2e8f0;
 }
 
-body.dark .cn1-developer-guide #content,
-body.dark .cn1-developer-guide #header,
-body.dark .cn1-developer-guide #toc,
-body.dark .cn1-developer-guide .toc,
-body.dark .cn1-developer-guide .admonitionblock td.content,
-body.dark .cn1-developer-guide .listingblock > .content > pre,
-body.dark .cn1-developer-guide table.tableblock,
-body.dark .cn1-developer-guide .sidebarblock > .content {
-  background: var(--entry) !important;
-  color: var(--primary) !important;
+.cn1-developer-guide,
+.cn1-developer-guide #content,
+.cn1-developer-guide #header,
+.cn1-developer-guide #footer {
+  background: var(--dg-bg) !important;
+  color: var(--dg-fg) !important;
+  border-color: var(--dg-border) !important;
 }
 
-body.dark .cn1-developer-guide p,
-body.dark .cn1-developer-guide li,
-body.dark .cn1-developer-guide td,
-body.dark .cn1-developer-guide th,
-body.dark .cn1-developer-guide code,
-body.dark .cn1-developer-guide pre,
-body.dark .cn1-developer-guide h1,
-body.dark .cn1-developer-guide h2,
-body.dark .cn1-developer-guide h3,
-body.dark .cn1-developer-guide h4,
-body.dark .cn1-developer-guide h5,
-body.dark .cn1-developer-guide h6,
-body.dark .cn1-developer-guide #toctitle,
-body.dark .cn1-developer-guide .admonitionblock td.content > .title {
-  color: var(--primary) !important;
+.cn1-developer-guide p,
+.cn1-developer-guide li,
+.cn1-developer-guide td,
+.cn1-developer-guide th,
+.cn1-developer-guide h1,
+.cn1-developer-guide h2,
+.cn1-developer-guide h3,
+.cn1-developer-guide h4,
+.cn1-developer-guide h5,
+.cn1-developer-guide h6,
+.cn1-developer-guide strong,
+.cn1-developer-guide em,
+.cn1-developer-guide span,
+.cn1-developer-guide div {
+  color: inherit;
+}
+
+.cn1-developer-guide a {
+  color: var(--dg-link) !important;
+}
+
+.cn1-developer-guide .listingblock > .title,
+.cn1-developer-guide .exampleblock > .title,
+.cn1-developer-guide .imageblock > .title,
+.cn1-developer-guide .tableblock > .title,
+.cn1-developer-guide .admonitionblock td.content > .title,
+.cn1-developer-guide .sidebarblock > .content > .title,
+.cn1-developer-guide .quoteblock > .title,
+.cn1-developer-guide .title,
+.cn1-developer-guide .caption {
+  color: var(--dg-caption) !important;
   opacity: 1 !important;
 }
 
-body.dark .cn1-developer-guide a {
-  color: #8ab4ff !important;
+.cn1-developer-guide code,
+.cn1-developer-guide tt {
+  background: var(--dg-inline-bg) !important;
+  color: var(--dg-inline-fg) !important;
+  border: 1px solid var(--dg-border) !important;
+  border-radius: 4px;
+  padding: 0.08em 0.32em;
+}
+
+.cn1-developer-guide pre,
+.cn1-developer-guide pre code,
+.cn1-developer-guide .listingblock > .content > pre,
+.cn1-developer-guide .literalblock > .content > pre,
+.cn1-developer-guide .sourceblock > .content > pre {
+  background: var(--dg-code-bg) !important;
+  color: var(--dg-code-fg) !important;
+  border: 1px solid var(--dg-border) !important;
+  border-radius: 8px;
+  opacity: 1 !important;
+}
+
+.cn1-developer-guide pre code {
+  border: 0 !important;
+  padding: 0;
+}
+
+.cn1-developer-guide .sidebarblock,
+.cn1-developer-guide .exampleblock,
+.cn1-developer-guide .admonitionblock td.content,
+.cn1-developer-guide .quoteblock,
+.cn1-developer-guide .note,
+.cn1-developer-guide .tip,
+.cn1-developer-guide .important,
+.cn1-developer-guide .warning,
+.cn1-developer-guide .caution {
+  background: var(--dg-panel) !important;
+  border-color: var(--dg-border) !important;
+  color: var(--dg-fg) !important;
+}
+
+.cn1-developer-guide .admonitionblock td.icon,
+.cn1-developer-guide .admonitionblock td.icon i,
+.cn1-developer-guide .admonitionblock td.icon .fa {
+  color: var(--dg-link) !important;
+}
+
+.cn1-developer-guide #toc,
+.cn1-developer-guide .toc {
+  background: var(--dg-panel) !important;
+  border: 1px solid var(--dg-border) !important;
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+}
+
+.cn1-developer-guide #toctitle {
+  color: var(--dg-caption) !important;
+}
+
+.cn1-developer-guide #toc ul,
+.cn1-developer-guide #toc ol {
+  color: var(--dg-fg) !important;
+}
+
+.cn1-developer-guide table.tableblock,
+.cn1-developer-guide table.tableblock td,
+.cn1-developer-guide table.tableblock th {
+  border-color: var(--dg-border) !important;
+  color: var(--dg-fg) !important;
+  background: transparent !important;
+}
+
+.cn1-developer-guide #content {
+  box-shadow: none !important;
 }
