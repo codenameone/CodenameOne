@@ -287,21 +287,58 @@ build_initializr_for_site() {
   (
     cd "${REPO_ROOT}/scripts/initializr"
 
+    run_initializr_mvn() {
+      if command -v xvfb-run >/dev/null 2>&1; then
+        xvfb-run -a ./mvnw "$@"
+      else
+        ./mvnw "$@"
+      fi
+    }
+
     if [ -n "${JAVA_HOME_8_X64:-}" ]; then
       export JAVA_HOME="${JAVA_HOME_8_X64}"
       export PATH="${JAVA_HOME}/bin:${PATH}"
     fi
 
+    # Ensure attached classifier artifact initializr-ZipSupport:jar:common is present
+    # in the local Maven repo before building modules that depend on it (e.g. initializr-common).
+    run_initializr_mvn -q -pl cn1libs/ZipSupport -am \
+      -DskipTests \
+      -Dcodename1.platform=javascript \
+      install
+
     if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
-      ./mvnw -q -pl javascript -am \
+      if ! run_initializr_mvn -q -pl javascript -am \
         cn1:set-user-token \
+        -Dcodename1.platform=javascript \
         -Duser="${CN1_USER}" \
-        -Dtoken="${CN1_TOKEN}"
+        -Dtoken="${CN1_TOKEN}"; then
+        echo "cn1:set-user-token is unavailable in this plugin version; writing CN1 credentials directly to Java preferences." >&2
+        local tmp_dir
+        tmp_dir="$(mktemp -d)"
+        cat > "${tmp_dir}/SetCn1Prefs.java" <<'JAVA'
+import java.util.prefs.Preferences;
+
+public class SetCn1Prefs {
+    public static void main(String[] args) {
+        if (args.length != 2) {
+            throw new IllegalArgumentException("Usage: SetCn1Prefs <user> <token>");
+        }
+        Preferences prefs = Preferences.userRoot().node("/com/codename1/ui");
+        prefs.put("user", args[0]);
+        prefs.put("token", args[1]);
+    }
+}
+JAVA
+        javac "${tmp_dir}/SetCn1Prefs.java"
+        java -cp "${tmp_dir}" SetCn1Prefs "${CN1_USER}" "${CN1_TOKEN}"
+        rm -rf "${tmp_dir}"
+      fi
     else
       echo "CN1_USER/CN1_TOKEN not provided; building Initializr JavaScript without setting token." >&2
     fi
 
-    ./mvnw -q -pl javascript -am \
+    run_initializr_mvn -q -pl javascript -am \
       -DskipTests \
       -Dautomated=true \
       -Dcodename1.platform=javascript \
