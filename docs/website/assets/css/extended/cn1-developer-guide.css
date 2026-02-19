@@ -123,6 +123,7 @@ body.dark .cn1-developer-guide {
 .cn1-developer-guide .exampleblock,
 .cn1-developer-guide .admonitionblock td.content,
 .cn1-developer-guide .quoteblock,
+.cn1-developer-guide .quoteblock blockquote,
 .cn1-developer-guide .note,
 .cn1-developer-guide .tip,
 .cn1-developer-guide .important,
@@ -135,6 +136,27 @@ body.dark .cn1-developer-guide {
 
 .cn1-developer-guide .admonitionblock td.content,
 .cn1-developer-guide .admonitionblock td.content * {
+  color: var(--dg-fg) !important;
+}
+
+.cn1-developer-guide .colist,
+.cn1-developer-guide .colist table,
+.cn1-developer-guide .colist tbody,
+.cn1-developer-guide .colist tr,
+.cn1-developer-guide .colist td,
+.cn1-developer-guide .colist td p,
+.cn1-developer-guide .colist td b,
+.cn1-developer-guide .colist td i,
+.cn1-developer-guide .colist td .conum {
+  color: var(--dg-fg) !important;
+  background: transparent !important;
+  border-color: var(--dg-border) !important;
+}
+
+.cn1-developer-guide .quoteblock blockquote,
+.cn1-developer-guide .quoteblock blockquote p,
+.cn1-developer-guide .quoteblock .paragraph p,
+.cn1-developer-guide .quoteblock .attribution {
   color: var(--dg-fg) !important;
 }
 
