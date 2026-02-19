@@ -69,6 +69,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
+      - name: Set up Java 8 for Initializr build
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
       - name: Build website
         run: |
           set -euo pipefail
@@ -76,6 +82,15 @@ jobs:
         env:
           WEBSITE_INCLUDE_JAVADOCS: "true"
           WEBSITE_INCLUDE_DEVGUIDE: "true"
+          WEBSITE_INCLUDE_INITIALIZR: ${{ secrets.CN1_USER != '' && secrets.CN1_TOKEN != '' && 'true' || 'false' }}
+          CN1_USER: ${{ secrets.CN1_USER }}
+          CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
+
+      - name: Validate Initializr JS output
+        if: ${{ secrets.CN1_USER != '' && secrets.CN1_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          test -f docs/website/public/initializr/index.html
 
       - name: Validate redirects against local Pages runtime
         run: |

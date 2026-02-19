@@ -17,6 +17,9 @@ HUGO_BASEURL="${HUGO_BASEURL:-https://www.codenameone.com/}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 WEBSITE_INCLUDE_JAVADOCS="${WEBSITE_INCLUDE_JAVADOCS:-false}"
 WEBSITE_INCLUDE_DEVGUIDE="${WEBSITE_INCLUDE_DEVGUIDE:-auto}"
+WEBSITE_INCLUDE_INITIALIZR="${WEBSITE_INCLUDE_INITIALIZR:-false}"
+CN1_USER="${CN1_USER:-}"
+CN1_TOKEN="${CN1_TOKEN:-}"
 
 build_javadocs_for_site() {
   if [ "${WEBSITE_INCLUDE_JAVADOCS}" != "true" ]; then
@@ -267,6 +270,57 @@ PY
     "${source_dir}/" "${guide_dir}/"
 }
 
+build_initializr_for_site() {
+  if [ "${WEBSITE_INCLUDE_INITIALIZR}" != "true" ]; then
+    return
+  fi
+
+  echo "Building Initializr JavaScript bundle for website..." >&2
+  (
+    cd "${REPO_ROOT}/scripts/initializr"
+
+    if [ -n "${JAVA_HOME_8_X64:-}" ]; then
+      export JAVA_HOME="${JAVA_HOME_8_X64}"
+      export PATH="${JAVA_HOME}/bin:${PATH}"
+    fi
+
+    if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
+      ./mvnw -q -pl javascript -am \
+        cn1:set-user-token \
+        -Duser="${CN1_USER}" \
+        -Dtoken="${CN1_TOKEN}"
+    else
+      echo "CN1_USER/CN1_TOKEN not provided; building Initializr JavaScript without setting token." >&2
+    fi
+
+    ./mvnw -q -pl javascript -am \
+      -DskipTests \
+      -Dautomated=true \
+      -Dcodename1.platform=javascript \
+      package
+  )
+
+  local output_dir="${WEBSITE_DIR}/static/initializr"
+  local result_zip="${REPO_ROOT}/scripts/initializr/javascript/target/result.zip"
+  if [ ! -f "${result_zip}" ]; then
+    result_zip="$(ls -1 "${REPO_ROOT}"/scripts/initializr/javascript/target/initializr-javascript-*.zip 2>/dev/null | head -n1 || true)"
+  fi
+
+  if [ -z "${result_zip}" ] || [ ! -f "${result_zip}" ]; then
+    echo "Could not locate Initializr JavaScript build zip output in scripts/initializr/javascript/target." >&2
+    exit 1
+  fi
+
+  rm -rf "${output_dir}"
+  mkdir -p "${output_dir}"
+  unzip -q -o "${result_zip}" -d "${output_dir}"
+
+  if [ ! -f "${output_dir}/index.html" ]; then
+    echo "Initializr website bundle is missing index.html after extraction." >&2
+    exit 1
+  fi
+}
+
 if ! command -v "${HUGO_BIN}" >/dev/null 2>&1; then
   echo "Hugo binary not found. Install Hugo (extended) and retry." >&2
   exit 1
@@ -274,6 +328,7 @@ fi
 
 build_javadocs_for_site
 build_developer_guide_for_site
+build_initializr_for_site
 
 cd "${WEBSITE_DIR}"
 
