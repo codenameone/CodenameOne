@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+<parent>  <artifactId>initializr-cn1libs</artifactId>
+  <groupId>com.codename1.initializr</groupId>
+  <version>1.0-SNAPSHOT</version>
+</parent>
+
+  <groupId>com.codename1.initializr</groupId>
+  <artifactId>initializr-ZipSupport</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>ZipSupport</name>
+  <dependencies>
+<dependency>
+     <groupId>com.codename1.initializr</groupId>
+     <artifactId>initializr-ZipSupport</artifactId>
+     <version>1.0-SNAPSHOT</version>
+     <classifier>common</classifier>
+     <type>jar</type>
+</dependency>
+</dependencies>
+<profiles>
+</profiles>
+<build>
+  <plugins>
+    <plugin>
+      <groupId>org.codehaus.mojo</groupId>
+      <artifactId>build-helper-maven-plugin</artifactId>
+      <version>1.7</version>
+      <executions>
+          <execution>
+            <id>attach-artifacts</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>attach-artifact</goal>
+            </goals>
+            <configuration>
+              <artifacts>
+<artifact>
+<file>${basedir}/jars/main.zip</file>
+<type>jar</type>
+<classifier>common</classifier>
+</artifact>
+              </artifacts>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+   </build>
+</project>

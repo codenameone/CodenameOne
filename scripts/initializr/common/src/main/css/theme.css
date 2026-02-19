@@ -1,0 +1,310 @@
+/** Define Theme Constants here */
+#Constants {
+    includeNativeBool: true;
+    defaultSourceDPIInt: "0";
+}
+
+/** Style for Button class */
+Button {
+    font-family: "native:MainLight";
+    font-size: 3mm;
+}
+
+/** Style for App Title Bar Text */
+Title {
+    font-family: "native:MainLight";
+    font-size: 6mm;
+}
+
+/** Style for Dialog body */
+DialogBody {
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+}
+
+/** Style for Dialog title bar text */
+DialogTitle {
+    font-family: "native:MainLight";
+    font-size: 4.5mm;
+}
+
+/** Style for the side menu */
+SideNavigationPanel {
+    background: white;
+    padding: 2mm 1mm 1mm 1mm;
+}
+
+@media platform-ios {
+    /** iOS Only styles for side menu. */
+    SideNavigationPanel {
+        /** Extra top padding to deal with notch on iPhoneX */
+        padding: 6mm 1mm 1mm 1mm;
+    }
+}
+
+/** Style for commands in side menu. */
+SideCommand {
+    padding: 1mm;
+    border: none;
+    text-decoration: none;
+    color: black;
+    font-family: "native:MainLight";
+    font-size: 4mm;
+    border-bottom: 2px solid #cccccc;
+}
+
+InitializrForm {
+    background-color: #f3f6fb;
+}
+
+InitializrRoot {
+    padding: 2.2mm;
+}
+
+InitializrHeaderCard {
+    background-color: #eaf2ff;
+    padding: 2.5mm;
+    margin: 1.2mm;
+}
+
+InitializrCard {
+    background-color: #ffffff;
+    padding: 2.5mm;
+    margin: 1.2mm;
+}
+
+InitializrHeroTitle {
+    color: #0d1b2a;
+    font-family: "native:MainBold";
+    font-size: 4.5mm;
+    padding: 0 0 1mm 0;
+}
+
+InitializrHeroSubtitle {
+    color: #4a5568;
+    font-family: "native:MainRegular";
+    font-size: 2.8mm;
+}
+
+InitializrSectionTitle {
+    color: #1f2937;
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    padding: 0 0 1.2mm 0;
+}
+
+InitializrFieldLabel {
+    color: #475569;
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    padding: 0.4mm 0;
+}
+
+InitializrField, InitializrFieldHint {
+    color: #1f2937;
+    font-family: "native:MainRegular";
+    font-size: 2.8mm;
+    background-color: #ffffff;
+    border: 1px solid #d0dae6;
+    padding: 1.1mm;
+    margin: 0 0 1.4mm 0;
+}
+
+InitializrChoicesGrid {
+    margin: 0 0 1.2mm 0;
+}
+
+InitializrChoice {
+    color: #1f2937;
+    background-color: #eef4ff;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    border: 1px solid #c5d6ee;
+    margin: 0.7mm;
+    padding: 1.1mm;
+    text-align: center;
+}
+
+InitializrChoice.pressed {
+    color: #ffffff;
+    background-color: #0f766e;
+    border: 1px solid #0f766e;
+    text-align: center;
+}
+
+InitializrSummary {
+    color: #1f2937;
+    font-family: "native:MainRegular";
+    font-size: 2.7mm;
+    background-color: #f8fbff;
+    border: 1px solid #dbe7f5;
+    padding: 1.4mm;
+    margin: 0 0 1.4mm 0;
+}
+
+InitializrTip {
+    color: #5f6b7a;
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    padding: 0 0 1.2mm 0;
+}
+
+InitializrValidationError {
+    color: #b42318;
+    font-family: "native:MainRegular";
+    font-size: 2.2mm;
+    padding: 0 0 0.8mm 0;
+}
+
+InitializrHelpButton {
+    cn1-derive: Button;
+    color: #64748b;
+    background-color: transparent;
+    border: none;
+    margin: 0;
+    padding: 0.2mm;
+}
+
+Images {
+    background-image: url(images/grub.png),
+        url(images/tweet.png);
+}
+
+InitializrPrimaryButton {
+    color: #ffffff;
+    background-color: #0f766e;
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    padding: 1.7mm;
+    margin: 1.4mm 1.2mm;
+    border: none;
+    text-align: center;
+}
+
+InitializrPrimaryButton.pressed {
+    color: #ffffff;
+    background-color: #0f766e;
+    border: 1px solid #0f766e;
+    text-align: center;
+}
+
+InitializrSecondaryButton {
+    color: #0f3b6c;
+    background-color: #e8f0ff;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    padding: 1.3mm;
+    margin: 0.8mm 0 0 0;
+    border: 1px solid #bfd3ef;
+}
+
+InitializrLiveFrame {
+    margin: 0 0 1.2mm 0;
+    border: 1px solid #d2dbe8;
+    padding: 2mm;
+}
+
+InitializrLiveContentDark {
+    cn1-derive: Container;
+    background-color: #0f172a;
+    color: #e2e8f0;
+}
+
+InitializrLiveToolbarDark {
+    cn1-derive: Toolbar;
+    background: #0f172a;
+    border: none;
+}
+
+InitializrLiveTitleDark {
+    cn1-derive: Title;
+    color: #e2e8f0;
+}
+
+InitializrLiveMenuDark {
+    cn1-derive: Command;
+    color: #e2e8f0;
+}
+
+InitializrLiveButtonDarkClean {
+    cn1-derive: Button;
+    color: #e2e8f0;
+    background-color: #1f2937;
+    border: 1px solid #475569;
+    border-radius: 0;
+}
+
+InitializrLiveButtonDarkClean.pressed {
+    color: #e2e8f0;
+    background-color: #334155;
+    border: 1px solid #64748b;
+}
+
+InitializrLiveButtonLightTealRound, InitializrLiveButtonLightTealSquare,
+InitializrLiveButtonDarkTealRound, InitializrLiveButtonDarkTealSquare {
+    cn1-derive: Button;
+    color: #ffffff;
+    background-color: #0f766e;
+    border: 1px solid #0f766e;
+}
+
+InitializrLiveButtonLightTealRound, InitializrLiveButtonDarkTealRound {
+    border-radius: 3mm;
+}
+
+InitializrLiveButtonLightTealSquare, InitializrLiveButtonDarkTealSquare {
+    border-radius: 0;
+}
+
+InitializrLiveButtonLightTealRound.pressed, InitializrLiveButtonLightTealSquare.pressed,
+InitializrLiveButtonDarkTealRound.pressed, InitializrLiveButtonDarkTealSquare.pressed {
+    color: #ffffff;
+    background-color: #0b5f59;
+    border: 1px solid #0b5f59;
+}
+
+InitializrLiveButtonLightBlueRound, InitializrLiveButtonLightBlueSquare,
+InitializrLiveButtonDarkBlueRound, InitializrLiveButtonDarkBlueSquare {
+    cn1-derive: Button;
+    color: #ffffff;
+    background-color: #1d4ed8;
+    border: 1px solid #1d4ed8;
+}
+
+InitializrLiveButtonLightBlueRound, InitializrLiveButtonDarkBlueRound {
+    border-radius: 3mm;
+}
+
+InitializrLiveButtonLightBlueSquare, InitializrLiveButtonDarkBlueSquare {
+    border-radius: 0;
+}
+
+InitializrLiveButtonLightBlueRound.pressed, InitializrLiveButtonLightBlueSquare.pressed,
+InitializrLiveButtonDarkBlueRound.pressed, InitializrLiveButtonDarkBlueSquare.pressed {
+    color: #ffffff;
+    background-color: #1e40af;
+    border: 1px solid #1e40af;
+}
+
+InitializrLiveButtonLightOrangeRound, InitializrLiveButtonLightOrangeSquare,
+InitializrLiveButtonDarkOrangeRound, InitializrLiveButtonDarkOrangeSquare {
+    cn1-derive: Button;
+    color: #ffffff;
+    background-color: #ea580c;
+    border: 1px solid #ea580c;
+}
+
+InitializrLiveButtonLightOrangeRound, InitializrLiveButtonDarkOrangeRound {
+    border-radius: 3mm;
+}
+
+InitializrLiveButtonLightOrangeSquare, InitializrLiveButtonDarkOrangeSquare {
+    border-radius: 0;
+}
+
+InitializrLiveButtonLightOrangeRound.pressed, InitializrLiveButtonLightOrangeSquare.pressed,
+InitializrLiveButtonDarkOrangeRound.pressed, InitializrLiveButtonDarkOrangeSquare.pressed {
+    color: #ffffff;
+    background-color: #c2410c;
+    border: 1px solid #c2410c;
+}
