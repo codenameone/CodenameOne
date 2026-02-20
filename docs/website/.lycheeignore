@@ -1,0 +1,25 @@
+# Legacy HTML aliases handled via Cloudflare _redirects (not local files in offline mode)
+^file://.*/public/demos\.html$
+^file://.*/public/gallery\.html$
+^file://.*/public/monetization\.html$
+^file://.*/public/tutorials-resources-learn-java-mobile-videos-courses-ios-android\.html$
+
+# Legacy demo slug links that resolve via redirects in production
+^file://.*/public/demo-[^/]+/?$
+
+# Legacy direct .html links are redirect-backed in production but absent as local files.
+^file://.*/public/.*\.html(#.*)?$
+
+# Redirect-backed docs aliases
+^file://.*/public/(manual|downloads?|build-server)(/.*)?(#.*)?$
+^file://.*/public/developer-guide/(Fonts|Images|Supported-Properties)(#.*)?$
+^file://.*/public/introduction/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/?$
+
+# Demo binary/app folders are redirect/external targets, not local static artifacts.
+^file://.*/public/demos/[A-Za-z0-9_-]+(/.*)?$
+
+# Redirect-only PDF route (target is generated in _redirects)
+^file://.*/public/files/developer-guide\.pdf$
+
+# Other externalized file assets that are linked but not present in local static output
+^file://.*/public/files/.*\.(pdf|xlsx)$

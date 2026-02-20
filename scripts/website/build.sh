@@ -208,7 +208,19 @@ def process(css):
     return "".join(out)
 
 with open(out_path, "w", encoding="utf-8") as f:
-    f.write(process(src))
+    scoped = process(src)
+    # Inline scoped stylesheet is injected on /javadoc/ pages, so make asset refs absolute.
+    # This keeps icons/fonts resolvable from both /javadoc/ and deep class pages loaded in-page.
+    import re
+    def repl(m):
+        raw = m.group(1).strip().strip('"\'')
+        if (raw.startswith("data:") or raw.startswith("http://") or raw.startswith("https://")
+                or raw.startswith("/") or raw.startswith("#")):
+            return f"url({m.group(1)})"
+        normalized = raw.lstrip("./")
+        return f"url('/javadoc/resource-files/{normalized}')"
+    scoped = re.sub(r"url\(([^)]+)\)", repl, scoped)
+    f.write(scoped)
 PY
   fi
 }
