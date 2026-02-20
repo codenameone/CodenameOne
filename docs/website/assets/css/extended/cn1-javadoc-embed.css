@@ -1,5 +1,6 @@
 .post-single--api-javadoc {
-  max-width: min(1700px, 98vw);
+  max-width: min(2200px, 99vw);
+  width: 100%;
 }
 
 .cn1-javadoc-links {
@@ -16,6 +17,8 @@
   padding: 0.7rem;
   background: var(--entry);
   color: var(--content);
+  overflow: visible;
+  --code-bg: color-mix(in srgb, var(--entry) 90%, var(--theme) 10%);
   --body-text-color: var(--content) !important;
   --block-text-color: var(--content) !important;
   --body-background-color: var(--entry) !important;
@@ -51,12 +54,52 @@
   margin: 0;
 }
 
+.cn1-javadoc .header,
+.cn1-javadoc .sub-nav,
+.cn1-javadoc .top-nav,
+.cn1-javadoc .flex-content {
+  overflow: visible !important;
+}
+
+.cn1-javadoc .table-header,
+.cn1-javadoc .table-sub-heading-color,
+.cn1-javadoc .summary-table div[class^="col-"],
+.cn1-javadoc .summary-table div[class*=" col-"] {
+  min-height: 2.25rem;
+  height: auto !important;
+  line-height: 1.35 !important;
+  padding-top: 0.4rem !important;
+  padding-bottom: 0.4rem !important;
+  overflow: visible !important;
+}
+
+.cn1-javadoc input[type="search"],
+.cn1-javadoc input#search-input,
+.cn1-javadoc #search-input,
+.cn1-javadoc .search-input {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 30;
+}
+
+.cn1-javadoc pre,
+.cn1-javadoc code,
+.cn1-javadoc pre code,
+.cn1-javadoc .snippet-container,
+.cn1-javadoc .snippet-container pre,
+.cn1-javadoc .block pre,
+.cn1-javadoc .block code {
+  background: var(--code-bg) !important;
+  color: var(--content) !important;
+}
+
 .cn1-javadoc a {
   color: var(--primary);
 }
 
 body.dark .cn1-javadoc {
   background: var(--theme);
+  --code-bg: #141f31;
   --body-background-color: var(--theme) !important;
   --section-background-color: var(--theme) !important;
   --detail-background-color: var(--theme) !important;

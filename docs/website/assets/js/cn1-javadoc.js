@@ -9,12 +9,25 @@
   let currentDocPath = "/javadoc/_index-raw.html";
   let searchAssetsLoaded = false;
 
+  const reviveSearchUi = () => {
+    const inputs = root.querySelectorAll('input[type="search"], input#search-input, #search-input');
+    inputs.forEach((input) => {
+      input.removeAttribute("disabled");
+      input.readOnly = false;
+      input.tabIndex = 0;
+      input.style.pointerEvents = "auto";
+      input.style.position = "relative";
+      input.style.zIndex = "30";
+    });
+  };
+
   const ensureSearchAssets = (fetchPath) => {
     window.pathtoroot = calcPathToRoot(fetchPath);
     if (!searchAssetsLoaded && typeof window.loadScripts === "function") {
       window.loadScripts(document, "script");
       searchAssetsLoaded = true;
     }
+    reviveSearchUi();
   };
 
   const resolveHref = (rawHref) => {
@@ -66,6 +79,7 @@
     root.innerHTML = doc.body.innerHTML;
     currentDocPath = route.fetchPath;
     ensureSearchAssets(route.fetchPath);
+    reviveSearchUi();
     if (pushState) {
       window.history.pushState({ cn1Javadoc: route.browserPath }, "", route.browserPath);
     }
