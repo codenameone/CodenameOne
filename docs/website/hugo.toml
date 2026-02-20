@@ -80,6 +80,12 @@ url = "https://cloud.codenameone.com/secure/index.html"
 weight = 15
 
 [[menu.main]]
+parent = "developers"
+name = "Initializr"
+url = "/initializr/"
+weight = 16
+
+[[menu.main]]
 identifier = "resources"
 name = "RESOURCES"
 url = "#"

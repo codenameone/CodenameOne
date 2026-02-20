@@ -17,6 +17,17 @@ HUGO_BASEURL="${HUGO_BASEURL:-https://www.codenameone.com/}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 WEBSITE_INCLUDE_JAVADOCS="${WEBSITE_INCLUDE_JAVADOCS:-false}"
 WEBSITE_INCLUDE_DEVGUIDE="${WEBSITE_INCLUDE_DEVGUIDE:-auto}"
+WEBSITE_INCLUDE_INITIALIZR="${WEBSITE_INCLUDE_INITIALIZR:-false}"
+CN1_USER="${CN1_USER:-}"
+CN1_TOKEN="${CN1_TOKEN:-}"
+
+if [ "${WEBSITE_INCLUDE_INITIALIZR}" = "auto" ]; then
+  if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
+    WEBSITE_INCLUDE_INITIALIZR="true"
+  else
+    WEBSITE_INCLUDE_INITIALIZR="false"
+  fi
+fi
 
 build_javadocs_for_site() {
   if [ "${WEBSITE_INCLUDE_JAVADOCS}" != "true" ]; then
@@ -267,6 +278,94 @@ PY
     "${source_dir}/" "${guide_dir}/"
 }
 
+build_initializr_for_site() {
+  if [ "${WEBSITE_INCLUDE_INITIALIZR}" != "true" ]; then
+    return
+  fi
+
+  echo "Building Initializr JavaScript bundle for website..." >&2
+  (
+    cd "${REPO_ROOT}/scripts/initializr"
+
+    run_initializr_mvn() {
+      if command -v xvfb-run >/dev/null 2>&1; then
+        xvfb-run -a ./mvnw "$@"
+      else
+        ./mvnw "$@"
+      fi
+    }
+
+    if [ -n "${JAVA_HOME_8_X64:-}" ]; then
+      export JAVA_HOME="${JAVA_HOME_8_X64}"
+      export PATH="${JAVA_HOME}/bin:${PATH}"
+    fi
+
+    # Ensure attached classifier artifact initializr-ZipSupport:jar:common is present
+    # in the local Maven repo before building modules that depend on it (e.g. initializr-common).
+    run_initializr_mvn -q -pl cn1libs/ZipSupport -am \
+      -DskipTests \
+      -Dcodename1.platform=javascript \
+      install
+
+    if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
+      if ! run_initializr_mvn -q -pl javascript -am \
+        cn1:set-user-token \
+        -Dcodename1.platform=javascript \
+        -Duser="${CN1_USER}" \
+        -Dtoken="${CN1_TOKEN}"; then
+        echo "cn1:set-user-token is unavailable in this plugin version; writing CN1 credentials directly to Java preferences." >&2
+        local tmp_dir
+        tmp_dir="$(mktemp -d)"
+        cat > "${tmp_dir}/SetCn1Prefs.java" <<'JAVA'
+import java.util.prefs.Preferences;
+
+public class SetCn1Prefs {
+    public static void main(String[] args) {
+        if (args.length != 2) {
+            throw new IllegalArgumentException("Usage: SetCn1Prefs <user> <token>");
+        }
+        Preferences prefs = Preferences.userRoot().node("/com/codename1/ui");
+        prefs.put("user", args[0]);
+        prefs.put("token", args[1]);
+    }
+}
+JAVA
+        javac "${tmp_dir}/SetCn1Prefs.java"
+        java -cp "${tmp_dir}" SetCn1Prefs "${CN1_USER}" "${CN1_TOKEN}"
+        rm -rf "${tmp_dir}"
+      fi
+    else
+      echo "CN1_USER/CN1_TOKEN not provided; building Initializr JavaScript without setting token." >&2
+    fi
+
+    run_initializr_mvn -q -pl javascript -am \
+      -DskipTests \
+      -Dautomated=true \
+      -Dcodename1.platform=javascript \
+      package
+  )
+
+  local output_dir="${WEBSITE_DIR}/static/initializr-app"
+  local result_zip="${REPO_ROOT}/scripts/initializr/javascript/target/result.zip"
+  if [ ! -f "${result_zip}" ]; then
+    result_zip="$(ls -1 "${REPO_ROOT}"/scripts/initializr/javascript/target/initializr-javascript-*.zip 2>/dev/null | head -n1 || true)"
+  fi
+
+  if [ -z "${result_zip}" ] || [ ! -f "${result_zip}" ]; then
+    echo "Could not locate Initializr JavaScript build zip output in scripts/initializr/javascript/target." >&2
+    exit 1
+  fi
+
+  rm -rf "${output_dir}"
+  mkdir -p "${output_dir}"
+  unzip -q -o "${result_zip}" -d "${output_dir}"
+
+  if [ ! -f "${output_dir}/index.html" ]; then
+    echo "Initializr website bundle is missing index.html after extraction." >&2
+    exit 1
+  fi
+}
+
 if ! command -v "${HUGO_BIN}" >/dev/null 2>&1; then
   echo "Hugo binary not found. Install Hugo (extended) and retry." >&2
   exit 1
@@ -274,6 +373,7 @@ fi
 
 build_javadocs_for_site
 build_developer_guide_for_site
+build_initializr_for_site
 
 cd "${WEBSITE_DIR}"
 

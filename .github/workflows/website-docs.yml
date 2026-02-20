@@ -34,11 +34,11 @@ jobs:
           hugo-version: 'latest'
           extended: true
 
-      - name: Set up Java 25
+      - name: Set up Java 8 for Initializr build
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: '8'
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -69,6 +69,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
+      - name: Set up Java 25 for website build
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
       - name: Build website
         run: |
           set -euo pipefail
@@ -76,6 +82,26 @@ jobs:
         env:
           WEBSITE_INCLUDE_JAVADOCS: "true"
           WEBSITE_INCLUDE_DEVGUIDE: "true"
+          WEBSITE_INCLUDE_INITIALIZR: "auto"
+          CN1_USER: ${{ secrets.CN1_USER }}
+          CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
+
+      - name: Validate Initializr page output
+        run: |
+          set -euo pipefail
+          test -f docs/website/public/initializr/index.html
+
+      - name: Validate Initializr JS bundle output
+        run: |
+          set -euo pipefail
+          if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
+            test -f docs/website/public/initializr-app/index.html
+          else
+            echo "CN1 credentials not configured; skipping Initializr JS bundle output validation."
+          fi
+        env:
+          CN1_USER: ${{ secrets.CN1_USER }}
+          CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
 
       - name: Validate redirects against local Pages runtime
         run: |
