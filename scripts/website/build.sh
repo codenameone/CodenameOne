@@ -44,6 +44,11 @@ build_javadocs_for_site() {
   mkdir -p "${WEBSITE_DIR}/static/javadoc" "${WEBSITE_DIR}/static/files"
   cp -a "${REPO_ROOT}/CodenameOne/dist/javadoc/." "${WEBSITE_DIR}/static/javadoc/"
   cp "${REPO_ROOT}/CodenameOne/javadocs.zip" "${WEBSITE_DIR}/static/files/javadocs.zip"
+  # Keep raw javadocs intact and reserve /javadoc/ for the Hugo themed wrapper page.
+  # The wrapper embeds /javadoc/_index-raw.html.
+  if [ -f "${WEBSITE_DIR}/static/javadoc/index.html" ]; then
+    mv "${WEBSITE_DIR}/static/javadoc/index.html" "${WEBSITE_DIR}/static/javadoc/_index-raw.html"
+  fi
 }
 
 build_developer_guide_for_site() {
