@@ -11,6 +11,19 @@
 </style>
   {{- end -}}
 {{- end -}}
+{{- if eq .Layout "api-javadoc" -}}
+  {{- $javadocCssPath := "static/javadoc/resource-files/stylesheet-scoped.css" -}}
+  {{- if fileExists $javadocCssPath -}}
+<style>
+{{ readFile $javadocCssPath | safeCSS }}
+</style>
+  {{- end -}}
+<script type="text/javascript" src="/javadoc/script-files/script.js"></script>
+<script type="text/javascript" src="/javadoc/script-files/jquery-3.7.1.min.js"></script>
+<script type="text/javascript" src="/javadoc/script-files/jquery-ui.min.js"></script>
+<script type="text/javascript" src="/javadoc/script-files/highlight.min.js"></script>
+<script type="text/javascript" src="/javadoc/script-files/javadoc-highlight-init.js"></script>
+{{- end -}}
 {{- with site.GetPage "section" "blog" -}}
   {{- with .OutputFormats.Get "RSS" -}}
 <link rel="alternate" type="{{ .MediaType.Type }}" href="{{ .Permalink }}" title="{{ site.Title }} Blog RSS">

@@ -2,36 +2,77 @@
   max-width: min(1700px, 98vw);
 }
 
-.post-single--api-javadoc .post-description {
-  margin-top: 0.35rem;
-}
-
-.post-single--api-javadoc .post-meta {
+.cn1-javadoc-links {
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  margin-top: 0.7rem;
+  margin: 0.4rem 0 1rem;
   font-size: 0.95rem;
 }
 
-.cn1-api-javadoc-frame-wrap {
-  margin-top: 1.1rem;
+.cn1-javadoc {
   border: 1px solid var(--border);
   border-radius: 12px;
-  overflow: hidden;
+  padding: 0.7rem;
   background: var(--entry);
+  color: var(--content);
+  --body-text-color: var(--content);
+  --block-text-color: var(--content);
+  --body-background-color: var(--entry);
+  --section-background-color: var(--entry);
+  --detail-background-color: var(--entry);
+  --code-background-color: var(--code-bg);
+  --pre-background-color: var(--code-bg);
+  --pre-text-color: var(--content);
+  --snippet-background-color: var(--code-bg);
+  --snippet-text-color: var(--content);
+  --table-header-color: color-mix(in srgb, var(--entry) 70%, var(--theme) 30%);
+  --even-row-color: var(--entry);
+  --odd-row-color: color-mix(in srgb, var(--entry) 90%, var(--theme) 10%);
+  --border-color: var(--border);
+  --title-color: var(--primary);
+  --link-color: var(--primary);
+  --link-color-active: var(--primary);
+  --toc-background-color: var(--theme);
+  --toc-hover-color: color-mix(in srgb, var(--entry) 80%, var(--theme) 20%);
+  --toc-highlight-color: color-mix(in srgb, var(--entry) 70%, var(--theme) 30%);
+  --navbar-background-color: color-mix(in srgb, var(--entry) 70%, #1f4a75 30%);
+  --navbar-text-color: var(--primary);
+  --subnav-background-color: color-mix(in srgb, var(--entry) 78%, var(--theme) 22%);
+  --subnav-link-color: var(--primary);
+  --selected-background-color: color-mix(in srgb, var(--primary) 26%, var(--entry) 74%);
+  --selected-text-color: var(--content);
+  --search-input-background-color: var(--entry);
+  --search-input-text-color: var(--content);
+  --search-input-placeholder-color: var(--secondary);
 }
 
-.cn1-api-javadoc-frame {
-  display: block;
-  width: 100%;
-  height: min(76vh, 1200px);
-  border: 0;
-  background: #fff;
+.cn1-javadoc .main-grid {
+  margin: 0;
 }
 
-@media (max-width: 900px) {
-  .cn1-api-javadoc-frame {
-    height: 72vh;
-  }
+.cn1-javadoc a {
+  color: var(--primary);
+}
+
+body.dark .cn1-javadoc {
+  background: var(--theme);
+  --body-background-color: var(--theme);
+  --section-background-color: var(--theme);
+  --detail-background-color: var(--theme);
+  --table-header-color: color-mix(in srgb, var(--theme) 70%, #1b2b40 30%);
+  --even-row-color: var(--theme);
+  --odd-row-color: color-mix(in srgb, var(--theme) 86%, #0d1726 14%);
+  --toc-background-color: #101a2a;
+  --toc-hover-color: #172439;
+  --toc-highlight-color: #1d2d45;
+  --navbar-background-color: #1b2d45;
+  --subnav-background-color: #152235;
+  --subnav-link-color: #cfe2ff;
+  --link-color: #b7d2ff;
+  --link-color-active: #d6e6ff;
+  --title-color: #e3edff;
+  --search-input-background-color: #111b2b;
+  --search-input-text-color: #e9eef7;
+  --search-input-placeholder-color: #8ea1bc;
 }

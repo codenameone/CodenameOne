@@ -41,13 +41,175 @@ build_javadocs_for_site() {
   )
 
   rm -rf "${WEBSITE_DIR}/static/javadoc"
-  mkdir -p "${WEBSITE_DIR}/static/javadoc" "${WEBSITE_DIR}/static/files"
+  mkdir -p "${WEBSITE_DIR}/static/javadoc" "${WEBSITE_DIR}/static/files" "${WEBSITE_DIR}/generated"
   cp -a "${REPO_ROOT}/CodenameOne/dist/javadoc/." "${WEBSITE_DIR}/static/javadoc/"
   cp "${REPO_ROOT}/CodenameOne/javadocs.zip" "${WEBSITE_DIR}/static/files/javadocs.zip"
-  # Keep raw javadocs intact and reserve /javadoc/ for the Hugo themed wrapper page.
-  # The wrapper embeds /javadoc/_index-raw.html.
+
   if [ -f "${WEBSITE_DIR}/static/javadoc/index.html" ]; then
     mv "${WEBSITE_DIR}/static/javadoc/index.html" "${WEBSITE_DIR}/static/javadoc/_index-raw.html"
+  fi
+
+  awk '
+    BEGIN { in_body = 0 }
+    /<body[^>]*>/ {
+      in_body = 1
+      sub(/^.*<body[^>]*>/, "")
+      if (length($0) > 0) print
+      next
+    }
+    in_body && /<\/body>/ {
+      sub(/<\/body>.*/, "")
+      if (length($0) > 0) print
+      exit
+    }
+    in_body { print }
+  ' "${WEBSITE_DIR}/static/javadoc/_index-raw.html" > "${WEBSITE_DIR}/generated/javadoc-content.html"
+
+  if [ -f "${WEBSITE_DIR}/static/javadoc/resource-files/stylesheet.css" ]; then
+    "${PYTHON_BIN}" - "${WEBSITE_DIR}/static/javadoc/resource-files/stylesheet.css" "${WEBSITE_DIR}/static/javadoc/resource-files/stylesheet-scoped.css" <<'PY'
+import re
+import sys
+
+src_path, out_path = sys.argv[1], sys.argv[2]
+src = open(src_path, "r", encoding="utf-8").read()
+src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+
+PREFIX = ".cn1-javadoc"
+
+def split_selectors(text):
+    out, cur = [], []
+    depth_paren = depth_bracket = 0
+    in_string = None
+    escape = False
+    for ch in text:
+        if in_string:
+            cur.append(ch)
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == in_string:
+                in_string = None
+            continue
+        if ch in ("'", '"'):
+            in_string = ch
+            cur.append(ch)
+            continue
+        if ch == "(":
+            depth_paren += 1
+        elif ch == ")":
+            depth_paren = max(0, depth_paren - 1)
+        elif ch == "[":
+            depth_bracket += 1
+        elif ch == "]":
+            depth_bracket = max(0, depth_bracket - 1)
+        if ch == "," and depth_paren == 0 and depth_bracket == 0:
+            out.append("".join(cur))
+            cur = []
+            continue
+        cur.append(ch)
+    out.append("".join(cur))
+    return out
+
+def transform_selector(sel):
+    sel = sel.strip()
+    if not sel:
+        return sel
+    if PREFIX in sel:
+        return sel
+    if sel in ("html", "body", ":root"):
+        return PREFIX
+    return f"{PREFIX} {sel}"
+
+def extract_block(text, start):
+    depth = 1
+    i = start
+    n = len(text)
+    in_string = None
+    escape = False
+    while i < n:
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == in_string:
+                in_string = None
+            i += 1
+            continue
+        if ch in ("'", '"'):
+            in_string = ch
+            i += 1
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:i], i + 1
+        i += 1
+    return text[start:], n
+
+def process(css):
+    out = []
+    i = 0
+    n = len(css)
+    while i < n:
+        j = i
+        depth_paren = depth_bracket = 0
+        in_string = None
+        escape = False
+        while j < n:
+            ch = css[j]
+            if in_string:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == in_string:
+                    in_string = None
+                j += 1
+                continue
+            if ch in ("'", '"'):
+                in_string = ch
+                j += 1
+                continue
+            if ch == "(":
+                depth_paren += 1
+            elif ch == ")":
+                depth_paren = max(0, depth_paren - 1)
+            elif ch == "[":
+                depth_bracket += 1
+            elif ch == "]":
+                depth_bracket = max(0, depth_bracket - 1)
+            if depth_paren == 0 and depth_bracket == 0 and ch in "{;":
+                break
+            j += 1
+        if j >= n:
+            out.append(css[i:])
+            break
+        prelude = css[i:j].strip()
+        term = css[j]
+        if term == ";":
+            out.append(css[i:j + 1])
+            i = j + 1
+            continue
+        block, next_i = extract_block(css, j + 1)
+        low = prelude.lower()
+        if low.startswith("@media") or low.startswith("@supports"):
+            out.append(f"{prelude}{{{process(block)}}}")
+        elif low.startswith("@"):
+            out.append(f"{prelude}{{{block}}}")
+        else:
+            selectors = [transform_selector(s) for s in split_selectors(prelude)]
+            out.append(f"{','.join(selectors)}{{{block}}}")
+        i = next_i
+    return "".join(out)
+
+with open(out_path, "w", encoding="utf-8") as f:
+    f.write(process(src))
+PY
   fi
 }
 

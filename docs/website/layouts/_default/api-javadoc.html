@@ -1,25 +1,21 @@
 {{- define "main" -}}
 <article class="post-single post-single--api-javadoc">
-  <header class="post-header">
-    {{ partial "breadcrumbs.html" . }}
-    <h1 class="post-title entry-hint-parent">{{ .Title }}</h1>
-    <div class="post-description">
-      Browse the Codename One JavaDoc with the standard website navigation and theme.
-    </div>
-    <div class="post-meta">
-      <a href="/javadoc/_index-raw.html">Open raw JavaDoc</a>
-      <span>&middot;</span>
-      <a href="/files/javadocs.zip">Download ZIP</a>
-    </div>
-  </header>
+  <div class="cn1-javadoc-links">
+    <a href="/javadoc/_index-raw.html">Open raw JavaDoc</a>
+    <span>&middot;</span>
+    <a href="/files/javadocs.zip">Download ZIP</a>
+  </div>
 
-  <div class="cn1-api-javadoc-frame-wrap">
-    <iframe
-      class="cn1-api-javadoc-frame"
-      src="/javadoc/_index-raw.html"
-      title="Codename One JavaDoc"
-      loading="lazy">
-    </iframe>
+  <div class="cn1-javadoc">
+    {{- $javadocFragment := "generated/javadoc-content.html" -}}
+    {{- if fileExists $javadocFragment -}}
+      {{- readFile $javadocFragment | safeHTML -}}
+    {{- else -}}
+      <p>
+        JavaDoc content isn't generated in this build.
+        Run the website build with <code>WEBSITE_INCLUDE_JAVADOCS=true</code>.
+      </p>
+    {{- end -}}
   </div>
 </article>
 {{- end -}}
