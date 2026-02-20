@@ -1,11 +1,5 @@
 {{- define "main" }}
 <section class="cn1-initializr-page">
-  <header class="cn1-initializr-header">
-    {{ partial "breadcrumbs.html" . }}
-    <h1>{{ .Title }}</h1>
-    {{ with .Description }}<p>{{ . }}</p>{{ end }}
-  </header>
-
   <div class="cn1-initializr-shell" id="cn1-initializr-shell">
     <div class="cn1-initializr-loader" id="cn1-initializr-loader" aria-live="polite">
       <img class="icon" src="/initializr-app/icon.png" alt="Initializr icon" />
@@ -26,27 +20,21 @@
 </section>
 
 <style>
-  .cn1-initializr-page {
-    max-width: 1180px;
-    margin: 0 auto;
-    padding: 1.25rem 1rem 2rem;
-  }
+.cn1-initializr-page {
+  height: 100%;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0.75rem;
+  box-sizing: border-box;
+}
 
-  .cn1-initializr-header h1 {
-    margin: 0.25rem 0 0.35rem;
-  }
-
-  .cn1-initializr-header p {
-    margin: 0 0 1rem;
-    opacity: 0.82;
-  }
-
-  .cn1-initializr-shell {
-    position: relative;
-    min-height: clamp(420px, 62vh, 760px);
-    border-radius: 16px;
-    overflow: hidden;
-    border: 1px solid var(--border);
+.cn1-initializr-shell {
+  position: relative;
+  height: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border);
     background: radial-gradient(circle at 20% 0%, #e9f1ff 0%, #f9fbff 40%, #ffffff 100%);
     box-shadow: 0 14px 42px rgba(0, 0, 0, 0.12);
   }
@@ -122,8 +110,8 @@
     opacity: 0.88;
   }
 
-  .cn1-initializr-frame {
-    position: absolute;
+.cn1-initializr-frame {
+  position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
@@ -137,20 +125,43 @@
 
   @keyframes cn1-shimmer {
     0% { transform: translateX(-120%); }
-    100% { transform: translateX(300%); }
-  }
+  100% { transform: translateX(300%); }
+}
+
+body.cn1-initializr-page-body {
+  overflow: hidden;
+}
+
+body.cn1-initializr-page-body .main {
+  padding: 0;
+  margin: 0;
+  height: calc(100dvh - var(--cn1-initializr-header-height, 76px));
+  overflow: hidden;
+}
 </style>
 
 <script>
-  (function () {
-    var frame = document.getElementById("cn1-initializr-frame");
-    var loader = document.getElementById("cn1-initializr-loader");
-    if (!frame || !loader) {
-      return;
-    }
+(function () {
+  var body = document.body;
+  var root = document.documentElement;
+  var frame = document.getElementById("cn1-initializr-frame");
+  var loader = document.getElementById("cn1-initializr-loader");
+  var siteHeader = document.querySelector(".header");
+
+  function syncHeight() {
+    var h = siteHeader ? siteHeader.offsetHeight : 76;
+    root.style.setProperty("--cn1-initializr-header-height", h + "px");
+  }
+
+  body.classList.add("cn1-initializr-page-body");
+  syncHeight();
+  window.addEventListener("resize", syncHeight);
+
+  if (frame && loader) {
     frame.addEventListener("load", function () {
       loader.classList.add("done");
     });
-  })();
+  }
+})();
 </script>
 {{- end }}
