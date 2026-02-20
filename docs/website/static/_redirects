@@ -8,7 +8,11 @@
 /files/CN1Libs.xml https://raw.githubusercontent.com/codenameone/CodenameOneLibs/refs/heads/master/CN1Libs.xml 302
 /files/CN1Libs.xml/ https://raw.githubusercontent.com/codenameone/CodenameOneLibs/refs/heads/master/CN1Libs.xml 302
 /files/CodenameOneBuildClient.jar https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar 302
-/files/CodeNameOneBuildClient.jar https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/CodeNameOneBuildClient.jar 302
+/files/UpdateCodenameOne.jar https://download.codenameone.com/files/UpdateCodenameOne.jar
+/files/cef-win64.zip https://download.codenameone.com/files/cef-win64.zip
+/files/cef-win.zip https://download.codenameone.com/files/cef-win.zip
+/files/cef-mac.zip https://download.codenameone.com/files/cef-mac.zip
+/files/cef-linux64.zip https://download.codenameone.com/files/cef-linux64.zip
 
 # High-priority legacy URL redirects (Cloudflare)
 /videos.html /videos/ 301
@@ -1008,6 +1012,14 @@
 
 # Dynamic placeholder/splat redirects (must stay at end for Cloudflare Pages)
 /files/cn1libs/* https://github.com/codenameone/CodenameOneLibs/raw/refs/heads/master/cn1libs/:splat 302
+/files/updates/* https://downloads.codenameone.com/files/updates/:splat 302
+/files/pr/* https://downloads.codenameone.com/files/pr/:splat 302
+/files/eclipse/* https://downloads.codenameone.com/files/eclipse/:splat 302
+/files/netbeans/* https://downloads.codenameone.com/files/netbeans/:splat 302
+/files/uber-book/* https://downloads.codenameone.com/files/uber-book/:splat 302
+/files/kitchensink/* https://downloads.codenameone.com/files/kitchensink/:splat 302
+/files/Themes/* https://downloads.codenameone.com/files/Themes/:splat 302
+
 /tag/* /tags/:splat/ 301
 /author/* /blog/ 301
 /demos/*.html /:splat/ 301
