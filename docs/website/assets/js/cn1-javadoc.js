@@ -113,6 +113,19 @@
     loadIntoContainer(route, true).catch(() => {});
   });
 
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest(".ui-autocomplete a[href], .ui-menu a[href]");
+    if (!link || link.target || link.hasAttribute("download")) return;
+    const rawHref = link.getAttribute("href");
+    if (!rawHref || rawHref.startsWith("#")) return;
+    const resolved = resolveHref(rawHref);
+    if (!resolved) return;
+    const route = toRoute(resolved);
+    if (!route) return;
+    event.preventDefault();
+    loadIntoContainer(route, true).catch(() => {});
+  }, true);
+
   window.addEventListener("popstate", () => {
     const route = toRoute(window.location.href);
     if (!route) return;
