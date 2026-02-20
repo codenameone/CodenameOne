@@ -91,7 +91,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String pom = getText(entries, "pom.xml");
         assertContains(pom, packageName, "Root pom should include package as groupId");
         assertContains(pom, mainClassName.toLowerCase(), "Root pom should include app artifact/name");
-        assertContains(pom, "<cn1.plugin.version>7.0.224</cn1.plugin.version>", "Root pom should use current CN1 plugin version");
+        assertContains(pom, "<cn1.plugin.version>7.0.250</cn1.plugin.version>", "Root pom should use current CN1 plugin version");
         assertFalse(pom.indexOf("com.example.myapp") >= 0, "Root pom still contains placeholder package");
         assertFalse(pom.indexOf("myappname") >= 0, "Root pom still contains placeholder app name");
     }
