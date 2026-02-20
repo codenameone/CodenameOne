@@ -6,271 +6,151 @@
     {{ with .Description }}<p>{{ . }}</p>{{ end }}
   </header>
 
-  <div class="cn1-initializr-shell">
-    <div id="cn1-splash" class="cn1-splash">
+  <div class="cn1-initializr-shell" id="cn1-initializr-shell">
+    <div class="cn1-initializr-loader" id="cn1-initializr-loader" aria-live="polite">
       <img class="icon" src="/initializr-app/icon.png" alt="Initializr icon" />
-      <div class="cn1-loader"></div>
-      <div class="progress-bar">
-        <div class="progress-bar-internal"></div>
+      <div class="cn1-loader-ring"></div>
+      <div class="cn1-loader-progress">
+        <div class="cn1-loader-progress-bar"></div>
       </div>
-      <p class="cn1-splash-label">Preparing Initializr...</p>
+      <p class="cn1-loader-label">Loading Initializr...</p>
     </div>
-    <canvas width="320" height="480" id="codenameone-canvas"></canvas>
+    <iframe
+            id="cn1-initializr-frame"
+            class="cn1-initializr-frame"
+            src="/initializr-app/index.html"
+            title="Codename One Initializr"
+            loading="eager">
+    </iframe>
   </div>
 </section>
 
 <style>
-.cn1-initializr-page {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 1.25rem 1rem 2rem;
-}
-
-.cn1-initializr-header h1 {
-  margin: 0.25rem 0 0.35rem;
-}
-
-.cn1-initializr-header p {
-  margin: 0 0 1rem;
-  opacity: 0.82;
-}
-
-.cn1-initializr-shell {
-  position: relative;
-  min-height: clamp(560px, 74vh, 900px);
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  background: radial-gradient(circle at 20% 0%, #e9f1ff 0%, #f9fbff 40%, #ffffff 100%);
-  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.12);
-}
-
-html.dark .cn1-initializr-shell {
-  background: radial-gradient(circle at 20% 0%, #172236 0%, #121a2a 45%, #0d1321 100%);
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.48);
-}
-
-#codenameone-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.cn1-splash {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 1rem;
-  z-index: 2;
-  text-align: center;
-  padding: 2rem;
-  color: #1d2638;
-  background:
-    radial-gradient(1000px 420px at 20% 0%, rgba(99, 142, 255, 0.22), rgba(99, 142, 255, 0) 65%),
-    radial-gradient(720px 360px at 100% 100%, rgba(60, 173, 216, 0.2), rgba(60, 173, 216, 0) 65%);
-}
-
-html.dark .cn1-splash {
-  color: #d8e4ff;
-}
-
-.cn1-splash img.icon {
-  width: 110px;
-  height: auto;
-  border-radius: 18px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
-}
-
-.cn1-loader {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  border: 3px solid rgba(49, 105, 230, 0.25);
-  border-top-color: #3169e6;
-  animation: cn1-spin 0.9s linear infinite;
-}
-
-.cn1-splash .progress-bar {
-  display: block;
-  width: min(340px, 75vw);
-  height: 9px;
-  border-radius: 999px;
-  overflow: hidden;
-  border: 1px solid rgba(49, 105, 230, 0.25);
-  background: rgba(255, 255, 255, 0.7);
-}
-
-.cn1-splash .progress-bar .progress-bar-internal {
-  width: 0;
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #2f66e4, #3dc8d1);
-  box-shadow: 0 0 18px rgba(47, 102, 228, 0.5);
-  transition: width 160ms ease-out;
-}
-
-.cn1-splash .cn1-splash-label {
-  margin: 0;
-  font-size: 0.95rem;
-  opacity: 0.88;
-}
-
-.cn1-edit-string, .cn1-string-picker {
-  position: absolute;
-  background-color: transparent;
-  z-index: 1000;
-  box-sizing: content-box;
-}
-
-.cn1-native-peer {
-  position: absolute;
-  border: none;
-}
-
-.cn1-capture-dialog,
-.cn1-capture-preview-dialog {
-  position: fixed;
-  top: 10px;
-  left: 10px;
-  right: 10px;
-  bottom: 10px;
-  border: 1px solid #222;
-  background: rgba(33, 33, 33, 0.9);
-  z-index: 1000;
-}
-
-@keyframes cn1-spin {
-  to {
-    transform: rotate(360deg);
+  .cn1-initializr-page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 1.25rem 1rem 2rem;
   }
-}
+
+  .cn1-initializr-header h1 {
+    margin: 0.25rem 0 0.35rem;
+  }
+
+  .cn1-initializr-header p {
+    margin: 0 0 1rem;
+    opacity: 0.82;
+  }
+
+  .cn1-initializr-shell {
+    position: relative;
+    min-height: clamp(420px, 62vh, 760px);
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: radial-gradient(circle at 20% 0%, #e9f1ff 0%, #f9fbff 40%, #ffffff 100%);
+    box-shadow: 0 14px 42px rgba(0, 0, 0, 0.12);
+  }
+
+  body.dark .cn1-initializr-shell {
+    background: radial-gradient(circle at 20% 0%, #172236 0%, #121a2a 45%, #0d1321 100%);
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.48);
+  }
+
+  .cn1-initializr-loader {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 1rem;
+    z-index: 2;
+    text-align: center;
+    padding: 2rem;
+    color: #1d2638;
+    background:
+      radial-gradient(1000px 420px at 20% 0%, rgba(99, 142, 255, 0.22), rgba(99, 142, 255, 0) 65%),
+      radial-gradient(720px 360px at 100% 100%, rgba(60, 173, 216, 0.2), rgba(60, 173, 216, 0) 65%);
+    transition: opacity 220ms ease-out, visibility 220ms ease-out;
+  }
+
+  .cn1-initializr-loader.done {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  body.dark .cn1-initializr-loader {
+    color: #d8e4ff;
+  }
+
+  .cn1-initializr-loader .icon {
+    width: 110px;
+    height: auto;
+    border-radius: 18px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+  }
+
+  .cn1-loader-ring {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 3px solid rgba(49, 105, 230, 0.25);
+    border-top-color: #3169e6;
+    animation: cn1-spin 0.9s linear infinite;
+  }
+
+  .cn1-loader-progress {
+    width: min(340px, 75vw);
+    height: 9px;
+    border-radius: 999px;
+    overflow: hidden;
+    border: 1px solid rgba(49, 105, 230, 0.25);
+    background: rgba(255, 255, 255, 0.7);
+  }
+
+  .cn1-loader-progress-bar {
+    width: 35%;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #2f66e4, #3dc8d1);
+    box-shadow: 0 0 18px rgba(47, 102, 228, 0.5);
+    animation: cn1-shimmer 1.2s ease-in-out infinite;
+  }
+
+  .cn1-loader-label {
+    margin: 0;
+    font-size: 0.95rem;
+    opacity: 0.88;
+  }
+
+  .cn1-initializr-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: transparent;
+  }
+
+  @keyframes cn1-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes cn1-shimmer {
+    0% { transform: translateX(-120%); }
+    100% { transform: translateX(300%); }
+  }
 </style>
 
 <script>
-window.cn1_debug_flags = {
-  disableTouchstart: false,
-  disableTouchend: false,
-  disableHover: false,
-  disableMouseup: false,
-  disableMousedown: false,
-  disableWheel: false,
-  debugLog: false,
-  useNativeQueue: false
-};
-
-(function() {
-  var cn1ToLoad = {
-    "teavm/classes.js": {size: 0, loaded: false},
-    "style.css": {size: 4923, loaded: false},
-    "js/pwa.js": {size: 584, loaded: false},
-    "js/bootstrap.min.js": {size: 35951, loaded: false},
-    "js/fontmetrics.js": {size: 145730, loaded: false},
-    "js/upup.min.js": {size: 939, loaded: false},
-    "js/push.js": {size: 12310, loaded: false},
-    "js/jquery.min.js": {size: 84319, loaded: false},
-    "js/manup.js": {size: 6493, loaded: false},
-    "css/bootstrap-theme.min.css": {size: 19963, loaded: false},
-    "css/bootstrap.min.css": {size: 117305, loaded: false},
-    "assets/material-design-font.ttf": {size: 353892, loaded: false},
-    "assets/grub-css.zip": {size: 1915434, loaded: false},
-    "assets/barebones-css.zip": {size: 599, loaded: false},
-    "assets/cn1-version-numbers": {size: 41, loaded: false},
-    "assets/iOS7Theme.res": {size: 300158, loaded: false},
-    "assets/common.zip": {size: 297101, loaded: false},
-    "assets/idea.zip": {size: 4555, loaded: false},
-    "assets/tweet-css.zip": {size: 2884, loaded: false},
-    "assets/android_holo_light.res": {size: 114442, loaded: false},
-    "assets/grub-cn1libs.zip": {size: 967546, loaded: false},
-    "assets/tweet-pom.xml": {size: 16251, loaded: false},
-    "assets/vscode.zip": {size: 1024, loaded: false},
-    "assets/CN1Resource.res": {size: 5961, loaded: false},
-    "assets/kotlin-pom.xml": {size: 15565, loaded: false},
-    "assets/theme.res": {size: 425304, loaded: false},
-    "assets/tweet-src.zip": {size: 357703, loaded: false},
-    "assets/barebones-src.zip": {size: 1327, loaded: false},
-    "assets/grub-pom.xml": {size: 15778, loaded: false},
-    "assets/barebones-pom.xml": {size: 15843, loaded: false},
-    "assets/grub-src.zip": {size: 279805, loaded: false},
-    "assets/eclipse.zip": {size: 11898, loaded: false},
-    "assets/kotlin-src.zip": {size: 1507, loaded: false},
-    "assets/netbeans.zip": {size: 2877, loaded: false}
-  };
-
-  window.cn1LoadedFile = function(filename) {
-    if (filename.indexOf("?") >= 0) {
-      filename = filename.substring(0, filename.indexOf("?"));
-    }
-    if (cn1ToLoad[filename]) {
-      cn1ToLoad[filename].loaded = true;
-    }
-  };
-
-  var progressTimer = window.setInterval(function() {
-    if (!window.jQuery) {
+  (function () {
+    var frame = document.getElementById("cn1-initializr-frame");
+    var loader = document.getElementById("cn1-initializr-loader");
+    if (!frame || !loader) {
       return;
     }
-    var splash = jQuery("#cn1-splash");
-    if (splash.length === 0) {
-      clearInterval(progressTimer);
-      return;
-    }
-    var bytesRequired = 0;
-    var bytesLoaded = 0;
-    for (var f in cn1ToLoad) {
-      bytesRequired += cn1ToLoad[f].size;
-      if (cn1ToLoad[f].loaded) {
-        bytesLoaded += cn1ToLoad[f].size;
-      }
-    }
-    if (bytesRequired > 0) {
-      var pct = Math.min(100, Math.round(bytesLoaded / bytesRequired * 100));
-      jQuery(".progress-bar-internal", splash).css("width", pct + "%");
-      if (pct >= 100) {
-        jQuery(".cn1-splash-label", splash).text("Launching Initializr...");
-      }
-    }
-  }, 180);
-})();
-</script>
-<link rel="stylesheet" href="/initializr-app/css/bootstrap.min.css">
-<link rel="stylesheet" href="/initializr-app/css/bootstrap-theme.min.css">
-<link rel="stylesheet" href="/initializr-app/style.css">
-<script src="/initializr-app/js/push.js"></script>
-<script>window.cn1LoadedFile("js/push.js");</script>
-<script src="/initializr-app/js/jquery.min.js"></script>
-<script>window.cn1LoadedFile("js/jquery.min.js");</script>
-<script src="/initializr-app/js/fontmetrics.js"></script>
-<script>window.cn1LoadedFile("js/fontmetrics.js");</script>
-<script src="/initializr-app/teavm/classes.js"></script>
-<script>window.cn1LoadedFile("teavm/classes.js");</script>
-<script>
-  (function() {
-    function splashMessage(msg) {
-      var node = document.querySelector("#cn1-splash .cn1-splash-label");
-      if (node) {
-        node.textContent = msg;
-      }
-    }
-    if (!window.jQuery) {
-      splashMessage("Initializr bundle is unavailable in this preview.");
-      return;
-    }
-    jQuery(document).ready(function() {
-      if (typeof window.main === "function") {
-        window.main();
-      } else {
-        splashMessage("Initializr failed to initialize.");
-      }
+    frame.addEventListener("load", function () {
+      loader.classList.add("done");
     });
   })();
 </script>
-<script src="/initializr-app/js/bootstrap.min.js"></script>
-<script>window.cn1LoadedFile("js/bootstrap.min.js");</script>
-<script src="/initializr-app/js/upup.min.js"></script>
-<script>window.cn1LoadedFile("js/upup.min.js");</script>
-<script src="/initializr-app/js/manup.js"></script>
-<script>window.cn1LoadedFile("js/manup.js");</script>
 {{- end }}
