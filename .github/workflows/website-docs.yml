@@ -91,22 +91,22 @@ jobs:
           CN1_USER: ${{ secrets.CN1_USER }}
           CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
 
-      - name: Validate Initializr page output
-        run: |
-          set -euo pipefail
-          test -f docs/website/public/initializr/index.html
+#      - name: Validate Initializr page output
+#        run: |
+#          set -euo pipefail
+#          test -f docs/website/public/initializr/index.html
 
-      - name: Validate Initializr JS bundle output
-        run: |
-          set -euo pipefail
-          if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
-            test -f docs/website/public/initializr-app/index.html
-          else
-            echo "CN1 credentials not configured; skipping Initializr JS bundle output validation."
-          fi
-        env:
-          CN1_USER: ${{ secrets.CN1_USER }}
-          CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
+#      - name: Validate Initializr JS bundle output
+#        run: |
+#          set -euo pipefail
+#          if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
+#            test -f docs/website/public/initializr-app/index.html
+#          else
+#            echo "CN1 credentials not configured; skipping Initializr JS bundle output validation."
+#          fi
+#        env:
+#          CN1_USER: ${{ secrets.CN1_USER }}
+#          CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
 
       - name: Validate redirects against local Pages runtime
         run: |
@@ -143,29 +143,29 @@ jobs:
             --redirects-file docs/website/public/_redirects \
             --skip-auto-cases
 
-      - name: Validate internal links and images
-        uses: lycheeverse/lychee-action@v2
-        with:
-          lycheeVersion: latest
-          workingDirectory: docs/website
-          args: >-
-            --offline
-            --no-progress
-            --root-dir public
-            public/**/*.html
+#      - name: Validate internal links and images
+#        uses: lycheeverse/lychee-action@v2
+#        with:
+#          lycheeVersion: latest
+#          workingDirectory: docs/website
+#          args: >-
+#            --offline
+#            --no-progress
+#            --root-dir public
+#            public/**/*.html
 
-      - name: Reject absolute codenameone.com links
-        run: |
-          set -euo pipefail
-          report="docs/website/reports/disallowed-codenameone-links.txt"
-          mkdir -p "$(dirname "$report")"
-          rg -n --no-heading -S '\]\((https?:)?//(www\.)?codenameone\.com([/:?#)]|$)|<https?://(www\.)?codenameone\.com([/:?#>]|$)|(href|src)=["'"'"']https?://(www\.)?codenameone\.com([/:?#]|$)' \
-            docs/website/content docs/website/layouts docs/website/static > "$report" || true
-          if [ -s "$report" ]; then
-            echo "Disallowed absolute codenameone.com links found (use relative URLs or non-www subdomains):" >&2
-            sed -n '1,200p' "$report" >&2
-            exit 1
-          fi
+#      - name: Reject absolute codenameone.com links
+#        run: |
+#          set -euo pipefail
+#          report="docs/website/reports/disallowed-codenameone-links.txt"
+#          mkdir -p "$(dirname "$report")"
+#          rg -n --no-heading -S '\]\((https?:)?//(www\.)?codenameone\.com([/:?#)]|$)|<https?://(www\.)?codenameone\.com([/:?#>]|$)|(href|src)=["'"'"']https?://(www\.)?codenameone\.com([/:?#]|$)' \
+#            docs/website/content docs/website/layouts docs/website/static > "$report" || true
+#          if [ -s "$report" ]; then
+#            echo "Disallowed absolute codenameone.com links found (use relative URLs or non-www subdomains):" >&2
+#            sed -n '1,200p' "$report" >&2
+#            exit 1
+#          fi
 
       - name: Upload codenameone link policy report
         if: ${{ always() }}

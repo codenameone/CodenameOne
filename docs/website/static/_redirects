@@ -1012,13 +1012,13 @@
 
 # Dynamic placeholder/splat redirects (must stay at end for Cloudflare Pages)
 /files/cn1libs/* https://github.com/codenameone/CodenameOneLibs/raw/refs/heads/master/cn1libs/:splat 302
-/files/updates/* https://downloads.codenameone.com/files/updates/:splat 302
-/files/pr/* https://downloads.codenameone.com/files/pr/:splat 302
-/files/eclipse/* https://downloads.codenameone.com/files/eclipse/:splat 302
-/files/netbeans/* https://downloads.codenameone.com/files/netbeans/:splat 302
-/files/uber-book/* https://downloads.codenameone.com/files/uber-book/:splat 302
-/files/kitchensink/* https://downloads.codenameone.com/files/kitchensink/:splat 302
-/files/Themes/* https://downloads.codenameone.com/files/Themes/:splat 302
+/files/updates/* https://download.codenameone.com/files/updates/:splat 302
+/files/pr/* https://download.codenameone.com/files/pr/:splat 302
+/files/eclipse/* https://download.codenameone.com/files/eclipse/:splat 302
+/files/netbeans/* https://download.codenameone.com/files/netbeans/:splat 302
+/files/uber-book/* https://download.codenameone.com/files/uber-book/:splat 302
+/files/kitchensink/* https://download.codenameone.com/files/kitchensink/:splat 302
+/files/Themes/* https://download.codenameone.com/files/Themes/:splat 302
 
 /tag/* /tags/:splat/ 301
 /author/* /blog/ 301
