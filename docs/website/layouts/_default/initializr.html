@@ -23,26 +23,20 @@
 .cn1-initializr-page {
   height: 100%;
   width: 100%;
-  max-width: none;
   margin: 0;
-  padding: 0.75rem;
+  padding: 0;
   box-sizing: border-box;
 }
 
 .cn1-initializr-shell {
   position: relative;
   height: 100%;
-  border-radius: 16px;
   overflow: hidden;
-  border: 1px solid var(--border);
-    background: radial-gradient(circle at 20% 0%, #e9f1ff 0%, #f9fbff 40%, #ffffff 100%);
-    box-shadow: 0 14px 42px rgba(0, 0, 0, 0.12);
-  }
-
-  body.dark .cn1-initializr-shell {
-    background: radial-gradient(circle at 20% 0%, #172236 0%, #121a2a 45%, #0d1321 100%);
-    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.48);
-  }
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
 
   .cn1-initializr-loader {
     position: absolute;
@@ -135,6 +129,8 @@ body.cn1-initializr-page-body {
 body.cn1-initializr-page-body .main {
   padding: 0;
   margin: 0;
+  max-width: none;
+  width: 100%;
   height: calc(100dvh - var(--cn1-initializr-header-height, 76px));
   overflow: hidden;
 }
