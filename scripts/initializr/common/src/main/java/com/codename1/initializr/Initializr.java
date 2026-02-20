@@ -11,6 +11,7 @@ import com.codename1.initializr.model.ProjectOptions;
 import com.codename1.initializr.model.Template;
 import com.codename1.initializr.ui.TemplatePreviewPanel;
 import com.codename1.system.Lifecycle;
+import com.codename1.system.NativeLookup;
 import com.codename1.ui.Button;
 import com.codename1.ui.ButtonGroup;
 import com.codename1.ui.CheckBox;
@@ -25,9 +26,12 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.util.UITimer;
 import com.codename1.util.StringUtil;
 
 public class Initializr extends Lifecycle {
+    private boolean websiteDarkMode;
+
     @Override
     public void runApp() {
         final Form form = new Form("", new BorderLayout());
@@ -132,6 +136,7 @@ public class Initializr extends Lifecycle {
         appNameField.addDataChangedListener((type, index) -> refresh.run());
         packageField.addDataChangedListener((type, index) -> refresh.run());
         refresh.run();
+        initWebsiteThemeSync(form);
         form.show();
     }
 
@@ -322,6 +327,92 @@ public class Initializr extends Lifecycle {
 
     private boolean supportsLivePreview(Template template) {
         return template == Template.BAREBONES || template == Template.KOTLIN;
+    }
+
+    private void initWebsiteThemeSync(Form form) {
+        WebsiteThemeNative websiteThemeNative = NativeLookup.create(WebsiteThemeNative.class);
+        if (websiteThemeNative == null || !websiteThemeNative.isSupported()) {
+            return;
+        }
+        websiteDarkMode = websiteThemeNative.isDarkMode();
+        applyWebsiteTheme(form, websiteDarkMode);
+        UITimer.timer(900, true, form, () -> {
+            boolean dark = websiteThemeNative.isDarkMode();
+            if (dark != websiteDarkMode) {
+                websiteDarkMode = dark;
+                applyWebsiteTheme(form, dark);
+                form.revalidate();
+            }
+        });
+    }
+
+    private void applyWebsiteTheme(Component component, boolean dark) {
+        String uiid = component.getUIID();
+        String themed = themedUiid(uiid, dark);
+        if (!uiid.equals(themed)) {
+            component.setUIID(themed);
+        }
+        if (component instanceof Container) {
+            Container cnt = (Container) component;
+            for (int i = 0; i < cnt.getComponentCount(); i++) {
+                applyWebsiteTheme(cnt.getComponentAt(i), dark);
+            }
+        }
+    }
+
+    private String themedUiid(String uiid, boolean dark) {
+        if (uiid == null || uiid.length() == 0) {
+            return uiid;
+        }
+        if (dark) {
+            if (uiid.endsWith("Dark")) {
+                return uiid;
+            }
+            switch (uiid) {
+                case "InitializrForm":
+                case "InitializrRoot":
+                case "InitializrHeaderCard":
+                case "InitializrCard":
+                case "InitializrHeroTitle":
+                case "InitializrHeroSubtitle":
+                case "InitializrSectionTitle":
+                case "InitializrFieldLabel":
+                case "InitializrField":
+                case "InitializrFieldHint":
+                case "InitializrChoice":
+                case "InitializrSummary":
+                case "InitializrTip":
+                case "InitializrValidationError":
+                case "InitializrHelpButton":
+                    return uiid + "Dark";
+                default:
+                    return uiid;
+            }
+        }
+        if (!uiid.endsWith("Dark")) {
+            return uiid;
+        }
+        String base = uiid.substring(0, uiid.length() - "Dark".length());
+        switch (base) {
+            case "InitializrForm":
+            case "InitializrRoot":
+            case "InitializrHeaderCard":
+            case "InitializrCard":
+            case "InitializrHeroTitle":
+            case "InitializrHeroSubtitle":
+            case "InitializrSectionTitle":
+            case "InitializrFieldLabel":
+            case "InitializrField":
+            case "InitializrFieldHint":
+            case "InitializrChoice":
+            case "InitializrSummary":
+            case "InitializrTip":
+            case "InitializrValidationError":
+            case "InitializrHelpButton":
+                return base;
+            default:
+                return uiid;
+        }
     }
 
     private void setEnabledRecursive(Component component, boolean enabled) {
