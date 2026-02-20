@@ -7,7 +7,6 @@
   }
 
   let currentDocPath = "/javadoc/_index-raw.html";
-  let searchAssetsLoaded = false;
 
   const reviveSearchUi = () => {
     const inputs = root.querySelectorAll('input[type="search"], input#search-input, #search-input');
@@ -23,10 +22,6 @@
 
   const ensureSearchAssets = (fetchPath) => {
     window.pathtoroot = calcPathToRoot(fetchPath);
-    if (!searchAssetsLoaded && typeof window.loadScripts === "function") {
-      window.loadScripts(document, "script");
-      searchAssetsLoaded = true;
-    }
     reviveSearchUi();
   };
 

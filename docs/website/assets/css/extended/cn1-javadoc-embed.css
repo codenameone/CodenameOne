@@ -1,6 +1,16 @@
+.main:has(.post-single--api-javadoc) {
+  max-width: 100vw;
+  width: 100vw;
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .post-single--api-javadoc {
-  max-width: min(2200px, 99vw);
+  max-width: 100vw;
   width: 100%;
+  margin: 0;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .cn1-javadoc-links {
@@ -13,7 +23,7 @@
 
 .cn1-javadoc {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 0;
   padding: 0.7rem;
   background: var(--entry);
   color: var(--content);
