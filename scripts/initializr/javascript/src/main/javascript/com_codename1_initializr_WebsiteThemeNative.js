@@ -4,6 +4,7 @@ var o = {};
 
     o.isDarkMode_ = function(callback) {
         var dark = false;
+        var hasExplicitPreference = false;
         try {
             var parentDoc = (window.parent && window.parent.document) ? window.parent.document : null;
             if (parentDoc && parentDoc.body && parentDoc.body.classList) {
@@ -13,14 +14,16 @@ var o = {};
                 var pref = window.parent.localStorage.getItem("pref-theme");
                 if (pref === "dark") {
                     dark = true;
+                    hasExplicitPreference = true;
                 } else if (pref === "light") {
                     dark = false;
+                    hasExplicitPreference = true;
                 }
             }
         } catch (ignored) {
             // Ignore parent access failures and fallback below.
         }
-        if (!dark && window.matchMedia) {
+        if (!hasExplicitPreference && !dark && window.matchMedia) {
             dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
         }
         callback.complete(!!dark);

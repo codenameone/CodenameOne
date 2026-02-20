@@ -171,6 +171,29 @@ InitializrChoicesGrid {
     margin: 0 0 1.2mm 0;
 }
 
+AccordionItemDark {
+    cn1-derive: Button;
+    color: #e2e8f0;
+    background-color: #1f2937;
+    border: 1px solid #334155;
+    margin: 0.6mm 0;
+    padding: 1.2mm;
+}
+
+AccordionItemDark.pressed {
+    cn1-derive: Button;
+    color: #f8fafc;
+    background-color: #334155;
+    border: 1px solid #475569;
+}
+
+AccordionContentDark {
+    cn1-derive: Container;
+    background-color: #111827;
+    border: 1px solid #334155;
+    padding: 1.2mm;
+}
+
 InitializrChoice {
     color: #1f2937;
     background-color: #eef4ff;
