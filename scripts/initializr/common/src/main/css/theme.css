@@ -57,7 +57,15 @@ InitializrForm {
     background-color: #f3f6fb;
 }
 
+InitializrFormDark {
+    background-color: #0f172a;
+}
+
 InitializrRoot {
+    padding: 2.2mm;
+}
+
+InitializrRootDark {
     padding: 2.2mm;
 }
 
@@ -67,8 +75,20 @@ InitializrHeaderCard {
     margin: 1.2mm;
 }
 
+InitializrHeaderCardDark {
+    background-color: #1e293b;
+    padding: 2.5mm;
+    margin: 1.2mm;
+}
+
 InitializrCard {
     background-color: #ffffff;
+    padding: 2.5mm;
+    margin: 1.2mm;
+}
+
+InitializrCardDark {
+    background-color: #111827;
     padding: 2.5mm;
     margin: 1.2mm;
 }
@@ -80,8 +100,21 @@ InitializrHeroTitle {
     padding: 0 0 1mm 0;
 }
 
+InitializrHeroTitleDark {
+    color: #e2e8f0;
+    font-family: "native:MainBold";
+    font-size: 4.5mm;
+    padding: 0 0 1mm 0;
+}
+
 InitializrHeroSubtitle {
     color: #4a5568;
+    font-family: "native:MainRegular";
+    font-size: 2.8mm;
+}
+
+InitializrHeroSubtitleDark {
+    color: #94a3b8;
     font-family: "native:MainRegular";
     font-size: 2.8mm;
 }
@@ -93,8 +126,22 @@ InitializrSectionTitle {
     padding: 0 0 1.2mm 0;
 }
 
+InitializrSectionTitleDark {
+    color: #e2e8f0;
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    padding: 0 0 1.2mm 0;
+}
+
 InitializrFieldLabel {
     color: #475569;
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    padding: 0.4mm 0;
+}
+
+InitializrFieldLabelDark {
+    color: #cbd5e1;
     font-family: "native:MainRegular";
     font-size: 2.4mm;
     padding: 0.4mm 0;
@@ -110,8 +157,53 @@ InitializrField, InitializrFieldHint {
     margin: 0 0 1.4mm 0;
 }
 
+InitializrFieldDark, InitializrFieldHintDark {
+    color: #e2e8f0;
+    font-family: "native:MainRegular";
+    font-size: 2.8mm;
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    padding: 1.1mm;
+    margin: 0 0 1.4mm 0;
+}
+
 InitializrChoicesGrid {
     margin: 0 0 1.2mm 0;
+}
+
+AccordionItemDark {
+    cn1-derive: Button;
+    color: #e2e8f0;
+    background-color: #1f2937;
+    border: 1px solid #334155;
+    margin: 0.6mm 0;
+    padding: 1.2mm;
+}
+
+AccordionItemDark.pressed {
+    cn1-derive: Button;
+    color: #f8fafc;
+    background-color: #334155;
+    border: 1px solid #475569;
+}
+
+AccordionContentDark {
+    cn1-derive: Container;
+    background-color: #111827;
+    border: 1px solid #334155;
+    padding: 1.2mm;
+}
+
+AccordionArrowDark {
+    cn1-derive: AccordionArrow;
+    color: #e2e8f0;
+    background-color: #1f2937;
+}
+
+AccordionOpenCloseIconDark {
+    cn1-derive: AccordionOpenCloseIcon;
+    color: #cbd5e1;
+    background-color: transparent;
 }
 
 InitializrChoice {
@@ -132,6 +224,24 @@ InitializrChoice.pressed {
     text-align: center;
 }
 
+InitializrChoiceDark {
+    color: #e2e8f0;
+    background-color: #1f2937;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    border: 1px solid #334155;
+    margin: 0.7mm;
+    padding: 1.1mm;
+    text-align: center;
+}
+
+InitializrChoiceDark.pressed {
+    color: #ffffff;
+    background-color: #0f766e;
+    border: 1px solid #0f766e;
+    text-align: center;
+}
+
 InitializrSummary {
     color: #1f2937;
     font-family: "native:MainRegular";
@@ -142,8 +252,25 @@ InitializrSummary {
     margin: 0 0 1.4mm 0;
 }
 
+InitializrSummaryDark {
+    color: #e2e8f0;
+    font-family: "native:MainRegular";
+    font-size: 2.7mm;
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    padding: 1.4mm;
+    margin: 0 0 1.4mm 0;
+}
+
 InitializrTip {
     color: #5f6b7a;
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    padding: 0 0 1.2mm 0;
+}
+
+InitializrTipDark {
+    color: #94a3b8;
     font-family: "native:MainRegular";
     font-size: 2.4mm;
     padding: 0 0 1.2mm 0;
@@ -156,9 +283,25 @@ InitializrValidationError {
     padding: 0 0 0.8mm 0;
 }
 
+InitializrValidationErrorDark {
+    color: #f87171;
+    font-family: "native:MainRegular";
+    font-size: 2.2mm;
+    padding: 0 0 0.8mm 0;
+}
+
 InitializrHelpButton {
     cn1-derive: Button;
     color: #64748b;
+    background-color: transparent;
+    border: none;
+    margin: 0;
+    padding: 0.2mm;
+}
+
+InitializrHelpButtonDark {
+    cn1-derive: Button;
+    color: #94a3b8;
     background-color: transparent;
     border: none;
     margin: 0;

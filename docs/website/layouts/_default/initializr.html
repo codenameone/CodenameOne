@@ -20,12 +20,30 @@
 </section>
 
 <style>
+:root {
+  --cn1-initializr-bg: #eef3ff;
+  --cn1-initializr-loader-bg: #eef3ff;
+  --cn1-initializr-loader-text: #1d2638;
+  --cn1-initializr-loader-progress-bg: rgba(255, 255, 255, 0.72);
+  --cn1-initializr-loader-progress-border: rgba(49, 105, 230, 0.25);
+}
+
+body.dark,
+body.cn1-initializr-dark {
+  --cn1-initializr-bg: #0a111d;
+  --cn1-initializr-loader-bg: #0a111d;
+  --cn1-initializr-loader-text: #d8e4ff;
+  --cn1-initializr-loader-progress-bg: rgba(10, 18, 31, 0.86);
+  --cn1-initializr-loader-progress-border: rgba(84, 128, 221, 0.45);
+}
+
 .cn1-initializr-page {
   height: 100%;
   width: 100%;
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  background: var(--cn1-initializr-bg);
 }
 
 .cn1-initializr-shell {
@@ -34,7 +52,7 @@
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  background: transparent;
+  background: var(--cn1-initializr-bg);
   box-shadow: none;
 }
 
@@ -48,8 +66,9 @@
     z-index: 2;
     text-align: center;
     padding: 2rem;
-    color: #1d2638;
-    background:
+    color: var(--cn1-initializr-loader-text);
+    background-color: var(--cn1-initializr-loader-bg);
+    background-image:
       radial-gradient(1000px 420px at 20% 0%, rgba(99, 142, 255, 0.22), rgba(99, 142, 255, 0) 65%),
       radial-gradient(720px 360px at 100% 100%, rgba(60, 173, 216, 0.2), rgba(60, 173, 216, 0) 65%);
     transition: opacity 220ms ease-out, visibility 220ms ease-out;
@@ -60,8 +79,11 @@
     visibility: hidden;
   }
 
-  body.dark .cn1-initializr-loader {
-    color: #d8e4ff;
+  body.dark .cn1-initializr-loader,
+  body.cn1-initializr-dark .cn1-initializr-loader {
+    background-image:
+      radial-gradient(1000px 420px at 20% 0%, rgba(80, 120, 216, 0.26), rgba(80, 120, 216, 0) 65%),
+      radial-gradient(720px 360px at 100% 100%, rgba(52, 168, 196, 0.24), rgba(52, 168, 196, 0) 65%);
   }
 
   .cn1-initializr-loader .icon {
@@ -85,8 +107,8 @@
     height: 9px;
     border-radius: 999px;
     overflow: hidden;
-    border: 1px solid rgba(49, 105, 230, 0.25);
-    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid var(--cn1-initializr-loader-progress-border);
+    background: var(--cn1-initializr-loader-progress-bg);
   }
 
   .cn1-loader-progress-bar {
@@ -110,7 +132,7 @@
     width: 100%;
     height: 100%;
     border: 0;
-    background: transparent;
+    background: var(--cn1-initializr-bg);
   }
 
   @keyframes cn1-spin {
@@ -143,15 +165,51 @@ body.cn1-initializr-page-body .main {
   var frame = document.getElementById("cn1-initializr-frame");
   var loader = document.getElementById("cn1-initializr-loader");
   var siteHeader = document.querySelector(".header");
+  var mediaQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
 
   function syncHeight() {
     var h = siteHeader ? siteHeader.offsetHeight : 76;
     root.style.setProperty("--cn1-initializr-header-height", h + "px");
   }
 
+  function syncInitializrTheme() {
+    var pref = "";
+    var dark = false;
+    try {
+      pref = localStorage.getItem("pref-theme") || "";
+    } catch (e) {
+      pref = "";
+    }
+    if (pref === "dark") {
+      dark = true;
+    } else if (pref === "light") {
+      dark = false;
+    } else {
+      dark = body.classList.contains("dark") || !!(mediaQuery && mediaQuery.matches);
+    }
+    body.classList.toggle("cn1-initializr-dark", dark);
+  }
+
   body.classList.add("cn1-initializr-page-body");
   syncHeight();
+  syncInitializrTheme();
   window.addEventListener("resize", syncHeight);
+  document.addEventListener("click", function (evt) {
+    if (evt.target && evt.target.id === "theme-toggle") {
+      window.requestAnimationFrame(syncInitializrTheme);
+    }
+  });
+  if (mediaQuery && mediaQuery.addEventListener) {
+    mediaQuery.addEventListener("change", syncInitializrTheme);
+  } else if (mediaQuery && mediaQuery.addListener) {
+    mediaQuery.addListener(syncInitializrTheme);
+  }
+  if (window.MutationObserver) {
+    new MutationObserver(syncInitializrTheme).observe(body, {
+      attributes: true,
+      attributeFilter: ["class"]
+    });
+  }
 
   if (frame && loader) {
     frame.addEventListener("load", function () {

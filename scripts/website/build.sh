@@ -481,13 +481,13 @@ build_initializr_for_site() {
 
     # Ensure attached classifier artifact initializr-ZipSupport:jar:common is present
     # in the local Maven repo before building modules that depend on it (e.g. initializr-common).
-    run_initializr_mvn -q -pl cn1libs/ZipSupport -am \
+    run_initializr_mvn -q -U -pl cn1libs/ZipSupport -am \
       -DskipTests \
       -Dcodename1.platform=javascript \
       install
 
     if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
-      if ! run_initializr_mvn -q -pl javascript -am \
+      if ! run_initializr_mvn -q -U -pl javascript -am \
         cn1:set-user-token \
         -Dcodename1.platform=javascript \
         -Duser="${CN1_USER}" \
@@ -517,7 +517,7 @@ JAVA
       echo "CN1_USER/CN1_TOKEN not provided; building Initializr JavaScript without setting token." >&2
     fi
 
-    run_initializr_mvn -q -pl javascript -am \
+    run_initializr_mvn -q -U -pl javascript -am \
       -DskipTests \
       -Dautomated=true \
       -Dcodename1.platform=javascript \
