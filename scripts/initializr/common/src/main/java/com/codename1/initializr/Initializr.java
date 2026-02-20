@@ -34,6 +34,7 @@ public class Initializr extends Lifecycle {
 
     @Override
     public void runApp() {
+        setProperty("platformHint.javascript.beforeUnloadMessage", null);
         final Form form = new Form("", new BorderLayout());
         form.setUIID("InitializrForm");
 
@@ -336,12 +337,13 @@ public class Initializr extends Lifecycle {
         }
         websiteDarkMode = websiteThemeNative.isDarkMode();
         applyWebsiteTheme(form, websiteDarkMode);
+        form.refreshTheme();
         UITimer.timer(900, true, form, () -> {
             boolean dark = websiteThemeNative.isDarkMode();
             if (dark != websiteDarkMode) {
                 websiteDarkMode = dark;
                 applyWebsiteTheme(form, dark);
-                form.revalidate();
+                form.refreshTheme();
             }
         });
     }
