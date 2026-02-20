@@ -1,0 +1,37 @@
+.post-single--api-javadoc {
+  max-width: min(1700px, 98vw);
+}
+
+.post-single--api-javadoc .post-description {
+  margin-top: 0.35rem;
+}
+
+.post-single--api-javadoc .post-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.7rem;
+  font-size: 0.95rem;
+}
+
+.cn1-api-javadoc-frame-wrap {
+  margin-top: 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--entry);
+}
+
+.cn1-api-javadoc-frame {
+  display: block;
+  width: 100%;
+  height: min(76vh, 1200px);
+  border: 0;
+  background: #fff;
+}
+
+@media (max-width: 900px) {
+  .cn1-api-javadoc-frame {
+    height: 72vh;
+  }
+}
