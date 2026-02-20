@@ -479,51 +479,16 @@ build_initializr_for_site() {
       export PATH="${JAVA_HOME}/bin:${PATH}"
     fi
 
-    local requested_cn1_plugin_version
-    local effective_cn1_plugin_version
-    local metadata_release_version
-    local metadata_latest_version
-    local set_user_token_goal
-    local -a initializr_plugin_override_args
-
-    requested_cn1_plugin_version="$(sed -n 's|.*<cn1\.plugin\.version>\([^<]*\)</cn1\.plugin\.version>.*|\1|p' pom.xml | head -n1)"
-    effective_cn1_plugin_version="${requested_cn1_plugin_version}"
-    initializr_plugin_override_args=()
-
-    if [ -n "${requested_cn1_plugin_version}" ]; then
-      if ! run_initializr_mvn -q -U -N org.apache.maven.plugins:maven-dependency-plugin:3.6.1:get \
-        -Dartifact="com.codenameone:codenameone-maven-plugin:${requested_cn1_plugin_version}" \
-        -Dtransitive=false >/dev/null 2>&1; then
-        metadata_release_version="$(curl -fsSL https://repo.maven.apache.org/maven2/com/codenameone/codenameone-maven-plugin/maven-metadata.xml \
-          | sed -n 's|.*<release>\([^<]*\)</release>.*|\1|p' | head -n1 || true)"
-        metadata_latest_version="$(curl -fsSL https://repo.maven.apache.org/maven2/com/codenameone/codenameone-maven-plugin/maven-metadata.xml \
-          | sed -n 's|.*<latest>\([^<]*\)</latest>.*|\1|p' | head -n1 || true)"
-        effective_cn1_plugin_version="${metadata_release_version:-${metadata_latest_version:-${requested_cn1_plugin_version}}}"
-        if [ "${effective_cn1_plugin_version}" != "${requested_cn1_plugin_version}" ]; then
-          echo "Requested Codename One Maven plugin ${requested_cn1_plugin_version} is not yet resolvable from Maven Central; using ${effective_cn1_plugin_version} for website Initializr build only." >&2
-          initializr_plugin_override_args=(-Dcn1.plugin.version="${effective_cn1_plugin_version}")
-        else
-          echo "Requested Codename One Maven plugin ${requested_cn1_plugin_version} is not currently resolvable, and no fallback release was discovered." >&2
-        fi
-      fi
-    fi
-    set_user_token_goal="cn1:set-user-token"
-    if [ -n "${effective_cn1_plugin_version}" ]; then
-      set_user_token_goal="com.codenameone:codenameone-maven-plugin:${effective_cn1_plugin_version}:set-user-token"
-    fi
-
     # Ensure attached classifier artifact initializr-ZipSupport:jar:common is present
     # in the local Maven repo before building modules that depend on it (e.g. initializr-common).
     run_initializr_mvn -q -U -pl cn1libs/ZipSupport -am \
-      "${initializr_plugin_override_args[@]}" \
       -DskipTests \
       -Dcodename1.platform=javascript \
       install
 
     if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
       if ! run_initializr_mvn -q -U -pl javascript -am \
-        "${initializr_plugin_override_args[@]}" \
-        "${set_user_token_goal}" \
+        cn1:set-user-token \
         -Dcodename1.platform=javascript \
         -Duser="${CN1_USER}" \
         -Dtoken="${CN1_TOKEN}"; then
@@ -553,7 +518,6 @@ JAVA
     fi
 
     run_initializr_mvn -q -U -pl javascript -am \
-      "${initializr_plugin_override_args[@]}" \
       -DskipTests \
       -Dautomated=true \
       -Dcodename1.platform=javascript \

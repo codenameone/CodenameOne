@@ -388,6 +388,8 @@ public class Initializr extends Lifecycle {
                 case "InitializrHelpButton":
                 case "AccordionItem":
                 case "AccordionContent":
+                case "AccordionArrow":
+                case "AccordionOpenCloseIcon":
                     return uiid + "Dark";
                 default:
                     return uiid;
@@ -415,6 +417,8 @@ public class Initializr extends Lifecycle {
             case "InitializrHelpButton":
             case "AccordionItem":
             case "AccordionContent":
+            case "AccordionArrow":
+            case "AccordionOpenCloseIcon":
                 return base;
             default:
                 return uiid;

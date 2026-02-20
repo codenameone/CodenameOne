@@ -194,6 +194,18 @@ AccordionContentDark {
     padding: 1.2mm;
 }
 
+AccordionArrowDark {
+    cn1-derive: AccordionArrow;
+    color: #e2e8f0;
+    background-color: #1f2937;
+}
+
+AccordionOpenCloseIconDark {
+    cn1-derive: AccordionOpenCloseIcon;
+    color: #cbd5e1;
+    background-color: transparent;
+}
+
 InitializrChoice {
     color: #1f2937;
     background-color: #eef4ff;
