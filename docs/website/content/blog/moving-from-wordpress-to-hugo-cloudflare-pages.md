@@ -5,6 +5,7 @@ author: Shai Almog
 slug: moving-from-wordpress-to-hugo-cloudflare-pages
 url: /blog/moving-from-wordpress-to-hugo-cloudflare-pages/
 description: Why we moved the Codename One website from WordPress to Hugo and Cloudflare Pages, what improved, and how to use Giscus for discussions.
+feed_html: '<img src="https://www.codenameone.com/blog/moving-from-wordpress-to-hugo-cloudflare-pages/moving-from-wordpress-to-hugo-cloudflare-pages.jpg" alt="WordPress to Hugo migration hero" /> Why we moved the Codename One website from WordPress to Hugo and Cloudflare Pages, what improved, and how to use Giscus for discussions.'
 ---
 
 ![WordPress to Hugo migration hero](/blog/moving-from-wordpress-to-hugo-cloudflare-pages/moving-from-wordpress-to-hugo-cloudflare-pages.jpg)
