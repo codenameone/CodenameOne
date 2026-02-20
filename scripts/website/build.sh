@@ -468,9 +468,9 @@ build_initializr_for_site() {
 
     run_initializr_mvn() {
       if command -v xvfb-run >/dev/null 2>&1; then
-        xvfb-run -a ./mvnw "$@" || true
+        xvfb-run -a ./mvnw "$@"
       else
-        ./mvnw "$@" || true
+        ./mvnw "$@"
       fi
     }
 
@@ -484,14 +484,14 @@ build_initializr_for_site() {
     run_initializr_mvn -q -U -pl cn1libs/ZipSupport -am \
       -DskipTests \
       -Dcodename1.platform=javascript \
-      install  || true
+      install
 
     if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
       if ! run_initializr_mvn -q -U -pl javascript -am \
         cn1:set-user-token \
         -Dcodename1.platform=javascript \
         -Duser="${CN1_USER}" \
-        -Dtoken="${CN1_TOKEN}"  || true; then
+        -Dtoken="${CN1_TOKEN}"; then
         echo "cn1:set-user-token is unavailable in this plugin version; writing CN1 credentials directly to Java preferences." >&2
         local tmp_dir
         tmp_dir="$(mktemp -d)"
@@ -521,7 +521,7 @@ JAVA
       -DskipTests \
       -Dautomated=true \
       -Dcodename1.platform=javascript \
-      package  || true
+      package
   )
 
   local output_dir="${WEBSITE_DIR}/static/initializr-app"
@@ -530,19 +530,19 @@ JAVA
     result_zip="$(ls -1 "${REPO_ROOT}"/scripts/initializr/javascript/target/initializr-javascript-*.zip 2>/dev/null | head -n1 || true)"
   fi
 
-  #if [ -z "${result_zip}" ] || [ ! -f "${result_zip}" ]; then
-  #  echo "Could not locate Initializr JavaScript build zip output in scripts/initializr/javascript/target." >&2
-  #  exit 1
-  #fi
+  if [ -z "${result_zip}" ] || [ ! -f "${result_zip}" ]; then
+    echo "Could not locate Initializr JavaScript build zip output in scripts/initializr/javascript/target." >&2
+    exit 1
+  fi
 
-  #rm -rf "${output_dir}"
-  #mkdir -p "${output_dir}"
-  #unzip -q -o "${result_zip}" -d "${output_dir}"
+  rm -rf "${output_dir}"
+  mkdir -p "${output_dir}"
+  unzip -q -o "${result_zip}" -d "${output_dir}"
 
-  #if [ ! -f "${output_dir}/index.html" ]; then
-  #  echo "Initializr website bundle is missing index.html after extraction." >&2
-  #  exit 1
-  #fi
+  if [ ! -f "${output_dir}/index.html" ]; then
+    echo "Initializr website bundle is missing index.html after extraction." >&2
+    exit 1
+  fi
 }
 
 if ! command -v "${HUGO_BIN}" >/dev/null 2>&1; then
