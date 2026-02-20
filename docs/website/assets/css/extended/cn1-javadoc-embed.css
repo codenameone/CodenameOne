@@ -1,5 +1,25 @@
+.cn1-javadoc-page .main {
+  max-width: 100vw;
+  width: 100vw;
+  margin: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+body.cn1-javadoc-page .main:has(> .post-single--api-javadoc) {
+  max-width: 100vw !important;
+  width: 100vw !important;
+  margin: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
 .post-single--api-javadoc {
-  max-width: min(1700px, 98vw);
+  max-width: 100vw;
+  width: 100%;
+  margin: 0;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .cn1-javadoc-links {
@@ -12,43 +32,113 @@
 
 .cn1-javadoc {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 0;
   padding: 0.7rem;
   background: var(--entry);
   color: var(--content);
-  --body-text-color: var(--content);
-  --block-text-color: var(--content);
-  --body-background-color: var(--entry);
-  --section-background-color: var(--entry);
-  --detail-background-color: var(--entry);
+  overflow: visible;
+  --code-bg: color-mix(in srgb, var(--entry) 90%, var(--theme) 10%);
+  --body-text-color: var(--content) !important;
+  --block-text-color: var(--content) !important;
+  --body-background-color: var(--entry) !important;
+  --section-background-color: var(--entry) !important;
+  --detail-background-color: var(--entry) !important;
   --code-background-color: var(--code-bg);
   --pre-background-color: var(--code-bg);
   --pre-text-color: var(--content);
   --snippet-background-color: var(--code-bg);
   --snippet-text-color: var(--content);
-  --table-header-color: color-mix(in srgb, var(--entry) 70%, var(--theme) 30%);
-  --even-row-color: var(--entry);
-  --odd-row-color: color-mix(in srgb, var(--entry) 90%, var(--theme) 10%);
-  --border-color: var(--border);
-  --title-color: var(--primary);
-  --link-color: var(--primary);
-  --link-color-active: var(--primary);
-  --toc-background-color: var(--theme);
-  --toc-hover-color: color-mix(in srgb, var(--entry) 80%, var(--theme) 20%);
-  --toc-highlight-color: color-mix(in srgb, var(--entry) 70%, var(--theme) 30%);
-  --navbar-background-color: color-mix(in srgb, var(--entry) 70%, #1f4a75 30%);
-  --navbar-text-color: var(--primary);
-  --subnav-background-color: color-mix(in srgb, var(--entry) 78%, var(--theme) 22%);
-  --subnav-link-color: var(--primary);
-  --selected-background-color: color-mix(in srgb, var(--primary) 26%, var(--entry) 74%);
-  --selected-text-color: var(--content);
-  --search-input-background-color: var(--entry);
-  --search-input-text-color: var(--content);
-  --search-input-placeholder-color: var(--secondary);
+  --table-header-color: color-mix(in srgb, var(--entry) 70%, var(--theme) 30%) !important;
+  --even-row-color: var(--entry) !important;
+  --odd-row-color: color-mix(in srgb, var(--entry) 90%, var(--theme) 10%) !important;
+  --border-color: var(--border) !important;
+  --title-color: var(--primary) !important;
+  --link-color: var(--primary) !important;
+  --link-color-active: var(--primary) !important;
+  --toc-background-color: var(--theme) !important;
+  --toc-hover-color: color-mix(in srgb, var(--entry) 80%, var(--theme) 20%) !important;
+  --toc-highlight-color: color-mix(in srgb, var(--entry) 70%, var(--theme) 30%) !important;
+  --navbar-background-color: color-mix(in srgb, var(--entry) 70%, #1f4a75 30%) !important;
+  --navbar-text-color: var(--primary) !important;
+  --subnav-background-color: color-mix(in srgb, var(--entry) 78%, var(--theme) 22%) !important;
+  --subnav-link-color: var(--primary) !important;
+  --selected-background-color: color-mix(in srgb, var(--primary) 26%, var(--entry) 74%) !important;
+  --selected-text-color: var(--content) !important;
+  --search-input-background-color: var(--entry) !important;
+  --search-input-text-color: var(--content) !important;
+  --search-input-placeholder-color: var(--secondary) !important;
 }
 
 .cn1-javadoc .main-grid {
+  width: 100% !important;
+  max-width: none !important;
   margin: 0;
+}
+
+.cn1-javadoc .header,
+.cn1-javadoc .sub-nav,
+.cn1-javadoc .top-nav,
+.cn1-javadoc .flex-content,
+.cn1-javadoc .main-content,
+.cn1-javadoc .contentContainer {
+  width: 100% !important;
+  max-width: none !important;
+  overflow: visible !important;
+}
+
+.cn1-javadoc .table-header,
+.cn1-javadoc .table-sub-heading-color,
+.cn1-javadoc .summary-table div[class^="col-"],
+.cn1-javadoc .summary-table div[class*=" col-"] {
+  min-height: 2.25rem;
+  height: auto !important;
+  line-height: 1.35 !important;
+  padding-top: 0.4rem !important;
+  padding-bottom: 0.4rem !important;
+  overflow: visible !important;
+}
+
+.cn1-javadoc input[type="search"],
+.cn1-javadoc input#search-input,
+.cn1-javadoc #search-input,
+.cn1-javadoc .search-input {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 30;
+}
+
+.cn1-javadoc-page .ui-autocomplete,
+.cn1-javadoc-page .ui-menu {
+  background: var(--entry) !important;
+  color: var(--content) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28) !important;
+  opacity: 1 !important;
+  max-width: min(92vw, 48rem) !important;
+  overflow: auto !important;
+  z-index: 2000 !important;
+}
+
+.cn1-javadoc-page .ui-menu .ui-menu-item-wrapper {
+  color: var(--content) !important;
+}
+
+.cn1-javadoc-page .ui-menu .ui-state-active,
+.cn1-javadoc-page .ui-menu .ui-menu-item-wrapper.ui-state-active {
+  background: color-mix(in srgb, var(--primary) 22%, var(--entry) 78%) !important;
+  border-color: var(--border) !important;
+  color: var(--content) !important;
+}
+
+.cn1-javadoc pre,
+.cn1-javadoc code,
+.cn1-javadoc pre code,
+.cn1-javadoc .snippet-container,
+.cn1-javadoc .snippet-container pre,
+.cn1-javadoc .block pre,
+.cn1-javadoc .block code {
+  background: var(--code-bg) !important;
+  color: var(--content) !important;
 }
 
 .cn1-javadoc a {
@@ -57,22 +147,23 @@
 
 body.dark .cn1-javadoc {
   background: var(--theme);
-  --body-background-color: var(--theme);
-  --section-background-color: var(--theme);
-  --detail-background-color: var(--theme);
-  --table-header-color: color-mix(in srgb, var(--theme) 70%, #1b2b40 30%);
-  --even-row-color: var(--theme);
-  --odd-row-color: color-mix(in srgb, var(--theme) 86%, #0d1726 14%);
-  --toc-background-color: #101a2a;
-  --toc-hover-color: #172439;
-  --toc-highlight-color: #1d2d45;
-  --navbar-background-color: #1b2d45;
-  --subnav-background-color: #152235;
-  --subnav-link-color: #cfe2ff;
-  --link-color: #b7d2ff;
-  --link-color-active: #d6e6ff;
-  --title-color: #e3edff;
-  --search-input-background-color: #111b2b;
-  --search-input-text-color: #e9eef7;
-  --search-input-placeholder-color: #8ea1bc;
+  --code-bg: #141f31;
+  --body-background-color: var(--theme) !important;
+  --section-background-color: var(--theme) !important;
+  --detail-background-color: var(--theme) !important;
+  --table-header-color: color-mix(in srgb, var(--theme) 70%, #1b2b40 30%) !important;
+  --even-row-color: var(--theme) !important;
+  --odd-row-color: color-mix(in srgb, var(--theme) 86%, #0d1726 14%) !important;
+  --toc-background-color: #101a2a !important;
+  --toc-hover-color: #172439 !important;
+  --toc-highlight-color: #1d2d45 !important;
+  --navbar-background-color: #1b2d45 !important;
+  --subnav-background-color: #152235 !important;
+  --subnav-link-color: #cfe2ff !important;
+  --link-color: #b7d2ff !important;
+  --link-color-active: #d6e6ff !important;
+  --title-color: #e3edff !important;
+  --search-input-background-color: #111b2b !important;
+  --search-input-text-color: #e9eef7 !important;
+  --search-input-placeholder-color: #8ea1bc !important;
 }

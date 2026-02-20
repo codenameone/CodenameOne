@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   build:
@@ -24,6 +25,8 @@ jobs:
     env:
       CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN || secrets.CF_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID }}
+      CF_PAGES_PROJECT_NAME: ${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME || 'codenameone' }}
+      CF_PAGES_PRODUCTION_BRANCH: ${{ vars.CLOUDFLARE_PAGES_PRODUCTION_BRANCH || 'main' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -141,10 +144,13 @@ jobs:
       - name: Validate internal links and images
         uses: lycheeverse/lychee-action@v2
         with:
+          lycheeVersion: latest
+          workingDirectory: docs/website
           args: >-
             --offline
             --no-progress
-            docs/website/public/**/*.html
+            --root-dir public
+            public/**/*.html
 
       - name: Reject absolute codenameone.com links
         run: |
@@ -196,6 +202,148 @@ jobs:
           path: docs/website/public
           if-no-files-found: error
 
+      - name: Check Cloudflare preview deploy credentials
+        if: ${{ github.event_name == 'pull_request' && env.CLOUDFLARE_TOKEN == '' }}
+        run: |
+          echo "::warning::Skipping Cloudflare Pages preview deploy because no API token secret is configured. Set CLOUDFLARE_TOKEN (preferred) or CF_API_TOKEN."
+
+      - name: Deploy PR preview to Cloudflare Pages
+        id: cf_preview
+        if: ${{ github.event_name == 'pull_request' && env.CLOUDFLARE_TOKEN != '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_TOKEN }}
+          PREVIEW_BRANCH: pr-${{ github.event.pull_request.number }}-website-preview
+        run: |
+          set -euo pipefail
+          deploy_output="$(npx --yes wrangler@4 pages deploy docs/website/public \
+            --project-name "${CF_PAGES_PROJECT_NAME}" \
+            --branch "${PREVIEW_BRANCH}" 2>&1)"
+          echo "${deploy_output}"
+          preview_url="$(printf '%s\n' "${deploy_output}" | grep -Eo 'https://[A-Za-z0-9._-]+\.pages\.dev' | tail -n1 || true)"
+          if [ -z "${preview_url}" ]; then
+            echo "Could not determine Cloudflare preview URL from deploy output." >&2
+            exit 1
+          fi
+          echo "preview_url=${preview_url}" >> "${GITHUB_OUTPUT}"
+          echo "preview_branch=${PREVIEW_BRANCH}" >> "${GITHUB_OUTPUT}"
+
+      - name: Publish Cloudflare preview link in CI summary
+        if: ${{ steps.cf_preview.outputs.preview_url != '' }}
+        run: |
+          {
+            echo "## Cloudflare Preview"
+            echo
+            echo "- URL: ${{ steps.cf_preview.outputs.preview_url }}"
+            echo "- Branch: \`${{ steps.cf_preview.outputs.preview_branch }}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Comment Cloudflare preview link on PR
+        if: ${{ github.event_name == 'pull_request' && steps.cf_preview.outputs.preview_url != '' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- cn1-cloudflare-preview -->';
+            const body = [
+              marker,
+              '## Cloudflare Preview',
+              '',
+              `- URL: ${{ steps.cf_preview.outputs.preview_url }}`,
+              `- Branch: \`${{ steps.cf_preview.outputs.preview_branch }}\``,
+            ].join('\n');
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) =>
+              comment.user?.type === 'Bot' && comment.body?.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }
+
+      - name: Prune older Cloudflare preview deployments for this PR branch
+        if: ${{ steps.cf_preview.outputs.preview_url != '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_TOKEN }}
+          PREVIEW_BRANCH: ${{ steps.cf_preview.outputs.preview_branch }}
+          PREVIEW_URL: ${{ steps.cf_preview.outputs.preview_url }}
+        run: |
+          set -euo pipefail
+          api_base="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${CF_PAGES_PROJECT_NAME}/deployments"
+          tmp_json="$(mktemp)"
+          curl -sS \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "${api_base}" > "${tmp_json}"
+
+          cat > /tmp/cf_preview_cleanup.py <<'PY'
+          import json
+          import sys
+
+          path, preview_branch, preview_url = sys.argv[1:]
+          data = json.load(open(path, encoding="utf-8"))
+          result = data.get("result", []) or []
+
+          def aliases_of(dep):
+              aliases = dep.get("aliases") or []
+              out = []
+              for a in aliases:
+                  if isinstance(a, str):
+                      out.append(a)
+                  elif isinstance(a, dict):
+                      v = a.get("url")
+                      if isinstance(v, str):
+                          out.append(v)
+              return out
+
+          def branch_of(dep):
+              trig = dep.get("deployment_trigger") or {}
+              meta = trig.get("metadata") or {}
+              return meta.get("branch")
+
+          current_id = None
+          for dep in result:
+              if preview_url in aliases_of(dep):
+                  current_id = dep.get("id")
+                  break
+
+          for dep in result:
+              dep_id = dep.get("id")
+              if not dep_id or dep_id == current_id:
+                  continue
+              if branch_of(dep) == preview_branch:
+                  print(dep_id)
+          PY
+
+          python3 /tmp/cf_preview_cleanup.py "${tmp_json}" "${PREVIEW_BRANCH}" "${PREVIEW_URL}" > /tmp/cf_deployments_to_delete.txt
+
+          while IFS= read -r dep_id; do
+            [ -z "${dep_id}" ] && continue
+            echo "Deleting old preview deployment: ${dep_id}"
+            curl -sS -X DELETE \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              "${api_base}/${dep_id}" >/dev/null
+          done < /tmp/cf_deployments_to_delete.txt
+
       - name: Check Cloudflare deploy credentials
         if: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master') && env.CLOUDFLARE_TOKEN == '' }}
         run: |
@@ -214,5 +362,5 @@ jobs:
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           command: >-
             pages deploy docs/website/public
-            --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME || secrets.CLOUDFLARE_PAGES_PROJECT_NAME || secrets.CF_PAGES_PROJECT_NAME || 'codenameone' }}
-            --branch=${{ vars.CLOUDFLARE_PAGES_PRODUCTION_BRANCH || secrets.CLOUDFLARE_PAGES_PRODUCTION_BRANCH || 'main' }}
+            --project-name=${{ env.CF_PAGES_PROJECT_NAME }}
+            --branch=${{ env.CF_PAGES_PRODUCTION_BRANCH }}
