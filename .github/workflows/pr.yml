@@ -270,6 +270,8 @@ jobs:
           ant $ANT_OPTS_ARGS -noinput -buildfile Ports/CLDC11/build.xml jar
       - name: Build with Ant
         run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
           ANT_OPTS_ARGS=""
           if [ "${{ matrix.java-version }}" != "8" ]; then
             ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"

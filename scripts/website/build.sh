@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+mkdir -p ~/.codenameone
+cp maven/UpdateCodenameOne.jar ~/.codenameone/
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 WEBSITE_DIR="${REPO_ROOT}/docs/website"

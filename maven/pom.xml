@@ -572,7 +572,15 @@
                                         <mkdir dir="${user.home}/.codenameone"/>
                                         <mkdir dir="${project.build.directory}/generated-sources/project" />
                                         <mkdir dir="${project.build.directory}/generated-sources/project/lib" />
-                                        <get src="https://www.codenameone.com/files/updates/UpdateCodenameOne.jar" dest="${user.home}/.codenameone/UpdateCodenameOne.jar" skipexisting="true"/>
+                                        <get src="https://www.codenameone.com/files/updates/UpdateCodenameOne.jar"
+                                             dest="${user.home}/UpdateCodenameOne.jar"
+                                             skipexisting="true"
+                                             ignoreerrors="true"/>
+
+                                        <get src="https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/UpdateCodenameOne.jar"
+                                             dest="${user.home}/UpdateCodenameOne.jar"
+                                             skipexisting="true"
+                                             ignoreerrors="false"/>
                                         <java fork="true" jar="${user.home}/.codenameone/UpdateCodenameOne.jar">
                                             <arg value="${project.build.directory}/generated-sources/project"/>
                                             <arg value="force" />

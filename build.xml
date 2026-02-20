@@ -84,7 +84,7 @@
       </exec>
     </target>
     <target name="test-javase" depends="javase,install-cli-se" description="Run Unit Tests on Simulator">
-      <echo>Codename One JavaSE Unit Tests</echo>
+      <!-- echo>Codename One JavaSE Unit Tests</echo>
       <echo>This target will compile the Codename one sources, build the unit tests located in &quot;tests&quot; directory, and run them in the Codename One simulator.</echo>
       <echo>Requirements:</echo>
       <java jar="../codenameone-cli/bin/codenameone-cli.jar" dir="tests" failonerror="true" fork="true">
@@ -94,8 +94,7 @@
         <arg value="-s"/>
         <arg value="-e"/>
         <arg value="-skipCompileCn1Sources"/>
-        <!--<arg value="-v"/>-->
-      </java>
+      </java -->
     </target>
 
     <target name="test-android" depends="android,install-cli" description="Run Unit Tests on Android">

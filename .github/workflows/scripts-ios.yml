@@ -70,6 +70,8 @@ jobs:
 
       - name: Ensure CocoaPods tooling
         run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
           set -euo pipefail
           if ! command -v ruby >/dev/null; then
             echo "ruby not found"; exit 1

@@ -132,7 +132,10 @@ jobs:
         run: ./scripts/build-android-port.sh -q -DskipTests
       - name: Build Hello Codename One Android app
         id: build-android-app
-        run: ./scripts/build-android-app.sh -q -DskipTests
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          ./scripts/build-android-app.sh -q -DskipTests
       - name: Enable KVM for Android emulator
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

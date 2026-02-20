@@ -55,7 +55,13 @@
                                     <mkdir dir="${project.build.directory}/codenameone/tmpProject"/>
                                     <get src="https://www.codenameone.com/files/updates/UpdateCodenameOne.jar"
                                          dest="${user.home}/UpdateCodenameOne.jar"
-                                         skipexisting="true"/>
+                                         skipexisting="true"
+                                         ignoreerrors="true"/>
+
+                                    <get src="https://github.com/codenameone/CodenameOne/raw/refs/heads/master/maven/UpdateCodenameOne.jar"
+                                         dest="${user.home}/UpdateCodenameOne.jar"
+                                         skipexisting="true"
+                                         ignoreerrors="false"/>
                                     <java jar="${user.home}/UpdateCodenameOne.jar" fork="true">
                                         <arg value="${project.build.directory}/codenameone/tmpProject"/>
                                         <arg value="force"/>
