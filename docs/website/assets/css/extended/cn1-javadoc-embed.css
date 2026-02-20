@@ -1,6 +1,7 @@
-.main:has(.post-single--api-javadoc) {
+.cn1-javadoc-page .main {
   max-width: 100vw;
   width: 100vw;
+  margin: 0;
   padding-left: 0;
   padding-right: 0;
 }
@@ -61,13 +62,19 @@
 }
 
 .cn1-javadoc .main-grid {
+  width: 100% !important;
+  max-width: none !important;
   margin: 0;
 }
 
 .cn1-javadoc .header,
 .cn1-javadoc .sub-nav,
 .cn1-javadoc .top-nav,
-.cn1-javadoc .flex-content {
+.cn1-javadoc .flex-content,
+.cn1-javadoc .main-content,
+.cn1-javadoc .contentContainer {
+  width: 100% !important;
+  max-width: none !important;
   overflow: visible !important;
 }
 
@@ -90,6 +97,29 @@
   pointer-events: auto !important;
   position: relative;
   z-index: 30;
+}
+
+.cn1-javadoc-page .ui-autocomplete,
+.cn1-javadoc-page .ui-menu {
+  background: var(--entry) !important;
+  color: var(--content) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28) !important;
+  opacity: 1 !important;
+  max-width: min(92vw, 48rem) !important;
+  overflow: auto !important;
+  z-index: 2000 !important;
+}
+
+.cn1-javadoc-page .ui-menu .ui-menu-item-wrapper {
+  color: var(--content) !important;
+}
+
+.cn1-javadoc-page .ui-menu .ui-state-active,
+.cn1-javadoc-page .ui-menu .ui-menu-item-wrapper.ui-state-active {
+  background: color-mix(in srgb, var(--primary) 22%, var(--entry) 78%) !important;
+  border-color: var(--border) !important;
+  color: var(--content) !important;
 }
 
 .cn1-javadoc pre,

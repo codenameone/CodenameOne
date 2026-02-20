@@ -1,6 +1,7 @@
 (() => {
   const root = document.querySelector(".cn1-javadoc");
   if (!root) return;
+  document.body.classList.add("cn1-javadoc-page");
 
   if (window.location.pathname === "/javadoc") {
     window.history.replaceState(null, "", "/javadoc/");
@@ -17,6 +18,24 @@
       input.style.pointerEvents = "auto";
       input.style.position = "relative";
       input.style.zIndex = "30";
+    });
+    clampSearchPopup();
+  };
+
+  const clampSearchPopup = () => {
+    document.querySelectorAll(".ui-autocomplete").forEach((menu) => {
+      menu.style.maxWidth = "min(92vw, 48rem)";
+      menu.style.background = "var(--entry)";
+      menu.style.color = "var(--content)";
+      menu.style.border = "1px solid var(--border)";
+      menu.style.boxShadow = "0 10px 24px rgba(0, 0, 0, 0.28)";
+      menu.style.opacity = "1";
+      menu.style.transform = "translateX(0)";
+      const rect = menu.getBoundingClientRect();
+      let dx = 0;
+      if (rect.right > window.innerWidth - 8) dx = (window.innerWidth - 8) - rect.right;
+      if (rect.left < 8) dx = 8 - rect.left;
+      if (dx !== 0) menu.style.transform = `translateX(${dx}px)`;
     });
   };
 
@@ -99,6 +118,9 @@
     if (!route) return;
     loadIntoContainer(route, false).catch(() => {});
   });
+  window.addEventListener("resize", clampSearchPopup);
+  root.addEventListener("input", clampSearchPopup, true);
+  root.addEventListener("focusin", clampSearchPopup, true);
 
   ensureSearchAssets(currentDocPath);
 })();
