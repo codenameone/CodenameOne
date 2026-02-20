@@ -1159,13 +1159,22 @@ public class MenuBar extends Container implements ActionListener {
                 || behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT
                 || behavior == Display.COMMAND_BEHAVIOR_ICS) {
 
-            if (getTitleComponent() != null) {
-                getTitleComponent().getParent().removeAll();
+            Component titleComp = getTitleComponent();
+            if (titleComp != null) {
+                Container parent = titleComp.getParent();
+                if (parent != null) {
+                    parent.removeAll();
+                }
             }
-            getTitleAreaContainer().removeAll();
-            getTitleAreaContainer().addComponent(BorderLayout.CENTER, getTitleComponent());
-            removeAll();
-            initTitleBarStatus();
+            Container titleContainer = getTitleAreaContainer();
+            if (titleContainer != null) {
+                titleContainer.removeAll();
+                if (titleComp != null) {
+                    titleContainer.addComponent(BorderLayout.CENTER, titleComp);
+                }
+                removeAll();
+                initTitleBarStatus();
+            }
             return;
         }
         updateCommands();
