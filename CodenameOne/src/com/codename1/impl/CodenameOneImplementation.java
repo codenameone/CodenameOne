@@ -2124,7 +2124,7 @@ public abstract class CodenameOneImplementation {
     ///
     /// #### See also
     ///
-    /// - @see isShapeSupported() to determine of the graphics context supports drawing
+    /// - #isShapeSupported(java.lang.Object) to determine of the graphics context supports drawing
     /// shapes.
     public void drawShape(Object graphics, Shape shape, Stroke stroke) {
     }
@@ -7074,7 +7074,11 @@ public abstract class CodenameOneImplementation {
     public void componentRemoved(Component c) {
     }
 
-    /// {@inheritDoc}
+    /// Gets the localization manager instance for this implementation.
+    ///
+    /// #### Returns
+    ///
+    /// The localization manager.
     public abstract L10NManager getLocalizationManager();
 
     /// Returns the package name for the application
@@ -7574,7 +7578,7 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `in`: A 2 or 3 element array representing either an (x,y) or (x,y,z) tuple to be transformed.
     ///
-    /// - `out`: A 2 or 3 element array (length should match {@var in}) to store the result of the transformation.
+    /// - `out`: A 2 or 3 element array (length should match `in`) to store the result of the transformation.
     ///
     /// #### See also
     ///

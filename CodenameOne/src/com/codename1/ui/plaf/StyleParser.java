@@ -2507,7 +2507,9 @@ public abstract class StyleParser {
 
         /// For line/dashed/dotted/underline border.  The thickness in pixels.
         ///
-        /// @asee #getWidth()
+        /// #### See also
+        ///
+        /// - #getWidth()
         ///
         /// #### Returns
         ///

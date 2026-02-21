@@ -33,7 +33,7 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 
-/// Allow us to create {@ling com.codename1.media.Media} objects using String URI's or with a stream to
+/// Allow us to create {@link com.codename1.media.Media} objects using String URI's or with a stream to
 /// the media data.
 ///
 /// Notice that the underlying platforms contains the actual codecs, therefore

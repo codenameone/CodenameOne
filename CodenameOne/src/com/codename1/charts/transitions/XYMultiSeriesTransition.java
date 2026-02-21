@@ -55,7 +55,7 @@ public class XYMultiSeriesTransition extends SeriesTransition {
         this.dataset = dataset;
     }
 
-    /// @inherit
+    /// {@inheritDoc}
     @Override
     protected void initTransition() {
 
@@ -72,7 +72,7 @@ public class XYMultiSeriesTransition extends SeriesTransition {
     }
 
 
-    /// @inherit
+    /// {@inheritDoc}
     ///
     /// #### Parameters
     ///
@@ -88,7 +88,7 @@ public class XYMultiSeriesTransition extends SeriesTransition {
         }
     }
 
-    /// @inherit
+    /// {@inheritDoc}
     @Override
     protected void cleanup() {
         super.cleanup();

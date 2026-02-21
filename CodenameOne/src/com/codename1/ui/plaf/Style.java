@@ -1577,7 +1577,9 @@ public class Style {
 
     /// Store current margin values into a cache that could be restored with restoreCachedMargins()
     ///
-    /// @parma override: if true, margins would be cached even if a a previous cache already exists. If false, margins would be cached only if no cache already exists
+    /// #### Parameters
+    ///
+    /// - `override`: if true, margins are cached even if a previous cache already exists. If false, margins are cached only if no cache already exists.
     /// Warning: This method is used internally when hidding a component with the Component.setHidden(true) method and expect a component with no previous margins cache.
     /// So do not use this method on a component that would be hidden or flush its margins cache by calling flushMarginsCache() before hidding the component.
     /// And do not use on an hidden component either or unhidding this component might result in unexpected results

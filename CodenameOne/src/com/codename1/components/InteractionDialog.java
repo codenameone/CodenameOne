@@ -183,12 +183,16 @@ public class InteractionDialog extends Container {
         contentPane.setLayout(layout);
     }
 
-    /// {@inheritDoc}
+    /// Gets this dialog title text.
     public String getTitle() {
         return title.getText();
     }
 
-    /// {@inheritDoc}
+    /// Sets this dialog title text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the title text.
     public void setTitle(String title) {
         this.title.setText(title);
     }
@@ -229,7 +233,11 @@ public class InteractionDialog extends Container {
         contentPane.removeComponent(cmp);
     }
 
-    /// {@inheritDoc}
+    /// Gets the label component used to display the title.
+    ///
+    /// #### Returns
+    ///
+    /// The title label component.
     public Label getTitleComponent() {
         return title;
     }

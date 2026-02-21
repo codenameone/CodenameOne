@@ -492,7 +492,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     /// Creates a selector that will query the current form.  If there is no
     /// current form, then this selector will have no roots.
     ///
-    /// Generally it is better to provide a root explicitly using {@link ComponentSelector#ComponentSelector(java.lang.String, com.codename1.ui.Component...)
+    /// Generally it is better to provide a root explicitly using {@link ComponentSelector#ComponentSelector(java.lang.String, com.codename1.ui.Component...)}
     /// to ensure that the selector has a tree to walk down.
     ///
     /// #### Parameters

@@ -417,8 +417,7 @@ public class JavascriptContext {
     ///
     /// - `key`: A Javascript expression whose result is being assigned the value.
     ///
-    /// - `value`: @param value The object or value that is being assigned to the Javascript variable
-    ///              on the left.
+    /// - `value`: The object or value that is being assigned to the Javascript variable on the left.
     public void set(String key, Object value) {
         synchronized (browser) {
 
@@ -444,14 +443,13 @@ public class JavascriptContext {
     }
 
     /// Sets a Javascript value given a compatible Java object value.  This is an abstraction
-    /// upon javascript to execute `key = value`.  See  {@link #set(java.lang.String, java.lang.Object) for a full description.
+    /// upon javascript to execute `key = value`. See {@link #set(java.lang.String, java.lang.Object)} for a full description.
     ///
     /// #### Parameters
     ///
     /// - `key`: A Javascript expression whose result is being assigned the value.
     ///
-    /// - `value`: @param value The object or value that is being assigned to the Javascript variable
-    ///              on the left.
+    /// - `value`: The object or value that is being assigned to the Javascript variable on the left.
     ///
     /// - `async`: If true, the call is made asynchronously.
     ///
@@ -475,8 +473,7 @@ public class JavascriptContext {
     ///
     /// - `key`: A Javascript expression whose result is being assigned the value.
     ///
-    /// - `value`: @param value The object or value that is being assigned to the Javascript variable
-    ///              on the left.
+    /// - `value`: The object or value that is being assigned to the Javascript variable on the left.
     ///
     /// #### See also
     ///

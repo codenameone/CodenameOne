@@ -587,7 +587,7 @@ public class Sheet extends Container {
 
     /// Gets the position where the Sheet is to be displayed.
     /// One of `BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
-    /// `BorderLayout#WEST`. `Default is {@link BorderLayout#SOUTH`.
+    /// `BorderLayout#WEST`, or `BorderLayout#EAST`. Default is `BorderLayout#SOUTH`.
     ///
     /// #### See also
     ///
@@ -603,12 +603,12 @@ public class Sheet extends Container {
 
     /// Sets the position where the Sheet is to be displayed.
     /// One of `BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
-    /// `BorderLayout#WEST`. `Default is {@link BorderLayout#SOUTH`.
+    /// `BorderLayout#WEST`, or `BorderLayout#EAST`. Default is `BorderLayout#SOUTH`.
     ///
     /// #### Parameters
     ///
-    /// - `position`: @param position One of `BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
-    ///                 `BorderLayout#WEST`. {@link BorderLayout#EAST.
+    /// - `position`: One of `BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
+    ///   `BorderLayout#WEST`, or `BorderLayout#EAST`.
     ///
     /// #### Since
     ///
@@ -698,13 +698,15 @@ public class Sheet extends Container {
 
     /// Sets the position where the Sheet is to be displayed.
     /// One of `BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
-    /// `BorderLayout#WEST`. `Default is {@link BorderLayout#SOUTH`.
+    /// `BorderLayout#WEST`, or `BorderLayout#EAST`. Default is `BorderLayout#SOUTH`.
     ///
     /// #### Parameters
     ///
-    /// - `phonePosition`: @param phonePosition  Position to use on a phone (i.e. non-tablet). One of `BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
-    ///                       `BorderLayout#WEST`. `@param tabletPosition Position to use on a tablet and desktop. One of {@link BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
-    ///                       `BorderLayout#WEST`. {@link BorderLayout#EAST.
+    /// - `phonePosition`: Position to use on a phone (i.e. non-tablet). One of `BorderLayout#CENTER`,
+    ///   `BorderLayout#NORTH`, `BorderLayout#SOUTH`, `BorderLayout#WEST`, or `BorderLayout#EAST`.
+    ///
+    /// - `tabletPosition`: Position to use on a tablet and desktop. One of `BorderLayout#CENTER`,
+    ///   `BorderLayout#NORTH`, `BorderLayout#SOUTH`, `BorderLayout#WEST`, or `BorderLayout#EAST`.
     ///
     /// #### Since
     ///

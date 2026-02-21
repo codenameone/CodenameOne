@@ -3,7 +3,7 @@
 /// The IO package includes all of the main features related to storage and networking with the exception
 /// of `SQL` & XML parsing.
 ///
-/// Storage
+/// ### Storage
 ///
 /// `com.codename1.io.Storage` is accessed via the `Storage`
 /// class. It is a flat filesystem like interface and contains the ability to list/delete and
@@ -48,7 +48,7 @@
 /// }
 /// ```
 ///
-/// The Preferences API
+/// ### The Preferences API
 ///
 /// `com.codename1.io.Storage` also offers a very simple API in the form of the
 /// `com.codename1.io.Preferences`
@@ -72,7 +72,7 @@
 /// trying to get an `Integer`. The workaround is to remain consistent and use code
 /// like this `Preferences.get("primitiveLongValue", (long)0)`.
 ///
-/// File System
+/// ### File System
 ///
 /// `com.codename1.io.FileSystemStorage` provides file system access. It maps to the underlying
 /// OS's file system API providing most of the common operations expected from a file API somewhat in
@@ -87,7 +87,7 @@
 /// allow saving a file anywhere, however mobile devices are far more restrictive and don't allow
 /// apps to see/modify files that are owned by other apps.
 ///
-/// File Paths & App Home
+/// ### File Paths & App Home
 ///
 /// All paths in `com.codename1.io.FileSystemStorage` are absolute, this simplifies the issue of portability
 /// significantly since the concept of relativity and current working directory aren't very portable.
@@ -117,12 +117,12 @@
 /// ```java
 /// Form hi = new Form("FileSystemTree", new BorderLayout());
 /// TreeModel tm = new TreeModel() {
-/// @Override
+///     @Override
 ///     public Vector getChildren(Object parent) {
 ///         String[] files;
 ///         if(parent == null) {
 ///             files = FileSystemStorage.getInstance().getRoots();
-///             return new Vector(Arrays.asList(files));
+///             return new Vector<Object>(Arrays.asList(files));
 ///         } else {
 ///             try {
 ///                 files = FileSystemStorage.getInstance().listFiles((String)parent);
@@ -138,73 +138,76 @@
 ///         }
 ///         return result;
 ///     }
-/// @Override
+///
+///     @Override
 ///     public boolean isLeaf(Object node) {
 ///         return !FileSystemStorage.getInstance().isDirectory((String)node);
 ///     }
 /// };
 /// Tree t = new Tree(tm) {
-/// @Override
+///     @Override
 ///     protected String childToDisplayLabel(Object child) {
 ///         String n = (String)child;
 ///         int pos = n.lastIndexOf("/");
-///         if(pos
+///         if(pos < 0) {
+///             return n;
+///         }
+///         return n.substring(pos);
+///     }
+/// };
+/// hi.add(BorderLayout.CENTER, t);
+/// hi.show();
+/// ```
 ///
-/// Storage vs. File System
+/// ### Storage vs. File System
 ///
-///     The question of storage vs. file system is often confusing for novice mobile developers. This embeds
-///     two separate questions:
+/// The question of storage vs. file system is often confusing for novice mobile developers. This embeds
+/// two separate questions:
 ///
 ///
 /// -
 ///
-///
-/// Why are there 2 API's where one would have worked?
-///
-///
+/// **Why are there 2 API's where one would have worked?**
 ///
 /// -
 ///
+/// **Which one should I pick?**
 ///
-/// Which one should I pick?
+/// The main reasons for the 2 API's are technical. Many OS's provide 2 ways of accessing data
+/// specific to the app and this is reflected within the API. E.g. on Android the
+/// `com.codename1.io.FileSystemStorage` maps to API's such as `java.io.FileInputStream`
+/// whereas the `com.codename1.io.Storage` maps to `Context.openFileInput()`.
 ///
+/// The secondary reason for the two API's is conceptual. `com.codename1.io.FileSystemStorage` is
+/// more powerful and in a sense provides more ways to fail, this is compounded by the complex
+/// on-device behavior of the API. `com.codename1.io.Storage` is designed to be friendlier to the
+/// uninitiated and more portable.
 ///
+/// You should pick `com.codename1.io.Storage` unless you have a specific requirement that prevents it.
+/// Some API's such as `Capture` expect a `com.codename1.io.FileSystemStorage` URI
+/// so in those cases this would also be a requirement.
 ///
-///     The main reasons for the 2 API's are technical. Many OS's provide 2 ways of accessing data
-///     specific to the app and this is reflected within the API. E.g. on Android the
-///     `com.codename1.io.FileSystemStorage` maps to API's such as `java.io.FileInputStream`
-///     whereas the `com.codename1.io.Storage` maps to `Context.openFileInput()`.
+/// Another case where `com.codename1.io.FileSystemStorage` is beneficial is the case of hierarchy or
+/// native API usage. If you need a a directory structure or need to communicate with a native
+/// API the `com.codename1.io.FileSystemStorage` approach is usually easier.
 ///
-///     The secondary reason for the two API's is conceptual. `com.codename1.io.FileSystemStorage` is
-///     more powerful and in a sense provides more ways to fail, this is compounded by the complex
-///     on-device behavior of the API. `com.codename1.io.Storage` is designed to be friendlier to the
-///     uninitiated and more portable.
+/// **Warning: **In some OS's the `com.codename1.io.FileSystemStorage` API can find the
+/// content of the `com.codename1.io.Storage` API. As one is implemented on top of the other. This is
+/// undocumented behavior that can change at any moment!
 ///
-///     You should pick `com.codename1.io.Storage` unless you have a specific requirement that prevents it.
-///     Some API's such as `Capture` expect a `com.codename1.io.FileSystemStorage` URI
-///     so in those cases this would also be a requirement.
+/// **Network Manager & Connection Request**
 ///
-///     Another case where `com.codename1.io.FileSystemStorage` is beneficial is the case of hierarchy or
-///     native API usage. If you need a a directory structure or need to communicate with a native
-///     API the `com.codename1.io.FileSystemStorage` approach is usually easier.
+/// One of the more common problems in Network programming is spawning a new thread to handle
+/// the network operations. In Codename One this is done seamlessly and becomes unessential
+/// thanks to the `com.codename1.io.NetworkManager`.
 ///
-///     **Warning: **In some OS's the `com.codename1.io.FileSystemStorage` API can find the
-///     content of the `com.codename1.io.Storage` API. As one is implemented on top of the other. This is
-///     undocumented behavior that can change at any moment!
+/// `com.codename1.io.NetworkManager` effectively alleviates the need for managing network threads by
+/// managing the complexity of network threading. The connection request class can be used to
+/// facilitate web service requests when coupled with the JSON/XML parsing capabilities.
 ///
-/// Network Manager & Connection Request
-///
-///     One of the more common problems in Network programming is spawning a new thread to handle
-///     the network operations. In Codename One this is done seamlessly and becomes unessential
-///     thanks to the `com.codename1.io.NetworkManager`.
-///
-///     `com.codename1.io.NetworkManager` effectively alleviates the need for managing network threads by
-///     managing the complexity of network threading. The connection request class can be used to
-///     facilitate web service requests when coupled with the JSON/XML parsing capabilities.
-///
-///     To open a connection one needs to use a `com.codename1.io.ConnectionRequest`
-///     object, which has some similarities to the networking mechanism in JavaScript but is obviously somewhat more
-///     elaborate.
+/// To open a connection one needs to use a `com.codename1.io.ConnectionRequest`
+/// object, which has some similarities to the networking mechanism in JavaScript but is obviously somewhat more
+/// elaborate.
 ///
 /// You can send a get request to a URL using something like:
 ///
@@ -218,9 +221,9 @@
 /// NetworkManager.getInstance().addToQueue(request);
 /// ```
 ///
-///     Notice that you can also implement the same thing and much more by avoiding the response
-///     listener code and instead overriding the methods of the `com.codename1.io.ConnectionRequest` class
-///     which offers multiple points to override e.g.
+/// Notice that you can also implement the same thing and much more by avoiding the response
+/// listener code and instead overriding the methods of the `com.codename1.io.ConnectionRequest` class
+/// which offers multiple points to override e.g.
 ///
 /// ```java
 /// ConnectionRequest request = new ConnectionRequest(url, false) {
@@ -241,15 +244,15 @@
 /// NetworkManager.getInstance().addToQueue(request);
 /// ```
 ///
-///     Notice that overriding `buildRequestBody(OutputStream)` will only work for
-///     `POST` requests and will replace writing the arguments.
+/// Notice that overriding `buildRequestBody(OutputStream)` will only work for
+/// `POST` requests and will replace writing the arguments.
 ///
-///     **Important:** You don't need to close the output/input streams passed to the
-///     request methods. They are implicitly cleaned up.
+/// **Important:** You don't need to close the output/input streams passed to the
+/// request methods. They are implicitly cleaned up.
 ///
-///     `com.codename1.io.NetworkManager` also supports synchronous requests which work in a similar
-///     way to `Dialog` via the `invokeAndBlock` call and thus don't block
-///     the EDT illegally. E.g. you can do something like this:
+/// `com.codename1.io.NetworkManager` also supports synchronous requests which work in a similar
+/// way to `Dialog` via the `invokeAndBlock` call and thus don't block
+/// the EDT illegally. E.g. you can do something like this:
 ///
 /// ```java
 /// ConnectionRequest request = new ConnectionRequest(url, false);
@@ -258,18 +261,18 @@
 /// byte[] resultOfRequest = request.getData();
 /// ```
 ///
-///     Notice that in this case the `addToQueueAndWait` method returned after the
-///     connection completed. Also notice that this was totally legal to do on the EDT!
+/// Notice that in this case the `addToQueueAndWait` method returned after the
+/// connection completed. Also notice that this was totally legal to do on the EDT!
 ///
-/// Threading
+/// ### Threading
 ///
-///     By default the `com.codename1.io.NetworkManager` launches with a single network thread. This is
-///     sufficient for very simple applications that don't do too much networking but if you need to
-///     fetch many images concurrently and perform web services in parallel this might be an issue.
+/// By default the `com.codename1.io.NetworkManager` launches with a single network thread. This is
+/// sufficient for very simple applications that don't do too much networking but if you need to
+/// fetch many images concurrently and perform web services in parallel this might be an issue.
 ///
-///     **Warning:** Once you increase the thread count there is no guarantee of order for your requests.
-///     Requests
-///     might not execute in the order with which you added them to the queue!
+/// **Warning:** Once you increase the thread count there is no guarantee of order for your requests.
+/// Requests
+/// might not execute in the order with which you added them to the queue!
 ///
 /// To update the number of threads use:
 ///
@@ -277,33 +280,33 @@
 /// NetworkManager.getInstance().updateThreadCount(4);
 /// ```
 ///
-///     All the callbacks in the `ConnectionRequest` occur on the network thread and
-///     **not on the EDT**!
+/// All the callbacks in the `ConnectionRequest` occur on the network thread and
+/// **not on the EDT**!
 ///
-///     There is one exception to this rule which is the `postResponse()` method designed
-///     to update the UI after the networking code completes.
+/// There is one exception to this rule which is the `postResponse()` method designed
+/// to update the UI after the networking code completes.
 ///
-///     **Important:** Never change the UI from a `com.codename1.io.ConnectionRequest`
-///     callback. You can either use a listener on the `com.codename1.io.ConnectionRequest`, use
-///     `postResponse()` (which is the only exception to this rule) or wrap your UI code with
-///     `com.codename1.ui.Display#callSerially(java.lang.Runnable)`.
+/// **Important:** Never change the UI from a `com.codename1.io.ConnectionRequest`
+/// callback. You can either use a listener on the `com.codename1.io.ConnectionRequest`, use
+/// `postResponse()` (which is the only exception to this rule) or wrap your UI code with
+/// `com.codename1.ui.Display#callSerially(java.lang.Runnable)`.
 ///
-/// Arguments, Headers & Methods
+/// ### Arguments, Headers & Methods
 ///
-///     HTTP/S is a complex protocol that expects complex encoded data for its requests. Codename
-///     One tries to simplify and abstract most of these complexities behind common sense API's while
-///     still providing the full low level access you would expect from such an API.
+/// HTTP/S is a complex protocol that expects complex encoded data for its requests. Codename
+/// One tries to simplify and abstract most of these complexities behind common sense API's while
+/// still providing the full low level access you would expect from such an API.
 ///
-/// Arguments
+/// #### Arguments
 ///
-///     HTTP supports several "request methods", most commonly `GET` &
-///     `POST` but also a few others such as `HEAD`, `PUT`,
-///     `DELETE` etc.
+/// HTTP supports several "request methods", most commonly `GET` &
+/// `POST` but also a few others such as `HEAD`, `PUT`,
+/// `DELETE` etc.
 ///
 /// Arguments in HTTP are passed differently between `GET` and `POST`
-///     methods. That is what the `setPost` method in Codename One determines, whether
-///     arguments added to the request should be placed using the `GET` semantics or the
-///     `POST` semantics.
+/// methods. That is what the `setPost` method in Codename One determines, whether
+/// arguments added to the request should be placed using the `GET` semantics or the
+/// `POST` semantics.
 ///
 /// So if we continue our example from above we can do something like this:
 ///
@@ -312,9 +315,9 @@
 /// request.addArgument("MyArgName", value);
 /// ```
 ///
-///     This will implicitly add a get argument with the content of `value`. Notice that we
-///     don't really care what value is. It's implicitly HTTP encoded based on the get/post semantics.
-///     In this case it will use the get encoding since we passed `false` to the constructor.
+/// This will implicitly add a get argument with the content of `value`. Notice that we
+/// don't really care what value is. It's implicitly HTTP encoded based on the get/post semantics.
+/// In this case it will use the get encoding since we passed `false` to the constructor.
 ///
 /// A simpler implementation could do something like this:
 ///
@@ -323,43 +326,43 @@
 /// "MyArgName=" + Util.encodeUrl(value), false);
 /// ```
 ///
-///     This would be almost identical but doesn't provide the convenience for switching back and
-///     forth between `GET`/`POST` and it isn't as fluent.
+/// This would be almost identical but doesn't provide the convenience for switching back and
+/// forth between `GET`/`POST` and it isn't as fluent.
 ///
 /// We can skip the encoding in complex cases where server code expects illegal HTTP
-///     characters (this happens) using the `addArgumentNoEncoding` method. We can
-///     also add multiple arguments with the same key using `addArgumentArray`.
+/// characters (this happens) using the `addArgumentNoEncoding` method. We can
+/// also add multiple arguments with the same key using `addArgumentArray`.
 ///
-/// Methods
+/// ### Methods
 ///
-///     As we explained above, the `setPost()` method allows us to manipulate the
-///     get/post semantics of a request. This implicitly changes the `POST`
-///     or `GET` method submitted to the server.
+/// As we explained above, the `setPost()` method allows us to manipulate the
+/// get/post semantics of a request. This implicitly changes the `POST`
+/// or `GET` method submitted to the server.
 ///
-///     However, if you wish to have finer grained control over the submission process e.g. for making a
-///     `HEAD` request you can do this with code like:
+/// However, if you wish to have finer grained control over the submission process e.g. for making a
+/// `HEAD` request you can do this with code like:
 ///
 /// ```java
 /// ConnectionRequest request = new ConnectionRequest(url, false);
 /// request.setHttpMethod("HEAD");
 /// ```
 ///
-/// Headers
+/// ### Headers
 ///
-///     When communicating with HTTP servers we often pass data within headers mostly for
-///     authentication/authorization but also to convey various properties.
+/// When communicating with HTTP servers we often pass data within headers mostly for
+/// authentication/authorization but also to convey various properties.
 ///
-///     Some headers are builtin as direct API's e.g. content type is directly exposed within the API
-///     since it's a pretty common use case. We can set the content type of a post request using:
+/// Some headers are builtin as direct API's e.g. content type is directly exposed within the API
+/// since it's a pretty common use case. We can set the content type of a post request using:
 ///
 /// ```java
 /// ConnectionRequest request = new ConnectionRequest(url, true);
 /// request.setContentType("text/xml");
 /// ```
 ///
-///     We can also add any arbitrary header type we want, e.g. a very common use case is basic
-///     authorization where the authorization header includes the Base64 encoded user/password
-///     combination as such:
+/// We can also add any arbitrary header type we want, e.g. a very common use case is basic
+/// authorization where the authorization header includes the Base64 encoded user/password
+/// combination as such:
 ///
 /// ```java
 /// String authCode = user + ":" + password;
@@ -368,7 +371,7 @@
 /// ```
 ///
 /// This can be quite tedious to do if you want all requests from your app to use this header.
-///     For this use case you can just use:
+/// For this use case you can just use:
 ///
 /// ```java
 /// String authCode = user + ":" + password;
@@ -376,10 +379,10 @@
 /// NetworkManager.getInstance().addDefaultHeader("Authorization", authHeader);
 /// ```
 ///
-/// Server Headers
+/// ### Server Headers
 ///
-///     Server returned headers are a bit trickier to read. We need to subclass the connection request
-///     and override the `readHeaders` method e.g.:
+/// Server returned headers are a bit trickier to read. We need to subclass the connection request
+/// and override the `readHeaders` method e.g.:
 ///
 /// ```java
 /// ConnectionRequest request = new ConnectionRequest(url, false) {
@@ -397,15 +400,15 @@
 /// NetworkManager.getInstance().addToQueue(request);
 /// ```
 ///
-///     Here we can extract the headers one by one to handle complex headers such as cookies,
-///     authentication etc.
+/// Here we can extract the headers one by one to handle complex headers such as cookies,
+/// authentication etc.
 ///
-/// Error Handling
+/// ### Error Handling
 ///
-///     As you noticed above practically all of the methods in the `ConectionRequest`
-///     throw `IOException`. This allows you to avoid the `try`/`catch`
-///     semantics and just let the error propagate up the chain so it can be handled uniformly by
-///     the application.
+/// As you noticed above practically all of the methods in the `ConectionRequest`
+/// throw `IOException`. This allows you to avoid the `try`/`catch`
+/// semantics and just let the error propagate up the chain so it can be handled uniformly by
+/// the application.
 ///
 /// There are two distinct placed where you can handle a networking error:
 ///
@@ -424,23 +427,23 @@
 ///
 ///
 ///
-///     Notice that the `com.codename1.io.NetworkManager` error handler takes precedence thus allowing
-///     you to define a global policy for network error handling by consuming errors.
+/// Notice that the `com.codename1.io.NetworkManager` error handler takes precedence thus allowing
+/// you to define a global policy for network error handling by consuming errors.
 ///
-///     E.g. if I would like to block all network errors from showing anything to the user I could do
-///     something like this:
+/// E.g. if I would like to block all network errors from showing anything to the user I could do
+/// something like this:
 ///
 /// ```java
 /// NetworkManager.getInstance().addToQueue(request);
 /// NetworkManager.getInstance().addErrorListener((e) -> e.consume());
 /// ```
 ///
-///     The error listener is invoked first with the `com.codename1.io.NetworkEvent` matching the
-///     error. Consuming the event prevents it from propagating further down the chain into the
-///     `com.codename1.io.ConnectionRequest` callbacks.
+/// The error listener is invoked first with the `com.codename1.io.NetworkEvent` matching the
+/// error. Consuming the event prevents it from propagating further down the chain into the
+/// `com.codename1.io.ConnectionRequest` callbacks.
 ///
-///     We can also override the error callbacks of the various types in the request e.g. in the case of a
-///     server error code we can do:
+/// We can also override the error callbacks of the various types in the request e.g. in the case of a
+/// server error code we can do:
 ///
 /// ```java
 /// ConnectionRequest request = new ConnectionRequest(url, false) {
@@ -456,14 +459,14 @@
 /// NetworkManager.getInstance().addToQueue(request);
 /// ```
 ///
-///     **Important:** The error callback callback is triggered in the network thread!
+/// **Important:** The error callback callback is triggered in the network thread!
 ///
-///     As a result it can't access the UI to show a `Dialog` or anything like that.
+/// As a result it can't access the UI to show a `Dialog` or anything like that.
 ///
-///     Another approach is to use the `setFailSilently(true)` method on the
-///     `com.codename1.io.ConnectionRequest`. This will prevent the
-///     `com.codename1.io.ConnectionRequest` from displaying any errors to the user. It's a very
-///     powerful strategy if you use the synchronous version of the API's e.g.:
+/// Another approach is to use the `setFailSilently(true)` method on the
+/// `com.codename1.io.ConnectionRequest`. This will prevent the
+/// `com.codename1.io.ConnectionRequest` from displaying any errors to the user. It's a very
+/// powerful strategy if you use the synchronous version of the API's e.g.:
 ///
 /// ```java
 /// ConnectionRequest request = new ConnectionRequest(url, false);
@@ -474,39 +477,39 @@
 /// }
 /// ```
 ///
-///     This code will only work with the synchronous "AndWait" version of the method since the response
-///     code will take a while to return for the non-wait version.
+/// This code will only work with the synchronous "AndWait" version of the method since the response
+/// code will take a while to return for the non-wait version.
 ///
-/// Error Stream
+/// ### Error Stream
 ///
-///     When we get an error code that isn't 200/300 we ignore the result. This is problematic as the
-///     result might contain information we need. E.g. many webservices provide further XML/JSON
-///     based details describing the reason for the error code.
+/// When we get an error code that isn't 200/300 we ignore the result. This is problematic as the
+/// result might contain information we need. E.g. many webservices provide further XML/JSON
+/// based details describing the reason for the error code.
 ///
-///     Calling `setReadResponseForErrors(true)` will trigger a mode where even errors
-///     will receive the `readResponse` callback with the error stream. This also means
-///     that API's like `getData` and the listener API's will also work correctly in
-///     case of error.
+/// Calling `setReadResponseForErrors(true)` will trigger a mode where even errors
+/// will receive the `readResponse` callback with the error stream. This also means
+/// that API's like `getData` and the listener API's will also work correctly in
+/// case of error.
 ///
-/// GZIP
+/// ### GZIP
 ///
-///     Gzip is a very common compression format based on the lz algorithm, it's used by web servers
-///     around the world to compress data.
+/// Gzip is a very common compression format based on the lz algorithm, it's used by web servers
+/// around the world to compress data.
 ///
-///     Codename One supports `com.codename1.io.gzip.GZIPInputStream` and
-///     `com.codename1.io.gzip.GZIPOutputStream`, which allow you to compress data
-///     seamlessly into a stream and extract compressed data from a stream. This is very useful and
-///     can be applied to every arbitrary stream.
+/// Codename One supports `com.codename1.io.gzip.GZIPInputStream` and
+/// `com.codename1.io.gzip.GZIPOutputStream`, which allow you to compress data
+/// seamlessly into a stream and extract compressed data from a stream. This is very useful and
+/// can be applied to every arbitrary stream.
 ///
-///     Codename One also features a `com.codename1.io.gzip.GZConnectionRequest`, which
-///     will automatically unzip an HTTP response if it is indeed gzipped. Notice that some devices (iOS)
-///     always request gzip'ed data and always decompress it for us, however in the case of iOS it
-///     doesn't remove the gziped header. The `GZConnectionRequest` is aware of such
-///     behaviors so its better to use that when connecting to the network (if applicable).
+/// Codename One also features a `com.codename1.io.gzip.GZConnectionRequest`, which
+/// will automatically unzip an HTTP response if it is indeed gzipped. Notice that some devices (iOS)
+/// always request gzip'ed data and always decompress it for us, however in the case of iOS it
+/// doesn't remove the gziped header. The `GZConnectionRequest` is aware of such
+/// behaviors so its better to use that when connecting to the network (if applicable).
 ///
-///     By default `GZConnectionRequest` doesn't request gzipped data (only unzips it
-///     when its received) but its pretty easy to do so just add the HTTP header
-///     `Accept-Encoding: gzip` e.g.:
+/// By default `GZConnectionRequest` doesn't request gzipped data (only unzips it
+/// when its received) but its pretty easy to do so just add the HTTP header
+/// `Accept-Encoding: gzip` e.g.:
 ///
 /// ```java
 /// GZConnectionRequest con = new GZConnectionRequest();
@@ -515,18 +518,18 @@
 ///
 /// Do the rest as usual and you should have smaller responses from the servers.
 ///
-/// File Upload
+/// ### File Upload
 ///
-///     `com.codename1.io.MultipartRequest` tries to simplify the process of uploading a file from
-///     the local device to a remote server.
+/// `com.codename1.io.MultipartRequest` tries to simplify the process of uploading a file from
+/// the local device to a remote server.
 ///
-///     You can always submit data in the `buildRequestBody` but this is flaky and has
-///     some limitations in terms of devices/size allowed. HTTP standardized file upload capabilities
-///     thru the multipart request protocol, this is implemented by countless servers and is well
-///     documented. Codename One supports this out of the box.
+/// You can always submit data in the `buildRequestBody` but this is flaky and has
+/// some limitations in terms of devices/size allowed. HTTP standardized file upload capabilities
+/// thru the multipart request protocol, this is implemented by countless servers and is well
+/// documented. Codename One supports this out of the box.
 ///
-///     Since we assume most developers reading this will be familiar with Java here is the way to
-///     implement the multipart upload in the servlet API.
+/// Since we assume most developers reading this will be familiar with Java here is the way to
+/// implement the multipart upload in the servlet API.
 ///
 /// ```java
 /// // File: MultipartClientSample.java
@@ -555,28 +558,28 @@
 /// }
 /// ```
 ///
-///     `com.codename1.io.MultipartRequest` is a `com.codename1.io.ConnectionRequest`
-///     most stuff you expect from there should work. Even addArgument etc.
+/// `com.codename1.io.MultipartRequest` is a `com.codename1.io.ConnectionRequest`
+/// most stuff you expect from there should work. Even addArgument etc.
 ///
-/// Parsing
+/// ### Parsing
 ///
 /// Codename One has several built in parsers for JSON, XML, CSV & Properties formats. You can
-///     use those parsers to read data from the Internet or data that is shipping with your product. E.g. use the
-///     CSV data to setup default values for your application.
+/// use those parsers to read data from the Internet or data that is shipping with your product. E.g. use the
+/// CSV data to setup default values for your application.
 ///
-///     All our parsers are designed with simplicity and small distribution size; they don't validate and will fail
-///     in odd ways when faced with broken data. The main logic behind this is that validation takes up CPU
-///     time on the device where CPU is a precious resource.
+/// All our parsers are designed with simplicity and small distribution size; they don't validate and will fail
+/// in odd ways when faced with broken data. The main logic behind this is that validation takes up CPU
+/// time on the device where CPU is a precious resource.
 ///
-/// Parsing CSV
+/// ### Parsing CSV
 ///
-///     CSV is probably the easiest to use, the "Comma Separated Values" format is just a list of values
-///     separated by commas (or some other character) with new lines to indicate another row in the table.
-///     These usually map well to an Excel spreadsheet or database table and are supported by default in all
-///     spreadsheets.
+/// CSV is probably the easiest to use, the "Comma Separated Values" format is just a list of values
+/// separated by commas (or some other character) with new lines to indicate another row in the table.
+/// These usually map well to an Excel spreadsheet or database table and are supported by default in all
+/// spreadsheets.
 ///
-///     To parse a CSV just use the
-///     [CSVParser](https://www.codenameone.com/javadoc/com/codename1/io/CSVParser.html) class as such:
+/// To parse a CSV just use the
+/// [CSVParser](https://www.codenameone.com/javadoc/com/codename1/io/CSVParser.html) class as such:
 ///
 /// ```java
 /// Form hi = new Form("CSV Parsing", new BorderLayout());

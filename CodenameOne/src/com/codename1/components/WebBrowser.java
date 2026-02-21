@@ -55,7 +55,7 @@ import java.io.OutputStreamWriter;
 /// is supported.
 ///
 /// On Android this component might show a native progress indicator dialog. You can disable that functionality
-/// using the {@Display.getInstance().setProperty("WebLoadingHidden", "true");} call.
+/// using `Display.getInstance().setProperty("WebLoadingHidden", "true");`.
 ///
 /// @author Shai Almog
 ///
