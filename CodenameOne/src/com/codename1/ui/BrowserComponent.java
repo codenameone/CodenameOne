@@ -68,7 +68,7 @@ import java.util.Vector;
 /// itself rather than CodenameOne making that decision for it.
 ///
 /// On Android this component might show a native progress indicator dialog. You can disable that functionality
-/// using the {@Display.getInstance().setProperty("WebLoadingHidden", "true");} call.
+/// using the `Display.getInstance().setProperty("WebLoadingHidden", "true");` call.
 ///
 /// The following code shows the basic usage of the `BrowserComponent`:
 ///
@@ -517,7 +517,7 @@ public class BrowserComponent extends Container {
     ///
     /// #### Deprecated
     ///
-    /// Use {@link #addBrowserNavigationCallback(com.codename1.ui.events.BrowserNavigationCallback) Instead
+    /// Use {@link #addBrowserNavigationCallback(com.codename1.ui.events.BrowserNavigationCallback)} instead.
     public void setBrowserNavigationCallback(BrowserNavigationCallback callback) {
         this.browserNavigationCallback = callback;
     }

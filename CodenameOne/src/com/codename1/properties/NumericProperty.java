@@ -30,25 +30,25 @@ package com.codename1.properties;
 public abstract class NumericProperty<T, K> extends Property<T, K> {
     private boolean nullable;
 
-    /// {@inheritDoc}
+    /// Creates a numeric property with the given name.
     public NumericProperty(String name) {
         super(name);
         nullable = true;
     }
 
-    /// {@inheritDoc}
+    /// Creates a numeric property with the given name and explicit value type.
     public NumericProperty(String name, Class genericType) {
         super(name, genericType);
         nullable = true;
     }
 
-    /// {@inheritDoc}
+    /// Creates a numeric property with the given name and initial value.
     public NumericProperty(String name, T value) {
         super(name, value);
         nullable = value == null;
     }
 
-    /// {@inheritDoc}
+    /// Creates a numeric property with the given name, type, and initial value.
     public NumericProperty(String name, Class genericType, T value) {
         super(name, genericType, value);
         nullable = value == null;

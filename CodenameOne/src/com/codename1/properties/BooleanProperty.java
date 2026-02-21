@@ -28,12 +28,12 @@ package com.codename1.properties;
 /// @author Shai Almog
 public class BooleanProperty<K> extends Property<Boolean, K> {
 
-    /// {@inheritDoc}
+    /// Creates a boolean property with the given name.
     public BooleanProperty(String name) {
         super(name, Boolean.class);
     }
 
-    /// {@inheritDoc}
+    /// Creates a boolean property with the given name and initial value.
     public BooleanProperty(String name, Boolean value) {
         super(name, Boolean.class, value);
     }

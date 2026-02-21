@@ -49,7 +49,7 @@ public class Photo extends FBObject {
     public Photo() {
     }
 
-    /// {@inheritDoc}
+    /// Constructor with properties to initialize this photo.
     public Photo(Hashtable props) {
         super(props);
         init(props);
