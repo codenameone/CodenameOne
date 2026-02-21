@@ -9729,6 +9729,22 @@ JAVA_INT com_codename1_impl_ios_IOSNative_readNSFile___long(CN1_THREAD_STATE_MUL
 #endif
 
 
+static void cn1CancelScheduledLocalNotificationById(NSString *nsId) {
+    if (nsId == nil) {
+        return;
+    }
+    UIApplication *app = [UIApplication sharedApplication];
+    NSArray *eventArray = [app scheduledLocalNotifications];
+    for (int i = 0; i < [eventArray count]; i++) {
+        UILocalNotification *n = [eventArray objectAtIndex:i];
+        NSDictionary *userInfo = n.userInfo;
+        NSString *uid = [NSString stringWithFormat:@"%@", [userInfo valueForKey:@"__ios_id__"]];
+        if ([nsId isEqualToString:uid]) {
+            [app cancelLocalNotification:n];
+        }
+    }
+}
+
 JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_long_int_boolean( CN1_THREAD_STATE_MULTI_ARG
     JAVA_OBJECT me, JAVA_OBJECT notificationId, JAVA_OBJECT alertTitle, JAVA_OBJECT alertBody, JAVA_OBJECT alertSound, JAVA_INT badgeNumber, JAVA_LONG fireDate, JAVA_INT repeatType, JAVA_BOOLEAN foreground
                                                                                                                                                                      ) {
@@ -9759,7 +9775,8 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
     body = tmpStr;
     
     NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
-    [dict setObject: toNSString(CN1_THREAD_STATE_PASS_ARG notificationId) forKey: @"__ios_id__"];
+    NSString *notificationIdString = toNSString(CN1_THREAD_STATE_PASS_ARG notificationId);
+    [dict setObject: notificationIdString forKey: @"__ios_id__"];
     if (foreground) {
         [dict setObject: @"true" forKey: @"foreground"];
     }
@@ -9861,6 +9878,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
         
             
             dispatch_sync(dispatch_get_main_queue(), ^{
+                cn1CancelScheduledLocalNotificationById(notificationIdString);
 #ifdef __IPHONE_8_0
                 if ([UIApplication instancesRespondToSelector:@selector(registerUserNotificationSettings:)]){
                     [[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound categories:nil]];
@@ -9878,16 +9896,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_cancelLocalNotification___java_lang_S
     }
     NSString *nsId = toNSString(CN1_THREAD_STATE_PASS_ARG notificationId);
     dispatch_sync(dispatch_get_main_queue(), ^{
-        UIApplication *app = [UIApplication sharedApplication];
-        NSArray *eventArray = [app scheduledLocalNotifications];
-        for (int i=0; i<[eventArray count]; i++) {
-            UILocalNotification *n = [eventArray objectAtIndex:i];
-            NSDictionary *userInfo = n.userInfo;
-            NSString *uid = [NSString stringWithFormat:@"%@", [userInfo valueForKey: @"__ios_id__"]];
-            if ([nsId isEqualToString:uid]) {
-                [app cancelLocalNotification:n];
-            }
-        }
+        cn1CancelScheduledLocalNotificationById(nsId);
     });
 }
 

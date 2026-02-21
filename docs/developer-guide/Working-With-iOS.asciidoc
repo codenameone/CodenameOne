@@ -105,6 +105,8 @@ Display.getInstance().scheduleLocalNotification(
 );
 -----
 
+NOTE: On iOS, scheduling a local notification with an `id` that already exists now replaces the previously scheduled notification with that same `id` instead of keeping duplicates.
+
 The resulting notification will look like
 
 .Resulting notification in iOS
