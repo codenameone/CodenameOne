@@ -44,7 +44,7 @@ public class Page extends FBObject {
     public Page() {
     }
 
-    /// {@inheritDoc}
+    /// Constructor with properties to initialize this page.
     public Page(Hashtable props) {
         super(props);
         init(props);

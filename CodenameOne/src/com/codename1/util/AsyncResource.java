@@ -673,9 +673,9 @@ public class AsyncResource<V> extends Observable {
 
     }
 
-    /// Exception thrown when the AsyncResource is cancelled.  Use {@link AsyncResource#isCancelled(java.lang.Throwable)
+    /// Exception thrown when the AsyncResource is cancelled.  Use {@link AsyncResource#isCancelled(java.lang.Throwable)}
     /// to test a particular exception to see if it resulted from cancelling an AsyncResource as this will
-    /// return turn true if the exception itself is a CancellationException, or if the exception was caused by
+    /// return true if the exception itself is a CancellationException, or if the exception was caused by
     /// a CancellationException.
     ///
     /// #### Since

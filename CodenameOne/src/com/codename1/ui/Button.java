@@ -689,8 +689,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
         return icon;
     }
 
-    /// Allows subclasses to override action event behavior
-    /// {@inheritDoc}
+    /// Allows subclasses to override action event behavior for pointer coordinates.
     ///
     /// #### Parameters
     ///

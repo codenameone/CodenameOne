@@ -28,12 +28,12 @@ package com.codename1.properties;
 /// @author Shai Almog
 public class ByteProperty<K> extends NumericProperty<Byte, K> {
 
-    /// {@inheritDoc}
+    /// Creates a byte property with the given name.
     public ByteProperty(String name) {
         super(name, Byte.class);
     }
 
-    /// {@inheritDoc}
+    /// Creates a byte property with the given name and initial value.
     public ByteProperty(String name, Byte value) {
         super(name, Byte.class, value);
     }

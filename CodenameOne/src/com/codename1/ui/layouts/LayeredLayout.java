@@ -1564,7 +1564,7 @@ public class LayeredLayout extends Layout {
         ///
         /// #### Deprecated
         ///
-        /// Use {@link #getReferenceBox(com.codename1.ui.Container)
+        /// Use {@link #getReferenceBox(com.codename1.ui.Container)}.
         public Rectangle getReferenceBox(Container parent, Component cmp) {
             return getReferenceBox(parent, cmp, new Rectangle());
         }

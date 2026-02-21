@@ -54,7 +54,7 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
         super(new Mercator(), name);
     }
 
-    /// {@inheritDoc}
+    /// Constructor with custom projection and layer name.
     public PointsLayer(Projection p, String name) {
         super(p, name);
     }

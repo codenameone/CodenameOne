@@ -47,7 +47,7 @@ public class LinesLayer extends AbstractLayer {
         this(new Mercator(), name);
     }
 
-    /// {@inheritDoc}
+    /// Constructor with custom projection and layer name.
     public LinesLayer(Projection p, String name) {
         super(p, name);
         _lineSegments = new Vector();
