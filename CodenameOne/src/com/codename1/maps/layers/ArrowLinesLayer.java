@@ -48,7 +48,7 @@ public class ArrowLinesLayer extends LinesLayer {
         this(new Mercator(), name);
     }
 
-    /// {@inheritDoc}
+    /// Constructor with custom projection and layer name.
     public ArrowLinesLayer(Projection p, String name) {
         super(p, name);
     }

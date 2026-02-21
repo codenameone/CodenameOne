@@ -28,12 +28,12 @@ package com.codename1.properties;
 /// @author Shai Almog
 public class LongProperty<K> extends NumericProperty<Long, K> {
 
-    /// {@inheritDoc}
+    /// Creates a long property with the given name.
     public LongProperty(String name) {
         super(name, Long.class);
     }
 
-    /// {@inheritDoc}
+    /// Creates a long property with the given name and initial value.
     public LongProperty(String name, Long value) {
         super(name, Long.class, value);
     }

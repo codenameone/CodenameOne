@@ -47,7 +47,7 @@ public class Album extends FBObject {
     public Album() {
     }
 
-    /// {@inheritDoc}
+    /// Constructor with properties to initialize this album.
     public Album(Hashtable props) {
         super(props);
         init(props);

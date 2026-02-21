@@ -397,7 +397,7 @@ public class Accordion extends Container {
 
     /// UIID for the header component
     ///
-    /// @retrun the uiid
+    /// @return the uiid
     public String getHeaderUIID() {
         return uiidHeader;
     }

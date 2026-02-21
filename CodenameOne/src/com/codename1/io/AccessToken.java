@@ -70,7 +70,7 @@ public class AccessToken implements Externalizable {
 
     /// Constructor with parameters
     ///
-    /// @ince 7.0
+    /// @since 7.0
     ///
     /// #### Parameters
     ///
@@ -85,7 +85,7 @@ public class AccessToken implements Externalizable {
 
     /// Constructor with parameters
     ///
-    /// @ince 7.0
+    /// @since 7.0
     ///
     /// #### Parameters
     ///

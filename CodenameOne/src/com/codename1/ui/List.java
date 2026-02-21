@@ -1551,7 +1551,7 @@ public class List<T> extends Component implements ActionSource {
         dispatcher.removeListener(l);
     }
 
-    /// {@inheritDoc}
+    /// Fires an action event for the current event source.
     @Override
     protected void fireActionEvent() {
         fireActionEvent(new ActionEvent(eventSource, ActionEvent.Type.Other));
