@@ -199,7 +199,11 @@ public class RGBImage extends Image {
         return opaque;
     }
 
-    /// {@inheritDoc}
+    /// Sets whether this image should be treated as fully opaque.
+    ///
+    /// #### Parameters
+    ///
+    /// - `opaque`: `true` to treat this image as opaque.
     @Override
     public void setOpaque(boolean opaque) {
         this.opaque = opaque;

@@ -1844,7 +1844,11 @@ public class Image implements ActionSource {
         return animated;
     }
 
-    /// {@inheritDoc}
+    /// Advances this image's animation state, if it is animated.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if the animation state changed.
     public boolean animate() {
         if (imageTime == -1) {
             imageTime = System.currentTimeMillis();

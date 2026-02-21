@@ -2212,10 +2212,10 @@ public class Border {
     /// This method returns the Compound Borders array.
     /// The array size is 4 and the borders arranged as follows :
     /// Border[] borders = getCompoundBorders();
-    /// Border top = borders[Component.TOP];
-    /// Border bottom = borders[Component.BOTTOM];
-    /// Border left = borders[Component.LEFT];
-    /// Border right = borders[Component.RIGHT];
+    /// `Border top = borders[Component.TOP];`
+    /// `Border bottom = borders[Component.BOTTOM];`
+    /// `Border left = borders[Component.LEFT];`
+    /// `Border right = borders[Component.RIGHT];`
     ///
     /// #### Returns
     ///

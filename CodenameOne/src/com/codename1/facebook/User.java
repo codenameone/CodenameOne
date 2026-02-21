@@ -53,7 +53,11 @@ public class User extends FBObject {
     public User() {
     }
 
-    /// {@inheritDoc}
+    /// Creates a user from a hashtable of Facebook user properties.
+    ///
+    /// #### Parameters
+    ///
+    /// - `props`: the properties map used to initialize the user.
     public User(Hashtable props) {
         super(props);
         init(props);

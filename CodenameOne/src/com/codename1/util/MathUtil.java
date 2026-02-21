@@ -1326,13 +1326,11 @@ public abstract class MathUtil {
     ///
     /// - `start`: starting value
     ///
-    /// - `direction`: @param direction value indicating which of the neighboring representable
-    /// floating point number to return
+    /// - `direction`: value indicating which of the neighboring representable floating point number to return.
     ///
     /// #### Returns
     ///
-    /// @return The floating-point number next to `start` in the
-    /// direction of {@direction}.
+    /// The floating-point number next to `start` in the direction of `direction`.
     public static double nextAfter(final double start, final double direction) {
         if (Double.isNaN(start) || Double.isNaN(direction)) {
             // If either argument is a NaN, then NaN is returned.

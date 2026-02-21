@@ -167,7 +167,7 @@ public class CommonProgressAnimations {
         int step = 0;
 
         /// Replaces the given component with a CircleProgress until its content is ready.
-        /// When the component's content is ready, then make sure to call {@link ProgressAnimation#markComponentReady(com.codename1.ui.Component) )
+        /// When the component's content is ready, then make sure to call {@link ProgressAnimation#markComponentReady(com.codename1.ui.Component)}
         /// to swap the component back into its parent.
         ///
         /// #### Parameters
@@ -219,7 +219,7 @@ public class CommonProgressAnimations {
     /// 7.0
     public static class EmptyAnimation extends ProgressAnimation {
         /// Replaces the given component with an EmptyAnimation until its content is ready.
-        /// When the component's content is ready, then make sure to call {@link ProgressAnimation#markComponentReady(com.codename1.ui.Component) )
+        /// When the component's content is ready, then make sure to call {@link ProgressAnimation#markComponentReady(com.codename1.ui.Component)}
         /// to swap the component back into its parent.
         ///
         /// #### Parameters
@@ -265,7 +265,7 @@ public class CommonProgressAnimations {
         }
 
         /// Replaces the given component with a LoadingTextAnimation until its content is ready.
-        /// When the component's content is ready, then make sure to call {@link ProgressAnimation#markComponentReady(com.codename1.ui.Component) )
+        /// When the component's content is ready, then make sure to call {@link ProgressAnimation#markComponentReady(com.codename1.ui.Component)}
         /// to swap the component back into its parent.
         ///
         /// #### Parameters

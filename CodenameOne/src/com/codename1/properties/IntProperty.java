@@ -28,12 +28,22 @@ package com.codename1.properties;
 /// @author Shai Almog
 public class IntProperty<K> extends NumericProperty<Integer, K> {
 
-    /// {@inheritDoc}
+    /// Creates an integer property with the given name.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the property name.
     public IntProperty(String name) {
         super(name, Integer.class);
     }
 
-    /// {@inheritDoc}
+    /// Creates an integer property with the given name and initial value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the property name.
+    ///
+    /// - `value`: the initial property value.
     public IntProperty(String name, Integer value) {
         super(name, Integer.class, value);
     }

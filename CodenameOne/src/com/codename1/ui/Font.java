@@ -388,7 +388,7 @@ public class Font extends CN {
     /// - `cutOffsets`: character offsets matching the bitmap pixels and characters in the font
     ///
     /// - `charWidth`: @param charWidth  The width of the character when drawing... this should not be confused with
-    /// the number of cutOffset[o + 1] - cutOffset[o]. They are completely different
+    /// the number of `cutOffset[o + 1] - cutOffset[o]`. They are completely different
     /// since a character can be "wider" and "seep" into the next region. This is
     /// especially true with italic characters all of which "lean" outside of their
     /// bounds.
@@ -417,7 +417,7 @@ public class Font extends CN {
     /// - `cutOffsets`: character offsets matching the bitmap pixels and characters in the font
     ///
     /// - `charWidth`: @param charWidth  The width of the character when drawing... this should not be confused with
-    /// the number of cutOffset[o + 1] - cutOffset[o]. They are completely different
+    /// the number of `cutOffset[o + 1] - cutOffset[o]`. They are completely different
     /// since a character can be "wider" and "seep" into the next region. This is
     /// especially true with italic characters all of which "lean" outside of their
     /// bounds.

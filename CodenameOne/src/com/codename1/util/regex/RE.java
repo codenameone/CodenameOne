@@ -243,7 +243,7 @@ import java.util.ArrayList;
 ///
 /// - Not *all* possibilities are considered for greediness when backreferences
 /// are involved (as POSIX suggests should be the case).  The POSIX RE
-/// "(ac*)c*d[ac]*\1", when matched against "acdacaa" should yield a match
+/// `"(ac*)c*d[ac]*\1"`, when matched against `"acdacaa"` should yield a match
 /// of acdacaa where \1 is "a".  This is not the case in this RE package,
 /// and actually Perl doesn't go to this extent either!  Until someone
 /// actually complains about this, I'm not sure it's worth "fixing".
@@ -1413,9 +1413,9 @@ public class RE {
 
     /// Splits a string into an array of strings on regular expression boundaries.
     /// This function works the same way as the Perl function of the same name.
-    /// Given a regular expression of "[ab]+" and a string to split of
-    /// "xyzzyababbayyzabbbab123", the result would be the array of Strings
-    /// "[xyzzy, yyz, 123]".
+    /// Given a regular expression of `"[ab]+"` and a string to split of
+    /// `"xyzzyababbayyzabbbab123"`, the result would be the array of Strings
+    /// `"[xyzzy, yyz, 123]"`.
     ///
     /// Please note that the first string in the resulting array may be an empty
     /// string. This happens when the very first character of input string is

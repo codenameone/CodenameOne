@@ -3481,7 +3481,11 @@ public class Container extends Component implements Iterable<Component> {
         return !isObscuredByChildren();
     }
 
-    /// {@inheritDoc}
+    /// Paints this container background, skipping container background fill when fully obscured by children.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: the graphics context.
     @Override
     public void paintComponentBackground(Graphics g) {
         if (isFlatten()) {

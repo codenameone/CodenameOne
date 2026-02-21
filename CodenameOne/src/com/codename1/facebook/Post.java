@@ -48,7 +48,11 @@ public class Post extends FBObject {
     public Post() {
     }
 
-    /// {@inheritDoc}
+    /// Creates a post from a hashtable of Facebook post properties.
+    ///
+    /// #### Parameters
+    ///
+    /// - `props`: the properties map used to initialize the post.
     public Post(Hashtable props) {
         super(props);
         init(props);

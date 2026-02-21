@@ -28,12 +28,22 @@ package com.codename1.properties;
 /// @author Shai Almog
 public class DoubleProperty<K> extends NumericProperty<Double, K> {
 
-    /// {@inheritDoc}
+    /// Creates a double property with the given name.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the property name.
     public DoubleProperty(String name) {
         super(name, Double.class);
     }
 
-    /// {@inheritDoc}
+    /// Creates a double property with the given name and initial value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the property name.
+    ///
+    /// - `value`: the initial property value.
     public DoubleProperty(String name, Double value) {
         super(name, Double.class, value);
     }

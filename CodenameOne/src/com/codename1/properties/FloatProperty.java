@@ -28,12 +28,22 @@ package com.codename1.properties;
 /// @author Shai Almog
 public class FloatProperty<K> extends NumericProperty<Float, K> {
 
-    /// {@inheritDoc}
+    /// Creates a float property with the given name.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the property name.
     public FloatProperty(String name) {
         super(name, Float.class);
     }
 
-    /// {@inheritDoc}
+    /// Creates a float property with the given name and initial value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the property name.
+    ///
+    /// - `value`: the initial property value.
     public FloatProperty(String name, Float value) {
         super(name, Float.class, value);
     }

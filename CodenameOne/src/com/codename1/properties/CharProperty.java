@@ -28,12 +28,22 @@ package com.codename1.properties;
 /// @author Shai Almog
 public class CharProperty<K> extends NumericProperty<Character, K> {
 
-    /// {@inheritDoc}
+    /// Creates a char property with the given name.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the property name.
     public CharProperty(String name) {
         super(name, Character.class);
     }
 
-    /// {@inheritDoc}
+    /// Creates a char property with the given name and initial value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the property name.
+    ///
+    /// - `value`: the initial property value.
     public CharProperty(String name, Character value) {
         super(name, Character.class, value);
     }
