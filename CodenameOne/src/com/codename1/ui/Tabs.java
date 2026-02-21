@@ -150,15 +150,15 @@ public class Tabs extends Container {
     private boolean riskySwipe;
 
     /// Creates an empty `TabbedPane` with a default
-    /// tab placement of `Component#TOP`.
+    /// tab placement of `Component.TOP`.
     public Tabs() {
         this(-1);
     }
 
 
     /// Creates an empty `TabbedPane` with the specified tab placement
-    /// of either: `Component#TOP`, `Component#BOTTOM`,
-    /// `Component#LEFT`, or `Component#RIGHT`.
+    /// of either: `Component.TOP`, `Component.BOTTOM`,
+    /// `Component.LEFT`, or `Component.RIGHT`.
     ///
     /// #### Parameters
     ///
@@ -1132,15 +1132,15 @@ public class Tabs extends Container {
     /// Sets the tab placement for this tabbedpane.
     /// Possible values are:
     ///
-    /// - `Component#TOP`
+    /// - `Component.TOP`
     ///
-    /// - `Component#BOTTOM`
+    /// - `Component.BOTTOM`
     ///
-    /// - `Component#LEFT`
+    /// - `Component.LEFT`
     ///
-    /// - `Component#RIGHT`
+    /// - `Component.RIGHT`
     ///
-    /// The default value, if not set, is `Component#TOP`.
+    /// The default value, if not set, is `Component.TOP`.
     ///
     /// #### Parameters
     ///
