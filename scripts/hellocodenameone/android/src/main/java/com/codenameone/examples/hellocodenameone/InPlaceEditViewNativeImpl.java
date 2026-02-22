@@ -7,9 +7,10 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.impl.android.InPlaceEditView;
 import com.codename1.impl.android.AndroidImplementation;
+import com.codenameone.examples.hellocodenameone.tests.InPlaceEditViewTest;
 
 public class InPlaceEditViewNativeImpl {
-    public void runReproductionTest(final ReproductionCallback callback) {
+    public void runReproductionTest() {
         Display.getInstance().callSerially(() -> {
             try {
                 java.lang.reflect.Method getImplMethod = Display.class.getDeclaredMethod("getImplementation");
@@ -17,8 +18,8 @@ public class InPlaceEditViewNativeImpl {
                 final Object impl = getImplMethod.invoke(Display.getInstance());
 
                 if (!(impl instanceof AndroidImplementation)) {
-                     Display.getInstance().callSerially(() -> callback.onResult(false, "Implementation is not AndroidImplementation: " + impl.getClass().getName()));
-                     return;
+                    Display.getInstance().callSerially(() -> InPlaceEditViewTest.onError("Implementation is not AndroidImplementation: " + impl.getClass().getName()));
+                    return;
                 }
                 final AndroidImplementation androidImpl = (AndroidImplementation) impl;
 
@@ -57,16 +58,16 @@ public class InPlaceEditViewNativeImpl {
                                 }
                             });
                         }
-                        Display.getInstance().callSerially(() -> callback.onResult(true, null));
+                        Display.getInstance().callSerially(() -> InPlaceEditViewTest.onSuccess());
                     } catch (Throwable t) {
                         t.printStackTrace();
-                        Display.getInstance().callSerially(() -> callback.onResult(false, t.toString()));
+                        Display.getInstance().callSerially(() -> InPlaceEditViewTest.onError(false, t.toString()));
                     }
                 }).start();
 
             } catch (Throwable t) {
                 t.printStackTrace();
-                Display.getInstance().callSerially(() -> callback.onResult(false, t.toString()));
+                Display.getInstance().callSerially(() -> InPlaceEditViewTest.onError(t.toString()));
             }
         });
     }
@@ -74,4 +75,5 @@ public class InPlaceEditViewNativeImpl {
     public boolean isSupported() {
         return true;
     }
+
 }

@@ -3,8 +3,8 @@
 
 @implementation com_codenameone_examples_hellocodenameone_LocalNotificationNativeImpl
 
-- (void)clearScheduledLocalNotifications:(NSString*)notificationId {
-    if (notificationId == nil) {
+-(void)clearScheduledLocalNotifications:(NSString*)param{
+   if (param == nil) {
         return;
     }
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -13,15 +13,15 @@
         for (UILocalNotification *notification in scheduled) {
             NSDictionary *userInfo = notification.userInfo;
             NSString *uid = [NSString stringWithFormat:@"%@", [userInfo valueForKey:@"__ios_id__"]];
-            if ([notificationId isEqualToString:uid]) {
+            if ([param isEqualToString:uid]) {
                 [app cancelLocalNotification:notification];
             }
         }
     });
 }
 
-- (int)getScheduledLocalNotificationCount:(NSString*)notificationId {
-    if (notificationId == nil) {
+-(int)getScheduledLocalNotificationCount:(NSString*)param{
+    if (param == nil) {
         return 0;
     }
     __block int count = 0;
@@ -31,7 +31,7 @@
         for (UILocalNotification *notification in scheduled) {
             NSDictionary *userInfo = notification.userInfo;
             NSString *uid = [NSString stringWithFormat:@"%@", [userInfo valueForKey:@"__ios_id__"]];
-            if ([notificationId isEqualToString:uid]) {
+            if ([param isEqualToString:uid]) {
                 count++;
             }
         }
@@ -39,7 +39,7 @@
     return count;
 }
 
-- (BOOL)isSupported {
+-(BOOL)isSupported{
     return YES;
 }
 
