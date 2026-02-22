@@ -5850,9 +5850,6 @@ extern int pendingRemoteNotificationRegistrations;
 void com_codename1_impl_ios_IOSNative_registerPush__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #ifdef INCLUDE_CN1_PUSH2
     dispatch_async(dispatch_get_main_queue(), ^{
-#if TARGET_OS_SIMULATOR
-        return;
-#endif
         if (@available(iOS 10, *)) {
             // iOS 10 ObjC code
             pendingRemoteNotificationRegistrations++;
@@ -9830,28 +9827,14 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
               authOptions = UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge;
 
             }
-#if TARGET_OS_SIMULATOR
-            NSArray<NSString *> *ids = @[toNSString(CN1_THREAD_STATE_PASS_ARG notificationId)];
-            [center removePendingNotificationRequestsWithIdentifiers:ids];
-            [center removeDeliveredNotificationsWithIdentifiers:ids];
-            [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
-                if (error != nil) {
-                    NSLog(@"%@", error.localizedDescription);
-                }
-            }];
-#else
             [center requestAuthorizationWithOptions:authOptions
             completionHandler:^(BOOL granted, NSError * _Nullable error) {
-                NSArray<NSString *> *ids = @[toNSString(CN1_THREAD_STATE_PASS_ARG notificationId)];
-                [center removePendingNotificationRequestsWithIdentifiers:ids];
-                [center removeDeliveredNotificationsWithIdentifiers:ids];
                 [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
                    if (error != nil) {
                        NSLog(@"%@", error.localizedDescription);
                    }
                 }];
             }];
-#endif
             
         });
         
@@ -9897,11 +9880,9 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
             dispatch_sync(dispatch_get_main_queue(), ^{
                 cn1CancelScheduledLocalNotificationById(notificationIdString);
 #ifdef __IPHONE_8_0
-#if !TARGET_OS_SIMULATOR
                 if ([UIApplication instancesRespondToSelector:@selector(registerUserNotificationSettings:)]){
                     [[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound categories:nil]];
                 }
-#endif
 #endif
                 [[UIApplication sharedApplication] scheduleLocalNotification: notification];
             });

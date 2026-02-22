@@ -61,7 +61,7 @@ public class InPlaceEditViewNativeImpl {
                         Display.getInstance().callSerially(() -> InPlaceEditViewTest.onSuccess());
                     } catch (Throwable t) {
                         t.printStackTrace();
-                        Display.getInstance().callSerially(() -> InPlaceEditViewTest.onError(false, t.toString()));
+                        Display.getInstance().callSerially(() -> InPlaceEditViewTest.onError(t.toString()));
                     }
                 }).start();
 
