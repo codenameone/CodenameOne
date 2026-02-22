@@ -4,7 +4,7 @@
 @implementation com_codenameone_examples_hellocodenameone_LocalNotificationNativeImpl
 
 - (void)clearScheduledLocalNotifications:(NSString*)notificationId {
-    /*if (notificationId == nil) {
+    if (notificationId == nil) {
         return;
     }
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -17,11 +17,11 @@
                 [app cancelLocalNotification:notification];
             }
         }
-    });*/
+    });
 }
 
 - (int)getScheduledLocalNotificationCount:(NSString*)notificationId {
-    /*if (notificationId == nil) {
+    if (notificationId == nil) {
         return 0;
     }
     __block int count = 0;
@@ -36,8 +36,7 @@
             }
         }
     });
-    return count;*/
-    return 0;
+    return count;
 }
 
 - (BOOL)isSupported {

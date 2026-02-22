@@ -1,0 +1,4 @@
+version: 1
+display_name: iOS CN1SS Xcode Debug
+short_description: Reproduce and triage CN1SS iOS build/test failures with local Xcode logs.
+default_prompt: Build local CN1 iOS snapshots, regenerate HelloCodenameOne ios-source offline, run xcodebuild and the CN1SS iOS runner, then summarize the first concrete failure and likely cause.

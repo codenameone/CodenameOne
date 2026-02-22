@@ -75,7 +75,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new BackgroundThreadUiAccessTest(),
             new VPNDetectionAPITest(),
             new CallDetectionAPITest(),
-            //new LocalNotificationOverrideTest(),
+            new LocalNotificationOverrideTest(),
             new AccessibilityTest()));
 
     public static void addTest(BaseTest test) {
