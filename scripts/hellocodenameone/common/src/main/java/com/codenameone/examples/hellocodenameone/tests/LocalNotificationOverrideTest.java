@@ -10,7 +10,7 @@ public class LocalNotificationOverrideTest extends BaseTest {
 
     @Override
     public boolean runTest() {
-        /*LocalNotificationNative nativeInterface = NativeLookup.create(LocalNotificationNative.class);
+        LocalNotificationNative nativeInterface = NativeLookup.create(LocalNotificationNative.class);
         if (nativeInterface == null || !nativeInterface.isSupported()) {
             done();
             return true;
@@ -33,7 +33,7 @@ public class LocalNotificationOverrideTest extends BaseTest {
             done();
         } catch (Throwable t) {
             fail("Local notification override test failed: " + t);
-        }*/
+        }
         return true;
     }
 
