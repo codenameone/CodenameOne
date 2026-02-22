@@ -715,6 +715,7 @@ export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 export CN1SS_COMMENT_MARKER="<!-- CN1SS_IOS_COMMENT -->"
 export CN1SS_COMMENT_LOG_PREFIX="[run-ios-device-tests]"
 export CN1SS_PREVIEW_SUBDIR="ios"
+export CN1SS_SUCCESS_MESSAGE="✅ Native iOS screenshot tests passed."
 
 # Load VM translation time if available
 CN1SS_VM_TIME=0

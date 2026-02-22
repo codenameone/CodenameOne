@@ -348,6 +348,9 @@ cn1ss_process_and_report() {
     --comment-out "$comment_out"
     --summary-out "$summary_out"
   )
+  if [ -n "${CN1SS_SUCCESS_MESSAGE:-}" ]; then
+    render_args+=(--success-message "$CN1SS_SUCCESS_MESSAGE")
+  fi
   if [ -n "${CN1SS_COVERAGE_SUMMARY:-}" ]; then
     render_args+=(--coverage-summary "$CN1SS_COVERAGE_SUMMARY")
   fi
