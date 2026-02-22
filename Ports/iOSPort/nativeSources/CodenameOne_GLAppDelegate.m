@@ -181,9 +181,11 @@ static void installSignalHandlers() {
         if (isIOS10()) {
             UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
             center.delegate = self;
+#if !TARGET_OS_SIMULATOR
             [center requestAuthorizationWithOptions:(UNAuthorizationOptionSound | UNAuthorizationOptionAlert | UNAuthorizationOptionBadge) completionHandler:^(BOOL granted, NSError * _Nullable error){
                 if( !error ) {}
             }];
+#endif
         } 
     }
 #endif
