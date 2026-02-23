@@ -8,6 +8,10 @@ on:
       - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
       - 'scripts/run-ios-ui-tests.sh'
+      - 'scripts/run-ios-native-tests.sh'
+      - 'scripts/ios/notification-tests/native-tests/**'
+      - 'scripts/ios/notification-tests/install-native-notification-tests.sh'
+      - 'scripts/ios/notification-tests/**'
       - 'scripts/hellocodenameone/**'
       - 'scripts/ios/tests/**'
       - 'scripts/ios/screenshots/**'
@@ -32,6 +36,10 @@ on:
       - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
       - 'scripts/run-ios-ui-tests.sh'
+      - 'scripts/run-ios-native-tests.sh'
+      - 'scripts/ios/notification-tests/native-tests/**'
+      - 'scripts/ios/notification-tests/install-native-notification-tests.sh'
+      - 'scripts/ios/notification-tests/**'
       - 'scripts/hellocodenameone/**'
       - 'scripts/ios/tests/**'
       - 'scripts/ios/screenshots/**'
@@ -144,6 +152,17 @@ jobs:
             "" \
             "${{ steps.build-ios-app.outputs.scheme }}"
         timeout-minutes: 30
+
+      - name: Run native iOS notification tests (XCTest)
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+          ./scripts/run-ios-native-tests.sh \
+            "${{ steps.build-ios-app.outputs.workspace }}" \
+            "${{ steps.build-ios-app.outputs.scheme }}"
+        timeout-minutes: 20
 
       - name: Upload iOS artifacts
         if: always()
