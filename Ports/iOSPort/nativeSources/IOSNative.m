@@ -9733,17 +9733,62 @@ static void cn1CancelScheduledLocalNotificationById(NSString *nsId) {
     if (nsId == nil) {
         return;
     }
-    UIApplication *app = [UIApplication sharedApplication];
-    NSArray *eventArray = [app scheduledLocalNotifications];
-    for (int i = 0; i < [eventArray count]; i++) {
-        UILocalNotification *n = [eventArray objectAtIndex:i];
-        NSDictionary *userInfo = n.userInfo;
-        NSString *uid = [NSString stringWithFormat:@"%@", [userInfo valueForKey:@"__ios_id__"]];
-        if ([nsId isEqualToString:uid]) {
-            [app cancelLocalNotification:n];
+#ifdef CN1_INCLUDE_NOTIFICATIONS2
+    if (@available(iOS 10, *)) {
+        UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+        dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+        __block NSMutableArray<NSString *> *matches = [NSMutableArray array];
+        [center getPendingNotificationRequestsWithCompletionHandler:^(NSArray<UNNotificationRequest *> * _Nonnull requests) {
+            for (UNNotificationRequest *request in requests) {
+                NSString *uid = [NSString stringWithFormat:@"%@", [request.content.userInfo valueForKey:@"__ios_id__"]];
+                if ([nsId isEqualToString:uid] || [nsId isEqualToString:request.identifier]) {
+                    [matches addObject:request.identifier];
+                }
+            }
+            dispatch_semaphore_signal(sem);
+        }];
+        dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)));
+        if ([matches count] > 0) {
+            [center removePendingNotificationRequestsWithIdentifiers:matches];
+            [center removeDeliveredNotificationsWithIdentifiers:matches];
         }
     }
+#endif
 }
+
+#ifdef CN1_INCLUDE_NOTIFICATIONS2
+static UNNotificationTrigger* cn1CreateNotificationTrigger(JAVA_LONG fireDate, JAVA_INT repeatType) API_AVAILABLE(ios(10.0));
+static UNNotificationTrigger* cn1CreateNotificationTrigger(JAVA_LONG fireDate, JAVA_INT repeatType) {
+    NSTimeInterval targetTime = fireDate / 1000.0 + 1;
+    NSDate *targetDate = [NSDate dateWithTimeIntervalSince1970:targetTime];
+    NSTimeInterval delta = targetTime - [[NSDate date] timeIntervalSince1970];
+    if (delta < 1) {
+        delta = 1;
+    }
+
+    NSCalendar *calendar = [NSCalendar currentCalendar];
+    NSDateComponents *components;
+    switch (repeatType) {
+        case 0:
+            return [UNTimeIntervalNotificationTrigger triggerWithTimeInterval:delta repeats:NO];
+        case 1:
+            components = [calendar components:(NSCalendarUnitSecond) fromDate:targetDate];
+            return [UNCalendarNotificationTrigger triggerWithDateMatchingComponents:components repeats:YES];
+        case 3:
+            components = [calendar components:(NSCalendarUnitMinute | NSCalendarUnitSecond) fromDate:targetDate];
+            return [UNCalendarNotificationTrigger triggerWithDateMatchingComponents:components repeats:YES];
+        case 4:
+            components = [calendar components:(NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond) fromDate:targetDate];
+            return [UNCalendarNotificationTrigger triggerWithDateMatchingComponents:components repeats:YES];
+        case 5:
+            components = [calendar components:(NSCalendarUnitWeekday | NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond) fromDate:targetDate];
+            return [UNCalendarNotificationTrigger triggerWithDateMatchingComponents:components repeats:YES];
+        default:
+            CN1Log(@"Unknown repeat interval type %d. Ignoring repeat interval", repeatType);
+            return [UNTimeIntervalNotificationTrigger triggerWithTimeInterval:delta repeats:NO];
+    }
+}
+#endif
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_long_int_boolean( CN1_THREAD_STATE_MULTI_ARG
     JAVA_OBJECT me, JAVA_OBJECT notificationId, JAVA_OBJECT alertTitle, JAVA_OBJECT alertBody, JAVA_OBJECT alertSound, JAVA_INT badgeNumber, JAVA_LONG fireDate, JAVA_INT repeatType, JAVA_BOOLEAN foreground
@@ -9780,112 +9825,32 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
     if (foreground) {
         [dict setObject: @"true" forKey: @"foreground"];
     }
-    
-    if (NO && @available(iOS 10, *)) {
-        // November 23, 2020 - Steve
-        // Disabling this block, which uses the new UNUserNotifications API for sending local notifications,
-        // and opting to continue to use the old UILocalNotifications API for now.  This is because
-        // the new API doesn't have an option to use a different repeat interval than the firstFire
-        // interval, and the UNUserNotifications API can still be used to receive the notification
-        // in the application delegate class fine.
-        // Eventually we'll probably want to switch to the new API, but for now, it is just too much work
-        // to try to replicate the functionality lost by the new API.
-        dispatch_sync(dispatch_get_main_queue(), ^{
-            
-            UNMutableNotificationContent* content = [[UNMutableNotificationContent alloc] init];
-            
-            content.title = [NSString localizedUserNotificationStringForKey:title arguments:nil];
-            content.body = [NSString localizedUserNotificationStringForKey:body
-                    arguments:nil];
-            if (alertSound) {
-                content.sound = [UNNotificationSound soundNamed:toNSString(CN1_THREAD_STATE_PASS_ARG alertSound)];
-                
+    if (@available(iOS 10, *)) {
+        UNMutableNotificationContent* content = [[UNMutableNotificationContent alloc] init];
+        content.title = [NSString localizedUserNotificationStringForKey:title arguments:nil];
+        content.body = [NSString localizedUserNotificationStringForKey:body arguments:nil];
+        if (alertSound != NULL) {
+            NSString *soundName = toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
+            if (soundName != nil && [soundName length] > 0) {
+                content.sound = [UNNotificationSound soundNamed:soundName];
             }
-            if (badgeNumber >= 0) {
-                
-                content.badge = [NSNumber numberWithInt:badgeNumber];
-            }
-            content.userInfo = dict;
-                                           
-            
-            
-           
-            UNTimeIntervalNotificationTrigger *trigger = [UNTimeIntervalNotificationTrigger triggerWithTimeInterval:fireDate/1000 - [[NSDate date] timeIntervalSince1970] + 1 repeats:NO];
-            
-            // Create the request object.
-            UNNotificationRequest* request = [UNNotificationRequest
-                   requestWithIdentifier:toNSString(CN1_THREAD_STATE_PASS_ARG notificationId) content:content trigger:trigger];
-           
-           
-             
-            UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
-            UNAuthorizationOptions authOptions;
-            if (@available(iOS 12.0, *)) {
-              authOptions = UNAuthorizationOptionProvisional | UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge;
-
-            } else {
-              authOptions = UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge;
-
-            }
-            [center requestAuthorizationWithOptions:authOptions
-            completionHandler:^(BOOL granted, NSError * _Nullable error) {
-                [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
-                   if (error != nil) {
-                       NSLog(@"%@", error.localizedDescription);
-                   }
-                }];
-            }];
-            
-        });
-        
-        
-        return;
-    } else {
-        UILocalNotification *notification = [[UILocalNotification alloc] init];
-        notification.alertTitle = title;
-        notification.alertBody = body;
-
-        notification.soundName= toNSString(CN1_THREAD_STATE_PASS_ARG alertSound);
-        notification.fireDate = [NSDate dateWithTimeIntervalSince1970: fireDate/1000 + 1];
-        notification.timeZone = [NSTimeZone defaultTimeZone];
+        }
         if (badgeNumber >= 0) {
-            notification.applicationIconBadgeNumber = badgeNumber;
+            content.badge = [NSNumber numberWithInt:badgeNumber];
         }
-        switch (repeatType) {
-            case 0:
-                notification.repeatInterval = nil;
-                break;
-            case 1:
-                notification.repeatInterval = NSMinuteCalendarUnit;
-                break;
-            case 3:
-                notification.repeatInterval = NSHourCalendarUnit;
-                break;
-            case 4:
-                notification.repeatInterval = NSDayCalendarUnit;
-                break;
-            case 5:
-                notification.repeatInterval = NSWeekCalendarUnit;
-                break;
-            default:
-                CN1Log(@"Unknown repeat interval type %d.  Ignoring repeat interval", repeatType);
-                notification.repeatInterval = nil;
-        }
-            
-        
-        
-        notification.userInfo = dict;
-        
-            
-            dispatch_sync(dispatch_get_main_queue(), ^{
-                cn1CancelScheduledLocalNotificationById(notificationIdString);
-#ifdef __IPHONE_8_0
-                if ([UIApplication instancesRespondToSelector:@selector(registerUserNotificationSettings:)]){
-                    [[UIApplication sharedApplication] registerUserNotificationSettings:[UIUserNotificationSettings settingsForTypes:UIUserNotificationTypeAlert|UIUserNotificationTypeBadge|UIUserNotificationTypeSound categories:nil]];
-                }
-#endif
-                [[UIApplication sharedApplication] scheduleLocalNotification: notification];
-            });
+        content.userInfo = dict;
+
+        UNNotificationTrigger *trigger = cn1CreateNotificationTrigger(fireDate, repeatType);
+        UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:notificationIdString content:content trigger:trigger];
+        UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
+        cn1CancelScheduledLocalNotificationById(notificationIdString);
+        [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
+            if (error != nil) {
+                CN1Log(@"Failed to schedule local notification: %@", error.localizedDescription);
+            }
+        }];
+    } else {
+        CN1Log(@"Ignoring local notification request on iOS versions below 10");
     }
 #endif
 }

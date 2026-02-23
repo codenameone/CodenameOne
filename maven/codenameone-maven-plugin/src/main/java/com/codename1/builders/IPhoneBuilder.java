@@ -1633,6 +1633,9 @@ public class IPhoneBuilder extends Executor {
                                 "ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;\n"
                             + "				ENABLE_BITCODE = NO;\n");
                     }
+                    if (xcodeVersion >= 9) {
+                        replaceAllInFile(pbx, "ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;", "");
+                    }
                 }
 
                 if (useMetal) {
@@ -1641,6 +1644,12 @@ public class IPhoneBuilder extends Executor {
                 }
             } catch (Exception ex) {
                 throw new BuildException("Failed to update infoplist file", ex);
+            }
+
+            try {
+                normalizeAssetCatalogs(request);
+            } catch (Exception ex) {
+                throw new BuildException("Failed to normalize iOS asset catalogs", ex);
             }
             stopwatch.split("Post-VM Setup");
             if (runPods) {
@@ -2687,9 +2696,11 @@ public class IPhoneBuilder extends Executor {
         File resDir = getResDir();
         
         BufferedImage iconImage = ImageIO.read(new ByteArrayInputStream(request.getIcon()));
-        icon512 = new File(iconDirectory, "iTunesArtwork");
+        // Legacy iOS icon files are still copied into the root resources, but should not
+        // be placed inside AppIcon.appiconset as they are not referenced by Contents.json.
+        icon512 = new File(resDir, "iTunesArtwork");
         createFile(icon512, request.getIcon());
-        icon57 = new File(iconDirectory, "Icon.png");
+        icon57 = new File(resDir, "Icon.png");
         createIconFile(icon57, iconImage, 57, 57);
         createIconFile(new File(iconDirectory, "iPhoneNotification@2x.png"), iconImage, 40, 40);
         createIconFile(new File(iconDirectory, "iPhoneNotification@3x.png"), iconImage, 60, 60);
@@ -2717,9 +2728,6 @@ public class IPhoneBuilder extends Executor {
         createIconFile(new File(iconDirectory, "iPadPro@2x.png"), iconImage, 167, 167);
         createIconFile(new File(iconDirectory, "AppStore.png"), iconImage, 1024, 1024);
         
-
-        copy(icon512, new File(resDir, icon512.getName()));
-        copy(icon57, new File(resDir, icon57.getName()));
         copyIcons(iconDirectory, resDir, 
                 "iPhoneNotification@2x.png",
                 "iPhoneNotification@3x.png",
@@ -2770,8 +2778,32 @@ public class IPhoneBuilder extends Executor {
                 copy(defaultLaunchStoryBoard, launchStoryBoard);
             }
             defaultLaunchStoryBoard.delete();
+
+            // Xcode 9+ uses LaunchScreen.storyboard. Keeping the legacy launch image set
+            // causes asset-catalog warnings for many missing legacy image files.
+            File legacyLaunchImages = new File(tmpFile, "dist/" + request.getMainClass() + "-src/Images.xcassets/LaunchImage.launchimage");
+            if (legacyLaunchImages.exists()) {
+                delTree(legacyLaunchImages);
+            }
         }
         return true;
+    }
+
+    private void normalizeAssetCatalogs(BuildRequest request) throws IOException {
+        File appSrcDir = new File(tmpFile, "dist/" + request.getMainClass() + "-src");
+        File appIconContents = new File(appSrcDir, "Images.xcassets/AppIcon.appiconset/Contents.json");
+        if (appIconContents.exists()) {
+            replaceInFile(appIconContents,
+                    ",\n    {\n      \"size\" : \"120x120\",\n      \"idiom\" : \"iphone\",\n      \"filename\" : \"Icon7@2x.png\",\n      \"scale\" : \"1x\"\n    },\n    {\n      \"size\" : \"167x167\",\n      \"idiom\" : \"ipad\",\n      \"filename\" : \"Icon-167.png\",\n      \"scale\" : \"3x\"\n    }",
+                    "");
+        }
+
+        if (xcodeVersion >= 9) {
+            File legacyLaunchImages = new File(appSrcDir, "Images.xcassets/LaunchImage.launchimage");
+            if (legacyLaunchImages.exists()) {
+                delTree(legacyLaunchImages);
+            }
+        }
     }
 
     

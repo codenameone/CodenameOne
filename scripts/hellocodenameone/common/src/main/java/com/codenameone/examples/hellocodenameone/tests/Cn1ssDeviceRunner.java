@@ -97,13 +97,14 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             });
         });
         for (BaseTest testClass : TEST_CLASSES) {
+            final String testName = testClass.getClass().getSimpleName();
             CN.callSerially(() -> {
-                log("CN1SS:INFO:suite starting test=" + testClass);
+                log("CN1SS:INFO:suite starting test=" + testName);
                 try {
                     testClass.prepare();
                     testClass.runTest();
                 } catch (Throwable t) {
-                    log("CN1SS:ERR:suite test=" + testClass + " failed=" + t);
+                    log("CN1SS:ERR:suite test=" + testName + " failed=" + t);
                     t.printStackTrace();
                 }
             });
@@ -114,15 +115,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             }
             testClass.cleanup();
             if(timeout == 0) {
-                log("CN1SS:ERR:suite test=" + testClass + " failed due to timeout waiting for DONE");
+                log("CN1SS:ERR:suite test=" + testName + " failed due to timeout waiting for DONE");
             } else if (testClass.isFailed()) {
-                log("CN1SS:ERR:suite test=" + testClass + " failed: " + testClass.getFailMessage());
+                log("CN1SS:ERR:suite test=" + testName + " failed: " + testClass.getFailMessage());
             } else {
                 if (!testClass.shouldTakeScreenshot()) {
-                    log("CN1SS:INFO:test=" + testClass + " screenshot=none");
+                    log("CN1SS:INFO:test=" + testName + " screenshot=none");
                 }
             }
-            log("CN1SS:INFO:suite finished test=" + testClass);
+            log("CN1SS:INFO:suite finished test=" + testName);
         }
         log("CN1SS:SUITE:FINISHED");
         TestReporting.getInstance().testExecutionFinished(getClass().getName());
