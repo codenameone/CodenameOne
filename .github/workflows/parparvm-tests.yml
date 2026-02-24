@@ -14,6 +14,9 @@ on:
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
+  release:
+    types:
+      - published
 
 jobs:
   vm-tests:
@@ -169,3 +172,37 @@ jobs:
               marker: '<!-- bytecode-quality-report -->',
               reportPath: 'quality-report.md',
             });
+
+
+  release-jars:
+    if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+
+      - name: Build release jars
+        run: |
+          mvn -B -f vm/JavaAPI/pom.xml package
+          mvn -B -f vm/ByteCodeTranslator/pom.xml package
+
+      - name: Verify release jars
+        run: |
+          test -f vm/JavaAPI/target/JavaAPI-1.0-SNAPSHOT.jar
+          test -f vm/ByteCodeTranslator/target/ByteCodeTranslator-1.0-SNAPSHOT.jar
+
+      - name: Attach JavaAPI and ByteCodeTranslator jars to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            vm/JavaAPI/target/JavaAPI-1.0-SNAPSHOT.jar
+            vm/ByteCodeTranslator/target/ByteCodeTranslator-1.0-SNAPSHOT.jar
