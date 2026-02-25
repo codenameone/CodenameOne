@@ -1754,6 +1754,27 @@ public class AndroidGradleBuilder extends Executor {
         drawableXXhdpiDir.mkdirs();
         File drawableXXXhdpiDir = new File(resDir, "drawable-xxxhdpi");
         drawableXXXhdpiDir.mkdirs();
+        boolean enableAdaptiveIcons = request.getArg("android.enableAdaptiveIcons", "false").equals("true");
+        File mipmapMdpiDir = null;
+        File mipmapHdpiDir = null;
+        File mipmapXhdpiDir = null;
+        File mipmapXXhdpiDir = null;
+        File mipmapXXXhdpiDir = null;
+        File mipmapAnydpiV26Dir = null;
+        if (enableAdaptiveIcons) {
+            mipmapMdpiDir = new File(resDir, "mipmap-mdpi");
+            mipmapMdpiDir.mkdirs();
+            mipmapHdpiDir = new File(resDir, "mipmap-hdpi");
+            mipmapHdpiDir.mkdirs();
+            mipmapXhdpiDir = new File(resDir, "mipmap-xhdpi");
+            mipmapXhdpiDir.mkdirs();
+            mipmapXXhdpiDir = new File(resDir, "mipmap-xxhdpi");
+            mipmapXXhdpiDir.mkdirs();
+            mipmapXXXhdpiDir = new File(resDir, "mipmap-xxxhdpi");
+            mipmapXXXhdpiDir.mkdirs();
+            mipmapAnydpiV26Dir = new File(resDir, "mipmap-anydpi-v26");
+            mipmapAnydpiV26Dir.mkdirs();
+        }
 
         try {
             BufferedImage iconImage = ImageIO.read(new ByteArrayInputStream(request.getIcon()));
@@ -1764,6 +1785,65 @@ public class AndroidGradleBuilder extends Executor {
             createIconFile(new File(drawableXhdpiDir, "icon.png"), iconImage, 96, 96);
             createIconFile(new File(drawableXXhdpiDir, "icon.png"), iconImage, 144, 144);
             createIconFile(new File(drawableXXXhdpiDir, "icon.png"), iconImage, 192, 192);
+
+            if (enableAdaptiveIcons) {
+                createIconFile(new File(mipmapMdpiDir, "ic_launcher.png"), iconImage, 48, 48);
+                createIconFile(new File(mipmapHdpiDir, "ic_launcher.png"), iconImage, 72, 72);
+                createIconFile(new File(mipmapXhdpiDir, "ic_launcher.png"), iconImage, 96, 96);
+                createIconFile(new File(mipmapXXhdpiDir, "ic_launcher.png"), iconImage, 144, 144);
+                createIconFile(new File(mipmapXXXhdpiDir, "ic_launcher.png"), iconImage, 192, 192);
+
+                createIconFile(new File(mipmapMdpiDir, "ic_launcher_foreground.png"), iconImage, 108, 108);
+                createIconFile(new File(mipmapHdpiDir, "ic_launcher_foreground.png"), iconImage, 162, 162);
+                createIconFile(new File(mipmapXhdpiDir, "ic_launcher_foreground.png"), iconImage, 216, 216);
+                createIconFile(new File(mipmapXXhdpiDir, "ic_launcher_foreground.png"), iconImage, 324, 324);
+                createIconFile(new File(mipmapXXXhdpiDir, "ic_launcher_foreground.png"), iconImage, 432, 432);
+
+                String adaptiveIconBackgroundImage = request.getArg("android.adaptiveIconBackgroundImage", "").trim();
+                String adaptiveIconBackgroundRef;
+                if (adaptiveIconBackgroundImage.length() > 0) {
+                    File adaptiveBackgroundFile = new File(adaptiveIconBackgroundImage);
+                    if (!adaptiveBackgroundFile.isAbsolute()) {
+                        adaptiveBackgroundFile = new File(assetsDir, adaptiveIconBackgroundImage);
+                    }
+                    if (!adaptiveBackgroundFile.exists()) {
+                        throw new BuildException("android.adaptiveIconBackgroundImage must reference an existing image file. Tried: " + adaptiveBackgroundFile.getAbsolutePath());
+                    }
+                    BufferedImage adaptiveBackground = ImageIO.read(adaptiveBackgroundFile);
+                    if (adaptiveBackground == null) {
+                        throw new BuildException("android.adaptiveIconBackgroundImage is not a readable image file: " + adaptiveBackgroundFile.getAbsolutePath());
+                    }
+                    createIconFile(new File(mipmapMdpiDir, "ic_launcher_background.png"), adaptiveBackground, 108, 108);
+                    createIconFile(new File(mipmapHdpiDir, "ic_launcher_background.png"), adaptiveBackground, 162, 162);
+                    createIconFile(new File(mipmapXhdpiDir, "ic_launcher_background.png"), adaptiveBackground, 216, 216);
+                    createIconFile(new File(mipmapXXhdpiDir, "ic_launcher_background.png"), adaptiveBackground, 324, 324);
+                    createIconFile(new File(mipmapXXXhdpiDir, "ic_launcher_background.png"), adaptiveBackground, 432, 432);
+                    adaptiveIconBackgroundRef = "@mipmap/ic_launcher_background";
+                } else {
+                    String adaptiveIconBackground = request.getArg("android.adaptiveIconBackground", "#ffffff");
+                    String iconBackgroundColors = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                            + "<resources>\n"
+                            + "    <color name=\"ic_launcher_background\">" + adaptiveIconBackground + "</color>\n"
+                            + "</resources>\n";
+                    try (OutputStream output = Files.newOutputStream(new File(valsDir, "ic_launcher_background.xml").toPath())) {
+                        output.write(iconBackgroundColors.getBytes(StandardCharsets.UTF_8));
+                    }
+                    adaptiveIconBackgroundRef = "@color/ic_launcher_background";
+                }
+
+                String adaptiveIconXml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                        + "<adaptive-icon xmlns:android=\"http://schemas.android.com/apk/res/android\">\n"
+                        + "    <background android:drawable=\"" + adaptiveIconBackgroundRef + "\" />\n"
+                        + "    <foreground android:drawable=\"@mipmap/ic_launcher_foreground\" />\n"
+                        + "</adaptive-icon>\n";
+
+                try (OutputStream output = Files.newOutputStream(new File(mipmapAnydpiV26Dir, "ic_launcher.xml").toPath())) {
+                    output.write(adaptiveIconXml.getBytes(StandardCharsets.UTF_8));
+                }
+                try (OutputStream output = Files.newOutputStream(new File(mipmapAnydpiV26Dir, "ic_launcher_round.xml").toPath())) {
+                    output.write(adaptiveIconXml.getBytes(StandardCharsets.UTF_8));
+                }
+            }
 
             File notifFile = new File(assetsDir, "ic_stat_notify.png");
             if (notifFile.exists()) {
@@ -2239,8 +2319,13 @@ public class AndroidGradleBuilder extends Executor {
         if (!applicationAttr.contains("android:label")) {
             applicationNode += " android:label=\"" + xmlizedDisplayName + "\" ";
         }
-        if (!applicationAttr.contains("android:icon")) {
+        if (enableAdaptiveIcons && !applicationAttr.contains("android:icon")) {
+            applicationNode += " android:icon=\"@mipmap/ic_launcher\" ";
+        } else if (!applicationAttr.contains("android:icon")) {
             applicationNode += " android:icon=\"@drawable/icon\" ";
+        }
+        if (enableAdaptiveIcons && !applicationAttr.contains("android:roundIcon")) {
+            applicationNode += " android:roundIcon=\"@mipmap/ic_launcher_round\" ";
         }
         if (request.getArg("android.multidex", "true").equals("true") && Integer.parseInt(minSDK) < 21) {
             debug("Setting Application node to MultiDexApplication because minSDK="+minSDK+" < 21");
