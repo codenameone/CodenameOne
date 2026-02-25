@@ -116,6 +116,15 @@ If none of the services are defined to true then plus, auth, base, analytics, gc
 |android.style
 |Allows injecting additional data into the `styles.xml` file right before the closing resources tag
 
+|android.enableAdaptiveIcons
+|Boolean true/false defaults to false. Enables Android adaptive icon generation in Android Gradle builds. When enabled, Codename One generates `mipmap` launcher resources (`ic_launcher`, `ic_launcher_foreground`, and adaptive XML in `mipmap-anydpi-v26`) and uses them in the application manifest (`android:icon` and `android:roundIcon`).
+
+|android.adaptiveIconBackground
+|Background color to use for adaptive icons when `android.enableAdaptiveIcons=true` and no background image is supplied. Defaults to `#ffffff` and is written as `@color/ic_launcher_background`.
+
+|android.adaptiveIconBackgroundImage
+|Optional path (relative to the root of the native Android project) to an image file to use as the adaptive icon background when `android.enableAdaptiveIcons=true`. If this property is set, it overrides `android.adaptiveIconBackground`.
+
 |android.cusom_layout1
 |Applies to any number of layouts as long as they are in sequence (e.g. android.cusom_layout2, android.cusom_layout3 etc.). Will write the content of the argument as a layout xml file and give it the name `cusom_layout1.xml` onwards. This can be used by native code to work with XML files
 
@@ -3008,4 +3017,3 @@ You will notice 3 big things that aren't covered in this unified framework:
 - We don't update cn1libs - I'm not sure if this is something we would like to update automatically
 
 - Versioned builds - there is a lot of complexity in the versioned build system. This might be something we address in the future but for now I wanted to keep the framework simple.
-
