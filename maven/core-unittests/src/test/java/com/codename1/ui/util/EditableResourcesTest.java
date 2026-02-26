@@ -54,6 +54,16 @@ public class EditableResourcesTest extends UITestBase {
     }
 
 
+
+    @Test
+    public void testSetThemePropertyStoresSingleProperty() {
+        EditableResources resources = new EditableResources();
+
+        resources.setThemeProperty("mainTheme", "bgColor", "00ff00");
+
+        assertEquals("00ff00", resources.getTheme("mainTheme").get("bgColor"));
+    }
+
     @Test
     public void testSetThemeStoresThemeResource() {
         EditableResources resources = new EditableResources();
