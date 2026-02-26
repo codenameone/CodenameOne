@@ -16,7 +16,7 @@ public class OrientationLockScreenshotTest extends BaseTest {
             @Override
             protected void onShowCompleted() {
                 CN.lockOrientation(false);
-                UITimer.timer(300, false, this, () -> {
+                waitForOrientation(this, false, () -> {
                     Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("landscape");
                     CN.lockOrientation(true);
                     waitForOrientation(this, true, OrientationLockScreenshotTest.this::done);
