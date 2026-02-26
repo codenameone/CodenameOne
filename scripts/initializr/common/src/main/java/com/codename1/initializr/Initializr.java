@@ -150,6 +150,14 @@ public class Initializr extends Lifecycle {
         refresh.run();
         initWebsiteThemeSync(form);
         form.show();
+        notifyWebsiteUiReady();
+    }
+
+    private void notifyWebsiteUiReady() {
+        WebsiteThemeNative nativeBridge = NativeLookup.create(WebsiteThemeNative.class);
+        if (nativeBridge != null && nativeBridge.isSupported()) {
+            nativeBridge.notifyUiReady();
+        }
     }
 
     private Container createLocalizationPanel(boolean[] includeLocalizationBundles,
