@@ -16,12 +16,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.codename1.junit.UITestBase;
 
-public class EditableResourcesTest extends UITestBase {
+public class MutableResouceTest extends UITestBase {
 
 
     @Test
     public void testSettersRejectUnsupportedTypes() {
-        EditableResources resources = new EditableResources();
+        MutableResouce resources = new MutableResouce();
 
         assertThrows(UnsupportedOperationException.class, () -> resources.setUi("form", new byte[]{1}));
         assertThrows(UnsupportedOperationException.class, () -> resources.setTimeline("timeline", null));
@@ -32,32 +32,32 @@ public class EditableResourcesTest extends UITestBase {
     @Test
     public void testOpenRejectsGuiBuilderEntry() throws Exception {
         byte[] content = createSingleEntryResource(Resources.MAGIC_UI, "form", new byte[]{1, 2, 3});
-        assertThrows(UnsupportedOperationException.class, () -> EditableResources.open(new ByteArrayInputStream(content)));
+        assertThrows(UnsupportedOperationException.class, () -> MutableResouce.open(new ByteArrayInputStream(content)));
     }
 
     @Test
     public void testOpenRejectsTimelineEntry() throws Exception {
         byte[] content = createSingleEntryResource(Resources.MAGIC_TIMELINE, "timeline", new byte[]{0});
-        assertThrows(UnsupportedOperationException.class, () -> EditableResources.open(new ByteArrayInputStream(content)));
+        assertThrows(UnsupportedOperationException.class, () -> MutableResouce.open(new ByteArrayInputStream(content)));
     }
 
     @Test
     public void testOpenRejectsIndexedImageSubtype() throws Exception {
         byte[] content = createImageEntryResource("img", (byte) 0xF3, new byte[0]);
-        assertThrows(UnsupportedOperationException.class, () -> EditableResources.open(new ByteArrayInputStream(content)));
+        assertThrows(UnsupportedOperationException.class, () -> MutableResouce.open(new ByteArrayInputStream(content)));
     }
 
     @Test
     public void testOpenRejectsSvgSubtype() throws Exception {
         byte[] content = createImageEntryResource("img", (byte) 0xF5, new byte[0]);
-        assertThrows(UnsupportedOperationException.class, () -> EditableResources.open(new ByteArrayInputStream(content)));
+        assertThrows(UnsupportedOperationException.class, () -> MutableResouce.open(new ByteArrayInputStream(content)));
     }
 
 
 
     @Test
     public void testSetThemePropertyStoresSingleProperty() {
-        EditableResources resources = new EditableResources();
+        MutableResouce resources = new MutableResouce();
 
         resources.setThemeProperty("mainTheme", "bgColor", "00ff00");
 
@@ -66,7 +66,7 @@ public class EditableResourcesTest extends UITestBase {
 
     @Test
     public void testSetThemeStoresThemeResource() {
-        EditableResources resources = new EditableResources();
+        MutableResouce resources = new MutableResouce();
         Hashtable<String, Object> theme = new Hashtable<String, Object>();
         theme.put("bgColor", "ff0000");
 
@@ -77,7 +77,7 @@ public class EditableResourcesTest extends UITestBase {
 
     @Test
     public void testEditableSaveRoundTripsSupportedTypesWithResourcesReader() throws Exception {
-        EditableResources editable = new EditableResources();
+        MutableResouce editable = new MutableResouce();
 
         editable.setImage("img", EncodedImage.create(SINGLE_PIXEL_PNG));
         editable.setData("blob", new byte[]{4, 5, 6});
