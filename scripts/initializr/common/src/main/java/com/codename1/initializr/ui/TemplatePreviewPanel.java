@@ -1,11 +1,9 @@
 package com.codename1.initializr.ui;
 
 import com.codename1.components.ImageViewer;
-import com.codename1.components.ToastBar;
 import com.codename1.initializr.model.ProjectOptions;
 import com.codename1.initializr.model.Template;
 import com.codename1.ui.Button;
-import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -19,6 +17,8 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 
 import java.util.Hashtable;
+
+import static com.codename1.ui.CN.getCurrentForm;
 
 public class TemplatePreviewPanel {
     private final Container root;
@@ -67,12 +67,9 @@ public class TemplatePreviewPanel {
         helloButton.setUIID("Button");
         helloButton.addActionListener(e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
         form.add(helloButton);
-        Command menuCommand = form.getToolbar().addMaterialCommandToSideMenu("Hello Command",
+        form.getToolbar().addMaterialCommandToSideMenu("Hello Command",
                 FontImage.MATERIAL_CHECK, 4, e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
-        form.getToolbar().addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU, e ->
-                ToastBar.showInfoMessage("Side menu is not available in embedded preview mode."));
-        Button menuButton = form.getToolbar().findCommandComponent(menuCommand);
-        applyLivePreviewOptions(form, helloButton, menuButton, options);
+        applyLivePreviewOptions(form, helloButton, null, options);
         return form;
     }
 
@@ -109,6 +106,11 @@ public class TemplatePreviewPanel {
         previewHolder.removeAll();
         if (template == Template.BAREBONES || template == Template.KOTLIN) {
             Form liveForm = createBarebonesPreviewForm(options);
+            Form current = getCurrentForm();
+            liveForm.show();
+            if (current != null && current != liveForm) {
+                current.showBack();
+            }
             liveFormPreview = new InterFormContainer(liveForm);
             liveFormPreview.setUIID("InitializrLiveFrame");
             previewHolder.add(BorderLayout.CENTER, liveFormPreview);
