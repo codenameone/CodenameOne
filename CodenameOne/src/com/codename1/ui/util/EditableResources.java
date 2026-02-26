@@ -93,6 +93,12 @@ public class EditableResources extends Resources {
     }
 
 
+
+    public void setTheme(String name, Hashtable theme) {
+        setResource(name, MAGIC_THEME, theme);
+        modified = true;
+    }
+
     public void setL10N(String name, Hashtable l10n) {
         setResource(name, MAGIC_L10N, l10n);
         modified = true;

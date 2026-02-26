@@ -53,6 +53,18 @@ public class EditableResourcesTest extends UITestBase {
         assertThrows(UnsupportedOperationException.class, () -> EditableResources.open(new ByteArrayInputStream(content)));
     }
 
+
+    @Test
+    public void testSetThemeStoresThemeResource() {
+        EditableResources resources = new EditableResources();
+        Hashtable<String, Object> theme = new Hashtable<String, Object>();
+        theme.put("bgColor", "ff0000");
+
+        resources.setTheme("mainTheme", theme);
+
+        assertEquals("ff0000", resources.getTheme("mainTheme").get("bgColor"));
+    }
+
     @Test
     public void testEditableSaveRoundTripsSupportedTypesWithResourcesReader() throws Exception {
         EditableResources editable = new EditableResources();
