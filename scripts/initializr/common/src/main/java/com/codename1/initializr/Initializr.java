@@ -98,7 +98,7 @@ public class Initializr extends Lifecycle {
         );
         final Container idePanel = createIdeSelectorPanel(selectedIde, refresh);
         final Container themePanel = createThemeOptionsPanel(selectedThemeMode, selectedAccent, roundedButtons, refresh);
-        final Container localizationPanel = createLocalizationPanel(includeLocalizationBundles, previewLanguage, refresh);
+        final Container localizationPanel = createLocalizationPanel(includeLocalizationBundles, previewLanguage, refresh, previewPanel);
         themePanelRef[0] = themePanel;
         final Container settingsPanel = BoxLayout.encloseY(summaryLabel);
 
@@ -154,7 +154,8 @@ public class Initializr extends Lifecycle {
 
     private Container createLocalizationPanel(boolean[] includeLocalizationBundles,
                                               ProjectOptions.PreviewLanguage[] previewLanguage,
-                                              Runnable onSelectionChanged) {
+                                              Runnable onSelectionChanged,
+                                              TemplatePreviewPanel previewPanel) {
         CheckBox includeBundles = new CheckBox("Include Resource Bundles");
         includeBundles.setUIID("InitializrChoice");
         includeBundles.setSelected(includeLocalizationBundles[0]);
@@ -178,6 +179,7 @@ public class Initializr extends Lifecycle {
             String selected = languagePicker.getSelectedString();
             previewLanguage[0] = findLanguageByLabel(selected);
             onSelectionChanged.run();
+            previewPanel.showUpdatedLivePreview();
         });
 
         return BoxLayout.encloseY(includeBundles, labeledField("Preview Language", languagePicker));

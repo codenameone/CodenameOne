@@ -59,6 +59,18 @@ public class TemplatePreviewPanel {
         updateMode();
     }
 
+    public void showUpdatedLivePreview() {
+        if (template == Template.BAREBONES || template == Template.KOTLIN) {
+            Form liveForm = createBarebonesPreviewForm(options);
+            liveForm.show();
+            liveFormPreview = new InterFormContainer(liveForm);
+            liveFormPreview.setUIID("InitializrLiveFrame");
+            previewHolder.removeAll();
+            previewHolder.add(BorderLayout.CENTER, liveFormPreview);
+            previewHolder.revalidate();
+        }
+    }
+
     private Form createBarebonesPreviewForm(ProjectOptions options) {
         installBundle(options);
         Form form = new Form("Hi World", BoxLayout.y());
