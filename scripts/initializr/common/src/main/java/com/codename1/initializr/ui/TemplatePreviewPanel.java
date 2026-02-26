@@ -90,13 +90,17 @@ public class TemplatePreviewPanel {
         if (resources == null || language == null) {
             return null;
         }
-        Hashtable<String, String> exact = resources.getL10N("messages", language.bundleSuffix);
-        if (exact != null) {
-            return exact;
-        }
-        int split = language.bundleSuffix.indexOf('_');
-        if (split > 0) {
-            return resources.getL10N("messages", language.bundleSuffix.substring(0, split));
+        try {
+            Hashtable<String, String> exact = resources.getL10N("messages", language.bundleSuffix);
+            if (exact != null) {
+                return exact;
+            }
+            int split = language.bundleSuffix.indexOf('_');
+            if (split > 0) {
+                return resources.getL10N("messages", language.bundleSuffix.substring(0, split));
+            }
+        } catch (RuntimeException ignored) {
+            // L10N bundle may be unavailable in current resource set.
         }
         return null;
     }
