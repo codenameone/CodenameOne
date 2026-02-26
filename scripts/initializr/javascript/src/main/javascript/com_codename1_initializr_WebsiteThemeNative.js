@@ -31,14 +31,24 @@ var o = {};
 
 
     o.notifyUiReady_ = function(callback) {
-        try {
-            if (window.parent && window.parent !== window && window.parent.postMessage) {
-                window.parent.postMessage({ type: "cn1-initializr-ui-ready" }, "*");
+        var sendReady = function() {
+            try {
+                if (window.parent && window.parent !== window && window.parent.postMessage) {
+                    window.parent.postMessage({ type: "cn1-initializr-ui-ready" }, "*");
+                }
+            } catch (ignored) {
+                // Ignore cross-origin or sandbox restrictions.
             }
-        } catch (ignored) {
-            // Ignore cross-origin or sandbox restrictions.
+            callback.complete();
+        };
+
+        if (window.requestAnimationFrame) {
+            window.requestAnimationFrame(function() {
+                window.requestAnimationFrame(sendReady);
+            });
+        } else {
+            window.setTimeout(sendReady, 48);
         }
-        callback.complete();
     };
 
     o.isSupported_ = function(callback) {

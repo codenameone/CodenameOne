@@ -229,7 +229,9 @@ body.cn1-initializr-page-body .main {
       if (evt.source !== frame.contentWindow || !evt.data || evt.data.type !== "cn1-initializr-ui-ready") {
         return;
       }
-      hideLoader();
+      window.requestAnimationFrame(function () {
+        hideLoader();
+      });
     });
   }
 })();
