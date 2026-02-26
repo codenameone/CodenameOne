@@ -997,14 +997,21 @@ public class ImageViewer extends Component {
     }
 
     private void drawArrow(Graphics g, boolean left) {
-        int x = left ? getX() + 6 : getX() + getWidth() - 30;
-        int y = getY() + getHeight() / 2 - 14;
+        int diameter = 28;
+        int radius = diameter / 2;
+        int centerX = left ? getX() + 16 : getX() + getWidth() - 16;
+        int centerY = getY() + getHeight() / 2;
         g.setColor(0x66000000);
-        g.fillRoundRect(x - 4, y - 4, 28, 28, 8, 8);
+        g.fillArc(centerX - radius, centerY - radius, diameter, diameter, 0, 360);
         g.setColor(0xffffff);
+        char icon = left ? FontImage.MATERIAL_CHEVRON_LEFT : FontImage.MATERIAL_CHEVRON_RIGHT;
+        String iconText = String.valueOf(icon);
         Font oldFont = g.getFont();
         g.setFont(FontImage.getMaterialDesignFont());
-        g.drawString(String.valueOf(left ? FontImage.MATERIAL_CHEVRON_LEFT : FontImage.MATERIAL_CHEVRON_RIGHT), x, y);
+        Font iconFont = g.getFont();
+        int iconX = centerX - iconFont.stringWidth(iconText) / 2;
+        int iconY = centerY - iconFont.getHeight() / 2;
+        g.drawString(iconText, iconX, iconY);
         g.setFont(oldFont);
     }
 
