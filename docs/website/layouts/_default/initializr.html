@@ -212,8 +212,26 @@ body.cn1-initializr-page-body .main {
   }
 
   if (frame && loader) {
-    frame.addEventListener("load", function () {
+    var loaderHidden = false;
+    var hideLoader = function () {
+      if (loaderHidden) {
+        return;
+      }
+      loaderHidden = true;
       loader.classList.add("done");
+    };
+
+    frame.addEventListener("load", function () {
+      window.setTimeout(hideLoader, 8000);
+    });
+
+    window.addEventListener("message", function (evt) {
+      if (evt.source !== frame.contentWindow || !evt.data || evt.data.type !== "cn1-initializr-ui-ready") {
+        return;
+      }
+      window.requestAnimationFrame(function () {
+        hideLoader();
+      });
     });
   }
 })();
