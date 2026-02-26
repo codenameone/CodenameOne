@@ -70,6 +70,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new MediaPlaybackScreenshotTest(),
             new OrientationLockScreenshotTest(),
             new SheetScreenshotTest(),
+            new ImageViewerNavigationScreenshotTest(),
             new InPlaceEditViewTest(),
             new BytecodeTranslatorRegressionTest(),
             new BackgroundThreadUiAccessTest(),

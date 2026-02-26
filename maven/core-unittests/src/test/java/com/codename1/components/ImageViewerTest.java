@@ -2,6 +2,7 @@ package com.codename1.components;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Display;
 import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
@@ -86,13 +87,49 @@ class ImageViewerTest extends UITestBase {
         viewer.setCycleLeft(false);
         viewer.setCycleRight(false);
         viewer.setSwipeThreshold(0.6f);
+        viewer.setNavigationArrowsVisible(true);
+        viewer.setThumbnailsVisible(true);
 
-        assertArrayEquals(new String[]{"eagerLock", "image", "imageList", "swipePlaceholder"}, viewer.getPropertyNames());
+        assertArrayEquals(new String[]{"eagerLock", "image", "imageList", "swipePlaceholder", "navigationArrowsVisible", "thumbnailsVisible"}, viewer.getPropertyNames());
         assertSame(placeholder, viewer.getPropertyValue("swipePlaceholder"));
         assertFalse(viewer.isEagerLock());
         assertFalse(viewer.isCycleLeft());
         assertFalse(viewer.isCycleRight());
         assertEquals(0.6f, viewer.getSwipeThreshold());
+        assertTrue(viewer.isNavigationArrowsVisible());
+        assertTrue(viewer.isThumbnailsVisible());
+        viewer.setThumbnailBarHeight(7.5f);
+        assertEquals(7.5f, viewer.getThumbnailBarHeight());
+    }
+
+    @FormTest
+    void thumbnailTapNavigatesToSpecificImage() {
+        Image first = Image.createImage(16, 16, 0xff112233);
+        Image second = Image.createImage(16, 16, 0xff445566);
+        Image third = Image.createImage(16, 16, 0xff778899);
+        DefaultListModel<Image> model = new DefaultListModel<>(first, second, third);
+        ImageViewer viewer = new ImageViewer(first);
+        viewer.setImageList(model);
+        viewer.setThumbnailsVisible(true);
+
+        Form f = new Form(new BorderLayout());
+        f.add(BorderLayout.CENTER, viewer);
+        f.show();
+        f.setSize(new com.codename1.ui.geom.Dimension(240, 320));
+        f.layoutContainer();
+        f.revalidate();
+        viewer.setSize(new com.codename1.ui.geom.Dimension(240, 220));
+        viewer.setX(0);
+        viewer.setY(0);
+
+        int y = viewer.getY() + viewer.getHeight() - 8;
+        int x = viewer.getWidth() - 20;
+        Display.getInstance().pointerPressed(new int[]{x}, new int[]{y});
+        Display.getInstance().pointerReleased(new int[]{x}, new int[]{y});
+        flushSerialCalls();
+
+        assertEquals(2, model.getSelectedIndex());
+        assertSame(third, viewer.getImage());
     }
 
     @FormTest

@@ -24,6 +24,8 @@ package com.codename1.components;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
@@ -36,6 +38,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 
 /// ImageViewer allows zooming/panning an image and potentially flicking between multiple images
 /// within a list of images.
@@ -65,6 +68,20 @@ import com.codename1.ui.plaf.Style;
 /// iv.setImageList(new DefaultListModel<>(red, green, blue, gray));
 /// hi.add(BorderLayout.CENTER, iv);
 /// ```
+///
+/// Optional navigation affordances can be enabled when using an image list:
+///
+/// ```java
+/// iv.setNavigationArrowsVisible(true);
+/// iv.setThumbnailsVisible(true);
+/// iv.setThumbnailBarHeight(6f);
+/// ```
+///
+/// These options can also be configured globally using theme constants:
+///
+/// - `imageviewerNavigationArrowsBool`
+/// - `imageviewerThumbnailsBool`
+/// - `imageviewerThumbnailBarHeightMM`
 ///
 /// You can even download image URL's dynamically into the `ImageViewer` thanks to the usage of the
 /// `com.codename1.ui.list.ListModel`. E.g. in this model book cover images are downloaded dynamically:
@@ -192,12 +209,37 @@ public class ImageViewer extends Component {
     private boolean cycleLeft = true;
     private boolean cycleRight = true;
     private boolean isPinchZooming;
+    private boolean navigationArrowsVisible;
+    private boolean thumbnailsVisible;
+    private float thumbnailBarHeightMM = 6f;
+    private int pointerPressedAction;
+    private int pointerPressedThumbnailIndex = -1;
 
     /// Default constructor
     public ImageViewer() {
         setFocusable(true);
         setUIIDFinal("ImageViewer");
         getAllStyles().setBgTransparency(0x0);
+        initThemeConstants();
+    }
+
+    private void initThemeConstants() {
+        UIManager manager = getUIManager();
+        String uiidPrefix = getUIID().toLowerCase();
+        navigationArrowsVisible = manager.isThemeConstant(uiidPrefix + "NavigationArrowsBool", navigationArrowsVisible);
+        thumbnailsVisible = manager.isThemeConstant(uiidPrefix + "ThumbnailsBool", thumbnailsVisible);
+        thumbnailBarHeightMM = parseFloatThemeConstant(manager.getThemeConstant(uiidPrefix + "ThumbnailBarHeightMM", Float.toString(thumbnailBarHeightMM)), thumbnailBarHeightMM);
+    }
+
+    private static float parseFloatThemeConstant(String value, float defaultValue) {
+        if (value == null || value.length() == 0) {
+            return defaultValue;
+        }
+        try {
+            return Float.parseFloat(value);
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
     }
 
     /// Initializes the component with an image
@@ -219,7 +261,7 @@ public class ImageViewer extends Component {
     /// {@inheritDoc}
     @Override
     public String[] getPropertyNames() {
-        return new String[]{"eagerLock", "image", "imageList", "swipePlaceholder"};
+        return new String[]{"eagerLock", "image", "imageList", "swipePlaceholder", "navigationArrowsVisible", "thumbnailsVisible"};
     }
 
     /// {@inheritDoc}
@@ -232,13 +274,13 @@ public class ImageViewer extends Component {
     @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Boolean.class, Image.class,
-                com.codename1.impl.CodenameOneImplementation.getImageArrayClass(), Image.class};
+                com.codename1.impl.CodenameOneImplementation.getImageArrayClass(), Image.class, Boolean.class, Boolean.class};
     }
 
     /// {@inheritDoc}
     @Override
     public String[] getPropertyTypeNames() {
-        return new String[]{"Boolean", "Image", "Image[]", "Image"};
+        return new String[]{"Boolean", "Image", "Image[]", "Image", "Boolean", "Boolean"};
     }
 
     /// {@inheritDoc}
@@ -267,6 +309,12 @@ public class ImageViewer extends Component {
         if ("swipePlaceholder".equals(name)) {
             return getSwipePlaceholder();
         }
+        if ("navigationArrowsVisible".equals(name)) {
+            return isNavigationArrowsVisible() ? Boolean.TRUE : Boolean.FALSE;
+        }
+        if ("thumbnailsVisible".equals(name)) {
+            return isThumbnailsVisible() ? Boolean.TRUE : Boolean.FALSE;
+        }
         return null;
     }
 
@@ -291,6 +339,14 @@ public class ImageViewer extends Component {
         }
         if ("swipePlaceholder".equals(name)) {
             setSwipePlaceholder((Image) value);
+            return null;
+        }
+        if ("navigationArrowsVisible".equals(name)) {
+            setNavigationArrowsVisible(value != null && ((Boolean) value).booleanValue());
+            return null;
+        }
+        if ("thumbnailsVisible".equals(name)) {
+            setThumbnailsVisible(value != null && ((Boolean) value).booleanValue());
             return null;
         }
         return super.setPropertyValue(name, value);
@@ -384,6 +440,8 @@ public class ImageViewer extends Component {
     public void pointerPressed(int x, int y) {
         pressX = x;
         pressY = y;
+        pointerPressedAction = getPointerActionAt(x, y);
+        pointerPressedThumbnailIndex = getThumbnailIndexAt(x, y);
         currentZoom = zoom;
         getComponentForm().addComponentAwaitingRelease(this);
     }
@@ -418,6 +476,28 @@ public class ImageViewer extends Component {
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
         isPinchZooming = false;
+        int releaseAction = getPointerActionAt(x, y);
+        if (pointerPressedAction != ACTION_NONE && pointerPressedAction == releaseAction) {
+            if (pointerPressedAction == ACTION_LEFT) {
+                navigateToLeft();
+                pointerPressedAction = ACTION_NONE;
+                return;
+            }
+            if (pointerPressedAction == ACTION_RIGHT) {
+                navigateToRight();
+                pointerPressedAction = ACTION_NONE;
+                return;
+            }
+            if (pointerPressedAction == ACTION_THUMBNAIL) {
+                int thumbnailIndex = getThumbnailIndexAt(x, y);
+                if (thumbnailIndex == pointerPressedThumbnailIndex) {
+                    navigateTo(thumbnailIndex);
+                }
+                pointerPressedAction = ACTION_NONE;
+                return;
+            }
+        }
+        pointerPressedAction = ACTION_NONE;
         if (panPositionX > 1) {
             if (panPositionX >= 1 + swipeThreshold && (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos())) {
                 new AnimatePanX(2, getImageRight(), getImageRightPos());
@@ -448,6 +528,9 @@ public class ImageViewer extends Component {
     /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
+        if (pointerPressedAction != ACTION_NONE) {
+            return;
+        }
         // could be a pan
         float distanceX = ((float) pressX - x) / getZoom();
         float distanceY = ((float) pressY - y) / getZoom();
@@ -765,6 +848,7 @@ public class ImageViewer extends Component {
                 g.drawImage(left, ((int) ratio) + getX() + prefX, getY() + prefY, prefW, prefH);
                 g.setRenderingHints(0);
             }
+            drawNavigationChrome(g);
             return;
         }
         if (panPositionX > 1) {
@@ -791,6 +875,7 @@ public class ImageViewer extends Component {
                 g.drawImage(right, ((int) ratio) + getX() + prefX, getY() + prefY, prefW, prefH);
                 g.setRenderingHints(0);
             }
+            drawNavigationChrome(g);
             return;
         }
         // can happen in the GUI builder
@@ -815,6 +900,131 @@ public class ImageViewer extends Component {
 
 
             g.setRenderingHints(0);
+        }
+        drawNavigationChrome(g);
+    }
+
+    private static final int ACTION_NONE = 0;
+    private static final int ACTION_LEFT = 1;
+    private static final int ACTION_RIGHT = 2;
+    private static final int ACTION_THUMBNAIL = 3;
+
+    private boolean canNavigate() {
+        return swipeableImages != null && swipeableImages.getSize() > 1;
+    }
+
+    private void navigateToLeft() {
+        if (!canNavigate()) {
+            return;
+        }
+        if (cycleLeft || swipeableImages.getSelectedIndex() > getImageLeftPos()) {
+            new AnimatePanX(-1, getImageLeft(), getImageLeftPos());
+        }
+    }
+
+    private void navigateToRight() {
+        if (!canNavigate()) {
+            return;
+        }
+        if (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos()) {
+            new AnimatePanX(2, getImageRight(), getImageRightPos());
+        }
+    }
+
+    private void navigateTo(int index) {
+        if (!canNavigate() || index < 0 || index >= swipeableImages.getSize()) {
+            return;
+        }
+        if (index != swipeableImages.getSelectedIndex()) {
+            swipeableImages.setSelectedIndex(index);
+        }
+    }
+
+    private int getPointerActionAt(int x, int y) {
+        if (!canNavigate()) {
+            return ACTION_NONE;
+        }
+        if (thumbnailsVisible && getThumbnailIndexAt(x, y) > -1) {
+            return ACTION_THUMBNAIL;
+        }
+        if (navigationArrowsVisible) {
+            int leftBound = getX() + Math.max(24, getWidth() / 8);
+            int rightBound = getX() + getWidth() - Math.max(24, getWidth() / 8);
+            if (x <= leftBound) {
+                return ACTION_LEFT;
+            }
+            if (x >= rightBound) {
+                return ACTION_RIGHT;
+            }
+        }
+        return ACTION_NONE;
+    }
+
+    private int getThumbnailIndexAt(int x, int y) {
+        if (!thumbnailsVisible || !canNavigate()) {
+            return -1;
+        }
+        int barHeight = Math.max(24, Display.getInstance().convertToPixels(thumbnailBarHeightMM));
+        int barTop = getY() + getHeight() - barHeight;
+        if (y < barTop || y > getY() + getHeight()) {
+            return -1;
+        }
+        int size = swipeableImages.getSize();
+        int availableWidth = getWidth() - 8;
+        int perThumbWidth = Math.max(14, availableWidth / size);
+        int startX = getX() + (getWidth() - (perThumbWidth * size)) / 2;
+        if (x < startX || x > startX + perThumbWidth * size) {
+            return -1;
+        }
+        int index = (x - startX) / perThumbWidth;
+        if (index < 0 || index >= size) {
+            return -1;
+        }
+        return index;
+    }
+
+    private void drawNavigationChrome(Graphics g) {
+        if (!canNavigate()) {
+            return;
+        }
+        if (navigationArrowsVisible) {
+            drawArrow(g, true);
+            drawArrow(g, false);
+        }
+        if (thumbnailsVisible) {
+            drawThumbnails(g);
+        }
+    }
+
+    private void drawArrow(Graphics g, boolean left) {
+        int x = left ? getX() + 6 : getX() + getWidth() - 30;
+        int y = getY() + getHeight() / 2 - 14;
+        g.setColor(0x66000000);
+        g.fillRoundRect(x - 4, y - 4, 28, 28, 8, 8);
+        g.setColor(0xffffff);
+        Font oldFont = g.getFont();
+        g.setFont(FontImage.getMaterialDesignFont());
+        g.drawString(String.valueOf(left ? FontImage.MATERIAL_CHEVRON_LEFT : FontImage.MATERIAL_CHEVRON_RIGHT), x, y);
+        g.setFont(oldFont);
+    }
+
+    private void drawThumbnails(Graphics g) {
+        int size = swipeableImages.getSize();
+        int barHeight = Math.max(24, Display.getInstance().convertToPixels(thumbnailBarHeightMM));
+        int y = getY() + getHeight() - barHeight;
+        g.setColor(0x66000000);
+        g.fillRect(getX(), y, getWidth(), barHeight);
+        int availableWidth = getWidth() - 8;
+        int perThumbWidth = Math.max(14, availableWidth / size);
+        int thumbMargin = 2;
+        int startX = getX() + (getWidth() - (perThumbWidth * size)) / 2;
+        int thumbHeight = barHeight - 6;
+        for (int i = 0; i < size; i++) {
+            int tx = startX + i * perThumbWidth;
+            Image thumb = swipeableImages.getItemAt(i);
+            g.drawImage(thumb, tx + thumbMargin, y + 3, perThumbWidth - thumbMargin * 2, thumbHeight);
+            g.setColor(i == swipeableImages.getSelectedIndex() ? 0xffffff : 0x99ffffff);
+            g.drawRect(tx + thumbMargin, y + 3, perThumbWidth - thumbMargin * 2, thumbHeight);
         }
     }
 
@@ -936,6 +1146,63 @@ public class ImageViewer extends Component {
     /// true if zoom is animated
     public boolean isAnimatedZoom() {
         return animateZoom;
+    }
+
+    /// Indicates if side navigation arrows should be painted for moving between images.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if side navigation arrows are visible.
+    public boolean isNavigationArrowsVisible() {
+        return navigationArrowsVisible;
+    }
+
+    /// Enables side navigation arrows (material font icons) for moving between images.
+    ///
+    /// #### Parameters
+    ///
+    /// - `navigationArrowsVisible`: `true` to show side navigation arrows.
+    public void setNavigationArrowsVisible(boolean navigationArrowsVisible) {
+        this.navigationArrowsVisible = navigationArrowsVisible;
+        repaint();
+    }
+
+    /// Indicates if thumbnails should be painted in a strip at the bottom for direct image selection.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if the thumbnail strip is visible.
+    public boolean isThumbnailsVisible() {
+        return thumbnailsVisible;
+    }
+
+    /// Enables a bottom thumbnail strip for direct image selection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `thumbnailsVisible`: `true` to show thumbnails.
+    public void setThumbnailsVisible(boolean thumbnailsVisible) {
+        this.thumbnailsVisible = thumbnailsVisible;
+        repaint();
+    }
+
+    /// Gets the thumbnail strip height in millimeters.
+    ///
+    /// #### Returns
+    ///
+    /// Height of the thumbnail strip in millimeters.
+    public float getThumbnailBarHeight() {
+        return thumbnailBarHeightMM;
+    }
+
+    /// Sets the thumbnail strip height in millimeters.
+    ///
+    /// #### Parameters
+    ///
+    /// - `thumbnailBarHeight`: Height of the thumbnail strip in millimeters.
+    public void setThumbnailBarHeight(float thumbnailBarHeight) {
+        this.thumbnailBarHeightMM = Math.max(1f, thumbnailBarHeight);
+        repaint();
     }
 
     /// Manipulate the zoom level of the application
