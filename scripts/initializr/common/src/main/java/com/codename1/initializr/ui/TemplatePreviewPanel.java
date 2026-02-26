@@ -62,7 +62,6 @@ public class TemplatePreviewPanel {
     public void showUpdatedLivePreview() {
         if (template == Template.BAREBONES || template == Template.KOTLIN) {
             Form liveForm = createBarebonesPreviewForm(options);
-            liveForm.show();
             liveFormPreview = new InterFormContainer(liveForm);
             liveFormPreview.setUIID("InitializrLiveFrame");
             previewHolder.removeAll();
