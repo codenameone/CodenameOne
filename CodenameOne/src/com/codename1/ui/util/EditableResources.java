@@ -15,7 +15,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.Hashtable;
 
 /**
@@ -135,7 +134,7 @@ public class EditableResources extends Resources {
 
     public void save(OutputStream out) throws IOException {
         String[] resourceNames = getResourceNames();
-        Arrays.sort(resourceNames, Comparator.naturalOrder());
+        Arrays.sort(resourceNames);
 
         DataOutputStream output = new DataOutputStream(out);
         output.writeShort(resourceNames.length + 1);
