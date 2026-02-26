@@ -2455,6 +2455,26 @@ image::img/components-imageviewer-multi.png[An ImageViewer with multiple element
 
 Notice that we use a https://www.codenameone.com/javadoc/com/codename1/ui/list/ListModel.html[ListModel] to allow swiping between images.
 
+From Codename One 9.0, `ImageViewer` also supports optional side arrows (material font icons) and an optional thumbnail strip for direct image navigation:
+
+[source,java]
+----
+ImageViewer iv = new ImageViewer(red);
+iv.setImageList(new DefaultListModel<>(red, green, blue, gray));
+iv.setNavigationArrowsVisible(true);
+iv.setThumbnailsVisible(true);
+iv.setThumbnailBarHeight(6f); // Optional, defaults to 6mm
+----
+
+When arrows are enabled, tapping near the left/right edge will move to the previous/next image.
+When thumbnails are enabled, tapping a thumbnail jumps directly to that image.
+
+All three options can be configured with theme constants (using the `ImageViewer` UIID prefix):
+
+- `imageviewerNavigationArrowsBool=true|false`
+- `imageviewerThumbnailsBool=true|false`
+- `imageviewerThumbnailBarHeightMM=<floating point millimeters>`
+
 TIP: `EncodedImage's` aren't always fully loaded and so when you swipe if the images are really large you might see delays!
 
 You can dynamically download images directly into the `ImageViewer` with a custom list model like this:

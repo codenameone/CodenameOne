@@ -190,6 +190,15 @@ SoftKey, Touch, Bar, Title, Right, Native
 |iconUiid
 |Allows theming the icon component used by `SpanLabel`, `SpanButton`, `MultiButton`, and `SpanMultiButton` when they fetch icon styling via theme constants.
 
+|imageviewerNavigationArrowsBool
+|Enables side navigation arrows by default for `ImageViewer` instances using the `ImageViewer` UIID (or a lowercased custom UIID prefix).
+
+|imageviewerThumbnailBarHeightMM
+|Sets the default thumbnail strip height (in millimeters) for `ImageViewer` navigation thumbnails.
+
+|imageviewerThumbnailsBool
+|Enables the bottom thumbnail strip by default for `ImageViewer` instances using the `ImageViewer` UIID (or a lowercased custom UIID prefix).
+
 |textUiid
 |Overrides the text component UIID for `SpanLabel`, `SpanButton`, `MultiButton`, and `SpanMultiButton` instances when provided as a theme constant.
 
