@@ -48,8 +48,8 @@ public class CSSThemeCompiler {
 
         compileConstants(css, theme);
         Rule[] rules = parseRules(css);
-        for (int i = 0; i < rules.length; i++) {
-            applyRule(theme, resources, rules[i]);
+        for (Rule rule : rules) {
+            applyRule(theme, resources, rule);
         }
         resolveThemeConstantVars(theme);
         resources.setTheme(themeName, theme);
@@ -84,8 +84,7 @@ public class CSSThemeCompiler {
             return;
         }
         Declaration[] declarations = parseDeclarations(stripped.substring(open + 1, close));
-        for (int i = 0; i < declarations.length; i++) {
-            Declaration declaration = declarations[i];
+        for (Declaration declaration : declarations) {
             theme.put("@" + declaration.property, declaration.value);
         }
     }
@@ -127,8 +126,7 @@ public class CSSThemeCompiler {
     }
 
     private void applyRootDeclarations(Hashtable theme, Declaration[] declarations) {
-        for (int i = 0; i < declarations.length; i++) {
-            Declaration declaration = declarations[i];
+        for (Declaration declaration : declarations) {
             if (!declaration.property.startsWith("--")) {
                 continue;
             }
@@ -332,8 +330,8 @@ public class CSSThemeCompiler {
             String body = stripped.substring(open + 1, close).trim();
             Declaration[] declarations = parseDeclarations(body);
             String[] selectorsList = splitOnChar(selectors, ',');
-            for (int i = 0; i < selectorsList.length; i++) {
-                String selector = selectorsList[i].trim();
+            for (String selectorEntry : selectorsList) {
+                String selector = selectorEntry.trim();
                 if (selector.length() == 0) {
                     continue;
                 }
@@ -373,8 +371,7 @@ public class CSSThemeCompiler {
     private Declaration[] parseDeclarations(String body) {
         ArrayList<Declaration> out = new ArrayList<Declaration>();
         String[] segments = splitOnChar(body, ';');
-        for (int i = 0; i < segments.length; i++) {
-            String line = segments[i];
+        for (String line : segments) {
             int colon = line.indexOf(':');
             if (colon <= 0) {
                 continue;
