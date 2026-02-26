@@ -7,6 +7,9 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.util.UITimer;
 
 public class OrientationLockScreenshotTest extends BaseTest {
+    private static final int ORIENTATION_POLL_INTERVAL_MS = 100;
+    private static final int ORIENTATION_POLL_ATTEMPTS = 25;
+
     @Override
     public boolean runTest() {
         Form hi = new Form("Orientation Lock", new BoxLayout(BoxLayout.Y_AXIS)) {
@@ -16,12 +19,24 @@ public class OrientationLockScreenshotTest extends BaseTest {
                 UITimer.timer(300, false, this, () -> {
                     Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("landscape");
                     CN.lockOrientation(true);
-                    UITimer.timer(300, false, this, OrientationLockScreenshotTest.this::done);
+                    waitForOrientation(this, true, OrientationLockScreenshotTest.this::done);
                 });
             }
         };
         hi.add(new Label("Testing orientation lock..."));
         hi.show();
         return true;
+    }
+    
+    private void waitForOrientation(Form form, boolean portrait, Runnable onDone) {
+        waitForOrientation(form, portrait, ORIENTATION_POLL_ATTEMPTS, onDone);
+    }
+
+    private void waitForOrientation(Form form, boolean portrait, int attemptsLeft, Runnable onDone) {
+        if (CN.isPortrait() == portrait || attemptsLeft <= 0) {
+            onDone.run();
+            return;
+        }
+        UITimer.timer(ORIENTATION_POLL_INTERVAL_MS, false, form, () -> waitForOrientation(form, portrait, attemptsLeft - 1, onDone));
     }
 }
