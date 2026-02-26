@@ -1,7 +1,7 @@
 package com.codename1.initializr.ui;
 
-import com.codename1.components.ToastBar;
 import com.codename1.components.ImageViewer;
+import com.codename1.components.ToastBar;
 import com.codename1.initializr.model.ProjectOptions;
 import com.codename1.initializr.model.Template;
 import com.codename1.ui.Button;
@@ -11,12 +11,14 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
-import com.codename1.ui.Image;
 import com.codename1.ui.InterFormContainer;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
+
+import java.util.Hashtable;
 
 public class TemplatePreviewPanel {
     private final Container root;
@@ -59,16 +61,44 @@ public class TemplatePreviewPanel {
     }
 
     private Form createBarebonesPreviewForm(ProjectOptions options) {
+        installBundle(options);
         Form form = new Form("Hi World", BoxLayout.y());
         Button helloButton = new Button("Hello World");
         helloButton.setUIID("Button");
         helloButton.addActionListener(e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
         form.add(helloButton);
-        Command menuCommand = form.getToolbar().addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU, e ->
+        Command menuCommand = form.getToolbar().addMaterialCommandToSideMenu("Hello Command",
+                FontImage.MATERIAL_CHECK, 4, e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
+        form.getToolbar().addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU, e ->
                 ToastBar.showInfoMessage("Side menu is not available in embedded preview mode."));
         Button menuButton = form.getToolbar().findCommandComponent(menuCommand);
         applyLivePreviewOptions(form, helloButton, menuButton, options);
         return form;
+    }
+
+    private void installBundle(ProjectOptions options) {
+        if (!options.includeLocalizationBundles) {
+            UIManager.getInstance().setBundle(null);
+            return;
+        }
+        Hashtable<String, String> bundle = findBundle(options.previewLanguage);
+        UIManager.getInstance().setBundle(bundle);
+    }
+
+    private Hashtable<String, String> findBundle(ProjectOptions.PreviewLanguage language) {
+        Resources resources = Resources.getGlobalResources();
+        if (resources == null || language == null) {
+            return null;
+        }
+        Hashtable<String, String> exact = resources.getL10N("messages", language.bundleSuffix);
+        if (exact != null) {
+            return exact;
+        }
+        int split = language.bundleSuffix.indexOf('_');
+        if (split > 0) {
+            return resources.getL10N("messages", language.bundleSuffix.substring(0, split));
+        }
+        return null;
     }
 
     private void updateMode() {

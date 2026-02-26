@@ -37,6 +37,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertCommonPom(entries, template, packageName, mainClassName);
         assertSettings(entries, template, packageName, mainClassName);
         assertMainSourceFile(entries, template, packageName, mainClassName);
+        assertLocalizationBundles(entries, template);
         assertNoTemplatePlaceholders(entries, template);
     }
 
@@ -135,6 +136,10 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String mainSource = getText(entries, path);
         assertContains(mainSource, "package " + packageName, "Main source package was not refactored");
         assertContains(mainSource, mainClassName, "Main source class was not renamed");
+        if (template == Template.BAREBONES || template == Template.KOTLIN) {
+            assertContains(mainSource, "setBundle", "Barebones starter should install localization bundle");
+            assertContains(mainSource, "messages", "Barebones starter should load i18n messages properties");
+        }
         if (template == Template.GRUB) {
             String grubModel = getText(entries, "common/src/main/java/" + packagePath + "/models/AccountModel.java");
             assertContains(grubModel, "extends Entity", "Grub models should keep CodeRAD 1 Entity base class");
@@ -144,6 +149,17 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertNotNull(entries.get("cn1libs/CodeRAD/jars/main.zip"), "Grub should include bundled CodeRAD common jar");
             assertNotNull(entries.get("cn1libs/CodeRAD/jars/css.zip"), "Grub should include bundled CodeRAD css artifact");
         }
+    }
+
+
+    private void assertLocalizationBundles(Map<String, byte[]> entries, Template template) {
+        if (template == Template.BAREBONES || template == Template.KOTLIN) {
+            assertNotNull(entries.get("common/src/main/resources/messages.properties"), "Barebones templates should include default localization bundle");
+            assertNotNull(entries.get("common/src/main/resources/messages_ar.properties"), "Barebones templates should include Arabic localization bundle");
+            assertNotNull(entries.get("common/src/main/resources/messages_he.properties"), "Barebones templates should include Hebrew localization bundle");
+            return;
+        }
+        assertNull(entries.get("common/src/main/resources/messages.properties"), "Non-bare templates should not receive default localization bundle");
     }
 
     private void assertNoTemplatePlaceholders(Map<String, byte[]> entries, Template template) {
