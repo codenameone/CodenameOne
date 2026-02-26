@@ -18,7 +18,6 @@ import com.codename1.ui.util.Resources;
 
 import java.util.Hashtable;
 
-import static com.codename1.ui.CN.getCurrentForm;
 
 public class TemplatePreviewPanel {
     private final Container root;
@@ -106,11 +105,6 @@ public class TemplatePreviewPanel {
         previewHolder.removeAll();
         if (template == Template.BAREBONES || template == Template.KOTLIN) {
             Form liveForm = createBarebonesPreviewForm(options);
-            Form current = getCurrentForm();
-            liveForm.show();
-            if (current != null && current != liveForm) {
-                current.showBack();
-            }
             liveFormPreview = new InterFormContainer(liveForm);
             liveFormPreview.setUIID("InitializrLiveFrame");
             previewHolder.add(BorderLayout.CENTER, liveFormPreview);
