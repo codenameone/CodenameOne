@@ -15,6 +15,7 @@ import com.codename1.system.NativeLookup;
 import com.codename1.ui.Button;
 import com.codename1.ui.ButtonGroup;
 import com.codename1.ui.CheckBox;
+import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -47,6 +48,8 @@ public class Initializr extends Lifecycle {
         final ProjectOptions.ThemeMode[] selectedThemeMode = new ProjectOptions.ThemeMode[]{ProjectOptions.ThemeMode.LIGHT};
         final ProjectOptions.Accent[] selectedAccent = new ProjectOptions.Accent[]{ProjectOptions.Accent.DEFAULT};
         final boolean[] roundedButtons = new boolean[]{true};
+        final boolean[] includeLocalizationBundles = new boolean[]{true};
+        final ProjectOptions.PreviewLanguage[] previewLanguage = new ProjectOptions.PreviewLanguage[]{ProjectOptions.PreviewLanguage.ENGLISH};
         final RadioButton[] templateButtons = new RadioButton[Template.values().length];
         final SpanLabel summaryLabel = new SpanLabel();
         final TemplatePreviewPanel previewPanel = new TemplatePreviewPanel(selectedTemplate[0]);
@@ -64,7 +67,10 @@ public class Initializr extends Lifecycle {
 
         final Runnable refresh = new Runnable() {
             public void run() {
-                ProjectOptions options = new ProjectOptions(selectedThemeMode[0], selectedAccent[0], roundedButtons[0]);
+                ProjectOptions options = new ProjectOptions(
+                        selectedThemeMode[0], selectedAccent[0], roundedButtons[0],
+                        includeLocalizationBundles[0], previewLanguage[0]
+                );
                 previewPanel.setTemplate(selectedTemplate[0]);
                 previewPanel.setOptions(options);
                 boolean canCustomizeTheme = supportsLivePreview(selectedTemplate[0]);
@@ -92,12 +98,14 @@ public class Initializr extends Lifecycle {
         );
         final Container idePanel = createIdeSelectorPanel(selectedIde, refresh);
         final Container themePanel = createThemeOptionsPanel(selectedThemeMode, selectedAccent, roundedButtons, refresh);
+        final Container localizationPanel = createLocalizationPanel(includeLocalizationBundles, previewLanguage, refresh, previewPanel);
         themePanelRef[0] = themePanel;
         final Container settingsPanel = BoxLayout.encloseY(summaryLabel);
 
         Accordion advancedAccordion = new Accordion();
         advancedAccordion.addContent("IDE", idePanel);
         advancedAccordion.addContent("Theme Customization", themePanel);
+        advancedAccordion.addContent("Localization", localizationPanel);
         advancedAccordion.addContent("Current Settings", settingsPanel);
         advancedAccordion.setAutoClose(false);
         advancedAccordion.setScrollable(false);
@@ -123,7 +131,10 @@ public class Initializr extends Lifecycle {
             }
             String appName = appNameField.getText() == null ? "" : appNameField.getText().trim();
             String packageName = packageField.getText() == null ? "" : packageField.getText().trim();
-            ProjectOptions options = new ProjectOptions(selectedThemeMode[0], selectedAccent[0], roundedButtons[0]);
+            ProjectOptions options = new ProjectOptions(
+                    selectedThemeMode[0], selectedAccent[0], roundedButtons[0],
+                    includeLocalizationBundles[0], previewLanguage[0]
+            );
             GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName, options).generate();
         });
 
@@ -139,6 +150,39 @@ public class Initializr extends Lifecycle {
         refresh.run();
         initWebsiteThemeSync(form);
         form.show();
+    }
+
+    private Container createLocalizationPanel(boolean[] includeLocalizationBundles,
+                                              ProjectOptions.PreviewLanguage[] previewLanguage,
+                                              Runnable onSelectionChanged,
+                                              TemplatePreviewPanel previewPanel) {
+        CheckBox includeBundles = new CheckBox("Include Resource Bundles");
+        includeBundles.setUIID("InitializrChoice");
+        includeBundles.setSelected(includeLocalizationBundles[0]);
+
+        Picker languagePicker = new Picker();
+        languagePicker.setUIID("InitializrField");
+        String[] labels = new String[ProjectOptions.PreviewLanguage.values().length];
+        for (int i = 0; i < labels.length; i++) {
+            labels[i] = ProjectOptions.PreviewLanguage.values()[i].label;
+        }
+        languagePicker.setStrings(labels);
+        languagePicker.setSelectedString(previewLanguage[0].label);
+
+        includeBundles.addActionListener(e -> {
+            includeLocalizationBundles[0] = includeBundles.isSelected();
+            languagePicker.setEnabled(includeBundles.isSelected());
+            onSelectionChanged.run();
+        });
+        languagePicker.setEnabled(includeBundles.isSelected());
+        languagePicker.addActionListener(e -> {
+            String selected = languagePicker.getSelectedString();
+            previewLanguage[0] = findLanguageByLabel(selected);
+            onSelectionChanged.run();
+            previewPanel.showUpdatedLivePreview();
+        });
+
+        return BoxLayout.encloseY(includeBundles, labeledField("Preview Language", languagePicker));
     }
 
     private Container createHeader() {
@@ -319,6 +363,16 @@ public class Initializr extends Lifecycle {
         return BoxLayout.encloseY(header, input);
     }
 
+
+    private ProjectOptions.PreviewLanguage findLanguageByLabel(String label) {
+        for (ProjectOptions.PreviewLanguage language : ProjectOptions.PreviewLanguage.values()) {
+            if (language.label.equals(label)) {
+                return language;
+            }
+        }
+        return ProjectOptions.PreviewLanguage.ENGLISH;
+    }
+
     private String formatEnumLabel(String text) {
         if ("DEFAULT".equals(text)) {
             return "Clean";
@@ -445,6 +499,8 @@ public class Initializr extends Lifecycle {
                 + "Theme: " + options.themeMode.name() + "\n"
                 + "Accent: " + options.accent.name() + "\n"
                 + "Rounded Buttons: " + (options.roundedButtons ? "Yes" : "No") + "\n"
+                + "Localization Bundles: " + (options.includeLocalizationBundles ? "Yes" : "No") + "\n"
+                + "Preview Language: " + options.previewLanguage.label + "\n"
                 + "Kotlin: " + (template.IS_KOTLIN ? "Yes" : "No");
     }
 

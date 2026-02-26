@@ -1,22 +1,27 @@
 package com.codename1.initializr.ui;
 
-import com.codename1.components.ToastBar;
 import com.codename1.components.ImageViewer;
 import com.codename1.initializr.model.ProjectOptions;
 import com.codename1.initializr.model.Template;
+import com.codename1.io.Log;
+import com.codename1.io.Properties;
 import com.codename1.ui.Button;
-import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
-import com.codename1.ui.Image;
 import com.codename1.ui.InterFormContainer;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
+
+import java.io.InputStream;
+import java.util.Hashtable;
+
+import static com.codename1.ui.CN.getResourceAsStream;
 
 public class TemplatePreviewPanel {
     private final Container root;
@@ -58,17 +63,92 @@ public class TemplatePreviewPanel {
         updateMode();
     }
 
+    public void showUpdatedLivePreview() {
+        if (template == Template.BAREBONES || template == Template.KOTLIN) {
+            Form liveForm = createBarebonesPreviewForm(options);
+            liveFormPreview = new InterFormContainer(liveForm);
+            liveFormPreview.setUIID("InitializrLiveFrame");
+            previewHolder.removeAll();
+            previewHolder.add(BorderLayout.CENTER, liveFormPreview);
+            previewHolder.revalidate();
+        }
+    }
+
     private Form createBarebonesPreviewForm(ProjectOptions options) {
+        installBundle(options);
         Form form = new Form("Hi World", BoxLayout.y());
         Button helloButton = new Button("Hello World");
         helloButton.setUIID("Button");
         helloButton.addActionListener(e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
         form.add(helloButton);
-        Command menuCommand = form.getToolbar().addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU, e ->
-                ToastBar.showInfoMessage("Side menu is not available in embedded preview mode."));
-        Button menuButton = form.getToolbar().findCommandComponent(menuCommand);
-        applyLivePreviewOptions(form, helloButton, menuButton, options);
+        form.getToolbar().addMaterialCommandToSideMenu("Hello Command",
+                FontImage.MATERIAL_CHECK, 4, e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
+        applyLivePreviewOptions(form, helloButton, null, options);
         return form;
+    }
+
+    private void installBundle(ProjectOptions options) {
+        if (!options.includeLocalizationBundles) {
+            UIManager.getInstance().setBundle(null);
+            return;
+        }
+        Hashtable<String, String> bundle = findBundle(options.previewLanguage);
+        UIManager.getInstance().setBundle(bundle);
+    }
+
+    private Hashtable<String, String> findBundle(ProjectOptions.PreviewLanguage language) {
+        if (language == null) {
+            return null;
+        }
+        Resources resources = Resources.getGlobalResources();
+        if (resources != null) {
+            try {
+                Hashtable<String, String> exact = resources.getL10N("messages", language.bundleSuffix);
+                if (exact != null) {
+                    return exact;
+                }
+                int split = language.bundleSuffix.indexOf('_');
+                if (split > 0) {
+                    Hashtable<String, String> languageOnly = resources.getL10N("messages", language.bundleSuffix.substring(0, split));
+                    if (languageOnly != null) {
+                        return languageOnly;
+                    }
+                }
+            } catch (RuntimeException err) {
+                Log.e(err);
+            }
+        }
+
+        String[] candidates = language.bundleSuffix.indexOf('_') > 0
+                ? new String[]{"/messages_" + language.bundleSuffix + ".properties", "/messages_" + language.bundleSuffix.substring(0, language.bundleSuffix.indexOf('_')) + ".properties", "/messages.properties"}
+                : new String[]{"/messages_" + language.bundleSuffix + ".properties", "/messages.properties"};
+
+        for (String path : candidates) {
+            Hashtable<String, String> loaded = loadBundleProperties(path);
+            if (loaded != null) {
+                return loaded;
+            }
+        }
+        return null;
+    }
+
+    private Hashtable<String, String> loadBundleProperties(String resourcePath) {
+        try (InputStream input = getResourceAsStream(resourcePath)) {
+            if (input == null) {
+                return null;
+            }
+            Properties props = new Properties();
+            props.load(input);
+            Hashtable<String, String> out = new Hashtable<String, String>();
+            for (Object key : props.keySet()) {
+                String keyString = key.toString();
+                out.put(keyString, props.getProperty(keyString));
+            }
+            return out;
+        } catch (Exception err) {
+            Log.e(err);
+            return null;
+        }
     }
 
     private void updateMode() {

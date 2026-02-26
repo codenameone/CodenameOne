@@ -73,6 +73,7 @@ public class GeneratorModel {
         }
         copyZipEntriesToMap(template.CSS, mergedEntries, ZipEntryType.TEMPLATE_CSS);
         copyZipEntriesToMap(template.SOURCE_ZIP, mergedEntries, ZipEntryType.TEMPLATE_SOURCE);
+        addLocalizationEntries(mergedEntries);
 
         try (ZipOutputStream zos = new ZipOutputStream(outputStream)) {
             for (Map.Entry<String, byte[]> fileEntry : mergedEntries.entrySet()) {
@@ -81,6 +82,30 @@ public class GeneratorModel {
                 zos.write(fileEntry.getValue());
                 zos.closeEntry();
             }
+        }
+    }
+
+
+    private void addLocalizationEntries(Map<String, byte[]> mergedEntries) throws IOException {
+        if (!isBareTemplate() || !options.includeLocalizationBundles) {
+            return;
+        }
+        copySingleTextEntryToMap(
+                "common/src/main/resources/messages.properties",
+                readResourceToString("/messages.properties"),
+                mergedEntries,
+                ZipEntryType.COMMON
+        );
+        for (ProjectOptions.PreviewLanguage language : ProjectOptions.PreviewLanguage.values()) {
+            if (language == ProjectOptions.PreviewLanguage.ENGLISH) {
+                continue;
+            }
+            copySingleTextEntryToMap(
+                    "common/src/main/resources/messages_" + language.bundleSuffix + ".properties",
+                    readResourceToString("/messages_" + language.bundleSuffix + ".properties"),
+                    mergedEntries,
+                    ZipEntryType.COMMON
+            );
         }
     }
 
@@ -155,6 +180,9 @@ public class GeneratorModel {
         if ("common/codenameone_settings.properties".equals(targetPath)) {
             content = replaceProperty(content, "codename1.kotlin", String.valueOf(template.IS_KOTLIN));
         }
+        if (options.includeLocalizationBundles && isBareTemplate()) {
+            content = injectLocalizationBootstrap(targetPath, content);
+        }
         if (isBareTemplate() && "common/src/main/css/theme.css".equals(targetPath)) {
             content += buildThemeOverrides();
         }
@@ -165,6 +193,54 @@ public class GeneratorModel {
             content = normalizeJavasePom(content);
         }
         return content.getBytes("UTF-8");
+    }
+
+
+    private String injectLocalizationBootstrap(String targetPath, String content) {
+        String javaMainPath = "common/src/main/java/" + packageName.replace('.', '/') + "/" + appName + ".java";
+        String kotlinMainPath = "common/src/main/kotlin/" + packageName.replace('.', '/') + "/" + appName + ".kt";
+        if (javaMainPath.equals(targetPath)) {
+            return injectJavaLocalizationBootstrap(content);
+        }
+        if (kotlinMainPath.equals(targetPath)) {
+            return injectKotlinLocalizationBootstrap(content);
+        }
+        return content;
+    }
+
+    private String injectJavaLocalizationBootstrap(String content) {
+        if (content.indexOf("setBundle(") >= 0) {
+            return content;
+        }
+        content = StringUtil.replaceAll(content, "import static com.codename1.ui.CN.*;\n", "import static com.codename1.ui.CN.*;\nimport com.codename1.l10n.L10NManager;\nimport com.codename1.ui.plaf.UIManager;\nimport java.util.Hashtable;\n");
+        String method = "\n    @Override\n"
+                + "    public void init(Object context) {\n"
+                + "        String language = L10NManager.getInstance().getLanguage();\n"
+                + "        Hashtable<String, String> bundle = Resources.getGlobalResources().getL10N(\"messages\", language);\n"
+                + "        UIManager.getInstance().setBundle(bundle);\n"
+                + "    }\n\n";
+        int firstBrace = content.indexOf('{');
+        if (firstBrace > -1) {
+            return content.substring(0, firstBrace + 1) + method + content.substring(firstBrace + 1);
+        }
+        return content;
+    }
+
+    private String injectKotlinLocalizationBootstrap(String content) {
+        if (content.indexOf("setBundle(") >= 0) {
+            return content;
+        }
+        content = StringUtil.replaceAll(content, "import com.codename1.system.Lifecycle\n", "import com.codename1.system.Lifecycle\nimport com.codename1.l10n.L10NManager\nimport com.codename1.ui.plaf.UIManager\nimport com.codename1.ui.util.Resources\nimport java.util.Hashtable\n");
+        String method = "\n    override fun init(context: Any?) {\n"
+                + "        val language = L10NManager.getInstance().language\n"
+                + "        val bundle: Hashtable<String, String>? = Resources.getGlobalResources().getL10N(\"messages\", language)\n"
+                + "        UIManager.getInstance().setBundle(bundle)\n"
+                + "    }\n\n";
+        int firstBrace = content.indexOf('{');
+        if (firstBrace > -1) {
+            return content.substring(0, firstBrace + 1) + method + content.substring(firstBrace + 1);
+        }
+        return content;
     }
 
     private static String replaceTagValue(String xml, String tagName, String value) {
