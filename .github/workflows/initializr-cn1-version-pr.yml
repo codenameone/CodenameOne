@@ -25,6 +25,7 @@ jobs:
       - name: Create pull request
         uses: peter-evans/create-pull-request@v6
         with:
+          base: ${{ github.event.repository.default_branch }}
           commit-message: "scripts/initializr: bump Codename One versions to ${{ github.event.release.tag_name || github.ref_name }}"
           title: "scripts/initializr: bump Codename One versions to ${{ github.event.release.tag_name || github.ref_name }}"
           body: |
