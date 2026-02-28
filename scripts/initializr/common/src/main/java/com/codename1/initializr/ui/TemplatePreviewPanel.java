@@ -3,6 +3,7 @@ package com.codename1.initializr.ui;
 import com.codename1.components.ImageViewer;
 import com.codename1.initializr.model.ProjectOptions;
 import com.codename1.initializr.model.Template;
+import com.codename1.components.ToastBar;
 import com.codename1.io.Log;
 import com.codename1.io.Properties;
 import com.codename1.ui.Button;
@@ -32,6 +33,7 @@ public class TemplatePreviewPanel {
     private final Label staticPreviewFallback;
     private InterFormContainer liveFormPreview;
     private final Hashtable baseTheme;
+    private String lastCssError;
 
     private Template template;
     private ProjectOptions options = ProjectOptions.defaults();
@@ -108,7 +110,16 @@ public class TemplatePreviewPanel {
             if (parsedTheme != null) {
                 UIManager.getInstance().addThemeProps(parsedTheme);
             }
+            lastCssError = null;
         } catch (RuntimeException ex) {
+            String errorMessage = ex.getMessage();
+            if (errorMessage == null || errorMessage.length() == 0) {
+                errorMessage = ex.toString();
+            }
+            if (lastCssError == null || !lastCssError.equals(errorMessage)) {
+                ToastBar.showErrorMessage("CSS Error: " + errorMessage);
+                lastCssError = errorMessage;
+            }
             Log.e(ex);
         }
     }
@@ -192,6 +203,17 @@ public class TemplatePreviewPanel {
     }
 
     private void applyLivePreviewOptions(Form form, Button button, Button menuButton, ProjectOptions options) {
+        if (options.themeEditorMode == ProjectOptions.ThemeEditorMode.ADVANCED) {
+            form.getContentPane().setUIID("Container");
+            form.getToolbar().setUIID("Toolbar");
+            form.getToolbar().getTitleComponent().setUIID("Title");
+            if (menuButton != null) {
+                menuButton.setUIID("Command");
+            }
+            button.setUIID("Button");
+            return;
+        }
+
         String mode = options.themeMode == ProjectOptions.ThemeMode.DARK ? "Dark" : "Light";
         String accent = accentName(options.accent);
         boolean clean = options.accent == ProjectOptions.Accent.DEFAULT;

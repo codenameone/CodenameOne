@@ -57,6 +57,7 @@ public class Initializr extends Lifecycle {
         final SpanLabel summaryLabel = new SpanLabel();
         final TemplatePreviewPanel previewPanel = new TemplatePreviewPanel(selectedTemplate[0]);
         final Container[] themePanelRef = new Container[1];
+        final UITimer[] cssRefreshTimer = new UITimer[1];
 
         appNameField.setUIID("InitializrField");
         packageField.setUIID("InitializrField");
@@ -92,6 +93,15 @@ public class Initializr extends Lifecycle {
                 form.revalidate();
             }
         };
+        final Runnable scheduleCssRefresh = () -> {
+            if (cssRefreshTimer[0] != null) {
+                cssRefreshTimer[0].cancel();
+            }
+            cssRefreshTimer[0] = UITimer.timer(500, false, form, () -> {
+                cssRefreshTimer[0] = null;
+                refresh.run();
+            });
+        };
 
         final Container essentialsCard = createEssentialsCard(
                 appNameField,
@@ -102,7 +112,7 @@ public class Initializr extends Lifecycle {
         );
         final Container idePanel = createIdeSelectorPanel(selectedIde, refresh);
         final Container themePanel = createThemeOptionsPanel(selectedThemeMode, selectedThemeEditorMode,
-                selectedAccent, roundedButtons, customThemeCss, refresh);
+                selectedAccent, roundedButtons, customThemeCss, refresh, scheduleCssRefresh);
         final Container localizationPanel = createLocalizationPanel(includeLocalizationBundles, previewLanguage, refresh, previewPanel);
         themePanelRef[0] = themePanel;
         final Container settingsPanel = BoxLayout.encloseY(summaryLabel);
@@ -266,7 +276,8 @@ public class Initializr extends Lifecycle {
                                               ProjectOptions.Accent[] selectedAccent,
                                               boolean[] roundedButtons,
                                               String[] customThemeCss,
-                                              Runnable onSelectionChanged) {
+                                              Runnable onSelectionChanged,
+                                              Runnable onCssChanged) {
         Container editorModeRow = new Container(new GridLayout(1, 2));
         editorModeRow.setUIID("InitializrChoicesGrid");
         ButtonGroup editorModeGroup = new ButtonGroup();
@@ -337,10 +348,10 @@ public class Initializr extends Lifecycle {
 
         TextArea cssEditor = new TextArea(customThemeCss[0], 8, 30);
         cssEditor.setUIID("InitializrField");
-        cssEditor.setGrowByContent(true);
+        cssEditor.setGrowByContent(false);
         cssEditor.addDataChangedListener((type, index) -> {
             customThemeCss[0] = cssEditor.getText();
-            onSelectionChanged.run();
+            onCssChanged.run();
         });
 
         Container simpleControls = BoxLayout.encloseY(
@@ -373,20 +384,29 @@ public class Initializr extends Lifecycle {
     }
 
     private String defaultAdvancedCss() {
-        return ":root {\n"
+        return "@constants {\n"
+                + "    includeNativeBool: true;\n"
+                + "    defaultSourceDPIInt: \"0\";\n"
+                + "}\n\n"
+                + ":root {\n"
                 + "    --primary: #1976d2;\n"
+                + "    --surface: #f3f6fb;\n"
+                + "    --text: #1f2937;\n"
+                + "}\n\n"
+                + "Container {\n"
+                + "    background-color: var(--surface);\n"
                 + "}\n\n"
                 + "Toolbar {\n"
-                + "    background-color: #f2f5fa;\n"
-                + "    color: #1f2933;\n"
+                + "    background-color: #eaf2ff;\n"
+                + "    color: var(--text);\n"
                 + "}\n\n"
                 + "Title {\n"
-                + "    color: #1f2933;\n"
+                + "    color: var(--text);\n"
                 + "}\n\n"
                 + "Button {\n"
                 + "    background-color: var(--primary);\n"
                 + "    color: #ffffff;\n"
-                + "    padding: 3px 6px;\n"
+                + "    padding: 2px 4px;\n"
                 + "}\n";
     }
 
