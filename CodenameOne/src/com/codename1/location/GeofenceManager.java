@@ -170,9 +170,10 @@ public final class GeofenceManager implements Iterable<Geofence> {
         boolean saveFences = false;
         boolean saveActive = false;
         boolean saveActiveFences = false;
-        for (Map.Entry<String, Long> time : times.entrySet()) {
+        for (Iterator<Map.Entry<String, Long>> it = times.entrySet().iterator(); it.hasNext();) {
+            Map.Entry<String, Long> time = it.next();
             if (time.getValue() > 0L && time.getValue() < now) {
-                times.remove(time.getKey());
+                it.remove();
                 if (!saveFences && fences.containsKey(time.getKey())) {
                     saveFences = true;
                 }

@@ -127,6 +127,22 @@ class GeofenceManagerTest extends UITestBase {
     }
 
     @FormTest
+    void updatePurgesExpiredGeofencesWithoutConcurrentModification() throws Exception {
+        Geofence first = createGeofence("expired-1", 0.0, 0.0, 50, -1L);
+        Geofence second = createGeofence("expired-2", 0.0, 0.0, 50, -1L);
+        manager.add(first, second);
+        Map<String, Long> expirations = new HashMap<String, Long>();
+        long expiredAt = System.currentTimeMillis() - 1000L;
+        expirations.put(first.getId(), expiredAt);
+        expirations.put(second.getId(), expiredAt);
+        setPrivateField("expiryTimes", expirations);
+
+        assertDoesNotThrow(() -> manager.update(1000));
+        assertFalse(manager.asMap().containsKey(first.getId()));
+        assertFalse(manager.asMap().containsKey(second.getId()));
+    }
+
+    @FormTest
     public void testGeofenceManagerListener() {
         // Instantiate the listener
         GeofenceManager.Listener listener = new GeofenceManager.Listener();
@@ -145,6 +161,13 @@ class GeofenceManagerTest extends UITestBase {
 
         listener.onEntered("test-id");
         assertTrue(MyGeofenceListener.calledEnter, "onEntered should delegate to registered listener");
+    }
+
+
+    private void setPrivateField(String name, Object value) throws Exception {
+        Field field = GeofenceManager.class.getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(manager, value);
     }
 
     private Geofence createGeofence(String id, double lat, double lng, int radius, long expiration) {
