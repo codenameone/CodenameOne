@@ -167,6 +167,26 @@ InitializrFieldDark, InitializrFieldHintDark {
     margin: 0 0 1.4mm 0;
 }
 
+InitializrCssEditor {
+    color: #0f172a;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    background-color: #ffffff;
+    border: 1px solid #9fb6d5;
+    padding: 1.1mm;
+    margin: 0 0 1.4mm 0;
+}
+
+InitializrCssEditorDark {
+    color: #f8fafc;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    background-color: #0b1220;
+    border: 1px solid #64748b;
+    padding: 1.1mm;
+    margin: 0 0 1.4mm 0;
+}
+
 InitializrChoicesGrid {
     margin: 0 0 1.2mm 0;
 }

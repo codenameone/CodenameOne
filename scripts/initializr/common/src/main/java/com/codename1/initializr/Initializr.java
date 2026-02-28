@@ -56,7 +56,6 @@ public class Initializr extends Lifecycle {
         final RadioButton[] templateButtons = new RadioButton[Template.values().length];
         final SpanLabel summaryLabel = new SpanLabel();
         final TemplatePreviewPanel previewPanel = new TemplatePreviewPanel(selectedTemplate[0]);
-        final Container[] themePanelRef = new Container[1];
         final UITimer[] cssRefreshTimer = new UITimer[1];
 
         appNameField.setUIID("InitializrField");
@@ -78,10 +77,6 @@ public class Initializr extends Lifecycle {
                 );
                 previewPanel.setTemplate(selectedTemplate[0]);
                 previewPanel.setOptions(options);
-                boolean canCustomizeTheme = supportsLivePreview(selectedTemplate[0]);
-                if (themePanelRef[0] != null) {
-                    setEnabledRecursive(themePanelRef[0], canCustomizeTheme);
-                }
                 summaryLabel.setText(createSummary(
                         appNameField.getText(),
                         packageField.getText(),
@@ -114,7 +109,6 @@ public class Initializr extends Lifecycle {
         final Container themePanel = createThemeOptionsPanel(selectedThemeMode, selectedThemeEditorMode,
                 selectedAccent, roundedButtons, customThemeCss, refresh, scheduleCssRefresh);
         final Container localizationPanel = createLocalizationPanel(includeLocalizationBundles, previewLanguage, refresh, previewPanel);
-        themePanelRef[0] = themePanel;
         final Container settingsPanel = BoxLayout.encloseY(summaryLabel);
 
         Accordion advancedAccordion = new Accordion();
@@ -347,7 +341,8 @@ public class Initializr extends Lifecycle {
         });
 
         TextArea cssEditor = new TextArea(customThemeCss[0], 8, 30);
-        cssEditor.setUIID("InitializrField");
+        cssEditor.setUIID("InitializrCssEditor");
+        cssEditor.setEditable(true);
         cssEditor.setGrowByContent(false);
         cssEditor.addDataChangedListener((type, index) -> {
             customThemeCss[0] = cssEditor.getText();
@@ -484,10 +479,6 @@ public class Initializr extends Lifecycle {
         return StringUtil.replaceAll(text, "_", " ");
     }
 
-    private boolean supportsLivePreview(Template template) {
-        return template == Template.BAREBONES || template == Template.KOTLIN;
-    }
-
     private void initWebsiteThemeSync(Form form) {
         WebsiteThemeNative websiteThemeNative = NativeLookup.create(WebsiteThemeNative.class);
         if (websiteThemeNative == null || !websiteThemeNative.isSupported()) {
@@ -539,6 +530,7 @@ public class Initializr extends Lifecycle {
                 case "InitializrFieldLabel":
                 case "InitializrField":
                 case "InitializrFieldHint":
+                case "InitializrCssEditor":
                 case "InitializrChoice":
                 case "InitializrSummary":
                 case "InitializrTip":
@@ -568,6 +560,7 @@ public class Initializr extends Lifecycle {
             case "InitializrFieldLabel":
             case "InitializrField":
             case "InitializrFieldHint":
+            case "InitializrCssEditor":
             case "InitializrChoice":
             case "InitializrSummary":
             case "InitializrTip":
@@ -580,16 +573,6 @@ public class Initializr extends Lifecycle {
                 return base;
             default:
                 return uiid;
-        }
-    }
-
-    private void setEnabledRecursive(Component component, boolean enabled) {
-        component.setEnabled(enabled);
-        if (component instanceof Container) {
-            Container cnt = (Container) component;
-            for (int i = 0; i < cnt.getComponentCount(); i++) {
-                setEnabledRecursive(cnt.getComponentAt(i), enabled);
-            }
         }
     }
 
