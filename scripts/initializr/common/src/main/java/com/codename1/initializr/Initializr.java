@@ -24,6 +24,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.TextField;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
@@ -46,8 +47,10 @@ public class Initializr extends Lifecycle {
         final Template[] selectedTemplate = new Template[]{Template.BAREBONES};
         final IDE[] selectedIde = new IDE[]{IDE.INTELLIJ};
         final ProjectOptions.ThemeMode[] selectedThemeMode = new ProjectOptions.ThemeMode[]{ProjectOptions.ThemeMode.LIGHT};
+        final ProjectOptions.ThemeEditorMode[] selectedThemeEditorMode = new ProjectOptions.ThemeEditorMode[]{ProjectOptions.ThemeEditorMode.SIMPLE};
         final ProjectOptions.Accent[] selectedAccent = new ProjectOptions.Accent[]{ProjectOptions.Accent.DEFAULT};
         final boolean[] roundedButtons = new boolean[]{true};
+        final String[] customThemeCss = new String[]{defaultAdvancedCss()};
         final boolean[] includeLocalizationBundles = new boolean[]{true};
         final ProjectOptions.PreviewLanguage[] previewLanguage = new ProjectOptions.PreviewLanguage[]{ProjectOptions.PreviewLanguage.ENGLISH};
         final RadioButton[] templateButtons = new RadioButton[Template.values().length];
@@ -69,7 +72,8 @@ public class Initializr extends Lifecycle {
             public void run() {
                 ProjectOptions options = new ProjectOptions(
                         selectedThemeMode[0], selectedAccent[0], roundedButtons[0],
-                        includeLocalizationBundles[0], previewLanguage[0]
+                        includeLocalizationBundles[0], previewLanguage[0],
+                        selectedThemeEditorMode[0], customThemeCss[0]
                 );
                 previewPanel.setTemplate(selectedTemplate[0]);
                 previewPanel.setOptions(options);
@@ -97,7 +101,8 @@ public class Initializr extends Lifecycle {
                 createTemplateSelector(selectedTemplate, templateButtons, refresh)
         );
         final Container idePanel = createIdeSelectorPanel(selectedIde, refresh);
-        final Container themePanel = createThemeOptionsPanel(selectedThemeMode, selectedAccent, roundedButtons, refresh);
+        final Container themePanel = createThemeOptionsPanel(selectedThemeMode, selectedThemeEditorMode,
+                selectedAccent, roundedButtons, customThemeCss, refresh);
         final Container localizationPanel = createLocalizationPanel(includeLocalizationBundles, previewLanguage, refresh, previewPanel);
         themePanelRef[0] = themePanel;
         final Container settingsPanel = BoxLayout.encloseY(summaryLabel);
@@ -133,7 +138,8 @@ public class Initializr extends Lifecycle {
             String packageName = packageField.getText() == null ? "" : packageField.getText().trim();
             ProjectOptions options = new ProjectOptions(
                     selectedThemeMode[0], selectedAccent[0], roundedButtons[0],
-                    includeLocalizationBundles[0], previewLanguage[0]
+                    includeLocalizationBundles[0], previewLanguage[0],
+                    selectedThemeEditorMode[0], customThemeCss[0]
             );
             GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName, options).generate();
         });
@@ -256,9 +262,31 @@ public class Initializr extends Lifecycle {
     }
 
     private Container createThemeOptionsPanel(ProjectOptions.ThemeMode[] selectedThemeMode,
+                                              ProjectOptions.ThemeEditorMode[] selectedThemeEditorMode,
                                               ProjectOptions.Accent[] selectedAccent,
                                               boolean[] roundedButtons,
+                                              String[] customThemeCss,
                                               Runnable onSelectionChanged) {
+        Container editorModeRow = new Container(new GridLayout(1, 2));
+        editorModeRow.setUIID("InitializrChoicesGrid");
+        ButtonGroup editorModeGroup = new ButtonGroup();
+        for (ProjectOptions.ThemeEditorMode editorMode : ProjectOptions.ThemeEditorMode.values()) {
+            RadioButton rb = new RadioButton(formatEnumLabel(editorMode.name()));
+            rb.setToggle(true);
+            rb.setUIID("InitializrChoice");
+            editorModeGroup.add(rb);
+            editorModeRow.add(rb);
+            if (editorMode == selectedThemeEditorMode[0]) {
+                rb.setSelected(true);
+            }
+            rb.addActionListener(e -> {
+                if (rb.isSelected()) {
+                    selectedThemeEditorMode[0] = editorMode;
+                    onSelectionChanged.run();
+                }
+            });
+        }
+
         Container modeRow = new Container(new GridLayout(1, 2));
         modeRow.setUIID("InitializrChoicesGrid");
         ButtonGroup modeGroup = new ButtonGroup();
@@ -307,11 +335,59 @@ public class Initializr extends Lifecycle {
             onSelectionChanged.run();
         });
 
-        return BoxLayout.encloseY(
+        TextArea cssEditor = new TextArea(customThemeCss[0], 8, 30);
+        cssEditor.setUIID("InitializrField");
+        cssEditor.setGrowByContent(true);
+        cssEditor.addDataChangedListener((type, index) -> {
+            customThemeCss[0] = cssEditor.getText();
+            onSelectionChanged.run();
+        });
+
+        Container simpleControls = BoxLayout.encloseY(
                 labeledField("Mode", modeRow),
                 labeledField("Accent", accentRow),
                 rounded
         );
+        Container advancedControls = labeledField("Theme CSS", cssEditor);
+
+        Runnable updateThemeEditorVisibility = () -> {
+            boolean advanced = selectedThemeEditorMode[0] == ProjectOptions.ThemeEditorMode.ADVANCED;
+            simpleControls.setHidden(advanced);
+            simpleControls.setVisible(!advanced);
+            advancedControls.setHidden(!advanced);
+            advancedControls.setVisible(advanced);
+        };
+        updateThemeEditorVisibility.run();
+        for (int i = 0; i < editorModeRow.getComponentCount(); i++) {
+            Component c = editorModeRow.getComponentAt(i);
+            if (c instanceof RadioButton) {
+                ((RadioButton)c).addActionListener(e -> updateThemeEditorVisibility.run());
+            }
+        }
+
+        return BoxLayout.encloseY(
+                labeledField("Editor", editorModeRow),
+                simpleControls,
+                advancedControls
+        );
+    }
+
+    private String defaultAdvancedCss() {
+        return ":root {\n"
+                + "    --primary: #1976d2;\n"
+                + "}\n\n"
+                + "Toolbar {\n"
+                + "    background-color: #f2f5fa;\n"
+                + "    color: #1f2933;\n"
+                + "}\n\n"
+                + "Title {\n"
+                + "    color: #1f2933;\n"
+                + "}\n\n"
+                + "Button {\n"
+                + "    background-color: var(--primary);\n"
+                + "    color: #ffffff;\n"
+                + "    padding: 3px 6px;\n"
+                + "}\n";
     }
 
     private Container createTemplateSelector(Template[] selectedTemplate, RadioButton[] templateButtons, Runnable onSelectionChanged) {
@@ -505,6 +581,7 @@ public class Initializr extends Lifecycle {
                 + "Template: " + template.name() + "\n"
                 + "IDE: " + ide.name() + "\n"
                 + "Theme: " + options.themeMode.name() + "\n"
+                + "Theme Editor: " + options.themeEditorMode.name() + "\n"
                 + "Accent: " + options.accent.name() + "\n"
                 + "Rounded Buttons: " + (options.roundedButtons ? "Yes" : "No") + "\n"
                 + "Localization Bundles: " + (options.includeLocalizationBundles ? "Yes" : "No") + "\n"

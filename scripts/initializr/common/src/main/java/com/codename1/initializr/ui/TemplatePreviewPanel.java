@@ -13,9 +13,11 @@ import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.InterFormContainer;
 import com.codename1.ui.Label;
+import com.codename1.ui.css.CSSThemeCompiler;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.MutableResource;
 import com.codename1.ui.util.Resources;
 
 import java.io.InputStream;
@@ -29,6 +31,7 @@ public class TemplatePreviewPanel {
     private final ImageViewer staticPreview;
     private final Label staticPreviewFallback;
     private InterFormContainer liveFormPreview;
+    private final Hashtable baseTheme;
 
     private Template template;
     private ProjectOptions options = ProjectOptions.defaults();
@@ -46,6 +49,8 @@ public class TemplatePreviewPanel {
         root = new Container(new BorderLayout());
         root.setUIID("InitializrCard");
         root.add(BorderLayout.CENTER, previewHolder);
+        String[] themeNames = Resources.getGlobalResources().getThemeResourceNames();
+        baseTheme = themeNames.length > 0 ? Resources.getGlobalResources().getTheme(themeNames[0]) : new Hashtable();
         updateMode();
     }
 
@@ -76,6 +81,7 @@ public class TemplatePreviewPanel {
 
     private Form createBarebonesPreviewForm(ProjectOptions options) {
         installBundle(options);
+        applyThemeOptions(options);
         Form form = new Form("Hi World", BoxLayout.y());
         Button helloButton = new Button("Hello World");
         helloButton.setUIID("Button");
@@ -85,6 +91,26 @@ public class TemplatePreviewPanel {
                 FontImage.MATERIAL_CHECK, 4, e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
         applyLivePreviewOptions(form, helloButton, null, options);
         return form;
+    }
+
+    private void applyThemeOptions(ProjectOptions options) {
+        UIManager.getInstance().setThemeProps(baseTheme);
+        if (options.themeEditorMode != ProjectOptions.ThemeEditorMode.ADVANCED) {
+            return;
+        }
+        if (options.customCss == null || options.customCss.trim().length() == 0) {
+            return;
+        }
+        try {
+            MutableResource resources = new MutableResource();
+            new CSSThemeCompiler().compile(options.customCss, resources, "Theme");
+            Hashtable parsedTheme = resources.getTheme("Theme");
+            if (parsedTheme != null) {
+                UIManager.getInstance().addThemeProps(parsedTheme);
+            }
+        } catch (RuntimeException ex) {
+            Log.e(ex);
+        }
     }
 
     private void installBundle(ProjectOptions options) {

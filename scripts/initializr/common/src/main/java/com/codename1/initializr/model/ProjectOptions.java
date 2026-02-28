@@ -36,6 +36,11 @@ public final class ProjectOptions {
         DARK
     }
 
+    public enum ThemeEditorMode {
+        SIMPLE,
+        ADVANCED
+    }
+
     public enum Accent {
         DEFAULT,
         TEAL,
@@ -48,14 +53,25 @@ public final class ProjectOptions {
     public final boolean roundedButtons;
     public final boolean includeLocalizationBundles;
     public final PreviewLanguage previewLanguage;
+    public final ThemeEditorMode themeEditorMode;
+    public final String customCss;
 
     public ProjectOptions(ThemeMode themeMode, Accent accent, boolean roundedButtons,
                           boolean includeLocalizationBundles, PreviewLanguage previewLanguage) {
+        this(themeMode, accent, roundedButtons, includeLocalizationBundles, previewLanguage,
+                ThemeEditorMode.SIMPLE, null);
+    }
+
+    public ProjectOptions(ThemeMode themeMode, Accent accent, boolean roundedButtons,
+                          boolean includeLocalizationBundles, PreviewLanguage previewLanguage,
+                          ThemeEditorMode themeEditorMode, String customCss) {
         this.themeMode = themeMode;
         this.accent = accent;
         this.roundedButtons = roundedButtons;
         this.includeLocalizationBundles = includeLocalizationBundles;
         this.previewLanguage = previewLanguage == null ? PreviewLanguage.ENGLISH : previewLanguage;
+        this.themeEditorMode = themeEditorMode == null ? ThemeEditorMode.SIMPLE : themeEditorMode;
+        this.customCss = customCss;
     }
 
     public static ProjectOptions defaults() {
