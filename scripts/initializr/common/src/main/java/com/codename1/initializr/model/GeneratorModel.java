@@ -91,6 +91,12 @@ public class GeneratorModel {
             return;
         }
         addLocalizationEntry(mergedEntries, "messages.properties");
+        copySingleTextEntryToMap(
+                "common/src/main/resources/messages_en.properties",
+                readRequiredResourceToString("/messages.properties"),
+                mergedEntries,
+                ZipEntryType.COMMON
+        );
         for (ProjectOptions.PreviewLanguage language : ProjectOptions.PreviewLanguage.values()) {
             if (language == ProjectOptions.PreviewLanguage.ENGLISH) {
                 continue;
@@ -215,19 +221,12 @@ public class GeneratorModel {
         String method = "\n    @Override\n"
                 + "    public void init(Object context) {\n"
                 + "        String language = L10NManager.getInstance().getLanguage();\n"
-                + "        Hashtable<String, String> bundle = null;\n"
-                + "        try {\n"
-                + "            bundle = Resources.getGlobalResources().getL10N(\"messages\", language);\n"
-                + "        } catch (RuntimeException ignored) {}\n"
+                + "        Hashtable<String, String> bundle = Resources.getGlobalResources().getL10N(\"messages\", language);\n"
                 + "        if (bundle == null && language != null && language.indexOf('_') > 0) {\n"
-                + "            try {\n"
-                + "                bundle = Resources.getGlobalResources().getL10N(\"messages\", language.substring(0, language.indexOf('_')));\n"
-                + "            } catch (RuntimeException ignored) {}\n"
+                + "            bundle = Resources.getGlobalResources().getL10N(\"messages\", language.substring(0, language.indexOf('_')));\n"
                 + "        }\n"
                 + "        if (bundle == null) {\n"
-                + "            try {\n"
-                + "                bundle = Resources.getGlobalResources().getL10N(\"messages\", \"\");\n"
-                + "            } catch (RuntimeException ignored) {}\n"
+                + "            bundle = Resources.getGlobalResources().getL10N(\"messages\", \"\");\n"
                 + "        }\n"
                 + "        UIManager.getInstance().setBundle(bundle);\n"
                 + "    }\n\n";
@@ -245,19 +244,12 @@ public class GeneratorModel {
         content = StringUtil.replaceAll(content, "import com.codename1.system.Lifecycle\n", "import com.codename1.system.Lifecycle\nimport com.codename1.l10n.L10NManager\nimport com.codename1.ui.plaf.UIManager\nimport com.codename1.ui.util.Resources\nimport java.util.Hashtable\n");
         String method = "\n    override fun init(context: Any?) {\n"
                 + "        val language = L10NManager.getInstance().language\n"
-                + "        var bundle: Hashtable<String, String>? = null\n"
-                + "        try {\n"
-                + "            bundle = Resources.getGlobalResources().getL10N(\"messages\", language)\n"
-                + "        } catch (ignored: RuntimeException) {}\n"
+                + "        var bundle: Hashtable<String, String>? = Resources.getGlobalResources().getL10N(\"messages\", language)\n"
                 + "        if (bundle == null && language != null && language.indexOf('_') > 0) {\n"
-                + "            try {\n"
-                + "                bundle = Resources.getGlobalResources().getL10N(\"messages\", language.substring(0, language.indexOf('_')))\n"
-                + "            } catch (ignored: RuntimeException) {}\n"
+                + "            bundle = Resources.getGlobalResources().getL10N(\"messages\", language.substring(0, language.indexOf('_')))\n"
                 + "        }\n"
                 + "        if (bundle == null) {\n"
-                + "            try {\n"
-                + "                bundle = Resources.getGlobalResources().getL10N(\"messages\", \"\")\n"
-                + "            } catch (ignored: RuntimeException) {}\n"
+                + "            bundle = Resources.getGlobalResources().getL10N(\"messages\", \"\")\n"
                 + "        }\n"
                 + "        UIManager.getInstance().setBundle(bundle)\n"
                 + "    }\n\n";

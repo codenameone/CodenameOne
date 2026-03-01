@@ -101,18 +101,18 @@ public class TemplatePreviewPanel {
         }
         Resources resources = Resources.getGlobalResources();
         if (resources != null) {
-            Hashtable<String, String> bundle = tryGetBundle(resources, language.bundleSuffix);
+            Hashtable<String, String> bundle = resources.getL10N("messages", language.bundleSuffix);
             if (bundle != null) {
                 return bundle;
             }
             int split = language.bundleSuffix.indexOf('_');
             if (split > 0) {
-                bundle = tryGetBundle(resources, language.bundleSuffix.substring(0, split));
+                bundle = resources.getL10N("messages", language.bundleSuffix.substring(0, split));
                 if (bundle != null) {
                     return bundle;
                 }
             }
-            bundle = tryGetBundle(resources, "");
+            bundle = resources.getL10N("messages", "");
             if (bundle != null) {
                 return bundle;
             }
@@ -131,14 +131,6 @@ public class TemplatePreviewPanel {
         return null;
     }
 
-
-    private Hashtable<String, String> tryGetBundle(Resources resources, String localeSuffix) {
-        try {
-            return resources.getL10N("messages", localeSuffix);
-        } catch (RuntimeException err) {
-            return null;
-        }
-    }
     private Hashtable<String, String> loadBundleProperties(String resourcePath) {
         try (InputStream input = getResourceAsStream(resourcePath)) {
             if (input == null) {
@@ -153,7 +145,7 @@ public class TemplatePreviewPanel {
             }
             return out;
         } catch (Exception err) {
-            return null;
+            throw new RuntimeException("Failed to load localization bundle " + resourcePath, err);
         }
     }
 

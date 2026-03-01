@@ -140,7 +140,6 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertContains(mainSource, "setBundle", "Barebones starter should install localization bundle");
             assertContains(mainSource, "messages", "Barebones starter should load i18n messages properties");
             assertContains(mainSource, "getL10N(\"messages\", \"\")", "Barebones starter should fallback to default bundle when locale-specific bundle is missing");
-            assertContains(mainSource, "RuntimeException", "Barebones starter should guard against runtime lookup failures in localization loading");
         }
         if (template == Template.GRUB) {
             String grubModel = getText(entries, "common/src/main/java/" + packagePath + "/models/AccountModel.java");
@@ -157,6 +156,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     private void assertLocalizationBundles(Map<String, byte[]> entries, Template template) {
         if (template == Template.BAREBONES || template == Template.KOTLIN) {
             assertNotNull(entries.get("common/src/main/resources/messages.properties"), "Barebones templates should include default localization bundle");
+            assertNotNull(entries.get("common/src/main/resources/messages_en.properties"), "Barebones templates should include English localization bundle alias for JS lookup");
             for (ProjectOptions.PreviewLanguage language : ProjectOptions.PreviewLanguage.values()) {
                 if (language == ProjectOptions.PreviewLanguage.ENGLISH) {
                     continue;

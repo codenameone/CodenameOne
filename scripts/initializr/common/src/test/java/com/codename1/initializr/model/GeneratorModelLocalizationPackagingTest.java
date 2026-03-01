@@ -102,6 +102,7 @@ public class GeneratorModelLocalizationPackagingTest extends AbstractTest {
 
     private static void writeGeneratedLocalizationResources(Map<String, byte[]> entries, File classesRoot) throws IOException {
         writeResource(entries, classesRoot, "messages.properties");
+        writeResource(entries, classesRoot, "messages_en.properties");
         for (ProjectOptions.PreviewLanguage language : ProjectOptions.PreviewLanguage.values()) {
             if (language == ProjectOptions.PreviewLanguage.ENGLISH) {
                 continue;
@@ -125,6 +126,7 @@ public class GeneratorModelLocalizationPackagingTest extends AbstractTest {
         try {
             Class<?> displayClass = Class.forName("com.example.packaging.DisplayClass", true, loader);
             assertNotNull(displayClass.getResourceAsStream("/messages.properties"), "Default bundle should resolve from display class");
+            assertNotNull(displayClass.getResourceAsStream("/messages_en.properties"), "English bundle alias should resolve from display class");
             for (ProjectOptions.PreviewLanguage language : ProjectOptions.PreviewLanguage.values()) {
                 if (language == ProjectOptions.PreviewLanguage.ENGLISH) {
                     continue;
