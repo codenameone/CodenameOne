@@ -139,7 +139,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         if (template == Template.BAREBONES || template == Template.KOTLIN) {
             assertContains(mainSource, "setBundle", "Barebones starter should install localization bundle");
             assertContains(mainSource, "messages", "Barebones starter should load i18n messages properties");
-            assertContains(mainSource, "getL10N(\"messages\", \"\")", "Barebones starter should fallback to default bundle when locale-specific bundle is missing");
+            assertContains(mainSource, "getL10N(\"messages\", \"en\")", "Barebones starter should fallback to English bundle when locale-specific bundle is missing");
         }
         if (template == Template.GRUB) {
             String grubModel = getText(entries, "common/src/main/java/" + packagePath + "/models/AccountModel.java");

@@ -226,7 +226,7 @@ public class GeneratorModel {
                 + "            bundle = Resources.getGlobalResources().getL10N(\"messages\", language.substring(0, language.indexOf('_')));\n"
                 + "        }\n"
                 + "        if (bundle == null) {\n"
-                + "            bundle = Resources.getGlobalResources().getL10N(\"messages\", \"\");\n"
+                + "            bundle = Resources.getGlobalResources().getL10N(\"messages\", \"en\");\n"
                 + "        }\n"
                 + "        UIManager.getInstance().setBundle(bundle);\n"
                 + "    }\n\n";
@@ -249,7 +249,7 @@ public class GeneratorModel {
                 + "            bundle = Resources.getGlobalResources().getL10N(\"messages\", language.substring(0, language.indexOf('_')))\n"
                 + "        }\n"
                 + "        if (bundle == null) {\n"
-                + "            bundle = Resources.getGlobalResources().getL10N(\"messages\", \"\")\n"
+                + "            bundle = Resources.getGlobalResources().getL10N(\"messages\", \"en\")\n"
                 + "        }\n"
                 + "        UIManager.getInstance().setBundle(bundle)\n"
                 + "    }\n\n";

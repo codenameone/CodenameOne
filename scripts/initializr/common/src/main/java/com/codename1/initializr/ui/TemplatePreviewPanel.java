@@ -112,7 +112,7 @@ public class TemplatePreviewPanel {
                     return bundle;
                 }
             }
-            bundle = resources.getL10N("messages", "");
+            bundle = resources.getL10N("messages", "en");
             if (bundle != null) {
                 return bundle;
             }
