@@ -68,9 +68,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new TransformCamera(),
             new BrowserComponentScreenshotTest(),
             new MediaPlaybackScreenshotTest(),
-            new OrientationLockScreenshotTest(),
             new SheetScreenshotTest(),
             new ImageViewerNavigationScreenshotTest(),
+            // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
+            new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
             new BytecodeTranslatorRegressionTest(),
             new BackgroundThreadUiAccessTest(),
