@@ -99,28 +99,18 @@ public class TemplatePreviewPanel {
         if (language == null) {
             return null;
         }
-        Resources resources = Resources.getGlobalResources();
-        if (resources != null) {
-            Hashtable<String, String> bundle = resources.getL10N("messages", language.bundleSuffix);
-            if (bundle != null) {
-                return bundle;
-            }
-            int split = language.bundleSuffix.indexOf('_');
-            if (split > 0) {
-                bundle = resources.getL10N("messages", language.bundleSuffix.substring(0, split));
-                if (bundle != null) {
-                    return bundle;
-                }
-            }
-            bundle = resources.getL10N("messages", "en");
-            if (bundle != null) {
-                return bundle;
-            }
-        }
-
         String[] candidates = language.bundleSuffix.indexOf('_') > 0
-                ? new String[]{"/messages_" + language.bundleSuffix + ".properties", "/messages_" + language.bundleSuffix.substring(0, language.bundleSuffix.indexOf('_')) + ".properties", "/messages.properties"}
-                : new String[]{"/messages_" + language.bundleSuffix + ".properties", "/messages.properties"};
+                ? new String[]{
+                        "/messages_" + language.bundleSuffix + ".properties",
+                        "/messages_" + language.bundleSuffix.substring(0, language.bundleSuffix.indexOf('_')) + ".properties",
+                        "/messages_en.properties",
+                        "/messages.properties"
+                }
+                : new String[]{
+                        "/messages_" + language.bundleSuffix + ".properties",
+                        "/messages_en.properties",
+                        "/messages.properties"
+                };
 
         for (String path : candidates) {
             Hashtable<String, String> loaded = loadBundleProperties(path);
