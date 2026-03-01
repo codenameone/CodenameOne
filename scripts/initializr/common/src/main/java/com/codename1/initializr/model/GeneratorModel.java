@@ -221,6 +221,9 @@ public class GeneratorModel {
         String method = "\n    @Override\n"
                 + "    public void init(Object context) {\n"
                 + "        String language = L10NManager.getInstance().getLanguage();\n"
+                + "        if (language == null || language.length() == 0) {\n"
+                + "            language = \"en\";\n"
+                + "        }\n"
                 + "        Hashtable<String, String> bundle = Resources.getGlobalResources().getL10N(\"messages\", language);\n"
                 + "        if (bundle == null && language != null && language.indexOf('_') > 0) {\n"
                 + "            bundle = Resources.getGlobalResources().getL10N(\"messages\", language.substring(0, language.indexOf('_')));\n"
@@ -243,7 +246,10 @@ public class GeneratorModel {
         }
         content = StringUtil.replaceAll(content, "import com.codename1.system.Lifecycle\n", "import com.codename1.system.Lifecycle\nimport com.codename1.l10n.L10NManager\nimport com.codename1.ui.plaf.UIManager\nimport com.codename1.ui.util.Resources\nimport java.util.Hashtable\n");
         String method = "\n    override fun init(context: Any?) {\n"
-                + "        val language = L10NManager.getInstance().language\n"
+                + "        var language = L10NManager.getInstance().language\n"
+                + "        if (language == null || language.length == 0) {\n"
+                + "            language = \"en\"\n"
+                + "        }\n"
                 + "        var bundle: Hashtable<String, String>? = Resources.getGlobalResources().getL10N(\"messages\", language)\n"
                 + "        if (bundle == null && language != null && language.indexOf('_') > 0) {\n"
                 + "            bundle = Resources.getGlobalResources().getL10N(\"messages\", language.substring(0, language.indexOf('_')))\n"
