@@ -155,8 +155,13 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     private void assertLocalizationBundles(Map<String, byte[]> entries, Template template) {
         if (template == Template.BAREBONES || template == Template.KOTLIN) {
             assertNotNull(entries.get("common/src/main/resources/messages.properties"), "Barebones templates should include default localization bundle");
-            assertNotNull(entries.get("common/src/main/resources/messages_ar.properties"), "Barebones templates should include Arabic localization bundle");
-            assertNotNull(entries.get("common/src/main/resources/messages_he.properties"), "Barebones templates should include Hebrew localization bundle");
+            for (ProjectOptions.PreviewLanguage language : ProjectOptions.PreviewLanguage.values()) {
+                if (language == ProjectOptions.PreviewLanguage.ENGLISH) {
+                    continue;
+                }
+                String path = "common/src/main/resources/messages_" + language.bundleSuffix + ".properties";
+                assertNotNull(entries.get(path), "Missing expected localization bundle for " + language.bundleSuffix);
+            }
             return;
         }
         assertNull(entries.get("common/src/main/resources/messages.properties"), "Non-bare templates should not receive default localization bundle");

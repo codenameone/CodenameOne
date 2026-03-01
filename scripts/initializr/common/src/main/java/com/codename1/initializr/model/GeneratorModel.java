@@ -90,23 +90,22 @@ public class GeneratorModel {
         if (!isBareTemplate() || !options.includeLocalizationBundles) {
             return;
         }
-        copySingleTextEntryToMap(
-                "common/src/main/resources/messages.properties",
-                readResourceToString("/messages.properties"),
-                mergedEntries,
-                ZipEntryType.COMMON
-        );
+        addLocalizationEntry(mergedEntries, "messages.properties");
         for (ProjectOptions.PreviewLanguage language : ProjectOptions.PreviewLanguage.values()) {
             if (language == ProjectOptions.PreviewLanguage.ENGLISH) {
                 continue;
             }
-            copySingleTextEntryToMap(
-                    "common/src/main/resources/messages_" + language.bundleSuffix + ".properties",
-                    readResourceToString("/messages_" + language.bundleSuffix + ".properties"),
-                    mergedEntries,
-                    ZipEntryType.COMMON
-            );
+            addLocalizationEntry(mergedEntries, "messages_" + language.bundleSuffix + ".properties");
         }
+    }
+
+    private void addLocalizationEntry(Map<String, byte[]> mergedEntries, String fileName) throws IOException {
+        copySingleTextEntryToMap(
+                "common/src/main/resources/" + fileName,
+                readRequiredResourceToString("/" + fileName),
+                mergedEntries,
+                ZipEntryType.COMMON
+        );
     }
 
     private void copyZipEntriesToMap(String zipResource, Map<String, byte[]> mergedEntries, ZipEntryType zipType) throws IOException {
@@ -459,6 +458,18 @@ public class GeneratorModel {
     private static String readResourceToString(String resourcePath) throws IOException {
         try (InputStream inputStream = getResourceAsStream(resourcePath)) {
             return readToStringNoClose(inputStream);
+        }
+    }
+
+    static String readRequiredResourceToString(String resourcePath) throws IOException {
+        InputStream inputStream = getResourceAsStream(resourcePath);
+        if (inputStream == null) {
+            throw new IOException("Missing required resource " + resourcePath);
+        }
+        try {
+            return readToStringNoClose(inputStream);
+        } finally {
+            inputStream.close();
         }
     }
 
