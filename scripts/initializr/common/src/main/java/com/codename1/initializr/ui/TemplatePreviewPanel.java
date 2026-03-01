@@ -3,7 +3,6 @@ package com.codename1.initializr.ui;
 import com.codename1.components.ImageViewer;
 import com.codename1.initializr.model.ProjectOptions;
 import com.codename1.initializr.model.Template;
-import com.codename1.io.Log;
 import com.codename1.io.Properties;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
@@ -102,20 +101,20 @@ public class TemplatePreviewPanel {
         }
         Resources resources = Resources.getGlobalResources();
         if (resources != null) {
-            try {
-                Hashtable<String, String> exact = resources.getL10N("messages", language.bundleSuffix);
-                if (exact != null) {
-                    return exact;
+            Hashtable<String, String> bundle = tryGetBundle(resources, language.bundleSuffix);
+            if (bundle != null) {
+                return bundle;
+            }
+            int split = language.bundleSuffix.indexOf('_');
+            if (split > 0) {
+                bundle = tryGetBundle(resources, language.bundleSuffix.substring(0, split));
+                if (bundle != null) {
+                    return bundle;
                 }
-                int split = language.bundleSuffix.indexOf('_');
-                if (split > 0) {
-                    Hashtable<String, String> languageOnly = resources.getL10N("messages", language.bundleSuffix.substring(0, split));
-                    if (languageOnly != null) {
-                        return languageOnly;
-                    }
-                }
-            } catch (RuntimeException err) {
-                Log.e(err);
+            }
+            bundle = tryGetBundle(resources, "");
+            if (bundle != null) {
+                return bundle;
             }
         }
 
@@ -132,6 +131,14 @@ public class TemplatePreviewPanel {
         return null;
     }
 
+
+    private Hashtable<String, String> tryGetBundle(Resources resources, String localeSuffix) {
+        try {
+            return resources.getL10N("messages", localeSuffix);
+        } catch (RuntimeException err) {
+            return null;
+        }
+    }
     private Hashtable<String, String> loadBundleProperties(String resourcePath) {
         try (InputStream input = getResourceAsStream(resourcePath)) {
             if (input == null) {
@@ -146,7 +153,6 @@ public class TemplatePreviewPanel {
             }
             return out;
         } catch (Exception err) {
-            Log.e(err);
             return null;
         }
     }
