@@ -2,6 +2,7 @@ package com.codename1.initializr.ui;
 
 import com.codename1.components.ImageViewer;
 import com.codename1.initializr.model.ProjectOptions;
+import com.codename1.initializr.model.ProjectOptions.PreviewLanguage;
 import com.codename1.initializr.model.Template;
 import com.codename1.io.Log;
 import com.codename1.io.Properties;
@@ -96,12 +97,12 @@ public class TemplatePreviewPanel {
         UIManager.getInstance().setBundle(bundle);
     }
 
-    private Hashtable<String, String> findBundle(ProjectOptions.PreviewLanguage language) {
+    private Hashtable<String, String> findBundle(PreviewLanguage language) {
         if (language == null) {
             return null;
         }
         Resources resources = Resources.getGlobalResources();
-        if (resources != null) {
+        if (resources != null && language != PreviewLanguage.ENGLISH) {
             try {
                 Hashtable<String, String> exact = resources.getL10N("messages", language.bundleSuffix);
                 if (exact != null) {

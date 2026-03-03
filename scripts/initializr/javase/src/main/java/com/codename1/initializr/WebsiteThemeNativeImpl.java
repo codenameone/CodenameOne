@@ -8,5 +8,6 @@ public class WebsiteThemeNativeImpl implements com.codename1.initializr.WebsiteT
     public boolean isSupported() {
         return false;
     }
+    public void notifyUiReady() {}
 
 }
