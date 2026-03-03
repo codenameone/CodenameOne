@@ -124,6 +124,53 @@ public class CSSWatcher implements Runnable {
     }
     
     
+    File findLocalizationDirectory(File srcFile, String overrideInputs) {
+        List<File> localizationDirectories = new ArrayList<File>();
+        if (overrideInputs != null) {
+            for (String input : overrideInputs.split(",")) {
+                String trimmed = input.trim();
+                if (!trimmed.isEmpty()) {
+                    addLocalizationCandidates(new File(trimmed), localizationDirectories);
+                }
+            }
+        } else {
+            addLocalizationCandidates(srcFile, localizationDirectories);
+        }
+
+        for (File directory : localizationDirectories) {
+            if (directory != null && directory.isDirectory()) {
+                return directory;
+            }
+        }
+        return null;
+    }
+
+    void addLocalizationCandidates(File cssFile, List<File> out) {
+        if (cssFile == null) {
+            return;
+        }
+        File cssDirectory = cssFile.getParentFile();
+        if (cssDirectory != null) {
+            File srcMainDirectory = cssDirectory.getParentFile();
+            if (srcMainDirectory != null) {
+                out.add(new File(srcMainDirectory, "l10n"));
+            }
+        }
+
+        File workingDirectory = new File(System.getProperty("user.dir"));
+        out.add(new File(workingDirectory, "l10n"));
+        out.add(new File(workingDirectory, "src/main/l10n"));
+        out.add(new File(workingDirectory, "../common/src/main/l10n"));
+    }
+
+    void addLocalizationArgument(List<String> args, File srcFile, String overrideInputs) {
+        File localizationDirectory = findLocalizationDirectory(srcFile, overrideInputs);
+        if (localizationDirectory != null) {
+            args.add("-l");
+            args.add(localizationDirectory.getAbsolutePath());
+        }
+    }
+
     public String unescapeXSI(final String s) throws IOException {
         StringBuilder sb = new StringBuilder();
 
@@ -227,11 +274,13 @@ public class CSSWatcher implements Runnable {
             args.add(overrideOutputs);
             args.add("-merge");
             args.add(System.getProperty("codename1.css.compiler.args.merge", null));
+            addLocalizationArgument(args, srcFile, overrideInputs);
             args.add("-watch");
-            
+
         } else {
             args.add(srcFile.getAbsolutePath());
             args.add(destFile.getAbsolutePath());
+            addLocalizationArgument(args, srcFile, null);
             args.add("-watch");
             args.add("-Dprism.order=sw");
         }
