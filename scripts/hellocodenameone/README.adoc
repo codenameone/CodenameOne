@@ -8,6 +8,11 @@ This is a multi-module maven project for building a Codename One application. Co
 
 If you plan to use Java as your primary language, https://shannah.github.io/cn1-maven-archetypes/cn1app-archetype-tutorial/getting-started.html[start here].
 
+=== Java Version
+
+Use Java 17 to build and run this project (e.g. `JAVA_HOME` should point to a JDK 17 installation).
+
+
 === Kotlin
 
 If you plan to use Kotlin as your primary language, https://shannah.github.io/cn1app-archetype-kotlin-template/getting-started.html[start here].

@@ -2,6 +2,23 @@
 set -e
 MVNW="./mvnw"
 
+JAVA17_HOME=""
+if [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/java" ] && "$JAVA_HOME/bin/java" -version 2>&1 | head -n 1 | grep -q "\"17"; then
+  JAVA17_HOME="$JAVA_HOME"
+else
+  for candidate in /usr/lib/jvm/java-17-openjdk-amd64 /usr/lib/jvm/java-17-openjdk /usr/lib/jvm/jdk-17 /usr/lib/jvm/*17*; do
+    if [ -x "$candidate/bin/java" ] && "$candidate/bin/java" -version 2>&1 | head -n 1 | grep -q "\"17"; then
+      JAVA17_HOME="$candidate"
+      break
+    fi
+  done
+fi
+
+if [ -n "$JAVA17_HOME" ]; then
+  export JAVA_HOME="$JAVA17_HOME"
+  export PATH="$JAVA_HOME/bin:$PATH"
+fi
+
 function mac_desktop {
   
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javase" "-Dcodename1.buildTarget=mac-os-x-desktop" "-U" "-e"
