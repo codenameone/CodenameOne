@@ -28,6 +28,8 @@
     <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.testSource>17</maven.compiler.testSource>
+    <maven.compiler.testTarget>17</maven.compiler.testTarget>
     <kotlin.compiler.jvmTarget>17</kotlin.compiler.jvmTarget>
     <cn1app.name>hellocodenameone</cn1app.name>
   </properties>
