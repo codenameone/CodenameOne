@@ -124,6 +124,67 @@ public class CSSWatcher implements Runnable {
     }
     
     
+    /**
+     * Resolves the first existing localization directory to pass to the CSS compiler.
+     * <p>This accepts both standard project layout and override-input mode so watch mode
+     * can produce unified resources in single-module and multi-module projects.</p>
+     */
+    File findLocalizationDirectory(File srcFile, String overrideInputs) {
+        List<File> localizationDirectories = new ArrayList<File>();
+        if (overrideInputs != null) {
+            for (String input : overrideInputs.split(",")) {
+                String trimmed = input.trim();
+                if (!trimmed.isEmpty()) {
+                    addLocalizationCandidates(new File(trimmed), localizationDirectories);
+                }
+            }
+        } else {
+            addLocalizationCandidates(srcFile, localizationDirectories);
+        }
+
+        for (File directory : localizationDirectories) {
+            if (directory != null && directory.isDirectory()) {
+                return directory;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Adds likely l10n locations derived from the CSS file and current working directory.
+     * <p>We include relative common-module paths because JavaSE watch is often launched
+     * from the `javase` module while CSS/l10n are in `../common/src/main`.</p>
+     */
+    void addLocalizationCandidates(File cssFile, List<File> out) {
+        if (cssFile == null) {
+            return;
+        }
+        File cssDirectory = cssFile.getParentFile();
+        if (cssDirectory != null) {
+            File srcMainDirectory = cssDirectory.getParentFile();
+            if (srcMainDirectory != null) {
+                out.add(new File(srcMainDirectory, "l10n"));
+            }
+        }
+
+        File workingDirectory = new File(System.getProperty("user.dir"));
+        out.add(new File(workingDirectory, "l10n"));
+        out.add(new File(workingDirectory, "src/main/l10n"));
+        out.add(new File(workingDirectory, "../common/src/main/l10n"));
+    }
+
+    /**
+     * Appends `-l <dir>` to the designer command arguments when a localization directory exists.
+     * <p>Keeping this in one helper ensures both watch invocation branches stay consistent.</p>
+     */
+    void addLocalizationArgument(List<String> args, File srcFile, String overrideInputs) {
+        File localizationDirectory = findLocalizationDirectory(srcFile, overrideInputs);
+        if (localizationDirectory != null) {
+            args.add("-l");
+            args.add(localizationDirectory.getAbsolutePath());
+        }
+    }
+
     public String unescapeXSI(final String s) throws IOException {
         StringBuilder sb = new StringBuilder();
 
@@ -227,11 +288,13 @@ public class CSSWatcher implements Runnable {
             args.add(overrideOutputs);
             args.add("-merge");
             args.add(System.getProperty("codename1.css.compiler.args.merge", null));
+            addLocalizationArgument(args, srcFile, overrideInputs);
             args.add("-watch");
-            
+
         } else {
             args.add(srcFile.getAbsolutePath());
             args.add(destFile.getAbsolutePath());
+            addLocalizationArgument(args, srcFile, null);
             args.add("-watch");
             args.add("-Dprism.order=sw");
         }

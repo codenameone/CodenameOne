@@ -84,7 +84,7 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
                     continue;
                 }
                 File localizationSibling = new File(parent, "l10n");
-                if (hasLocalizationBundles(localizationSibling)) {
+                if (hasLocalizationDirectory(localizationSibling)) {
                     return localizationSibling;
                 }
             }
@@ -93,11 +93,11 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         File cn1ProjectDir = getCN1ProjectDir();
         if (cn1ProjectDir != null) {
             File defaultLocalization = new File(cn1ProjectDir, path("src", "main", "l10n"));
-            if (hasLocalizationBundles(defaultLocalization)) {
+            if (hasLocalizationDirectory(defaultLocalization)) {
                 return defaultLocalization;
             }
             File rootLocalization = new File(cn1ProjectDir, "l10n");
-            if (hasLocalizationBundles(rootLocalization)) {
+            if (hasLocalizationDirectory(rootLocalization)) {
                 return rootLocalization;
             }
         }
@@ -105,24 +105,13 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         return null;
     }
 
-    private boolean hasLocalizationBundles(File directory) {
-        if (directory == null || !directory.isDirectory()) {
-            return false;
-        }
-        File[] files = directory.listFiles();
-        if (files == null) {
-            return false;
-        }
-        for (File file : files) {
-            if (file.isDirectory()) {
-                if (hasLocalizationBundles(file)) {
-                    return true;
-                }
-            } else if (file.getName().endsWith(".properties")) {
-                return true;
-            }
-        }
-        return false;
+    /**
+     * Treats an existing l10n directory as a valid localization source.
+     * <p>This intentionally does not require `.properties` files up-front because
+     * the CSS flow can still rely on the directory even when bundles are generated later.</p>
+     */
+    private boolean hasLocalizationDirectory(File directory) {
+        return directory != null && directory.isDirectory();
     }
 
     private void executeImpl(String themePrefix) throws MojoExecutionException, MojoFailureException {

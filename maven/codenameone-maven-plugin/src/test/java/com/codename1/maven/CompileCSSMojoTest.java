@@ -49,6 +49,21 @@ class CompileCSSMojoTest {
         assertFalse(args.contains("-l"), "Did not expect -l argument without localization directory");
     }
 
+    @Test
+    void addsLocalizationArgumentWhenDirectoryIsEmpty(@TempDir Path tempDir) throws Exception {
+        Path projectDir = setupProject(tempDir, false);
+        Files.createDirectories(projectDir.resolve("src/main/l10n"));
+        TestCompileCSSMojo mojo = createMojo(projectDir);
+
+        mojo.executeImpl();
+
+        List<String> args = mojo.getRecordingJava().getCommandLineArguments();
+        assertTrue(args.contains("-l"), "Expected -l argument when localization directory exists even if empty");
+        int index = args.indexOf("-l");
+        assertTrue(index >= 0 && index + 1 < args.size(), "Expected localization directory argument after -l");
+        assertEquals(projectDir.resolve("src/main/l10n").toFile().getAbsolutePath(), args.get(index + 1));
+    }
+
     private TestCompileCSSMojo createMojo(Path projectDir) throws IOException {
         MavenProject mavenProject = new MavenProject();
         mavenProject.setFile(projectDir.resolve("pom.xml").toFile());
