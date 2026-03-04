@@ -719,6 +719,7 @@ public class IPhoneBuilder extends Executor {
         }
         
         File glAppDelegate = new File(buildinRes, "CodenameOne_GLAppDelegate.m");
+        boolean useUIScene = "true".equalsIgnoreCase(request.getArg("ios.uiscene", "false"));
         String integrateFacebook = "";
         
 
@@ -872,6 +873,14 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND", "#define CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND");
             } catch (IOException ex) {
                 throw new BuildException("Failure while processing ios.blockScreenshotsOnEnterBackground build hint", ex);
+            }
+        }
+
+        if (useUIScene) {
+            try {
+                replaceInFile(new File(buildinRes, "CodenameOne_GLAppDelegate.h"), "#ifdef CN1_USE_UI_SCENE", "#define CN1_USE_UI_SCENE\n#ifdef CN1_USE_UI_SCENE");
+            } catch (IOException ex) {
+                throw new BuildException("Failure while processing ios.uiscene build hint", ex);
             }
         }
         
@@ -2354,6 +2363,25 @@ public class IPhoneBuilder extends Executor {
             if (!inject.contains("UILaunchStoryboardName")) {
                 inject += "\n<key>UILaunchStoryboardName</key><string>"+request.getArg("ios.launchStoryboardName", "LaunchScreen")+"</string>";
             }
+        }
+        if ("true".equalsIgnoreCase(request.getArg("ios.uiscene", "false")) && !inject.contains("UIApplicationSceneManifest")) {
+            inject += "\n<key>UIApplicationSceneManifest</key>\n"
+                    + "<dict>\n"
+                    + "    <key>UIApplicationSupportsMultipleScenes</key>\n"
+                    + "    <false/>\n"
+                    + "    <key>UISceneConfigurations</key>\n"
+                    + "    <dict>\n"
+                    + "        <key>UIWindowSceneSessionRoleApplication</key>\n"
+                    + "        <array>\n"
+                    + "            <dict>\n"
+                    + "                <key>UISceneConfigurationName</key>\n"
+                    + "                <string>Default Configuration</string>\n"
+                    + "                <key>UISceneDelegateClassName</key>\n"
+                    + "                <string>CodenameOne_GLSceneDelegate</string>\n"
+                    + "            </dict>\n"
+                    + "        </array>\n"
+                    + "    </dict>\n"
+                    + "</dict>";
         }
 
         if(request.getArg("ios.fileSharingEnabled", "false").equals("true")) {

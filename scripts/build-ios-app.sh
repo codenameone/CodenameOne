@@ -60,6 +60,8 @@ bia_log "Using JAVA_HOME at $JAVA_HOME"
 bia_log "Using JAVA17_HOME at $JAVA17_HOME"
 bia_log "Using Maven installation at $MAVEN_HOME"
 bia_log "Using CocoaPods version $(pod --version 2>/dev/null || echo '<unknown>')"
+IOS_UISCENE="${IOS_UISCENE:-false}"
+bia_log "Building sample app with ios.uiscene=${IOS_UISCENE}"
 
 APP_DIR="scripts/hellocodenameone"
 
@@ -78,6 +80,7 @@ export CN1_BUILD_STATS_FILE="$ARTIFACTS_DIR/iphone-builder-stats.txt"
   -DskipTests \
   -Dcodename1.platform=ios \
   -Dcodename1.buildTarget=ios-source \
+  -Dcodename1.arg.ios.uiscene="${IOS_UISCENE}" \
   -Dopen=false \
   -U -e
 VM_END=$(date +%s)
