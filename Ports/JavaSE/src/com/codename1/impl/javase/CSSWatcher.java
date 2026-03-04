@@ -124,6 +124,11 @@ public class CSSWatcher implements Runnable {
     }
     
     
+    /**
+     * Resolves the first existing localization directory to pass to the CSS compiler.
+     * <p>This accepts both standard project layout and override-input mode so watch mode
+     * can produce unified resources in single-module and multi-module projects.</p>
+     */
     File findLocalizationDirectory(File srcFile, String overrideInputs) {
         List<File> localizationDirectories = new ArrayList<File>();
         if (overrideInputs != null) {
@@ -145,6 +150,11 @@ public class CSSWatcher implements Runnable {
         return null;
     }
 
+    /**
+     * Adds likely l10n locations derived from the CSS file and current working directory.
+     * <p>We include relative common-module paths because JavaSE watch is often launched
+     * from the `javase` module while CSS/l10n are in `../common/src/main`.</p>
+     */
     void addLocalizationCandidates(File cssFile, List<File> out) {
         if (cssFile == null) {
             return;
@@ -163,6 +173,10 @@ public class CSSWatcher implements Runnable {
         out.add(new File(workingDirectory, "../common/src/main/l10n"));
     }
 
+    /**
+     * Appends `-l <dir>` to the designer command arguments when a localization directory exists.
+     * <p>Keeping this in one helper ensures both watch invocation branches stay consistent.</p>
+     */
     void addLocalizationArgument(List<String> args, File srcFile, String overrideInputs) {
         File localizationDirectory = findLocalizationDirectory(srcFile, overrideInputs);
         if (localizationDirectory != null) {

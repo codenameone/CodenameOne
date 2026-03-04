@@ -105,6 +105,11 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
         return null;
     }
 
+    /**
+     * Treats an existing l10n directory as a valid localization source.
+     * <p>This intentionally does not require `.properties` files up-front because
+     * the CSS flow can still rely on the directory even when bundles are generated later.</p>
+     */
     private boolean hasLocalizationDirectory(File directory) {
         return directory != null && directory.isDirectory();
     }
