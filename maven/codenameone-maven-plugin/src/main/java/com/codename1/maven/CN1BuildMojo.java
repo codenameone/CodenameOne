@@ -1008,6 +1008,20 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         String incSources = request.getArg("build.incSources", null);
         request.setIncludeSource(true);
 
+        // Local iOS build must use a java.version that is compatible with the compiled bytecode.
+        // Some sample projects keep codename1.arg.java.version at 8 for historical reasons, while
+        // compiling sources with a newer maven compiler target (e.g. 17). In that case the builder
+        // can fail later with opaque errors. Align the request java.version with compiler target.
+        String requestJavaVersion = request.getArg("java.version", null);
+        String compilerTarget = project.getProperties().getProperty("maven.compiler.target");
+        int requestJavaVersionNum = parseJavaVersion(requestJavaVersion, 8);
+        int compilerTargetNum = parseJavaVersion(compilerTarget, requestJavaVersionNum);
+        if (compilerTargetNum > requestJavaVersionNum) {
+            request.putArgument("java.version", String.valueOf(compilerTargetNum));
+            getLog().info("Overriding codename1.arg.java.version for local iOS build: "
+                    + requestJavaVersionNum + " -> " + compilerTargetNum);
+        }
+
 
 
         String testBuild = request.getArg("build.unitTest", null);
@@ -1075,17 +1089,41 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
 
 
+
+    private static int parseJavaVersion(String version, int defaultValue) {
+        if (version == null) {
+            return defaultValue;
+        }
+        String normalized = version.trim();
+        if (normalized.isEmpty()) {
+            return defaultValue;
+        }
+        if (normalized.startsWith("1.")) {
+            normalized = normalized.substring(2);
+        }
+        int dotPos = normalized.indexOf('.');
+        if (dotPos > 0) {
+            normalized = normalized.substring(0, dotPos);
+        }
+        int dashPos = normalized.indexOf('-');
+        if (dashPos > 0) {
+            normalized = normalized.substring(0, dashPos);
+        }
+        try {
+            return Integer.parseInt(normalized);
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
+    }
+
     private SortedProperties mergeRequiredProperties(String libraryName, Properties libProps, Properties projectProps) throws LibraryPropertiesException {
 
 
         String javaVersion = (String)projectProps.getProperty("codename1.arg.java.version", "8");
         String javaVersionLib = (String)libProps.get("codename1.arg.java.version");
         if(javaVersionLib != null){
-            int v1 = 5;
-            if(javaVersion != null){
-                v1 = Integer.parseInt(javaVersion);
-            }
-            int v2 = Integer.parseInt(javaVersionLib);
+            int v1 = parseJavaVersion(javaVersion, 5);
+            int v2 = parseJavaVersion(javaVersionLib, 5);
             //if the lib java version is bigger, this library cannot be used
             if(v1 < v2){
                 throw new VersionMismatchException(libraryName, "Cannot use a cn1lib with java version "
