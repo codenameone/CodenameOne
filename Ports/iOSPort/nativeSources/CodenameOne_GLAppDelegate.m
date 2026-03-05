@@ -21,6 +21,9 @@
  * need additional information or have any questions.
  */
 #import "CodenameOne_GLAppDelegate.h"
+#ifdef CN1_USE_UI_SCENE
+#import "CodenameOne_GLSceneDelegate.h"
+#endif
 #import "CN1JailbreakDetector.h"
 #include "xmlvm.h"
 #import "EAGLView.h"
@@ -38,6 +41,8 @@ extern BOOL isIOS10();
 int pendingRemoteNotificationRegistrations = 0;
 
 BOOL isAppSuspended = NO;
+static BOOL cn1GestureRecognizerInstalled = NO;
+static BOOL cn1IsHiddenInBackground = NO;
 //GL_APP_DELEGATE_IMPORT
 //GL_APP_DELEGATE_INCLUDE
 
@@ -111,6 +116,161 @@ static void installSignalHandlers() {
 
 @synthesize viewController=_viewController;
 
+- (CodenameOne_GLViewController *)cn1EnsureViewController
+{
+    if (self.viewController == nil) {
+#ifdef CN1_USE_ARC
+        self.viewController = [[CodenameOne_GLViewController alloc] initWithNibName:@"CodenameOne_GLViewController" bundle:nil];
+#else
+        CodenameOne_GLViewController *viewController = [[CodenameOne_GLViewController alloc] initWithNibName:@"CodenameOne_GLViewController" bundle:nil];
+        self.viewController = viewController;
+        [viewController release];
+#endif
+    }
+    return self.viewController;
+}
+
+- (void)cn1InstallTapGestureRecognizerIfNeeded
+{
+    CodenameOne_GLViewController *viewController = [self cn1EnsureViewController];
+    if (cn1GestureRecognizerInstalled || viewController.view.window == nil) {
+        return;
+    }
+    CN1TapGestureRecognizer* recognizer = [[CN1TapGestureRecognizer alloc] initWithTarget:nil action:nil];
+    [recognizer install:viewController];
+    [recognizer release];
+    cn1GestureRecognizerInstalled = YES;
+}
+
+- (void)cn1InstallRootViewControllerIntoWindow:(UIWindow *)window
+{
+    self.window = window;
+    self.window.rootViewController = [self cn1EnsureViewController];
+    [self.window makeKeyAndVisible];
+    [self cn1InstallTapGestureRecognizerIfNeeded];
+}
+
+- (void)cn1StoreAppArgForURL:(NSURL *)url
+{
+    if(url != nil) {
+        JAVA_OBJECT o = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+        JAVA_OBJECT key = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"AppArg");
+        JAVA_OBJECT value;
+        if([url isFileURL]) {
+            value = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG url.path);
+        } else {
+            value = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [url absoluteString]);
+        }
+        com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG o, key, value);
+    }
+}
+
+- (BOOL)cn1ContinueUserActivity:(NSUserActivity *)userActivity
+{
+    if (userActivity != nil && [NSUserActivityTypeBrowsingWeb isEqualToString:userActivity.activityType] && userActivity.webpageURL != nil) {
+#ifdef CN1_HANDLE_UNIVERSAL_LINKS
+        JAVA_OBJECT url = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [userActivity.webpageURL absoluteString]);
+        com_codename1_impl_ios_IOSImplementation_applicationReceivedUniversalLink___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG url);
+#else
+        JAVA_OBJECT launchUrlStr = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [userActivity.webpageURL absoluteString]);
+        JAVA_OBJECT appArgKey = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"AppArg");
+        JAVA_OBJECT displayInstObj = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+        com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG displayInstObj, appArgKey, launchUrlStr);
+#endif
+        return YES;
+    }
+    return NO;
+}
+
+- (void)cn1ApplicationWillResignActive
+{
+    com_codename1_impl_ios_IOSImplementation_applicationWillResignActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+- (void)cn1ApplicationDidEnterBackground
+{
+ #ifdef CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND
+    [[CodenameOne_GLViewController instance] eaglView].hidden = YES;
+    cn1IsHiddenInBackground = YES;
+#endif
+    if(editingComponent != nil) {
+        [editingComponent resignFirstResponder];
+        [editingComponent removeFromSuperview];
+#ifndef CN1_USE_ARC
+        [editingComponent release];
+#endif
+        editingComponent = nil;
+    }
+    com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    //----application_will_resign_active
+    isAppSuspended = YES;
+#ifdef NEW_CODENAME_ONE_VM
+    java_lang_System_stopGC__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    mallocWhileSuspended = 0;
+#endif
+}
+
+- (void)cn1ApplicationWillEnterForeground
+{
+    if (cn1IsHiddenInBackground) {
+        [[CodenameOne_GLViewController instance] eaglView].hidden = NO;
+    }
+    com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    CodenameOne_GLViewController* vc = [CodenameOne_GLViewController instance];
+    if (vc != nil) {
+        [vc updateCanvas:YES];
+    }
+}
+
+- (void)cn1ApplicationDidBecomeActive
+{
+#ifdef INCLUDE_CN1_PUSH
+     [UIApplication sharedApplication].applicationIconBadgeNumber = 0;
+#endif
+    com_codename1_impl_ios_IOSImplementation_applicationDidBecomeActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    //DELEGATE_applicationDidBecomeActive
+}
+
+- (BOOL)cn1OpenURL:(UIApplication *)application url:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation
+{
+    JAVA_OBJECT str1 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [url absoluteString]);
+    JAVA_OBJECT str2 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG sourceApplication);
+    
+#ifdef INCLUDE_GOOGLE_CONNECT
+#ifndef GOOGLE_SIGNIN
+    BOOL res = [GPPURLHandler handleURL:url
+           sourceApplication:sourceApplication
+                  annotation:annotation];
+    if (res) {
+        return res;
+    }
+#else
+    BOOL res = [[GIDSignIn sharedInstance] handleURL:url];
+    if (res) {
+        return res;
+    }
+#endif
+#endif
+#ifdef INCLUDE_FACEBOOK_CONNECT
+    BOOL fbRes = [[FBSDKApplicationDelegate sharedInstance] application:application
+                                                          openURL:url
+                                                sourceApplication:sourceApplication
+                                                       annotation:annotation];
+    if (fbRes) {
+        return fbRes;
+    }
+#endif
+    
+    //openURLMarkerEntry
+    
+#ifdef NEW_CODENAME_ONE_VM
+    JAVA_BOOLEAN b = com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG str1, str2);
+#else
+    JAVA_BOOLEAN b = com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG str1, str2);
+#endif
+
+    return b;
+}
 
 
 
@@ -126,35 +286,19 @@ static void installSignalHandlers() {
     // Install signal handlers so that rather than the app crashing upon a BAD_ACCESS, the 
     // app will throw an NPE.
     installSignalHandlers();
-    self.window.rootViewController = self.viewController;
-    CN1TapGestureRecognizer* recognizer = [[CN1TapGestureRecognizer alloc] initWithTarget:nil action:nil];
-    [recognizer install:self.viewController];
-    [recognizer release];
+    [self cn1EnsureViewController];
+#ifndef CN1_USE_UI_SCENE
+    [self cn1InstallRootViewControllerIntoWindow:self.window];
+#endif
     NSURL *url = (NSURL *)[launchOptions valueForKey:UIApplicationLaunchOptionsURLKey];
-    if(url != nil) {
-        JAVA_OBJECT o = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-        JAVA_OBJECT key = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"AppArg");
-        JAVA_OBJECT value;
-        if([url isFileURL]) {
-            value = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG url.path);
-        } else {
-            value = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [url absoluteString]);
-        }
-        com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG o, key, value);
-    }
+    [self cn1StoreAppArgForURL:url];
     if (@available(iOS 8, *)) {
         // App Links from associated domains
         NSDictionary *activityDictionary = [launchOptions objectForKey:UIApplicationLaunchOptionsUserActivityDictionaryKey];
         if (activityDictionary) {
             NSUserActivity *userActivity = [activityDictionary valueForKey:@"UIApplicationLaunchOptionsUserActivityKey"];
             if (userActivity != nil) {
-                if ([NSUserActivityTypeBrowsingWeb isEqualToString:userActivity.activityType] && userActivity.webpageURL != nil) {
-                    JAVA_OBJECT launchUrlStr = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [userActivity.webpageURL absoluteString]);
-                    JAVA_OBJECT appArgKey = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"AppArg");
-                    JAVA_OBJECT displayInstObj = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-
-                    com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG displayInstObj, appArgKey, launchUrlStr);
-                }
+                [self cn1ContinueUserActivity:userActivity];
             }
         }
     }
@@ -245,20 +389,19 @@ static void installSignalHandlers() {
     isAppSuspended = NO;
     if(launchOptions != nil) {
         NSURL *url = (NSURL *)[launchOptions valueForKey:UIApplicationLaunchOptionsURLKey];
-        if(url != nil) {
-            JAVA_OBJECT o = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-            JAVA_OBJECT key = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"AppArg");
-            JAVA_OBJECT value;
-            if([url isFileURL]) {
-                value = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG url.path);
-            } else {
-                value = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [url absoluteString]);
-            }
-            com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG o, key, value);
-        }
+        [self cn1StoreAppArgForURL:url];
     }
     return YES;
 }
+
+#ifdef CN1_USE_UI_SCENE
+- (UISceneConfiguration *)application:(UIApplication *)application configurationForConnectingSceneSession:(UISceneSession *)connectingSceneSession options:(UISceneConnectionOptions *)options API_AVAILABLE(ios(13.0))
+{
+    UISceneConfiguration *sceneConfiguration = [UISceneConfiguration configurationWithName:@"Default Configuration" sessionRole:connectingSceneSession.role];
+    sceneConfiguration.delegateClass = [CodenameOne_GLSceneDelegate class];
+    return sceneConfiguration;
+}
+#endif
 
 #ifdef CN1_HANDLE_UNIVERSAL_LINKS
 // https://developer.apple.com/documentation/uikit/core_app/allowing_apps_and_websites_to_link_to_your_content?language=objc
@@ -266,54 +409,12 @@ static void installSignalHandlers() {
 - (BOOL)application:(UIApplication *)application
         continueUserActivity:(NSUserActivity *)userActivity
         restorationHandler:(void (^)(NSArray *))restorationHandler {
-    if ([NSUserActivityTypeBrowsingWeb isEqualToString:userActivity.activityType] && userActivity.webpageURL != nil) {
-        JAVA_OBJECT url = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [userActivity.webpageURL absoluteString]);
-        com_codename1_impl_ios_IOSImplementation_applicationReceivedUniversalLink___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG url);
-        return YES;
-    }
-    return NO;
+    return [self cn1ContinueUserActivity:userActivity];
 }
 #endif
 
 - (BOOL)application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation {
-    JAVA_OBJECT str1 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [url absoluteString]);
-    JAVA_OBJECT str2 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG sourceApplication);
-    
-#ifdef INCLUDE_GOOGLE_CONNECT
-#ifndef GOOGLE_SIGNIN
-    // Handle Google Plus Login
-    BOOL res = [GPPURLHandler handleURL:url
-           sourceApplication:sourceApplication
-                  annotation:annotation];
-    if (res) {
-        return res;
-    }
-#else
-    BOOL res = [[GIDSignIn sharedInstance] handleURL:url];
-    if (res) {
-        return res;
-    }
-#endif
-#endif
-#ifdef INCLUDE_FACEBOOK_CONNECT
-    BOOL fbRes = [[FBSDKApplicationDelegate sharedInstance] application:application
-                                                          openURL:url
-                                                sourceApplication:sourceApplication
-                                                       annotation:annotation];
-    if (fbRes) {
-        return fbRes;
-    }
-#endif
-    
-    //openURLMarkerEntry
-    
-#ifdef NEW_CODENAME_ONE_VM
-    JAVA_BOOLEAN b = com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG str1, str2);
-#else
-    JAVA_BOOLEAN b = com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG str1, str2);
-#endif
-
-    return b;
+    return [self cn1OpenURL:application url:url sourceApplication:sourceApplication annotation:annotation];
 }
 
 - (BOOL)application:(UIApplication *)application handleOpenURL:(NSURL *)url
@@ -327,63 +428,33 @@ static void installSignalHandlers() {
      Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
      Use this method to pause ongoing tasks, disable timers, and throttle down OpenGL ES frame rates. Games should use this method to pause the game.
      */
-    com_codename1_impl_ios_IOSImplementation_applicationWillResignActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    [self cn1ApplicationWillResignActive];
     //[self.viewController stopAnimation];
 }
-static BOOL cn1IsHiddenInBackground = NO;
 - (void)applicationDidEnterBackground:(UIApplication *)application
 {
- #ifdef CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND
-    [[CodenameOne_GLViewController instance] eaglView].hidden = YES;
-    cn1IsHiddenInBackground = YES;
-#endif
-    if(editingComponent != nil) {
-        [editingComponent resignFirstResponder];
-        [editingComponent removeFromSuperview];
-#ifndef CN1_USE_ARC
-        [editingComponent release];
-#endif
-        editingComponent = nil;
-    }
     /*
      Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
      If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
      */
-    com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-    //----application_will_resign_active
-    isAppSuspended = YES;
-#ifdef NEW_CODENAME_ONE_VM
-    java_lang_System_stopGC__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-    mallocWhileSuspended = 0;
-#endif
+    [self cn1ApplicationDidEnterBackground];
 }
 
 - (void)applicationWillEnterForeground:(UIApplication *)application
-{   if (cn1IsHiddenInBackground) {
-          [[CodenameOne_GLViewController instance] eaglView].hidden = NO;
-    }
-    
+{
     /*
      Called as part of the transition from the background to the inactive state; here you can undo many of the changes made on entering the background.
      */
-    com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-    CodenameOne_GLViewController* vc = [CodenameOne_GLViewController instance];
-    if (vc != nil) {
-        [vc updateCanvas:YES];
-    }
+    [self cn1ApplicationWillEnterForeground];
 }
 
 - (void)applicationDidBecomeActive:(UIApplication *)application
 {
-#ifdef INCLUDE_CN1_PUSH
-     [UIApplication sharedApplication].applicationIconBadgeNumber = 0;
-#endif
     /*
      Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
      */
     //[self.viewController startAnimation];
-    com_codename1_impl_ios_IOSImplementation_applicationDidBecomeActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-    //DELEGATE_applicationDidBecomeActive
+    [self cn1ApplicationDidBecomeActive];
 }
 
 - (void)applicationWillTerminate:(UIApplication *)application
