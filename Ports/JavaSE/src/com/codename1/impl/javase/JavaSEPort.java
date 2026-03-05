@@ -2075,6 +2075,83 @@ public class JavaSEPort extends CodenameOneImplementation {
         private Cursor defaultCursor = Cursor.getDefaultCursor();        
         private int currentCursor = 0;
         private java.util.Timer reSize;
+        private final Object pendingSizeChangeLock = new Object();
+        private int pendingSizeChangeWidth = -1;
+        private int pendingSizeChangeHeight = -1;
+        private boolean pendingSizeChangeQueued;
+        private boolean pendingRevalidateAfterSizeChange;
+        private boolean pendingForceRevalidateAfterSizeChange;
+        private boolean pendingResetGraphicsAfterSizeChange;
+        private boolean pendingDelayedWindowRepaint;
+
+        private void queueSizeChangeEvent(int w, int h, boolean revalidate, boolean forceRevalidate, boolean resetGraphics, boolean delayedWindowRepaint) {
+            synchronized (pendingSizeChangeLock) {
+                pendingSizeChangeWidth = w;
+                pendingSizeChangeHeight = h;
+                pendingRevalidateAfterSizeChange |= revalidate;
+                pendingForceRevalidateAfterSizeChange |= forceRevalidate;
+                pendingResetGraphicsAfterSizeChange |= resetGraphics;
+                pendingDelayedWindowRepaint |= delayedWindowRepaint;
+                if (pendingSizeChangeQueued) {
+                    return;
+                }
+                pendingSizeChangeQueued = true;
+            }
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    int queuedW;
+                    int queuedH;
+                    boolean doRevalidate;
+                    boolean doForceRevalidate;
+                    boolean doResetGraphics;
+                    boolean doDelayedWindowRepaint;
+                    synchronized (pendingSizeChangeLock) {
+                        queuedW = pendingSizeChangeWidth;
+                        queuedH = pendingSizeChangeHeight;
+                        doRevalidate = pendingRevalidateAfterSizeChange;
+                        doForceRevalidate = pendingForceRevalidateAfterSizeChange;
+                        doResetGraphics = pendingResetGraphicsAfterSizeChange;
+                        doDelayedWindowRepaint = pendingDelayedWindowRepaint;
+                        pendingRevalidateAfterSizeChange = false;
+                        pendingForceRevalidateAfterSizeChange = false;
+                        pendingResetGraphicsAfterSizeChange = false;
+                        pendingDelayedWindowRepaint = false;
+                        pendingSizeChangeQueued = false;
+                    }
+
+                    JavaSEPort.this.sizeChanged(queuedW, queuedH);
+
+                    if (doResetGraphics) {
+                        g2dInstance = null;
+                    }
+
+                    Form f = Display.getInstance().getCurrent();
+                    if (f != null) {
+                        if (doForceRevalidate) {
+                            f.forceRevalidate();
+                        } else if (doRevalidate) {
+                            f.revalidate();
+                        }
+                    }
+
+                    if (doDelayedWindowRepaint) {
+                        new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    Thread.sleep(1500);
+                                } catch (Exception e) {
+                                }
+                                if (window != null) {
+                                    window.repaint();
+                                }
+                            }
+                        }).start();
+                        reSize = null;
+                    }
+                }
+            });
+        }
         
         public void mouseMoved(MouseEvent e) {
             e.consume();
@@ -2138,11 +2215,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             boolean desktopSkin = pref.getBoolean("desktopSkin", false);
             if (getSkin() == null && !desktopSkin) {
-                Display.getInstance().callSerially(new Runnable() {
-                    public void run() {
-                        JavaSEPort.this.sizeChanged((int)(getWidth() * retinaScale), (int)(getHeight() * retinaScale));
-                    }
-                });                
+                queueSizeChangeEvent((int)(getWidth() * retinaScale), (int)(getHeight() * retinaScale), false, false, false, false);
             }
 
         }
@@ -2186,17 +2259,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     setSize((int)topSize.getWidth(), (int)topSize.getHeight());
                     canvas.setForcedSize(new Dimension(getWidth(), getHeight()));
                     
-                    Display.getInstance().callSerially(new Runnable() {
-                        public void run() {
-                            
-                            JavaSEPort.this.sizeChanged((int)(getWidth() * retinaScale), (int)(getHeight() * retinaScale));
-                            
-                            Form f = Display.getInstance().getCurrent();
-                            if (f != null) {
-                                f.revalidate();
-                            }
-                        }
-                    });
+                    queueSizeChangeEvent((int)(getWidth() * retinaScale), (int)(getHeight() * retinaScale), true, false, false, false);
                     return;
                 } 
                 
@@ -2214,32 +2277,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         //    System.out.println("Resize with media container");
                         //    JavaSEPort.this.sizeChanged((int)(mediaContainer.getWidth() * retinaScale), (int)(mediaContainer.getHeight() * retinaScale));
                         //}else{
-                            Display.getInstance().callSerially(new Runnable() {
-                                public void run() {
-                                    JavaSEPort.this.sizeChanged((int)(getWidth() * retinaScale), (int)(getHeight() * retinaScale));
-                                    g2dInstance = null;
-                                    Form f = Display.getInstance().getCurrent();
-                                    if (f != null) {
-                                        f.forceRevalidate();
-                                    }
-                                    
-                                    // probably not necessary
-                                    new Thread(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            try {
-                                                Thread.sleep(1500);
-                                            } catch (Exception e) {
-                                            }
-                                            if (window != null) {
-                                                window.repaint();
-                                            }
-                                        }
-                                    }).start();
-
-                                    reSize = null;
-                                }
-                            });
+                            queueSizeChangeEvent((int)(getWidth() * retinaScale), (int)(getHeight() * retinaScale), false, true, true, true);
                             
                         //}
                         
