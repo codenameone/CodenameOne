@@ -54,12 +54,17 @@ if ! command -v pod >/dev/null 2>&1; then
   exit 1
 fi
 
+ORIGINAL_JAVA_HOME="$JAVA_HOME"
+export JAVA_HOME="$JAVA17_HOME"
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 
 bia_log "Using JAVA_HOME at $JAVA_HOME"
+bia_log "Original JAVA_HOME was $ORIGINAL_JAVA_HOME"
 bia_log "Using JAVA17_HOME at $JAVA17_HOME"
 bia_log "Using Maven installation at $MAVEN_HOME"
 bia_log "Using CocoaPods version $(pod --version 2>/dev/null || echo '<unknown>')"
+bia_log "Java version for Maven invocations:"
+"$JAVA_HOME/bin/java" -version
 
 APP_DIR="scripts/hellocodenameone"
 
