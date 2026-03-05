@@ -14,8 +14,8 @@
   
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.compiler.source>1.8</maven.compiler.source>
-    <maven.compiler.target>1.8</maven.compiler.target>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
     <codename1.platform>win</codename1.platform>
       <codename1.projectPlatform>win</codename1.projectPlatform>
       <codename1.defaultBuildTarget>windows-device</codename1.defaultBuildTarget>
