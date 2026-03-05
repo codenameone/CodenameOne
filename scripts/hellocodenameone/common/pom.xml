@@ -303,43 +303,7 @@
                 <codename1.targetPlatform>javase</codename1.targetPlatform>
             </properties>
         </profile>
-        <profile>
-            <id>java17-language-tests</id>
-            <activation>
-                <property>
-                    <name>hellocodenameone.java17</name>
-                    <value>true</value>
-                </property>
-            </activation>
-            <properties>
-                <maven.compiler.testSource>17</maven.compiler.testSource>
-                <maven.compiler.testTarget>17</maven.compiler.testTarget>
-            </properties>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <version>3.5.0</version>
-                        <executions>
-                            <execution>
-                                <id>add-java17-test-source</id>
-                                <phase>generate-test-sources</phase>
-                                <goals>
-                                    <goal>add-test-source</goal>
-                                </goals>
-                                <configuration>
-                                    <sources>
-                                        <source>${project.basedir}/src/test/java17</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
+            </profiles>
 
     <build>
         <plugins>
