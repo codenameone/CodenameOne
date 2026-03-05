@@ -132,14 +132,39 @@ jobs:
         run: ./scripts/build-ios-port.sh -q -DskipTests
         timeout-minutes: 25
 
-      - name: Build sample iOS app and compile workspace
-        id: build-ios-app
+      - name: Build sample iOS app and compile workspace (UIScene on)
+        id: build-ios-app-scene
+        env:
+          IOS_UISCENE: "true"
         run: ./scripts/build-ios-app.sh -q -DskipTests
         timeout-minutes: 30
 
-      - name: Run iOS UI screenshot tests
+      - name: Run iOS UI screenshot tests (UIScene on)
         env:
-          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-scene-true
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+          
+          echo "workspace='${{ steps.build-ios-app-scene.outputs.workspace }}'"
+          echo "scheme='${{ steps.build-ios-app-scene.outputs.scheme }}'"
+          
+          ./scripts/run-ios-ui-tests.sh \
+            "${{ steps.build-ios-app-scene.outputs.workspace }}" \
+            "" \
+            "${{ steps.build-ios-app-scene.outputs.scheme }}"
+        timeout-minutes: 30
+
+      - name: Build sample iOS app and compile workspace (UIScene off)
+        id: build-ios-app
+        env:
+          IOS_UISCENE: "false"
+        run: ./scripts/build-ios-app.sh -q -DskipTests
+        timeout-minutes: 30
+
+      - name: Run iOS UI screenshot tests (UIScene off)
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-scene-false
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
