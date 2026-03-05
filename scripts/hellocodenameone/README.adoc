@@ -10,8 +10,8 @@ If you plan to use Java as your primary language, https://shannah.github.io/cn1-
 
 === Java Version
 
-Use Java 17 to build and run this project (e.g. `JAVA_HOME` should point to a JDK 17 installation).
-
+The project defaults to Java 8 compatibility.
+To run the Java 17 language-feature test, use a JDK 17 and activate `-Dhellocodenameone.java17=true`.
 
 === Kotlin
 
