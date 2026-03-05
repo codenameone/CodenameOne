@@ -309,6 +309,7 @@ public final class Display extends CN1Constants {
     private int previousKeyPressed;
     private int lastKeyPressed;
     private int lastDragOffset;
+    private int lastSizeChangeOffset = -1;
 
     // huge false positive from PMD...
     @SuppressWarnings("PMD.SingularField")
@@ -1139,6 +1140,7 @@ public final class Display extends CN1Constants {
             inputEventStackPointerTmp = inputEventStackPointer;
             inputEventStackPointer = 0;
             lastDragOffset = -1;
+            lastSizeChangeOffset = -1;
             int[] qt = inputEventStackTmp;
             inputEventStackTmp = inputEventStack;
 
@@ -2118,12 +2120,23 @@ public final class Display extends CN1Constants {
 
     private void addSizeChangeEvent(int type, int w, int h) {
         synchronized (lock) {
-            inputEventStack[inputEventStackPointer] = type;
-            inputEventStackPointer++;
-            inputEventStack[inputEventStackPointer] = w;
-            inputEventStackPointer++;
-            inputEventStack[inputEventStackPointer] = h;
-            inputEventStackPointer++;
+            try {
+                if (lastSizeChangeOffset > -1) {
+                    inputEventStack[lastSizeChangeOffset] = w;
+                    inputEventStack[lastSizeChangeOffset + 1] = h;
+                } else {
+                    inputEventStack[inputEventStackPointer] = type;
+                    inputEventStackPointer++;
+                    lastSizeChangeOffset = inputEventStackPointer;
+                    inputEventStack[inputEventStackPointer] = w;
+                    inputEventStackPointer++;
+                    inputEventStack[inputEventStackPointer] = h;
+                    inputEventStackPointer++;
+                }
+            } catch (ArrayIndexOutOfBoundsException err) {
+                Log.p("EDT performance is very slow triggering this exception!");
+                Log.e(err);
+            }
             lock.notifyAll();
         }
     }
