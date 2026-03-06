@@ -427,6 +427,43 @@ public class RECompiler {
         }
     }
 
+    private int parsePosixCharacterClass(boolean nestedPosixClass) throws RESyntaxException {
+        // Skip colon
+        idx++;
+
+        // POSIX character classes are denoted with lowercase ASCII strings
+        int idxStart = idx;
+        while (idx < len && pattern.charAt(idx) >= 'a' && pattern.charAt(idx) <= 'z') {
+            idx++;
+        }
+
+        // Should be a ":]" to terminate the POSIX character class
+        if ((idx + 1) < len && pattern.charAt(idx) == ':' && pattern.charAt(idx + 1) == ']') {
+            // Get character class
+            String charClass = pattern.substring(idxStart, idx);
+
+            // Select the POSIX class id
+            Character i = (Character) hashPOSIX.get(charClass);
+            if (i != null) {
+                // Move past colon and right bracket
+                idx += 2;
+
+                // Nested POSIX class "[[:class:]]" consumes one more right bracket.
+                if (nestedPosixClass) {
+                    if (idx >= len || pattern.charAt(idx) != ']') {
+                        syntaxError("Invalid POSIX character class syntax");
+                    }
+                    idx++;
+                }
+
+                return node(RE.OP_POSIXCLASS, i.charValue());
+            }
+            syntaxError("Invalid POSIX character class '" + charClass + "'");
+        }
+        syntaxError("Invalid POSIX character class syntax");
+        return -1;
+    }
+
     /// Compile a character class
     ///
     /// #### Returns
@@ -447,34 +484,15 @@ public class RECompiler {
             syntaxError("Empty or unterminated class");
         }
 
-        // Check for POSIX character class
+        // Check for POSIX character class in the "[:class:]" form.
         if (idx < len && pattern.charAt(idx) == ':') {
-            // Skip colon
+            return parsePosixCharacterClass(false);
+        }
+
+        // Check for POSIX character class in the "[[:class:]]" form.
+        if ((idx + 1) < len && pattern.charAt(idx) == '[' && pattern.charAt(idx + 1) == ':') {
             idx++;
-
-            // POSIX character classes are denoted with lowercase ASCII strings
-            int idxStart = idx;
-            while (idx < len && pattern.charAt(idx) >= 'a' && pattern.charAt(idx) <= 'z') {
-                idx++;
-            }
-
-            // Should be a ":]" to terminate the POSIX character class
-            if ((idx + 1) < len && pattern.charAt(idx) == ':' && pattern.charAt(idx + 1) == ']') {
-                // Get character class
-                String charClass = pattern.substring(idxStart, idx);
-
-                // Select the POSIX class id
-                Character i = (Character) hashPOSIX.get(charClass);
-                if (i != null) {
-                    // Move past colon and right bracket
-                    idx += 2;
-
-                    // Return new POSIX character class node
-                    return node(RE.OP_POSIXCLASS, i.charValue());
-                }
-                syntaxError("Invalid POSIX character class '" + charClass + "'");
-            }
-            syntaxError("Invalid POSIX character class syntax");
+            return parsePosixCharacterClass(true);
         }
 
         // Try to build a class.  Create OP_ANYOF node

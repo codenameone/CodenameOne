@@ -91,6 +91,27 @@ public final class Character{
     }
 
     /**
+     * Determines if the specified character is alphabetic.
+     */
+    public static boolean isAlpha(char ch){
+        return isLowerCase(ch) || isUpperCase(ch);
+    }
+
+    /**
+     * Determines if the specified character is numeric.
+     */
+    public static boolean isNumeric(char ch){
+        return isDigit(ch);
+    }
+
+    /**
+     * Determines if the specified character is alphabetic or numeric.
+     */
+    public static boolean isAlphaNumeric(char ch){
+        return isAlpha(ch) || isNumeric(ch);
+    }
+
+    /**
      * Determines if the specified character is a digit.
      */
     public static boolean isDigit(char ch){
