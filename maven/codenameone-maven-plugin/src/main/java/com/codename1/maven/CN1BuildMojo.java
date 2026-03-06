@@ -1016,6 +1016,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         try {
             boolean result = e.build(distJar, request);
             if (!result) {
+                String builderLog = e.getErrorMessage();
+                if (builderLog != null && builderLog.trim().length() > 0) {
+                    getLog().error("iOS builder log:\n" + builderLog);
+                }
                 throw new MojoExecutionException("iOS build failed");
             }
 
@@ -1039,6 +1043,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
 
         } catch (BuildException ex) {
+            String builderLog = e.getErrorMessage();
+            if (builderLog != null && builderLog.trim().length() > 0) {
+                getLog().error("iOS builder log:\n" + builderLog);
+            }
             throw new MojoExecutionException("Failed to build ios app", ex);
         } finally {
 

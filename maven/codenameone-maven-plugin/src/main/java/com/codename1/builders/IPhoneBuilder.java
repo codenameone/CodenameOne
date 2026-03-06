@@ -1193,8 +1193,9 @@ public class IPhoneBuilder extends Executor {
         if (!new File(javacPath).exists()) {
             javacPath = "javac";
         }
+        String[] stubSourceTarget = getStubCompileSourceTarget(javacPath);
         try {
-            if (!execWithFiles(stubSource, stubSource, ".java", javacPath, "-source", "1.6", "-target", "1.6", "-classpath",
+            if (!execWithFiles(stubSource, stubSource, ".java", javacPath, "-source", stubSourceTarget[0], "-target", stubSourceTarget[1], "-classpath",
                     classesDir.getAbsolutePath(),
                     "-d", classesDir.getAbsolutePath())) {
                 return false;
@@ -2595,7 +2596,7 @@ public class IPhoneBuilder extends Executor {
      */
     private int getXcodeVersion(String xcodeBuild) {
         try {
-            String result = execString(tmpFile, xcodeBuild, "-version");
+            String result = execString(new File("."), xcodeBuild, "-version");
             debug("Result is "+result);
 
             Scanner scanner = new Scanner(result);
@@ -2637,7 +2638,37 @@ public class IPhoneBuilder extends Executor {
         return defaultVal;
     }
 
+    private String[] getStubCompileSourceTarget(String javacPath) {
+        String source = "1.6";
+        String target = "1.6";
+        try {
+            String versionOutput = execString(tmpFile != null ? tmpFile : new File("."), javacPath, "-version");
+            if (versionOutput != null && versionOutput.trim().length() > 0) {
+                String[] parts = versionOutput.trim().split("\\s+");
+                String version = parts[parts.length - 1];
+                int major = getMajorVersionInt(version, -1);
+                if (major >= 9) {
+                    source = "8";
+                    target = "8";
+                    log("JDK " + version + " does not support -source/-target 1.6. Compiling iOS stubs with -source/-target 8.");
+                }
+            }
+        } catch (Exception ex) {
+            debug("Failed to resolve javac version for iOS stub compile: " + ex.getMessage());
+        }
+        return new String[]{source, target};
+    }
+
     private String resolveXcodebuild() {
+        String explicitXcodebuild = System.getenv("XCODEBUILD");
+        if (explicitXcodebuild != null && explicitXcodebuild.length() > 0) {
+            File candidate = new File(explicitXcodebuild);
+            if (candidate.exists()) {
+                log("Using xcodebuild from XCODEBUILD: " + candidate.getAbsolutePath());
+                return candidate.getAbsolutePath();
+            }
+        }
+
         String developerDir = System.getenv("DEVELOPER_DIR");
         if (developerDir != null && developerDir.length() > 0) {
             File candidate = new File(developerDir, "usr/bin/xcodebuild");

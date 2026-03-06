@@ -4,14 +4,19 @@ set -euo pipefail
 
 bia_log() { echo "[build-ios-app] $1"; }
 
-# Pin Xcode so CN1’s Java subprocess sees xcodebuild
-XCODE_APP="${XCODE_APP:-/Applications/Xcode_26.0.1.app}"
-if [ ! -d "$XCODE_APP" ]; then
-  bia_log "Xcode 26 not found at $XCODE_APP. Set XCODE_APP to the Xcode 26 app bundle path." >&2
+# Pin Xcode 26 for CI validation.
+if [ -z "${XCODE_APP:-}" ]; then
+  XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
+fi
+if [ ! -x "$XCODE_APP/Contents/Developer/usr/bin/xcodebuild" ]; then
+  bia_log "Xcode 26 not found. Set XCODE_APP to an installed Xcode 26 app bundle path." >&2
   exit 1
 fi
 export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
+export XCODEBUILD="$DEVELOPER_DIR/usr/bin/xcodebuild"
 export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
+bia_log "Using DEVELOPER_DIR=$DEVELOPER_DIR"
+bia_log "Using XCODEBUILD=$XCODEBUILD"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -56,12 +61,13 @@ fi
 
 ORIGINAL_JAVA_HOME="$JAVA_HOME"
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
+BASE_PATH="$PATH"
 
 bia_log "Using JAVA_HOME at $JAVA_HOME"
 bia_log "Using JAVA17_HOME at $JAVA17_HOME"
 bia_log "Using Maven installation at $MAVEN_HOME"
 bia_log "Using CocoaPods version $(pod --version 2>/dev/null || echo '<unknown>')"
-bia_log "Java version for Maven process:"
+bia_log "Java version for baseline toolchain:"
 "$JAVA_HOME/bin/java" -version
 bia_log "Using JAVAC from JAVA17_HOME for demo compilation:"
 "$JAVA17_HOME/bin/javac" -version
@@ -81,15 +87,34 @@ mkdir -p "$ARTIFACTS_DIR"
 
 export CN1_BUILD_STATS_FILE="$ARTIFACTS_DIR/iphone-builder-stats.txt"
 
-./mvnw package \
-  -DskipTests \
-  -Dcodename1.platform=ios \
-  -Dcodename1.buildTarget=ios-source \
-  -Dmaven.compiler.fork=true \
-  -Dmaven.compiler.executable="$JAVA17_HOME/bin/javac" \
-  -Dcodename1.arg.ios.uiscene="${IOS_UISCENE}" \
-  -Dopen=false \
-  -U -e
+bia_log "Running HelloCodenameOne Maven build with JAVA_HOME=$JAVA17_HOME"
+(
+  export JAVA_HOME="$JAVA17_HOME"
+  export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$BASE_PATH"
+  MVN_IOS_LOG="$ARTIFACTS_DIR/hellocn1-ios-build.log"
+  set +e
+  ./mvnw package \
+    -DskipTests \
+    -Dcodename1.platform=ios \
+    -Dcodename1.buildTarget=ios-source \
+    -Dmaven.compiler.fork=true \
+    -Dmaven.compiler.executable="$JAVA17_HOME/bin/javac" \
+    -Dcodename1.arg.ios.uiscene="${IOS_UISCENE}" \
+    -Dopen=false \
+    -U -e -X > "$MVN_IOS_LOG" 2>&1
+  RC=$?
+  set -e
+  if [ $RC -ne 0 ]; then
+    bia_log "Maven iOS build failed (exit=$RC). Log: $MVN_IOS_LOG"
+    bia_log "Key failure lines:"
+    if command -v rg >/dev/null 2>&1; then
+      rg -n "(iOS builder log:|Caused by:|BuildException|Cannot run program|UnsupportedClassVersionError|error:|\\[ERROR\\])" "$MVN_IOS_LOG" | tail -n 200 || true
+    else
+      grep -nE "(iOS builder log:|Caused by:|BuildException|Cannot run program|UnsupportedClassVersionError|error:|\\[ERROR\\])" "$MVN_IOS_LOG" | tail -n 200 || true
+    fi
+    exit $RC
+  fi
+)
 VM_END=$(date +%s)
 VM_TIME=$((VM_END - VM_START))
 cd ../..
