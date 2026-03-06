@@ -32,4 +32,42 @@ class RETest extends UITestBase {
         String[] split = expression.split(input);
         assertArrayEquals(new String[]{"", " and "}, split);
     }
+
+    @FormTest
+    void testNestedPosixAlphaCharacterClassSupport() throws Exception {
+        RE expression = new RE("^list [[:alpha:]]*$");
+
+        assertTrue(expression.match("list abcXYZ"));
+        assertTrue(expression.match("list "));
+        assertFalse(expression.match("list 123"));
+        assertFalse(expression.match("listing abc"));
+    }
+
+    @FormTest
+    void testLegacyPosixAlphaCharacterClassSupport() throws Exception {
+        RE expression = new RE("^list [:alpha:]*$");
+
+        assertTrue(expression.match("list alpha"));
+        assertFalse(expression.match("list alpha1"));
+    }
+
+    @FormTest
+    void testPosixClassesAndEscapes() throws Exception {
+        RE alnum = new RE("^[[:alnum:]]+$");
+        assertTrue(alnum.match("abc123"));
+        assertFalse(alnum.match("abc-123"));
+
+        RE digit = new RE("^[[:digit:]]+$");
+        assertTrue(digit.match("007"));
+        assertFalse(digit.match("7a"));
+
+        RE xdigit = new RE("^[[:xdigit:]]+$");
+        assertTrue(xdigit.match("a0B9F"));
+        assertFalse(xdigit.match("g0"));
+
+        RE wordThenDigits = new RE("^\\w+\\s+\\d+$");
+        assertTrue(wordThenDigits.match("item\t42"));
+        assertFalse(wordThenDigits.match("item-42"));
+    }
+
 }
