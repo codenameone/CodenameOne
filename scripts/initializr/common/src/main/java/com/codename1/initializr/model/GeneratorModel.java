@@ -18,7 +18,7 @@ import java.util.Map;
 import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
-    private static final String CN1_PLUGIN_VERSION = "7.0.250";
+    private static final String CN1_PLUGIN_VERSION = "7.0.227";
     private static final String GENERATED_GITIGNORE =
             "**/target/\n" +
             ".idea/\n" +
