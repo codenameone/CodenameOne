@@ -30,6 +30,12 @@ import static com.codename1.maven.PathUtil.path;
  */
 @Mojo(name = "compliance-check", defaultPhase = LifecyclePhase.PROCESS_CLASSES, requiresDependencyResolution = ResolutionScope.TEST)
 public class ComplianceCheckMojo extends AbstractCN1Mojo {
+    private static final String[] DEFAULT_DONTWARN_CLASSES = {
+            // RMI isn't part of Codename One supported runtime API.
+            "java.rmi.Remote",
+            // JDK implementation detail that can leak into analysis in newer JDK toolchains.
+            "java.util.Arrays$ArrayList"
+    };
 
     private File complianceOutputFile;
     @Override
@@ -234,6 +240,11 @@ public class ComplianceCheckMojo extends AbstractCN1Mojo {
                 java.createArg().setValue(keep);
             }
         }
+        for (String dontWarnClass : DEFAULT_DONTWARN_CLASSES) {
+            java.createArg().setValue("-dontwarn");
+            java.createArg().setValue(dontWarnClass);
+        }
+
         if (passNum == 0) {
             getLog().debug("Compliance check pass 0");
             // In the first pass we don't want any warnings or errors.
