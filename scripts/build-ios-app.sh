@@ -65,6 +65,8 @@ bia_log "Java version for Maven process:"
 "$JAVA_HOME/bin/java" -version
 bia_log "Using JAVAC from JAVA17_HOME for demo compilation:"
 "$JAVA17_HOME/bin/javac" -version
+IOS_UISCENE="${IOS_UISCENE:-false}"
+bia_log "Building sample app with ios.uiscene=${IOS_UISCENE}"
 
 APP_DIR="scripts/hellocodenameone"
 
@@ -85,6 +87,7 @@ export CN1_BUILD_STATS_FILE="$ARTIFACTS_DIR/iphone-builder-stats.txt"
   -Dcodename1.buildTarget=ios-source \
   -Dmaven.compiler.fork=true \
   -Dmaven.compiler.executable="$JAVA17_HOME/bin/javac" \
+  -Dcodename1.arg.ios.uiscene="${IOS_UISCENE}" \
   -Dopen=false \
   -U -e
 VM_END=$(date +%s)
