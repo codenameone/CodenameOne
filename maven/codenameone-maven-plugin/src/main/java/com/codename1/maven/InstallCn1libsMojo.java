@@ -231,32 +231,6 @@ public class InstallCn1libsMojo extends AbstractCN1Mojo {
     }
     
 
-    private static int parseJavaVersion(String version, int defaultValue) {
-        if (version == null) {
-            return defaultValue;
-        }
-        String normalized = version.trim();
-        if (normalized.isEmpty()) {
-            return defaultValue;
-        }
-        if (normalized.startsWith("1.")) {
-            normalized = normalized.substring(2);
-        }
-        int dotPos = normalized.indexOf('.');
-        if (dotPos > 0) {
-            normalized = normalized.substring(0, dotPos);
-        }
-        int dashPos = normalized.indexOf('-');
-        if (dashPos > 0) {
-            normalized = normalized.substring(0, dashPos);
-        }
-        try {
-            return Integer.parseInt(normalized);
-        } catch (NumberFormatException ex) {
-            return defaultValue;
-        }
-    }
-
     /**
      * Merges the lib's required properties with the project properties.  Does not persist.
      * @param artifact
@@ -271,8 +245,8 @@ public class InstallCn1libsMojo extends AbstractCN1Mojo {
         String javaVersion = (String)projectProps.getProperty("codename1.arg.java.version", "8");
         String javaVersionLib = (String)libProps.get("codename1.arg.java.version");
         if(javaVersionLib != null){
-            int v1 = parseJavaVersion(javaVersion, 5);
-            int v2 = parseJavaVersion(javaVersionLib, 5);
+            int v1 = JavaVersionUtil.parseJavaVersion(javaVersion, 5);
+            int v2 = JavaVersionUtil.parseJavaVersion(javaVersionLib, 5);
             //if the lib java version is bigger, this library cannot be used
             if(v1 < v2){
                 throw new BuildException("Cannot use a cn1lib with java version "

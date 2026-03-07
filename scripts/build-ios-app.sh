@@ -59,7 +59,6 @@ if ! command -v pod >/dev/null 2>&1; then
   exit 1
 fi
 
-ORIGINAL_JAVA_HOME="$JAVA_HOME"
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 BASE_PATH="$PATH"
 

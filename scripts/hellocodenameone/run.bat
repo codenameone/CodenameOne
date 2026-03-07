@@ -5,7 +5,7 @@ setlocal EnableExtensions
 
 set MVNW=mvnw.cmd
 
-java -version 2>&1 | findstr /c:"17" >nul
+java -version 2>&1 | findstr /r /c:"version \"17\." /c:"version \"17\"" >nul
 if errorlevel 1 if exist "C:\Program Files\Java\jdk-17" set "JAVA_HOME=C:\Program Files\Java\jdk-17"
 if errorlevel 1 if exist "C:\Program Files\Eclipse Adoptium\jdk-17" set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17"
 if not "%JAVA_HOME%"=="" set "PATH=%JAVA_HOME%\bin;%PATH%"
