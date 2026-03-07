@@ -294,6 +294,87 @@ class BytecodeInstructionIntegrationTest {
         assertTrue(output.contains("RESULT="), "Compiled program should print the expected Invoke/Ldc result");
     }
 
+    @Test
+    void translatesJava17StringConcatInvokeDynamic() throws Exception {
+        Parser.cleanup();
+
+        List<CompilerHelper.CompilerConfig> configs = CompilerHelper.getAvailableCompilers("17");
+        CompilerHelper.CompilerConfig config = configs.stream()
+                .filter(c -> CompilerHelper.getJdkMajor(c) >= 17)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("No JDK 17+ compiler available for invokedynamic string concat test"));
+
+        assertTrue(CompilerHelper.isJavaApiCompatible(config),
+                "JDK " + config.jdkVersion + " must target matching bytecode level for JavaAPI");
+
+        Path sourceDir = Files.createTempDirectory("concat-indy-sources");
+        Path classesDir = Files.createTempDirectory("concat-indy-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-classes");
+
+        Files.write(sourceDir.resolve("StringConcatInvokeDynamicApp.java"),
+                stringConcatInvokeDynamicAppSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("native_report.c"), nativeReportSource().getBytes(StandardCharsets.UTF_8));
+
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
+
+        List<String> compileArgs = new ArrayList<>();
+        compileArgs.add("-source");
+        compileArgs.add("17");
+        compileArgs.add("-target");
+        compileArgs.add("17");
+        compileArgs.add("-classpath");
+        compileArgs.add(javaApiDir.toString());
+        compileArgs.add("-d");
+        compileArgs.add(classesDir.toString());
+        compileArgs.add(sourceDir.resolve("StringConcatInvokeDynamicApp.java").toString());
+
+        int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
+        assertEquals(0, compileResult, "StringConcatInvokeDynamicApp should compile with " + config);
+
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
+        Files.copy(sourceDir.resolve("native_report.c"), classesDir.resolve("native_report.c"));
+
+        Path outputDir = Files.createTempDirectory("concat-indy-output");
+        CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "StringConcatInvokeDynamic");
+
+        Path distDir = outputDir.resolve("dist");
+        Path cmakeLists = distDir.resolve("CMakeLists.txt");
+        assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project for invokedynamic string concat sample");
+
+        Path srcRoot = distDir.resolve("StringConcatInvokeDynamic-src");
+        Path generatedSource = findGeneratedSource(srcRoot, "StringConcatInvokeDynamicApp");
+        String generatedCode = new String(Files.readAllBytes(generatedSource), StandardCharsets.UTF_8);
+
+        assertTrue(generatedCode.contains("__NEW_java_lang_StringBuilder"),
+                "String concat invokedynamic should translate into StringBuilder allocation");
+        assertTrue(generatedCode.contains("virtual_java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder"),
+                "String concat invokedynamic should append string segments");
+        assertTrue(generatedCode.contains("virtual_java_lang_StringBuilder_append___int_R_java_lang_StringBuilder"),
+                "String concat invokedynamic should append primitive values");
+        assertTrue(generatedCode.contains("virtual_java_lang_StringBuilder_toString___R_java_lang_String"),
+                "String concat invokedynamic should finalize to String");
+
+        CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
+
+        Path buildDir = distDir.resolve("build");
+        Files.createDirectories(buildDir);
+
+        CleanTargetIntegrationTest.runCommand(Arrays.asList(
+                "cmake",
+                "-S", distDir.toString(),
+                "-B", buildDir.toString(),
+                "-DCMAKE_C_COMPILER=clang",
+                "-DCMAKE_OBJC_COMPILER=clang"
+        ), distDir);
+
+        CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+
+        Path executable = buildDir.resolve("StringConcatInvokeDynamic");
+        String output = CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), buildDir);
+        assertTrue(output.contains("RESULT=1"),
+                "Translated executable should preserve invokedynamic concat semantics. Output:\n" + output);
+    }
+
     private Set<String> snapshotArrayTypes() throws Exception {
         Field arrayTypesField = ByteCodeClass.class.getDeclaredField("arrayTypes");
         arrayTypesField.setAccessible(true);
@@ -643,6 +724,20 @@ class BytecodeInstructionIntegrationTest {
                 "}\n";
     }
 
+    private String stringConcatInvokeDynamicAppSource() {
+        return "public class StringConcatInvokeDynamicApp {\n" +
+                "    private static native void report(int value);\n" +
+                "    private static String format(String name, int count) {\n" +
+                "        return \"user=\" + name + \";count=\" + count + \";ok\";\n" +
+                "    }\n" +
+                "    public static void main(String[] args) {\n" +
+                "        String expected = \"user=alice;count=7;ok\";\n" +
+                "        String actual = format(\"alice\", 7);\n" +
+                "        report(expected.equals(actual) ? 1 : -1);\n" +
+                "    }\n" +
+                "}\n";
+    }
+
     private String javaLangDoubleHeader() {
         return "#include \"cn1_globals.h\"\n" +
                 "#include <limits.h>\n" +
@@ -674,6 +769,9 @@ class BytecodeInstructionIntegrationTest {
                 "    printf(\"RESULT=%d\\n\", value);\n" +
                 "}\n" +
                 "void InvokeLdcLocalVarsApp_report___int(CODENAME_ONE_THREAD_STATE, JAVA_INT value) {\n" +
+                "    printf(\"RESULT=%d\\n\", value);\n" +
+                "}\n" +
+                "void StringConcatInvokeDynamicApp_report___int(CODENAME_ONE_THREAD_STATE, JAVA_INT value) {\n" +
                 "    printf(\"RESULT=%d\\n\", value);\n" +
                 "}\n";
     }

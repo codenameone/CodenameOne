@@ -54,6 +54,7 @@ public class Parser extends ClassVisitor {
     private static List<ByteCodeClass> classes = new ArrayList<>();
     private static final MethodDependencyGraph dependencyGraph = new MethodDependencyGraph();
     private int lambdaCounter;
+    private int stringConcatCounter;
     public static void cleanup() {
         nativeSources = null;
         classes.clear();
@@ -814,6 +815,82 @@ public class Parser extends ClassVisitor {
 
         @Override
         public void visitInvokeDynamicInsn(String name, String desc, Handle bsm, Object... bsmArgs) {
+            if ("java/lang/invoke/StringConcatFactory".equals(bsm.getOwner()) &&
+                ("makeConcatWithConstants".equals(bsm.getName()) || "makeConcat".equals(bsm.getName()))) {
+
+                Type invokedType = Type.getMethodType(desc);
+                if (!Type.getType(String.class).equals(invokedType.getReturnType())) {
+                    super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs);
+                    return;
+                }
+
+                String helperName = "cn1$concat$" + (stringConcatCounter++);
+                BytecodeMethod helper = new BytecodeMethod(clsName, Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC, helperName, desc, null, null);
+                cls.addMethod(helper);
+
+                helper.addTypeInstruction(Opcodes.NEW, "java/lang/StringBuilder");
+                helper.addInstruction(Opcodes.DUP);
+                helper.addInvoke(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "()V", false);
+
+                Type[] argTypes = invokedType.getArgumentTypes();
+                int maxLocal = 0;
+                for (Type t : argTypes) {
+                    maxLocal += t.getSize();
+                }
+
+                int localIndex = 0;
+                int argIndex = 0;
+                if ("makeConcat".equals(bsm.getName())) {
+                    for (Type argType : argTypes) {
+                        appendConcatArgument(helper, argType, localIndex);
+                        localIndex += argType.getSize();
+                    }
+                } else {
+                    String recipe = bsmArgs != null && bsmArgs.length > 0 ? String.valueOf(bsmArgs[0]) : "";
+                    List<String> constants = new ArrayList<>();
+                    if (bsmArgs != null) {
+                        for (int i = 1; i < bsmArgs.length; i++) {
+                            constants.add(String.valueOf(bsmArgs[i]));
+                        }
+                    }
+                    int constantIndex = 0;
+                    StringBuilder literal = new StringBuilder();
+                    for (int i = 0; i < recipe.length(); i++) {
+                        char ch = recipe.charAt(i);
+                        if (ch == '\u0001') {
+                            appendConcatLiteral(helper, literal);
+                            literal.setLength(0);
+                            if (argIndex < argTypes.length) {
+                                Type argType = argTypes[argIndex++];
+                                appendConcatArgument(helper, argType, localIndex);
+                                localIndex += argType.getSize();
+                            }
+                        } else if (ch == '\u0002') {
+                            appendConcatLiteral(helper, literal);
+                            literal.setLength(0);
+                            if (constantIndex < constants.size()) {
+                                appendConcatLiteral(helper, constants.get(constantIndex++));
+                            }
+                        } else {
+                            literal.append(ch);
+                        }
+                    }
+                    appendConcatLiteral(helper, literal);
+                    while (argIndex < argTypes.length) {
+                        Type argType = argTypes[argIndex++];
+                        appendConcatArgument(helper, argType, localIndex);
+                        localIndex += argType.getSize();
+                    }
+                }
+
+                helper.addInvoke(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "toString", "()Ljava/lang/String;", false);
+                helper.addInstruction(Opcodes.ARETURN);
+                helper.setMaxes(16, maxLocal + 2);
+
+                mtd.addInvoke(Opcodes.INVOKESTATIC, clsName, helperName, desc, false);
+                return;
+            }
+
             if ("java/lang/invoke/LambdaMetafactory".equals(bsm.getOwner()) &&
                 ("metafactory".equals(bsm.getName()) || "altMetafactory".equals(bsm.getName()))) {
 
@@ -981,6 +1058,53 @@ public class Parser extends ClassVisitor {
             }
 
             super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs); 
+        }
+
+        private void appendConcatLiteral(BytecodeMethod targetMethod, CharSequence literal) {
+            if (literal == null || literal.length() == 0) {
+                return;
+            }
+            targetMethod.addLdc(literal.toString());
+            targetMethod.addInvoke(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
+        }
+
+        private void appendConcatArgument(BytecodeMethod targetMethod, Type argType, int localIndex) {
+            targetMethod.addVariableOperation(argType.getOpcode(Opcodes.ILOAD), localIndex);
+            String appendDesc;
+            switch (argType.getSort()) {
+                case Type.BOOLEAN:
+                    appendDesc = "(Z)Ljava/lang/StringBuilder;";
+                    break;
+                case Type.CHAR:
+                    appendDesc = "(C)Ljava/lang/StringBuilder;";
+                    break;
+                case Type.BYTE:
+                case Type.SHORT:
+                case Type.INT:
+                    appendDesc = "(I)Ljava/lang/StringBuilder;";
+                    break;
+                case Type.LONG:
+                    appendDesc = "(J)Ljava/lang/StringBuilder;";
+                    break;
+                case Type.FLOAT:
+                    appendDesc = "(F)Ljava/lang/StringBuilder;";
+                    break;
+                case Type.DOUBLE:
+                    appendDesc = "(D)Ljava/lang/StringBuilder;";
+                    break;
+                case Type.OBJECT:
+                    if ("java/lang/String".equals(argType.getInternalName())) {
+                        appendDesc = "(Ljava/lang/String;)Ljava/lang/StringBuilder;";
+                    } else {
+                        appendDesc = "(Ljava/lang/Object;)Ljava/lang/StringBuilder;";
+                    }
+                    break;
+                case Type.ARRAY:
+                default:
+                    appendDesc = "(Ljava/lang/Object;)Ljava/lang/StringBuilder;";
+                    break;
+            }
+            targetMethod.addInvoke(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append", appendDesc, false);
         }
 
         @Override
