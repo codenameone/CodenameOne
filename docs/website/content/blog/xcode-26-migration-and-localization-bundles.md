@@ -5,7 +5,10 @@ author: Shai Almog
 slug: xcode-26-migration-and-localization-bundles
 url: /blog/xcode-26-migration-and-localization-bundles/
 description: We started the Xcode 26 migration rollout, Initializr now generates localization resource bundles, and there are several useful platform updates you should know about.
+feed_html: '<img src="https://www.codenameone.com/blog/xcode-26-migration-and-localization-bundles.jpg" alt="Xcode 26 Migration, UIScene Rollout, Initializr Localization Bundles, and More" /> We started the Xcode 26 migration rollout, Initializr now generates localization resource bundles, and there are several useful platform updates you should know about.'
 ---
+
+![Xcode 26 Migration, UIScene Rollout, Initializr Localization Bundles, and More](/blog/xcode-26-migration-and-localization-bundles.jpg)
 
 A lot landed since the last update, so I want to give you a practical summary of what changed and what matters.
 
