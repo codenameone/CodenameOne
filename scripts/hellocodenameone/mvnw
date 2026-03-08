@@ -72,6 +72,23 @@ if [ -z "$JAVA_HOME" ] ; then
   fi
 fi
 
+is_java17_home() {
+  if [ -z "$1" ] || [ ! -x "$1/bin/java" ]; then
+    return 1
+  fi
+  "$1/bin/java" -version 2>&1 | head -n 1 | grep -q '"17'
+}
+
+if ! is_java17_home "$JAVA_HOME" ; then
+  for candidate in /usr/lib/jvm/java-17-openjdk-amd64 /usr/lib/jvm/java-17-openjdk /usr/lib/jvm/jdk-17 /usr/lib/jvm/*17*; do
+    if is_java17_home "$candidate" ; then
+      JAVA_HOME="$candidate"
+      export JAVA_HOME
+      break
+    fi
+  done
+fi
+
 if [ -z "$M2_HOME" ] ; then
   ## resolve links - $0 may be a link to maven's home
   PRG="$0"

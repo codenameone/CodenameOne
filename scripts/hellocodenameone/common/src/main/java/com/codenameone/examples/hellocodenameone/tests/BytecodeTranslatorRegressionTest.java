@@ -30,7 +30,9 @@ public class BytecodeTranslatorRegressionTest extends BaseTest {
 
         default void drawArrow(Graphics gc, SlotProvider src, SlotProvider dest, int x1, int y1, int x2, int y2,
                 Hue color, double arrowOpacity, int tickSize, double lineWidth) {
-            GameViewer.log("draw-arrow:" + x1 + ":" + tickSize + ":" + lineWidth);
+            StringBuilder sb = new StringBuilder();
+            sb.append("draw-arrow:").append(x1).append(':').append(tickSize).append(':').append(lineWidth);
+            GameViewer.log(sb.toString());
         }
 
         default int lastSlot() {

@@ -53,14 +53,19 @@ ri_log "Loading workspace environment from $ENV_FILE"
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 
-# Use the same Xcode as the build step
-XCODE_APP="${XCODE_APP:-/Applications/Xcode_26.0.1.app}"
-if [ ! -d "$XCODE_APP" ]; then
-  ri_log "Xcode 26 not found at $XCODE_APP. Set XCODE_APP to the Xcode 26 app bundle path." >&2
+# Pin Xcode 26 for CI validation.
+if [ -z "${XCODE_APP:-}" ]; then
+  XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
+fi
+if [ ! -x "$XCODE_APP/Contents/Developer/usr/bin/xcodebuild" ]; then
+  ri_log "Xcode 26 not found. Set XCODE_APP to an installed Xcode 26 app bundle path." >&2
   exit 3
 fi
 export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
+export XCODEBUILD="$DEVELOPER_DIR/usr/bin/xcodebuild"
 export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
+ri_log "Using DEVELOPER_DIR=$DEVELOPER_DIR"
+ri_log "Using XCODEBUILD=$XCODEBUILD"
 
 if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
   ri_log "JAVA17_HOME not set correctly" >&2
@@ -525,11 +530,11 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
     xcrun simctl uninstall "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
 
     xcrun simctl spawn "$SIM_DEVICE_ID" \
-      log stream --style json --level debug \
-      --predicate 'eventMessage CONTAINS "CN1SS"' \
+      log stream --style compact --level debug \
+      --predicate '(composedMessage CONTAINS "CN1SS") OR (eventMessage CONTAINS "CN1SS")' \
       > "$TEST_LOG" 2>&1 &
   else
-    xcrun simctl spawn booted log stream --style compact --level debug --predicate 'composedMessage CONTAINS "CN1SS"' > "$TEST_LOG" 2>&1 &
+    xcrun simctl spawn booted log stream --style compact --level debug --predicate '(composedMessage CONTAINS "CN1SS") OR (eventMessage CONTAINS "CN1SS")' > "$TEST_LOG" 2>&1 &
   fi
   LOG_STREAM_PID=$!
   sleep 2
@@ -616,7 +621,7 @@ LOG_STREAM_PID=0
 FALLBACK_LOG="$ARTIFACTS_DIR/device-runner-fallback.log"
 xcrun simctl spawn "$SIM_DEVICE_ID" \
   log show --style syslog --last 30m \
-  --predicate 'eventMessage CONTAINS "CN1SS"' \
+  --predicate '(composedMessage CONTAINS "CN1SS") OR (eventMessage CONTAINS "CN1SS")' \
   > "$FALLBACK_LOG" 2>/dev/null || true
 
 if [ -n "$SIM_DEVICE_ID" ]; then

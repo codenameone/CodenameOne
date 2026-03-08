@@ -54,6 +54,13 @@ if exist "%HOME%\mavenrc_pre.cmd" call "%HOME%\mavenrc_pre.cmd"
 
 set ERROR_CODE=0
 
+@REM Prefer JDK 17 when available because this project compiles with target 17.
+if not "%JAVA_HOME%" == "" (
+    "%JAVA_HOME%\bin\java.exe" -version 2>&1 | findstr /r /c:"version \"17\." /c:"version \"17\"" >nul
+)
+if errorlevel 1 if exist "C:\Program Files\Java\jdk-17\bin\java.exe" set "JAVA_HOME=C:\Program Files\Java\jdk-17"
+if errorlevel 1 if exist "C:\Program Files\Eclipse Adoptium\jdk-17\bin\java.exe" set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17"
+
 @REM To isolate internal variables from possible post scripts, we use another setlocal
 @setlocal
 

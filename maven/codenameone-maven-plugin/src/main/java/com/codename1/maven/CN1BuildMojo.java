@@ -1008,8 +1008,6 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         String incSources = request.getArg("build.incSources", null);
         request.setIncludeSource(true);
 
-
-
         String testBuild = request.getArg("build.unitTest", null);
         if(testBuild != null && testBuild.equals("1")) {
             e.setUnitTestMode(true);
@@ -1018,6 +1016,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         try {
             boolean result = e.build(distJar, request);
             if (!result) {
+                String builderLog = e.getErrorMessage();
+                if (builderLog != null && builderLog.trim().length() > 0) {
+                    getLog().error("iOS builder log:\n" + builderLog);
+                }
                 throw new MojoExecutionException("iOS build failed");
             }
 
@@ -1041,6 +1043,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
 
         } catch (BuildException ex) {
+            String builderLog = e.getErrorMessage();
+            if (builderLog != null && builderLog.trim().length() > 0) {
+                getLog().error("iOS builder log:\n" + builderLog);
+            }
             throw new MojoExecutionException("Failed to build ios app", ex);
         } finally {
 
@@ -1073,19 +1079,14 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
     }
 
-
-
     private SortedProperties mergeRequiredProperties(String libraryName, Properties libProps, Properties projectProps) throws LibraryPropertiesException {
 
 
         String javaVersion = (String)projectProps.getProperty("codename1.arg.java.version", "8");
         String javaVersionLib = (String)libProps.get("codename1.arg.java.version");
         if(javaVersionLib != null){
-            int v1 = 5;
-            if(javaVersion != null){
-                v1 = Integer.parseInt(javaVersion);
-            }
-            int v2 = Integer.parseInt(javaVersionLib);
+            int v1 = JavaVersionUtil.parseJavaVersion(javaVersion, 5);
+            int v2 = JavaVersionUtil.parseJavaVersion(javaVersionLib, 5);
             //if the lib java version is bigger, this library cannot be used
             if(v1 < v2){
                 throw new VersionMismatchException(libraryName, "Cannot use a cn1lib with java version "
