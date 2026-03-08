@@ -1,0 +1,2571 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AndroidAsyncView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.codename1.impl.android</a> &gt; <span class="el_source">AndroidAsyncView.java</span></div><h1>AndroidAsyncView.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android;
+
+import android.app.Activity;
+import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
+import android.graphics.Canvas;
+import android.graphics.LinearGradient;
+import android.graphics.Matrix;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RadialGradient;
+import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.Shader;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputConnection;
+
+import com.codename1.io.Log;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.PeerComponent;
+import com.codename1.ui.Stroke;
+import com.codename1.ui.TextField;
+import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Rectangle;
+import java.util.ArrayList;
+
+import com.codename1.ui.Transform;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.StyleAccessor;
+import java.util.WeakHashMap;
+
+public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
+
+
+<span class="fc" id="L66">    private RectF tmpRectf = new RectF();</span>
+
+    public static class LayoutParams extends ViewGroup.MarginLayoutParams {
+        public PeerComponent pc;
+        public LayoutParams(int x, int y, int w, int h, PeerComponent pc) {
+<span class="fc" id="L71">            super(w, h);</span>
+<span class="fc" id="L72">            this.pc = pc;</span>
+<span class="fc" id="L73">            this.x = x;</span>
+<span class="fc" id="L74">            this.y = y;</span>
+<span class="fc" id="L75">            this.w = w;</span>
+<span class="fc" id="L76">            this.h = h;</span>
+<span class="fc" id="L77">        }</span>
+
+        public int x, y, w, h;
+        public boolean dirty;
+    }
+
+    public Rect getSafeAreaInsets() {
+<span class="fc" id="L84">        return cn1View.getSafeArea();</span>
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+<span class="fc" id="L89">        final int count = getChildCount();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for(int iter = 0 ; iter &lt; count ; iter++) {</span>
+<span class="fc" id="L91">            View child = getChildAt(iter);</span>
+<span class="fc" id="L92">            LayoutParams lp = (LayoutParams) child.getLayoutParams();</span>
+<span class="fc" id="L93">            child.measure(View.MeasureSpec.makeMeasureSpec(lp.w, MeasureSpec.EXACTLY),</span>
+<span class="fc" id="L94">                    View.MeasureSpec.makeMeasureSpec(lp.h, MeasureSpec.EXACTLY));</span>
+        }
+<span class="fc" id="L96">        setMeasuredDimension(widthMeasureSpec, heightMeasureSpec);</span>
+<span class="fc" id="L97">    }</span>
+
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+<span class="fc" id="L101">        final int count = getChildCount();</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        for(int iter = 0 ; iter &lt; count ; iter++) {</span>
+<span class="fc" id="L103">            View child = getChildAt(iter);</span>
+<span class="fc" id="L104">            LayoutParams lp = (LayoutParams) child.getLayoutParams();</span>
+<span class="fc" id="L105">            child.layout(lp.x, lp.y, lp.x + lp.w, lp.y + lp.h);</span>
+        }
+<span class="fc" id="L107">    }</span>
+
+
+    @Override
+    public boolean shouldDelayChildPressedState() {
+<span class="nc" id="L112">        return false;</span>
+    }
+
+
+    abstract class AsyncOp {
+
+        int clipX;
+        int clipY;
+        int clipW;
+        int clipH;
+        
+        Path clipPath;
+        boolean clipIsPath;
+
+<span class="fc" id="L126">        public AsyncOp(Rectangle clip, Path clipP, boolean clipIsPath) {</span>
+<span class="fc" id="L127">            this.clipIsPath = clipIsPath;</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (clipIsPath) {</span>
+<span class="fc" id="L129">                this.clipPath = new Path();</span>
+<span class="fc" id="L130">                this.clipPath.set(clipP);</span>
+            } else {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">                if (clip == null) {</span>
+<span class="nc" id="L133">                    clipW = cn1View.width;</span>
+<span class="nc" id="L134">                    clipH = cn1View.height;</span>
+                } else {
+<span class="fc" id="L136">                    clipX = clip.getX();</span>
+<span class="fc" id="L137">                    clipY = clip.getY();</span>
+<span class="fc" id="L138">                    clipW = clip.getWidth();</span>
+<span class="fc" id="L139">                    clipH = clip.getHeight();</span>
+                }
+            }
+
+<span class="fc" id="L143">        }</span>
+        
+<span class="fc" id="L145">        public void prepare() {}</span>
+        
+        public void executeWithClip(AndroidGraphics underlying) {
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            if(clipIsPath){</span>
+<span class="fc" id="L149">                underlying.setClipRaw(clipPath);</span>
+            }else{
+<span class="fc" id="L151">                underlying.setClipRaw(clipX, clipY, clipW, clipH);</span>
+            }
+<span class="fc" id="L153">            execute(underlying);</span>
+<span class="fc" id="L154">        }</span>
+
+        public abstract void execute(AndroidGraphics underlying);
+    }
+<span class="fc" id="L158">    private static final Object RENDERING_OPERATIONS_LOCK = new Object();</span>
+<span class="fc" id="L159">    private ArrayList&lt;AsyncOp&gt; renderingOperations = new ArrayList&lt;AsyncOp&gt;();</span>
+<span class="fc" id="L160">    private ArrayList&lt;AsyncOp&gt; pendingRenderingOperations = new ArrayList&lt;AsyncOp&gt;();</span>
+<span class="fc" id="L161">    private ArrayList&lt;AsyncOp&gt; currentlyRendering = new ArrayList&lt;AsyncOp&gt;();</span>
+    private final CodenameOneView cn1View;
+    private final AndroidGraphics graphics;
+    private final AndroidGraphics internalGraphics;
+    private final AndroidImplementation implementation;
+<span class="fc" id="L166">    static boolean legacyPaintLogic = true;</span>
+<span class="fc" id="L167">    private static ArrayList&lt;Path&gt; pathPool = new ArrayList&lt;Path&gt;();</span>
+
+    private synchronized static Path createPathFromPool() {
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        if (!pathPool.isEmpty()) {</span>
+<span class="nc" id="L171">            Path out = pathPool.remove(pathPool.size()-1);</span>
+<span class="nc" id="L172">            out.rewind();</span>
+<span class="nc" id="L173">            return out;</span>
+        }
+<span class="nc" id="L175">        return new Path();</span>
+    }
+
+    private synchronized static void recycle(Path p) {
+<span class="nc bnc" id="L179" title="All 4 branches missed.">        if (pathPool.size() &lt; 5 &amp;&amp; p != null) {</span>
+<span class="nc" id="L180">            pathPool.add(p);</span>
+        }
+<span class="nc" id="L182">    }</span>
+
+
+    public AndroidAsyncView(Activity activity, AndroidImplementation implementation) {
+<span class="fc" id="L186">        super(activity);</span>
+<span class="fc" id="L187">        setId(2001);</span>
+<span class="fc" id="L188">        this.implementation = implementation;</span>
+<span class="fc" id="L189">        graphics = new AsyncGraphics(implementation);</span>
+<span class="fc" id="L190">        internalGraphics = new AndroidGraphics(implementation, null, false);</span>
+<span class="fc" id="L191">        cn1View = new CodenameOneView(activity, this, implementation, false);</span>
+<span class="fc" id="L192">        setWillNotCacheDrawing(true);</span>
+<span class="fc" id="L193">        setWillNotDraw(true);</span>
+<span class="fc" id="L194">        setBackgroundDrawable(null);</span>
+<span class="fc" id="L195">        this.setFocusable(true);</span>
+<span class="fc" id="L196">        this.setFocusableInTouchMode(false);</span>
+<span class="fc" id="L197">        this.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);</span>
+<span class="fc" id="L198">    }</span>
+
+
+    @Override
+    protected void dispatchDraw(Canvas c) {
+        // **************************
+        // Commented out debuging code useful for hand tuning the drawing logic performance
+        // **************************
+        //long time = System.currentTimeMillis();
+        
+        //boolean paintOnBuffer = implementation.isEditingText() ||
+        //        InPlaceEditView.isKeyboardShowing();
+        
+<span class="fc" id="L211">        boolean paintOnBuffer = false;</span>
+        
+<span class="fc" id="L213">        internalGraphics.setCanvasNoSave(c);</span>
+<span class="fc" id="L214">        AndroidGraphics g = internalGraphics;</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (paintOnBuffer) {</span>
+<span class="nc" id="L216">            g = cn1View.getGraphics();</span>
+        }
+
+        //final HashMap&lt;String, Long&gt; slowest = new HashMap&lt;&gt;();
+        //final HashMap&lt;String, Long&gt; counts = new HashMap&lt;&gt;();
+<span class="fc" id="L221">        int count = renderingOperations.size();</span>
+
+        // this works around the case of a blank screen when an invalidate occurs out of nowhere
+        // and no operations are in the queue
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if(count &gt; 0) {</span>
+<span class="fc" id="L226">            currentlyRendering.clear();</span>
+<span class="fc" id="L227">            currentlyRendering.addAll(renderingOperations);</span>
+        } else {
+<span class="fc" id="L229">            count = currentlyRendering.size();</span>
+        }
+<span class="fc" id="L231">        int offset = 0;</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        for(; offset &lt; count ; offset++) {</span>
+<span class="fc" id="L233">            AsyncOp o = currentlyRendering.get(offset);</span>
+<span class="fc" id="L234">            o.executeWithClip(g);</span>
+            /*ntime = System.nanoTime() - ntime;
+            String s = o.toString();
+            Long l = slowest.get(s);
+            if(l == null) {
+                slowest.put(s, ntime);
+                counts.put(s, Long.valueOf(1));
+            } else {
+                slowest.put(s, l.longValue() + ntime);
+                Long ll = counts.get(s);
+                counts.put(s, ll.longValue() + 1);
+            }*/
+        }
+        
+<span class="fc" id="L248">        synchronized (RENDERING_OPERATIONS_LOCK) {</span>
+<span class="fc" id="L249">            renderingOperations.clear();</span>
+<span class="fc" id="L250">            RENDERING_OPERATIONS_LOCK.notify();</span>
+<span class="fc" id="L251">        }</span>
+
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">        if (paintOnBuffer) {</span>
+<span class="nc" id="L254">            cn1View.d(c);</span>
+        }
+<span class="pc bpc" id="L256" title="1 of 4 branches missed.">        if (implementation.isAsyncEditMode() &amp;&amp; implementation.isEditingText()) {</span>
+<span class="fc" id="L257">            InPlaceEditView.reLayoutEdit();</span>
+        }
+        /*long etime = System.currentTimeMillis();
+        if(etime - time &gt;= 16) {
+            System.out.println(&quot;JANK... &quot; + (etime - time));
+
+            ArrayList&lt;String&gt; sortedSlowest = new ArrayList&lt;&gt;(slowest.keySet());
+            Collections.sort(sortedSlowest, new Comparator&lt;String&gt;() {
+                @Override
+                public int compare(String lhs, String rhs) {
+                    return (int) (slowest.get(rhs).longValue() - slowest.get(lhs).longValue());
+                }
+            });
+
+
+            ArrayList&lt;String&gt; sortedCounts = new ArrayList&lt;&gt;(counts.keySet());
+            Collections.sort(sortedCounts, new Comparator&lt;String&gt;() {
+                @Override
+                public int compare(String lhs, String rhs) {
+                    return (int) (counts.get(rhs).longValue() - counts.get(lhs).longValue());
+                }
+            });
+            for(int iter = 0 ; iter &lt; Math.min(5, sortedSlowest.size()) ; iter++) {
+                String name = sortedSlowest.get(iter);
+                System.out.println(&quot;Slowest entry &quot; + iter + &quot; is &quot; + name + &quot; for &quot; + slowest.get(name));
+
+                name = sortedCounts.get(iter);
+                System.out.println(&quot;Most entries &quot; + iter + &quot; is &quot; + name + &quot; for &quot; + counts.get(name));
+            }
+        }*/
+<span class="fc" id="L287">    }</span>
+
+    public void setPaintViewOnBuffer(boolean paintViewOnBuffer) {
+        //this.paintViewOnBuffer = paintViewOnBuffer;
+<span class="fc" id="L291">    }</span>
+
+    @Override
+    public boolean isOpaque() {
+<span class="fc" id="L295">        return true;</span>
+    }
+
+    private void visibilityChangedTo(boolean visible) {
+<span class="fc" id="L299">        cn1View.visibilityChangedTo(visible);</span>
+<span class="fc" id="L300">    }</span>
+
+    @Override
+    protected void onWindowVisibilityChanged(int visibility) {
+<span class="fc" id="L304">        super.onWindowVisibilityChanged(visibility);</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        this.visibilityChangedTo(visibility == View.VISIBLE);</span>
+        /*if(visibility != View.VISIBLE){
+            paintViewOnBuffer = true;
+        }*/
+<span class="fc" id="L309">    }</span>
+
+    @Override
+    protected void onSizeChanged(final int w, final int h, int oldw, int oldh) {
+<span class="fc" id="L313">        super.onSizeChanged(w, h, oldw, oldh);</span>
+
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if (!Display.isInitialized()) {</span>
+<span class="nc" id="L316">            return;</span>
+        }
+        //if the input is pan mode, there is no need to resize the screen
+        // It turns out that this was only necessary because the InPlaceEditView was causing
+        // an onSizeChanged event to be fired when its visibility was set to GONE.
+        // Removing that visibility setting removes the erroneous resize event.
+        // Keeping this was problematic because sometimes a resize event is correct even when
+        // the keyboard is showing, e.g. when the device is rotated.
+        //if((InPlaceEditView.isEditing() || InPlaceEditView.isKeyboardShowing()) &amp;&amp; !InPlaceEditView.isInputResize()){
+        //    return;
+        //}
+<span class="fc" id="L327">        Display.getInstance().callSerially(new Runnable() {</span>
+            public void run() {
+<span class="fc" id="L329">                cn1View.handleSizeChange(w, h);</span>
+<span class="fc" id="L330">            }</span>
+        });
+<span class="fc" id="L332">    }</span>
+
+    public void resizeViews() {
+<span class="fc" id="L335">        int children = getChildCount();</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        if(children &gt; 0) {</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">            for (int iter = 0; iter &lt; children; iter++) {</span>
+<span class="fc" id="L338">                final View v = getChildAt(iter);</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">                if(v != null) {</span>
+<span class="fc" id="L340">                    final AndroidAsyncView.LayoutParams lp = (AndroidAsyncView.LayoutParams) v.getLayoutParams();</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">                    if (lp.dirty) {</span>
+<span class="fc" id="L342">                        lp.dirty = false;</span>
+<span class="fc" id="L343">                        v.post(new Runnable() {</span>
+                            @Override
+                            public void run() {
+<span class="fc" id="L346">                                v.requestLayout();</span>
+    
+<span class="fc" id="L348">                                Display.getInstance().getInstance().callSerially(new Runnable() {</span>
+                                    @Override
+                                    public void run() {
+<span class="fc" id="L351">                                        Display.getInstance().getCurrent().repaint();</span>
+<span class="fc" id="L352">                                    }</span>
+                                });
+<span class="fc" id="L354">                            }</span>
+                        });
+                    }
+                }
+            }
+        }
+<span class="fc" id="L360">    }</span>
+
+    // A counter used in flushGraphics to count how many times the rendering operations
+    // being non-empty blocks a flushGraphics call.
+    // When this reaches 10, the rendering operations are flushed.
+<span class="fc" id="L365">    private int timeoutCounter=0;</span>
+
+    @Override
+    public void flushGraphics(Rect rect) {
+        //Log.d(Display.getInstance().getProperty(&quot;AppName&quot;, &quot;CodenameOne&quot;), &quot;Flush graphics invoked with pending: &quot; + pendingRenderingOperations.size() + &quot; and current &quot; + renderingOperations.size());
+
+        // we might have pending entries in the rendering queue
+<span class="fc" id="L372">        int counter = 0;</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        while (!renderingOperations.isEmpty()) {</span>
+            try {
+<span class="fc" id="L375">                synchronized (RENDERING_OPERATIONS_LOCK) {</span>
+<span class="fc" id="L376">                    RENDERING_OPERATIONS_LOCK.wait(5);</span>
+<span class="fc" id="L377">                }</span>
+
+                // don't let the EDT die here
+<span class="fc" id="L380">                counter++;</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">                if (counter &gt; 10) {</span>
+<span class="fc" id="L382">                    synchronized (RENDERING_OPERATIONS_LOCK) {</span>
+<span class="fc" id="L383">                        pendingRenderingOperations.clear();</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">                        if (timeoutCounter++ &gt; 10) {</span>
+<span class="nc" id="L385">                            renderingOperations.clear();</span>
+                        }
+<span class="fc" id="L387">                    }</span>
+
+                    //Log.d(Display.getInstance().getProperty(&quot;AppName&quot;, &quot;CodenameOne&quot;), &quot;Flush graphics timed out!!!&quot;);
+<span class="fc" id="L390">                    Display.getInstance().callSerially(new Runnable() {</span>
+
+                        @Override
+                        public void run() {
+<span class="fc" id="L394">                            Form f = Display.getInstance().getCurrent();</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">                            if (f != null) {</span>
+<span class="fc" id="L396">                                f.repaint();</span>
+                            }
+<span class="fc" id="L398">                        }</span>
+
+                    });
+<span class="fc" id="L401">                    return;</span>
+                }
+<span class="nc" id="L403">            } catch (InterruptedException err) {</span>
+<span class="pc" id="L404">            }</span>
+        }
+<span class="fc" id="L406">        timeoutCounter = 0;</span>
+<span class="fc" id="L407">        ArrayList&lt;AsyncOp&gt; tmp = renderingOperations;</span>
+<span class="fc" id="L408">        renderingOperations = pendingRenderingOperations;</span>
+<span class="fc" id="L409">        pendingRenderingOperations = tmp;</span>
+        try {
+<span class="fc bfc" id="L411" title="All 2 branches covered.">            for (AsyncOp o : renderingOperations) {</span>
+                // can happen due to synchronization issues see: https://www.reddit.com/r/cn1/comments/1oo43in/error_while_using_app/
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">                if (o != null) {</span>
+<span class="fc" id="L414">                    o.prepare();</span>
+                }
+<span class="fc" id="L416">            }</span>
+<span class="nc" id="L417">        } catch (java.util.ConcurrentModificationException ex) {</span>
+            // This is a race condition that sometimes occurs
+            // Rather than add synchronized here (which may have performance implications)
+            // we'll just &quot;give up&quot; and issue a repaint.
+<span class="nc" id="L421">            handlePaintLoopException(ex, &quot;NOTICE: Hit concurrent modification race condition in flushGraphics.  Skipping flush, and issuing another repaint.&quot;);</span>
+<span class="nc" id="L422">            return;</span>
+<span class="nc" id="L423">        } catch (ArrayIndexOutOfBoundsException arrayIndexOutOfBoundsException) {</span>
+<span class="nc" id="L424">            handlePaintLoopException(arrayIndexOutOfBoundsException, &quot;NOTICE: Hit array index out of bounds in flushGraphics.  Skipping flush, and issuing another repaint.&quot;);</span>
+<span class="nc" id="L425">            return;</span>
+<span class="fc" id="L426">        }</span>
+
+<span class="fc bfc" id="L428" title="All 2 branches covered.">        if (rect == null) {</span>
+<span class="fc" id="L429">            postInvalidate();</span>
+        } else {
+<span class="fc" id="L431">            postInvalidate(rect.left, rect.top, rect.right, rect.bottom);</span>
+        }
+<span class="fc" id="L433">        graphics.setClip(0, 0, cn1View.width, cn1View.height);</span>
+<span class="fc" id="L434">        graphics.setAlpha(255);</span>
+<span class="fc" id="L435">        graphics.setColor(0);</span>
+<span class="fc" id="L436">    }</span>
+
+    private void handlePaintLoopException(Exception ex, String message) {
+<span class="nc" id="L439">        Log.p(message);</span>
+<span class="nc" id="L440">        Log.e(ex);</span>
+<span class="nc" id="L441">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L444">                Form f = Display.getInstance().getCurrent();</span>
+<span class="nc bnc" id="L445" title="All 2 branches missed.">                if (f != null) {</span>
+<span class="nc" id="L446">                    f.repaint();</span>
+                }
+<span class="nc" id="L448">            }</span>
+        });
+<span class="nc" id="L450">    }</span>
+
+    @Override
+    public void flushGraphics() {
+<span class="fc" id="L454">        flushGraphics(null);</span>
+<span class="fc" id="L455">    }</span>
+
+    @Override
+    public boolean onKeyMultiple(int keyCode, int repeatCount, KeyEvent event) {
+<span class="nc" id="L459">        return true;</span>
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+<span class="nc bnc" id="L464" title="All 2 branches missed.">        if (InPlaceEditView.isEditing()) {</span>
+<span class="nc" id="L465">            return true;</span>
+        }
+<span class="nc" id="L467">        return cn1View.onKeyUpDown(true, keyCode, event);</span>
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+<span class="nc bnc" id="L472" title="All 2 branches missed.">        if (InPlaceEditView.isEditing()) {</span>
+<span class="nc" id="L473">            return true;</span>
+        }
+<span class="nc" id="L475">        return cn1View.onKeyUpDown(false, keyCode, event);</span>
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+<span class="nc" id="L480">        boolean res = false;</span>
+<span class="nc bnc" id="L481" title="All 2 branches missed.">        if (!(res = cn1View.onTouchEvent(event))) {</span>
+<span class="nc" id="L482">            return super.dispatchTouchEvent(event);</span>
+        }
+<span class="nc" id="L484">        return res;</span>
+        
+    }
+
+    @Override
+    public AndroidGraphics getGraphics() {
+<span class="fc" id="L490">        return graphics;</span>
+    }
+
+    @Override
+    public int getViewHeight() {
+<span class="fc" id="L495">        return cn1View.height;</span>
+    }
+
+    @Override
+    public int getViewWidth() {
+<span class="fc" id="L500">        return cn1View.width;</span>
+    }
+
+    @Override
+    public InputConnection onCreateInputConnection(EditorInfo editorInfo) {
+<span class="nc bnc" id="L505" title="All 4 branches missed.">        if (!Display.isInitialized() || Display.getInstance().getCurrent() == null) {</span>
+<span class="nc" id="L506">            return super.onCreateInputConnection(editorInfo);</span>
+        }
+<span class="nc" id="L508">        cn1View.setInputType(editorInfo);</span>
+<span class="nc" id="L509">        return super.onCreateInputConnection(editorInfo);</span>
+    }
+
+    @Override
+    public boolean onCheckIsTextEditor() {
+<span class="pc bpc" id="L514" title="1 of 4 branches missed.">        if (!Display.isInitialized() || Display.getInstance().getCurrent() == null) {</span>
+<span class="fc" id="L515">            return false;</span>
+        }
+<span class="fc" id="L517">        Component txtCmp = Display.getInstance().getCurrent().getFocused();</span>
+<span class="pc bpc" id="L518" title="3 of 4 branches missed.">        if (txtCmp != null &amp;&amp; txtCmp instanceof TextField) {</span>
+<span class="nc" id="L519">            return true;</span>
+        }
+<span class="fc" id="L521">        return false;</span>
+    }
+
+    @Override
+    public View getAndroidView() {
+<span class="fc" id="L526">        return this;</span>
+    }
+    
+    public void removePeerView(final View v) {
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">        if(v.getParent() != null) {</span>
+<span class="fc" id="L531">            ((Activity)v.getContext()).runOnUiThread(new Runnable() {</span>
+                @Override
+                public void run() {
+                    // this might happen twice if draw view is invoked twice before the screen has time to draw
+<span class="pc bpc" id="L535" title="1 of 2 branches missed.">                    if(v.getParent() != null) {</span>
+<span class="fc" id="L536">                        removeView(v);</span>
+                    }
+<span class="fc" id="L538">                }</span>
+            });
+        }
+<span class="fc" id="L541">    }</span>
+    
+
+    class AsyncGraphics extends AndroidGraphics {
+
+        private boolean clipIsPath;
+        private Matrix convertedTransform;
+        private boolean clipFresh;
+<span class="fc" id="L549">        private boolean transformDirty=true;</span>
+<span class="fc" id="L550">        private Rectangle clip = null;</span>
+<span class="fc" id="L551">        private Path clipP = null;</span>
+<span class="fc" id="L552">        private GeneralPath clipGP = null;</span>
+        private int clipX, clipY, clipW, clipH;
+
+        private int alpha;
+        private int color;
+<span class="fc" id="L557">        private Paint imagePaint = new Paint();</span>
+        private Transform transform;
+        private Transform inverseTransform;
+<span class="fc" id="L560">        private boolean inverseTransformDirty=true;</span>
+<span class="fc" id="L561">        private com.codename1.ui.geom.Rectangle tmpClipBoundsRect = new com.codename1.ui.geom.Rectangle();</span>
+<span class="fc" id="L562">        private com.codename1.ui.geom.Rectangle tmpRect = new com.codename1.ui.geom.Rectangle();</span>
+<span class="fc" id="L563">        private GeneralPath tmpClipBoundsPath = new GeneralPath();</span>
+
+<span class="fc" id="L565">        private float[] tmpMatrix3x3 = new float[9];</span>
+
+        private Transform getInverseTransform() {
+<span class="nc bnc" id="L568" title="All 2 branches missed.">            if (inverseTransform == null) {</span>
+<span class="nc" id="L569">                inverseTransform = Transform.makeIdentity();</span>
+<span class="nc" id="L570">                inverseTransformDirty = true;</span>
+            }
+<span class="nc bnc" id="L572" title="All 2 branches missed.">            if (inverseTransformDirty) {</span>
+
+                try {
+<span class="nc" id="L575">                    getTransform().getInverse(inverseTransform);</span>
+<span class="nc" id="L576">                    inverseTransformDirty = false;</span>
+<span class="nc" id="L577">                } catch (Exception ex) {</span>
+<span class="nc" id="L578">                    ex.printStackTrace();</span>
+<span class="nc" id="L579">                }</span>
+            }
+<span class="nc" id="L581">            return inverseTransform;</span>
+        }
+
+<span class="fc" id="L584">        AsyncGraphics(AndroidImplementation impl) {</span>
+<span class="fc" id="L585">            super(impl, null, false);</span>
+<span class="fc" id="L586">        }</span>
+
+
+        private void freshClip() {
+<span class="fc bfc" id="L590" title="All 2 branches covered.">            if (!clipFresh) {</span>
+<span class="fc" id="L591">                clipFresh = true;</span>
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">                if (clipIsPath) {</span>
+<span class="nc bnc" id="L593" title="All 2 branches missed.">                    if (clipGP == null) {</span>
+<span class="nc" id="L594">                        clipX = 0;</span>
+<span class="nc" id="L595">                        clipY = 0;</span>
+<span class="nc" id="L596">                        clipW = cn1View.width;</span>
+<span class="nc" id="L597">                        clipH = cn1View.height;</span>
+                    } else {
+<span class="nc" id="L599">                        tmpClipBoundsPath.setPath(clipGP, getInverseTransform());</span>
+<span class="nc" id="L600">                        tmpClipBoundsPath.getBounds(tmpClipBoundsRect);</span>
+<span class="nc" id="L601">                        clipX = tmpClipBoundsRect.getX();</span>
+<span class="nc" id="L602">                        clipY = tmpClipBoundsRect.getY();</span>
+<span class="nc" id="L603">                        clipW = tmpClipBoundsRect.getWidth();</span>
+<span class="nc" id="L604">                        clipH = tmpClipBoundsRect.getHeight();</span>
+                    }
+                } else {
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">                    if (clip == null) {</span>
+<span class="nc" id="L608">                        clip = new Rectangle(0, 0, cn1View.width, cn1View.height);</span>
+<span class="nc" id="L609">                        clipX = 0;</span>
+<span class="nc" id="L610">                        clipY = 0;</span>
+<span class="nc" id="L611">                        clipW = cn1View.width;</span>
+<span class="nc" id="L612">                        clipH = cn1View.height;</span>
+                    } else {
+<span class="fc" id="L614">                        clipX = clip.getX();</span>
+<span class="fc" id="L615">                        clipY = clip.getY();</span>
+<span class="fc" id="L616">                        clipW = clip.getWidth();</span>
+<span class="fc" id="L617">                        clipH = clip.getHeight();</span>
+                    }
+<span class="pc bpc" id="L619" title="1 of 2 branches missed.">                    if (!getTransform().isIdentity()) {</span>
+<span class="nc" id="L620">                        tmpClipBoundsPath.setRect(clip, getInverseTransform());</span>
+<span class="nc" id="L621">                        tmpClipBoundsPath.getBounds(tmpClipBoundsRect);</span>
+<span class="nc" id="L622">                        clipX = tmpClipBoundsRect.getX();</span>
+<span class="nc" id="L623">                        clipY = tmpClipBoundsRect.getY();</span>
+<span class="nc" id="L624">                        clipW = tmpClipBoundsRect.getWidth();</span>
+<span class="nc" id="L625">                        clipH = tmpClipBoundsRect.getHeight();</span>
+                    }
+                }
+            }
+<span class="fc" id="L629">        }</span>
+
+        @Override
+        public void drawView(final View v, final AndroidAsyncView.LayoutParams lp) {
+<span class="fc bfc" id="L633" title="All 2 branches covered.">            if(v.getParent() == null) {</span>
+<span class="fc" id="L634">                ((Activity)v.getContext()).runOnUiThread(new Runnable() {</span>
+                    @Override
+                    public void run() {
+                        // this might happen twice if draw view is invoked twice before the screen has time to draw
+<span class="pc bpc" id="L638" title="1 of 2 branches missed.">                        if(v.getParent() == null) {</span>
+<span class="fc" id="L639">                            v.setLayoutParams(lp);</span>
+<span class="fc" id="L640">                            addView(v);</span>
+<span class="fc" id="L641">                            ArrayList&lt;View&gt; toRemove = new ArrayList&lt;View&gt;();</span>
+<span class="fc" id="L642">                            ViewGroup parentGroup = (ViewGroup)v.getParent();</span>
+<span class="fc" id="L643">                            int childCount = parentGroup.getChildCount();</span>
+<span class="fc bfc" id="L644" title="All 2 branches covered.">                            for (int i=0; i&lt;childCount; i++) {</span>
+<span class="fc" id="L645">                                View child = parentGroup.getChildAt(i);</span>
+<span class="pc bpc" id="L646" title="1 of 2 branches missed.">                                if (child == v) {</span>
+<span class="fc" id="L647">                                    continue;</span>
+                                }
+<span class="nc" id="L649">                                AndroidImplementation.AndroidPeer peer = AndroidImplementation.activePeers.get(child);</span>
+
+<span class="nc bnc" id="L651" title="All 2 branches missed.">                                if (peer != null) {</span>
+<span class="nc bnc" id="L652" title="All 2 branches missed.">                                    if (!peer._initialized()) {</span>
+<span class="nc" id="L653">                                        toRemove.add(child);</span>
+                                    }
+                                }
+                            }
+<span class="pc bpc" id="L657" title="1 of 2 branches missed.">                            for (View child : toRemove) {</span>
+<span class="nc" id="L658">                                removeView(child);</span>
+<span class="nc" id="L659">                                synchronized(AndroidImplementation.activePeers) {</span>
+<span class="nc" id="L660">                                    AndroidImplementation.activePeers.remove(child);</span>
+<span class="nc" id="L661">                                }</span>
+<span class="nc" id="L662">                            }</span>
+
+                        }
+<span class="fc" id="L665">                    }</span>
+                });
+
+            }
+<span class="fc" id="L669">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc bfc" id="L672" title="All 2 branches covered.">                    if (v.getParent() != null) {</span>
+<span class="fc" id="L673">                        drawChild(underlying.canvas, v, getDrawingTime());</span>
+                    }
+<span class="fc" id="L675">                }</span>
+
+                public String toString() {
+<span class="nc" id="L678">                    return &quot;drawView(PeerComponent)&quot;;</span>
+                }
+            });
+
+<span class="fc" id="L682">        }</span>
+
+        @Override
+        public void rotate(final float angle, final int x, final int y) {
+<span class="fc" id="L686">            getTransform().rotate(angle, x, y);</span>
+<span class="fc" id="L687">            transformDirty = true;</span>
+<span class="fc" id="L688">            inverseTransformDirty = true;</span>
+<span class="fc" id="L689">            clipFresh = false;</span>
+<span class="fc" id="L690">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L693">                    underlying.rotate(angle, x, y);</span>
+<span class="fc" id="L694">                }</span>
+
+                @Override
+                public void executeWithClip(AndroidGraphics underlying) {
+<span class="fc" id="L698">                    execute(underlying);</span>
+<span class="fc" id="L699">                }</span>
+
+                public String toString() {
+<span class="nc" id="L702">                    return &quot;rotate&quot;;</span>
+                }
+            });
+<span class="fc" id="L705">        }</span>
+
+        @Override
+        public void rotate(final float angle) {
+<span class="nc" id="L709">            getTransform().rotate(angle, 0, 0);</span>
+<span class="nc" id="L710">            transformDirty = true;</span>
+<span class="nc" id="L711">            inverseTransformDirty = true;</span>
+<span class="nc" id="L712">            clipFresh = false;</span>
+<span class="nc" id="L713">            pendingRenderingOperations.add(new AsyncOp(clip,clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="nc" id="L716">                    underlying.rotate(angle);</span>
+<span class="nc" id="L717">                }</span>
+
+                @Override
+                public void executeWithClip(AndroidGraphics underlying) {
+<span class="nc" id="L721">                    execute(underlying);</span>
+<span class="nc" id="L722">                }</span>
+
+                public String toString() {
+<span class="nc" id="L725">                    return &quot;rotate (no pivot)&quot;;</span>
+                }
+            });
+<span class="nc" id="L728">        }</span>
+
+
+        @Override
+        public void scale(final float x, final float y) {
+<span class="fc" id="L733">            getTransform().scale(x, y);</span>
+<span class="fc" id="L734">            transformDirty = true;</span>
+<span class="fc" id="L735">            inverseTransformDirty = true;</span>
+<span class="fc" id="L736">            clipFresh = false;</span>
+<span class="fc" id="L737">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L740">                    underlying.scale(x, y);</span>
+<span class="fc" id="L741">                }</span>
+
+                @Override
+                public void executeWithClip(AndroidGraphics underlying) {
+<span class="fc" id="L745">                    execute(underlying);</span>
+<span class="fc" id="L746">                }</span>
+
+                public String toString() {
+<span class="nc" id="L749">                    return &quot;scale&quot;;</span>
+                }
+            });
+<span class="fc" id="L752">        }</span>
+
+        @Override
+        public void resetAffine() {
+<span class="fc" id="L756">            getTransform().setIdentity();</span>
+<span class="fc" id="L757">            transformDirty = true;</span>
+<span class="fc" id="L758">            inverseTransformDirty = true;</span>
+<span class="fc" id="L759">            clipFresh = false;</span>
+<span class="fc" id="L760">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L763">                    underlying.resetAffine();</span>
+<span class="fc" id="L764">                }</span>
+
+                @Override
+                public void executeWithClip(AndroidGraphics underlying) {
+<span class="fc" id="L768">                    execute(underlying);</span>
+<span class="fc" id="L769">                }</span>
+
+                public String toString() {
+<span class="nc" id="L772">                    return &quot;resetAffine&quot;;</span>
+                }
+            });
+<span class="fc" id="L775">        }</span>
+
+
+        /*
+        private Matrix getTransformMatrix(){
+            if ( transformDirty ){
+                // Conversion from 4x4 to 3x3
+                // See http://www.w3.org/TR/2009/WD-SVG-Transforms-20090320/#_4x4-to-3x3-conversion
+                // for formula
+                CN1Matrix4f m = (CN1Matrix4f)getTransform().getNativeTransform();
+                float[] mMatrix3x3 = tmpMatrix3x3;
+                float[] mMatrix4x4 = m.getData();
+
+
+                mMatrix3x3[0] = mMatrix4x4[0];
+                mMatrix3x3[1] = mMatrix4x4[4];
+                mMatrix3x3[2] = mMatrix4x4[12];
+                mMatrix3x3[3] = mMatrix4x4[1];
+                mMatrix3x3[4] = mMatrix4x4[5];
+                mMatrix3x3[5] = mMatrix4x4[13];
+                mMatrix3x3[6] = mMatrix4x4[3];
+                mMatrix3x3[7] = mMatrix4x4[7];
+                mMatrix3x3[8] = mMatrix4x4[15];
+
+                if (convertedTransform == null) {
+                    convertedTransform = new Matrix();
+                }
+                convertedTransform.setValues(mMatrix3x3);
+
+                transformDirty = false;
+
+            }
+            return convertedTransform;
+
+        }
+        */
+
+        @Override
+        public int getColor() {
+<span class="fc" id="L814">            return color;</span>
+        }
+
+
+        private void getClipShape(GeneralPath out) {
+<span class="nc bnc" id="L819" title="All 2 branches missed.">            if (clipIsPath) {</span>
+<span class="nc" id="L820">                out.reset();</span>
+<span class="nc bnc" id="L821" title="All 2 branches missed.">                if (getTransform().isIdentity()) {</span>
+<span class="nc" id="L822">                    out.setPath(clipGP, null);</span>
+                } else {
+<span class="nc" id="L824">                    out.setPath(clipGP, getInverseTransform());</span>
+                }
+            } else {
+<span class="nc" id="L827">                out.reset();</span>
+<span class="nc bnc" id="L828" title="All 2 branches missed.">                if (clip == null) {</span>
+<span class="nc" id="L829">                    clip = new Rectangle(0, 0, cn1View.width, cn1View.height);</span>
+                }
+<span class="nc" id="L831">                out.setRect(clip, getInverseTransform());</span>
+            }
+<span class="nc" id="L833">        }</span>
+
+        @Override
+        public void clipRect(final int x, final int y, final int width, final int height) {
+<span class="fc" id="L837">            boolean isIdentity = getTransform().isIdentity();</span>
+<span class="fc" id="L838">            clipFresh = false;</span>
+<span class="pc bpc" id="L839" title="1 of 2 branches missed.">            if (clipIsPath) {</span>
+<span class="nc bnc" id="L840" title="All 2 branches missed.">                if (clipGP == null) {</span>
+<span class="nc" id="L841">                    setClip(x, y, width, height);</span>
+<span class="nc" id="L842">                    return;</span>
+                }
+<span class="nc bnc" id="L844" title="All 2 branches missed.">                if (!isIdentity) {</span>
+<span class="nc" id="L845">                    clipGP.transform(getInverseTransform());</span>
+                }
+<span class="nc bnc" id="L847" title="All 2 branches missed.">                if (!clipGP.intersect(x, y, width, height)) {</span>
+<span class="nc bnc" id="L848" title="All 2 branches missed.">                    if (clip == null) {</span>
+<span class="nc" id="L849">                        clip = new Rectangle();</span>
+                    }
+<span class="nc" id="L851">                    clip.setBounds(x,y,0,0);</span>
+<span class="nc" id="L852">                    clipIsPath = false;</span>
+<span class="nc" id="L853">                    return;</span>
+                }
+<span class="nc bnc" id="L855" title="All 2 branches missed.">                if (!isIdentity) {</span>
+<span class="nc" id="L856">                    clipGP.transform(getTransform());</span>
+                }
+<span class="nc bnc" id="L858" title="All 2 branches missed.">                if (clipGP.isRectangle()) {</span>
+<span class="nc bnc" id="L859" title="All 2 branches missed.">                    if (clip == null) {</span>
+<span class="nc" id="L860">                        clip = new Rectangle();</span>
+                    }
+<span class="nc" id="L862">                    clipGP.getBounds(clip);</span>
+<span class="nc" id="L863">                    clipIsPath = false;</span>
+                } else {
+<span class="nc bnc" id="L865" title="All 2 branches missed.">                    if (clipP == null) {</span>
+<span class="nc" id="L866">                        clipP = new Path();</span>
+                    }
+<span class="nc" id="L868">                    AndroidImplementation.cn1ShapeToAndroidPath(clipGP, clipP);</span>
+                }
+            } else {
+<span class="pc bpc" id="L871" title="1 of 2 branches missed.">                if (clip == null) {</span>
+<span class="nc" id="L872">                    setClip(x, y, width, height);</span>
+<span class="nc" id="L873">                    return;</span>
+                }
+<span class="pc bpc" id="L875" title="2 of 4 branches missed.">                if (clip.getWidth() &lt;= 0 || clip.getHeight() &lt;= 0) {</span>
+<span class="nc" id="L876">                    return;</span>
+                }
+<span class="pc bpc" id="L878" title="1 of 2 branches missed.">                if (isIdentity) {</span>
+<span class="fc" id="L879">                    tmpRect.setBounds(x, y, width, height);</span>
+<span class="fc" id="L880">                    clip.intersection(tmpRect, clip);</span>
+                } else {
+<span class="nc" id="L882">                    clipIsPath = true;</span>
+<span class="nc bnc" id="L883" title="All 2 branches missed.">                    if (clipGP == null) {</span>
+<span class="nc" id="L884">                        clipGP = new GeneralPath();</span>
+                    }
+<span class="nc" id="L886">                    clipGP.setRect(clip, null);</span>
+<span class="nc" id="L887">                    clipGP.transform(getInverseTransform());</span>
+<span class="nc bnc" id="L888" title="All 2 branches missed.">                    if (!clipGP.intersect(x, y, width, height)) {</span>
+<span class="nc" id="L889">                        clip.setBounds(x, y, 0, 0);</span>
+<span class="nc" id="L890">                        clipIsPath = false;</span>
+<span class="nc" id="L891">                        return;</span>
+                    }
+<span class="nc" id="L893">                    clipGP.transform(getTransform());</span>
+
+<span class="nc bnc" id="L895" title="All 2 branches missed.">                    if (clipGP.isRectangle()) {</span>
+<span class="nc" id="L896">                        clipGP.getBounds(clip);</span>
+<span class="nc" id="L897">                        clipIsPath = false;</span>
+                    } else {
+<span class="nc bnc" id="L899" title="All 2 branches missed.">                        if (clipP == null) {</span>
+<span class="nc" id="L900">                            clipP = new Path();</span>
+                        }
+<span class="nc" id="L902">                        AndroidImplementation.cn1ShapeToAndroidPath(clipGP, clipP);</span>
+                    }
+                }
+            }
+            //not implemented - if the current clipping is a Path we should intersect it with 
+            //the shape
+<span class="fc" id="L908">        }</span>
+
+        @Override
+        public void setClip(final int x, final int y, final int width, final int height) {
+<span class="fc" id="L912">            boolean isIdentity = getTransform().isIdentity();</span>
+<span class="fc" id="L913">            clipFresh = false;</span>
+<span class="pc bpc" id="L914" title="1 of 2 branches missed.">            if (isIdentity) {</span>
+<span class="fc" id="L915">                clipIsPath = false;</span>
+<span class="fc bfc" id="L916" title="All 2 branches covered.">                if (clip == null) {</span>
+<span class="fc" id="L917">                    clip = new Rectangle(x, y, width, height);</span>
+                } else {
+<span class="fc" id="L919">                    clip.setBounds(x, y, width, height);</span>
+                }
+            } else {
+<span class="nc" id="L922">                clipIsPath = true;</span>
+<span class="nc bnc" id="L923" title="All 2 branches missed.">                if (clipGP == null) {</span>
+<span class="nc" id="L924">                    clipGP = new GeneralPath();</span>
+                }
+<span class="nc bnc" id="L926" title="All 2 branches missed.">                if (clip == null) {</span>
+<span class="nc" id="L927">                    clip = new Rectangle();</span>
+                }
+<span class="nc" id="L929">                clip.setBounds(x, y, width, height);</span>
+<span class="nc" id="L930">                clipGP.setRect(clip, getTransform());</span>
+
+<span class="nc bnc" id="L932" title="All 2 branches missed.">                if (clipGP.isRectangle()) {</span>
+<span class="nc" id="L933">                    clipIsPath = false;</span>
+<span class="nc bnc" id="L934" title="All 2 branches missed.">                    if (clip == null) {</span>
+<span class="nc" id="L935">                        clip = new Rectangle();</span>
+                    }
+<span class="nc" id="L937">                    clipGP.getBounds(clip);</span>
+                } else {
+<span class="nc bnc" id="L939" title="All 2 branches missed.">                    if (clipP == null) {</span>
+<span class="nc" id="L940">                        clipP = new Path();</span>
+                    }
+<span class="nc" id="L942">                    AndroidImplementation.cn1ShapeToAndroidPath(clipGP, clipP);</span>
+                }
+            }
+
+<span class="fc" id="L946">        }</span>
+
+        @Override
+        public void setClip(com.codename1.ui.geom.Shape shape) {
+<span class="fc" id="L950">            clipIsPath = true;</span>
+<span class="fc" id="L951">            clipFresh = false;</span>
+<span class="fc bfc" id="L952" title="All 2 branches covered.">            if (clipGP == null) {</span>
+<span class="fc" id="L953">                clipGP = new GeneralPath();</span>
+            }
+<span class="fc" id="L955">            boolean isIdentity = getTransform().isIdentity();</span>
+<span class="pc bpc" id="L956" title="1 of 2 branches missed.">            if (isIdentity) {</span>
+<span class="fc" id="L957">                clipGP.setShape(shape, null);</span>
+            } else {
+<span class="nc" id="L959">                clipGP.setShape(shape, getTransform());</span>
+            }
+<span class="pc bpc" id="L961" title="1 of 2 branches missed.">            if (clipGP.isRectangle()) {</span>
+<span class="nc" id="L962">                clipIsPath = false;</span>
+<span class="nc bnc" id="L963" title="All 2 branches missed.">                if (clip == null) {</span>
+<span class="nc" id="L964">                    clip = new Rectangle();</span>
+                }
+<span class="nc" id="L966">                clipGP.getBounds(clip);</span>
+            } else {
+<span class="fc bfc" id="L968" title="All 2 branches covered.">                if (clipP == null) {</span>
+<span class="fc" id="L969">                    clipP = new Path();</span>
+                }
+<span class="fc" id="L971">                AndroidImplementation.cn1ShapeToAndroidPath(clipGP, clipP);</span>
+
+            }
+
+<span class="fc" id="L975">        }</span>
+
+        @Override
+        public int getClipY() {
+<span class="fc" id="L979">            freshClip();</span>
+<span class="fc" id="L980">            return clipY;</span>
+        }
+
+        @Override
+        public int getClipX() {
+<span class="fc" id="L985">            freshClip();</span>
+<span class="fc" id="L986">            return clipX;</span>
+
+        }
+        @Override
+        public int getClipWidth() {
+<span class="fc" id="L991">            freshClip();</span>
+<span class="fc" id="L992">            return clipW;</span>
+        }
+
+        @Override
+        public int getClipHeight() {
+<span class="fc" id="L997">            freshClip();</span>
+<span class="fc" id="L998">            return clipH;</span>
+        }
+
+        @Override
+        public void setAlpha(final int a) {
+<span class="fc" id="L1003">            this.alpha = a;</span>
+<span class="fc" id="L1004">        }</span>
+
+        @Override
+        public int getAlpha() {
+<span class="fc" id="L1008">            return alpha;</span>
+        }
+
+        @Override
+        public void fillRoundRect(final int x, final int y, final int width, final int height, final int arcWidth, final int arcHeight) {
+<span class="fc" id="L1013">            final int alph = alpha;</span>
+<span class="fc" id="L1014">            final int col = color;</span>
+<span class="fc" id="L1015">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L1018">                    underlying.setAlpha(alph);</span>
+<span class="fc" id="L1019">                    underlying.setColor(col);</span>
+<span class="fc" id="L1020">                    underlying.fillRoundRect(x, y, width, height, arcWidth, arcHeight);</span>
+<span class="fc" id="L1021">                }</span>
+                public String toString() {
+<span class="nc" id="L1023">                    return &quot;fillRoundRect&quot;;</span>
+                }
+            });
+<span class="fc" id="L1026">        }</span>
+
+        @Override
+        public void fillRect(final int x, final int y, final int width, final int height) {
+<span class="pc bpc" id="L1030" title="1 of 2 branches missed.">            if (alpha == 0) {</span>
+<span class="nc" id="L1031">                return;</span>
+            }
+<span class="fc" id="L1033">            final int al = alpha;</span>
+<span class="fc" id="L1034">            final int col = color;</span>
+<span class="fc" id="L1035">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L1038">                    underlying.setColor(col);</span>
+<span class="fc" id="L1039">                    underlying.setAlpha(al);</span>
+<span class="fc" id="L1040">                    underlying.fillRect(x, y, width, height);</span>
+<span class="fc" id="L1041">                }</span>
+                public String toString() {
+<span class="nc" id="L1043">                    return &quot;fillRectA&quot;;</span>
+                }
+            });
+<span class="fc" id="L1046">        }</span>
+
+        @Override
+        public void fillRect(final int x, final int y, final int w, final int h, byte alpha) {
+<span class="nc bnc" id="L1050" title="All 2 branches missed.">            if (alpha == 0) {</span>
+<span class="nc" id="L1051">                return;</span>
+            }
+<span class="nc" id="L1053">            final int preAlpha = this.alpha;</span>
+<span class="nc" id="L1054">            final int al = alpha &amp; 0xff;</span>
+<span class="nc" id="L1055">            final int col = color;</span>
+<span class="nc" id="L1056">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="nc" id="L1059">                    underlying.setColor(col);</span>
+<span class="nc" id="L1060">                    underlying.setAlpha(al);</span>
+<span class="nc" id="L1061">                    underlying.fillRect(x, y, w, h);</span>
+<span class="nc" id="L1062">                    underlying.setAlpha(preAlpha);</span>
+<span class="nc" id="L1063">                }</span>
+                public String toString() {
+<span class="nc" id="L1065">                    return &quot;fillRectB&quot;;</span>
+                }
+            });
+<span class="nc" id="L1068">        }</span>
+
+        @Override
+        public void fillLinearGradient(final int startColor, final int endColor, final int x, final int y, final int width, final int height, final boolean horizontal) {
+<span class="pc bpc" id="L1072" title="1 of 2 branches missed.">            if (alpha == 0) {</span>
+<span class="nc" id="L1073">                return;</span>
+            }
+<span class="fc" id="L1075">            final int al = alpha;</span>
+<span class="fc" id="L1076">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L1079">                    underlying.setAlpha(al);</span>
+<span class="fc" id="L1080">                    underlying.fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);</span>
+<span class="fc" id="L1081">                }</span>
+                public String toString() {
+<span class="nc" id="L1083">                    return &quot;fillLinearGradient&quot;;</span>
+                }
+            });
+<span class="fc" id="L1086">        }</span>
+
+        @Override
+        public void fillRectRadialGradient(final int startColor, final int endColor, final int x, final int y,
+                                           final int width, final int height, final float relativeX, final float relativeY, final float relativeSize) {
+<span class="pc bpc" id="L1091" title="1 of 2 branches missed.">            if (alpha == 0) {</span>
+<span class="nc" id="L1092">                return;</span>
+            }
+<span class="fc" id="L1094">            final int al = alpha;</span>
+<span class="fc" id="L1095">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L1098">                    underlying.setAlpha(al);</span>
+<span class="fc" id="L1099">                    underlying.fillRectRadialGradient(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);</span>
+<span class="fc" id="L1100">                }</span>
+                public String toString() {
+<span class="nc" id="L1102">                    return &quot;fillRectRadialGradient&quot;;</span>
+                }
+            });
+<span class="fc" id="L1105">        }</span>
+
+        @Override
+        public void fillRadialGradient(final int startColor, final int endColor, final int x, final int y, final int width, final int height) {
+<span class="fc" id="L1109">            fillRadialGradient(startColor, endColor, x, y, width, height, 0, 360);</span>
+            
+<span class="fc" id="L1111">        }</span>
+        
+        @Override
+        public void fillRadialGradient(final int startColor, final int endColor, final int x, final int y, final int width, final int height, final int startAngle, final int arcAngle) {
+<span class="pc bpc" id="L1115" title="1 of 2 branches missed.">            if (alpha == 0) {</span>
+<span class="nc" id="L1116">                return;</span>
+            }
+<span class="fc" id="L1118">            final int al = alpha;</span>
+<span class="fc" id="L1119">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L1122">                    underlying.setAlpha(al);</span>
+<span class="fc" id="L1123">                    underlying.fillRadialGradient(startColor, endColor, x, y, width, height, startAngle, arcAngle);</span>
+<span class="fc" id="L1124">                }</span>
+                public String toString() {
+<span class="nc" id="L1126">                    return &quot;fillRadialGradient&quot;;</span>
+                }
+            });
+<span class="fc" id="L1129">        }</span>
+        
+<span class="nc" id="L1131">        class AndroidStyleCache {</span>
+            AsyncPaintPosition backgroundPainter;
+            CodenameOneTextPaint textPaint;
+            Paint iconPaint;
+        }
+        
+        abstract class AsyncPaintPosition extends AsyncOp{
+            int x;
+            int y;
+            int width;
+            int height;
+            int alpha;
+            
+            // the pending values allow changing this op on the Codename One EDT while the Android thread
+            // renders it
+            int pendingX;
+            int pendingY;
+            int pendingWidth;
+            int pendingHeight;
+            int pendingAlpha;
+
+            int pendingClipX;
+            int pendingClipY;
+            int pendingClipW;
+            int pendingClipH;
+            
+            Path pendingClipP;
+            boolean pendingClipIsPath;
+            
+<span class="nc" id="L1160">            public AsyncPaintPosition(Rectangle clip, Path clipP, boolean clipIsPath) {</span>
+<span class="nc" id="L1161">                super(clip, clipP, clipIsPath);</span>
+<span class="nc" id="L1162">                pendingClipIsPath = clipIsPath;</span>
+
+
+<span class="nc bnc" id="L1165" title="All 2 branches missed.">                if (clipIsPath) {</span>
+<span class="nc" id="L1166">                    pendingClipP = new Path();</span>
+<span class="nc" id="L1167">                    pendingClipP.set(this.clipPath);</span>
+                } else {
+<span class="nc" id="L1169">                    pendingClipX = clipX;</span>
+<span class="nc" id="L1170">                    pendingClipY = clipY;</span>
+<span class="nc" id="L1171">                    pendingClipW = clipW;</span>
+<span class="nc" id="L1172">                    pendingClipH= clipH;</span>
+                }
+<span class="nc" id="L1174">            }</span>
+
+            public void updateClip(Rectangle clip, Path clipP, boolean clipIsPath) {
+<span class="nc" id="L1177">                pendingClipIsPath = clipIsPath;</span>
+<span class="nc bnc" id="L1178" title="All 2 branches missed.">                if (clipIsPath) {</span>
+<span class="nc bnc" id="L1179" title="All 2 branches missed.">                    if (pendingClipP == null) {</span>
+<span class="nc" id="L1180">                        pendingClipP = new Path();</span>
+                    }
+<span class="nc" id="L1182">                    pendingClipP.set(clipP);</span>
+                } else {
+<span class="nc" id="L1184">                    pendingClipX = clip.getX();</span>
+<span class="nc" id="L1185">                    pendingClipY = clip.getY();</span>
+<span class="nc" id="L1186">                    pendingClipW = clip.getWidth();</span>
+<span class="nc" id="L1187">                    pendingClipH = clip.getHeight();</span>
+                }
+<span class="nc" id="L1189">            }</span>
+
+            @Override
+            public void prepare() {
+<span class="nc" id="L1193">                x = pendingX;</span>
+<span class="nc" id="L1194">                y = pendingY;</span>
+<span class="nc" id="L1195">                height = pendingHeight;</span>
+<span class="nc" id="L1196">                width = pendingWidth;</span>
+<span class="nc" id="L1197">                alpha = pendingAlpha;</span>
+<span class="nc" id="L1198">                clipIsPath = pendingClipIsPath;</span>
+<span class="nc bnc" id="L1199" title="All 2 branches missed.">                if (clipIsPath) {</span>
+<span class="nc bnc" id="L1200" title="All 2 branches missed.">                    if (clipPath == null) {</span>
+<span class="nc" id="L1201">                        clipPath = new Path();</span>
+                    }
+<span class="nc" id="L1203">                    clipPath.set(pendingClipP);</span>
+                } else {
+<span class="nc" id="L1205">                    clipX = pendingClipX;</span>
+<span class="nc" id="L1206">                    clipY = pendingClipY;</span>
+<span class="nc" id="L1207">                    clipW = pendingClipW;</span>
+<span class="nc" id="L1208">                    clipH = pendingClipH;</span>
+                }
+<span class="nc" id="L1210">            }</span>
+
+            @Override
+            public void execute(AndroidGraphics underlying) {
+<span class="nc" id="L1214">                executeImpl(underlying);</span>
+<span class="nc" id="L1215">            }</span>
+            
+            public abstract void executeImpl(AndroidGraphics underlying);
+        }
+                
+        AsyncPaintPosition createGradientPaint(Style s) {
+<span class="nc" id="L1221">            final Paint paint = new Paint();</span>
+<span class="nc" id="L1222">            paint.setStyle(Paint.Style.FILL);</span>
+<span class="nc" id="L1223">            paint.setAntiAlias(true);</span>
+<span class="nc" id="L1224">            paint.setAlpha(255);</span>
+<span class="nc" id="L1225">            final byte bgType = s.getBackgroundType();</span>
+<span class="nc" id="L1226">            final int startColor = s.getBackgroundGradientStartColor();</span>
+<span class="nc" id="L1227">            final int endColor = s.getBackgroundGradientEndColor();</span>
+            
+<span class="nc" id="L1229">            AsyncPaintPosition ap = new AsyncPaintPosition(clip, clipP, clipIsPath) {</span>
+                int lastHeight;
+                int lastWidth;
+                @Override
+                public void executeImpl(AndroidGraphics underlying) {
+<span class="nc bnc" id="L1234" title="All 4 branches missed.">                    if(width != lastWidth || height != lastHeight) {</span>
+<span class="nc" id="L1235">                        lastWidth = width;</span>
+<span class="nc" id="L1236">                        lastHeight = height;</span>
+<span class="nc bnc" id="L1237" title="All 4 branches missed.">                        switch(bgType) {</span>
+                            case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
+<span class="nc" id="L1239">                                paint.setShader(new LinearGradient(0, 0, 0, height, startColor, endColor, Shader.TileMode.MIRROR));</span>
+<span class="nc" id="L1240">                                break;</span>
+                            case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
+<span class="nc" id="L1242">                                paint.setShader(new LinearGradient(0, 0, width, 0, startColor, endColor, Shader.TileMode.MIRROR));</span>
+<span class="nc" id="L1243">                                break;</span>
+                            case Style.BACKGROUND_GRADIENT_RADIAL:
+<span class="nc" id="L1245">                                paint.setShader(new RadialGradient(x, y, Math.max(width, height), startColor, endColor, Shader.TileMode.MIRROR));</span>
+                                break;
+                        }
+<span class="nc" id="L1248">                        underlying.canvas.drawRect(x, y, x + width, y + height, paint);</span>
+                    }
+<span class="nc" id="L1250">                }</span>
+                public String toString() {
+<span class="nc" id="L1252">                    return &quot;GradientPaint&quot;;</span>
+                }
+            };
+<span class="nc" id="L1255">            return ap;</span>
+        }
+        
+        @Override
+        public void paintComponentBackground(final int x, final int y, final int width, final int height, final Style s) {
+<span class="pc bpc" id="L1260" title="3 of 6 branches missed.">            if (alpha == 0 || width &lt;= 0 || height &lt;= 0) {</span>
+<span class="nc" id="L1261">                return;</span>
+            }
+            
+<span class="pc bpc" id="L1264" title="3 of 4 branches missed.">            if(legacyPaintLogic || StyleAccessor.isRendererStyle(s)) {</span>
+<span class="fc" id="L1265">                final int al = alpha;</span>
+<span class="fc" id="L1266">                final byte backgroundType = s.getBackgroundType();</span>
+<span class="fc" id="L1267">                final Image bgImage = s.getBgImage();</span>
+<span class="fc" id="L1268">                final int bgColor = s.getBgColor();</span>
+<span class="fc" id="L1269">                final byte bgTransparency = s.getBgTransparency();</span>
+<span class="fc" id="L1270">                final int backgroundGradientStartColor = s.getBackgroundGradientStartColor();</span>
+<span class="fc" id="L1271">                final int backgroundGradientEndColor = s.getBackgroundGradientEndColor();</span>
+<span class="fc" id="L1272">                final float backgroundGradientRelativeX = s.getBackgroundGradientRelativeX();</span>
+<span class="fc" id="L1273">                final float backgroundGradientRelativeY = s.getBackgroundGradientRelativeY();</span>
+<span class="fc" id="L1274">                final float backgroundGradientRelativeSize = s.getBackgroundGradientRelativeSize();</span>
+<span class="fc" id="L1275">                pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                    @Override
+                    public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L1278">                        underlying.setAlpha(al);</span>
+<span class="fc" id="L1279">                        underlying.paintComponentBackground(backgroundType, bgImage, bgColor, bgTransparency,</span>
+                                backgroundGradientStartColor, backgroundGradientEndColor,
+                                backgroundGradientRelativeX, backgroundGradientRelativeY,
+                                backgroundGradientRelativeSize, x, y, width, height);
+<span class="fc" id="L1283">                    }</span>
+                    public String toString() {
+<span class="nc" id="L1285">                        return &quot;paintComponentBackground - Legacy&quot;;</span>
+                    }
+                });
+<span class="fc" id="L1288">                return;</span>
+            }
+
+<span class="nc" id="L1291">            AndroidStyleCache sc = (AndroidStyleCache)StyleAccessor.getCachedData(s);</span>
+<span class="nc" id="L1292">            AsyncPaintPosition bgPaint = null;</span>
+<span class="nc bnc" id="L1293" title="All 2 branches missed.">            if(sc != null) {</span>
+<span class="nc" id="L1294">                bgPaint = sc.backgroundPainter;</span>
+            }
+<span class="nc bnc" id="L1296" title="All 2 branches missed.">            if(bgPaint == null) {</span>
+<span class="nc" id="L1297">                final byte backgroundType = s.getBackgroundType() ;</span>
+<span class="nc" id="L1298">                Image bgImageOrig = s.getBgImage();</span>
+<span class="nc bnc" id="L1299" title="All 2 branches missed.">                if (bgImageOrig == null) {</span>
+<span class="nc bnc" id="L1300" title="All 2 branches missed.">                    if(backgroundType &gt;= Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL) {</span>
+<span class="nc" id="L1301">                        bgPaint = createGradientPaint(s);</span>
+                    } else {
+                        // solid color paint
+<span class="nc" id="L1304">                        byte bgt = s.getBgTransparency();</span>
+<span class="nc bnc" id="L1305" title="All 2 branches missed.">                        if(bgt == 0) {</span>
+<span class="nc" id="L1306">                            return;</span>
+                        }
+<span class="nc" id="L1308">                        bgPaint = paintBackgroundSolidColor(bgt, s, bgPaint);</span>
+<span class="nc" id="L1309">                    }</span>
+                } else {
+<span class="nc bnc" id="L1311" title="All 9 branches missed.">                    switch(backgroundType) {</span>
+                        case Style.BACKGROUND_NONE:
+<span class="nc" id="L1313">                            byte bgt = s.getBgTransparency();</span>
+<span class="nc bnc" id="L1314" title="All 2 branches missed.">                            if(bgt == 0) {</span>
+<span class="nc" id="L1315">                                return;</span>
+                            }
+<span class="nc" id="L1317">                            bgPaint = paintBackgroundSolidColor(bgt, s, bgPaint);</span>
+<span class="nc" id="L1318">                            break;</span>
+                        case Style.BACKGROUND_IMAGE_SCALED:
+<span class="nc" id="L1320">                            final Paint bgImageScalePaint = new Paint();</span>
+<span class="nc" id="L1321">                            bgImageScalePaint.setXfermode(PORTER);</span>
+<span class="nc" id="L1322">                            final Bitmap b = (Bitmap) bgImageOrig.getImage();</span>
+<span class="nc" id="L1323">                            final Rect src = new Rect();</span>
+<span class="nc" id="L1324">                            src.top = 0;</span>
+<span class="nc" id="L1325">                            src.bottom = b.getHeight();</span>
+<span class="nc" id="L1326">                            src.left = 0;</span>
+<span class="nc" id="L1327">                            src.right = b.getWidth();</span>
+                            
+<span class="nc" id="L1329">                            bgPaint = new AsyncPaintPosition(clip, clipP, clipIsPath) {</span>
+                                @Override
+                                public void executeImpl(AndroidGraphics underlying) {
+<span class="nc" id="L1332">                                    Rect dest = new Rect();</span>
+<span class="nc" id="L1333">                                    dest.top = y;</span>
+<span class="nc" id="L1334">                                    dest.bottom = y + height;</span>
+<span class="nc" id="L1335">                                    dest.left = x;</span>
+<span class="nc" id="L1336">                                    dest.right = x + width;</span>
+<span class="nc" id="L1337">                                    bgImageScalePaint.setAlpha(alpha);</span>
+<span class="nc" id="L1338">                                    underlying.canvas.drawBitmap(b, src, dest, bgImageScalePaint);</span>
+<span class="nc" id="L1339">                                }</span>
+                                public String toString() {
+<span class="nc" id="L1341">                                    return &quot;BackgroundScaledImage&quot;;</span>
+                                }
+                            };
+<span class="nc" id="L1344">                            break;</span>
+                        case Style.BACKGROUND_IMAGE_SCALED_FILL:
+<span class="nc" id="L1346">                            final Paint bgImageScaleFillPaint = new Paint();</span>
+<span class="nc" id="L1347">                            bgImageScaleFillPaint.setXfermode(PORTER);</span>
+<span class="nc" id="L1348">                            final Bitmap bFill = (Bitmap) bgImageOrig.getImage();</span>
+<span class="nc" id="L1349">                            final Rect srcFill = new Rect();</span>
+<span class="nc" id="L1350">                            srcFill.top = 0;</span>
+<span class="nc" id="L1351">                            srcFill.bottom = bFill.getHeight();</span>
+<span class="nc" id="L1352">                            srcFill.left = 0;</span>
+<span class="nc" id="L1353">                            srcFill.right = bFill.getWidth();</span>
+<span class="nc" id="L1354">                            final int iW = bgImageOrig.getWidth();</span>
+<span class="nc" id="L1355">                            final int iH = bgImageOrig.getHeight();</span>
+                            
+<span class="nc" id="L1357">                            bgPaint = new AsyncPaintPosition(clip, clipP, clipIsPath) {</span>
+                                @Override
+                                public void executeImpl(AndroidGraphics underlying) {
+<span class="nc" id="L1360">                                    Rect dest = new Rect();</span>
+<span class="nc" id="L1361">                                    float r = Math.max(((float)width) / ((float)iW), ((float)height) / ((float)iH));</span>
+<span class="nc" id="L1362">                                    int bwidth = (int)(((float)iW) * r);</span>
+<span class="nc" id="L1363">                                    int bheight = (int)(((float)iH) * r);</span>
+<span class="nc" id="L1364">                                    x = x + (width - bwidth) / 2;</span>
+<span class="nc" id="L1365">                                    y = y + (height - bheight) / 2; </span>
+<span class="nc" id="L1366">                                    dest.top = y;</span>
+<span class="nc" id="L1367">                                    dest.bottom = y + bheight;</span>
+<span class="nc" id="L1368">                                    dest.left = x;</span>
+<span class="nc" id="L1369">                                    dest.right = x + bwidth;</span>
+<span class="nc" id="L1370">                                    bgImageScaleFillPaint.setAlpha(alpha);</span>
+<span class="nc" id="L1371">                                    underlying.canvas.drawBitmap(bFill, srcFill, dest, bgImageScaleFillPaint);</span>
+<span class="nc" id="L1372">                                }</span>
+                                public String toString() {
+<span class="nc" id="L1374">                                    return &quot;ScaledImageFill&quot;;</span>
+                                }
+                            };
+<span class="nc" id="L1377">                            break;</span>
+                        case Style.BACKGROUND_IMAGE_SCALED_FIT:
+<span class="nc" id="L1379">                            final Paint bgImageScaleFitPaint = new Paint();</span>
+<span class="nc" id="L1380">                            final Paint bgImageScaleFitColorPaint = new Paint();</span>
+<span class="nc" id="L1381">                            final byte bgtScaleFitColorAlpha = s.getBgTransparency();</span>
+<span class="nc" id="L1382">                            int cc = ((bgtScaleFitColorAlpha &lt;&lt; 24) &amp; 0xff000000) | (s.getBgColor() &amp; 0xffffff);</span>
+<span class="nc" id="L1383">                            bgImageScaleFitColorPaint.setAntiAlias(false);</span>
+<span class="nc" id="L1384">                            bgImageScaleFitColorPaint.setStyle(Paint.Style.FILL);</span>
+<span class="nc" id="L1385">                            bgImageScaleFitColorPaint.setColor(cc);</span>
+<span class="nc" id="L1386">                            bgImageScaleFitPaint.setAlpha(255);</span>
+
+<span class="nc" id="L1388">                            final Bitmap bFit = (Bitmap) bgImageOrig.getImage();</span>
+<span class="nc" id="L1389">                            final Rect srcFit = new Rect();</span>
+<span class="nc" id="L1390">                            srcFit.top = 0;</span>
+<span class="nc" id="L1391">                            srcFit.bottom = bFit.getHeight();</span>
+<span class="nc" id="L1392">                            srcFit.left = 0;</span>
+<span class="nc" id="L1393">                            srcFit.right = bFit.getWidth();</span>
+<span class="nc" id="L1394">                            final int iWFit = bgImageOrig.getWidth();</span>
+<span class="nc" id="L1395">                            final int iHFit = bgImageOrig.getHeight();</span>
+                            
+<span class="nc" id="L1397">                            bgPaint = new AsyncPaintPosition(clip, clipP, clipIsPath) {</span>
+                                @Override
+                                public void executeImpl(AndroidGraphics underlying) {
+<span class="nc bnc" id="L1400" title="All 2 branches missed.">                                    if(alpha &gt; 0) {</span>
+<span class="nc" id="L1401">                                        bgImageScaleFitColorPaint.setAlpha(alpha);</span>
+<span class="nc" id="L1402">                                        underlying.canvas.drawRect(x, y, x + width, y + height, bgImageScaleFitColorPaint);</span>
+                                    }
+<span class="nc" id="L1404">                                    Rect dest = new Rect();</span>
+<span class="nc" id="L1405">                                    float r2 = Math.min(((float)width) / ((float)iWFit), ((float)height) / ((float)iHFit));</span>
+<span class="nc" id="L1406">                                    int awidth = (int)(((float)iWFit) * r2);</span>
+<span class="nc" id="L1407">                                    int aheight = (int)(((float)iHFit) * r2);</span>
+
+<span class="nc" id="L1409">                                    x = x + (width - awidth) / 2;</span>
+<span class="nc" id="L1410">                                    y = y + (height - aheight) / 2; </span>
+<span class="nc" id="L1411">                                    dest.top = y;</span>
+<span class="nc" id="L1412">                                    dest.bottom = y + aheight;</span>
+<span class="nc" id="L1413">                                    dest.left = x;</span>
+<span class="nc" id="L1414">                                    dest.right = x + awidth;</span>
+<span class="nc" id="L1415">                                    underlying.canvas.drawBitmap(bFit, srcFit, dest, bgImageScaleFitPaint);</span>
+<span class="nc" id="L1416">                                }</span>
+                                public String toString() {
+<span class="nc" id="L1418">                                    return &quot;ScaledImageFit&quot;;</span>
+                                }
+                            };
+<span class="nc" id="L1421">                            break;</span>
+                        case Style.BACKGROUND_IMAGE_TILE_BOTH:
+<span class="nc" id="L1423">                            final Paint bgImageTiledBothPaint = new Paint();</span>
+<span class="nc" id="L1424">                            Bitmap bitmapTileBoth = (Bitmap) bgImageOrig.getImage();</span>
+<span class="nc" id="L1425">                            BitmapShader shader = new BitmapShader(bitmapTileBoth, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);</span>
+<span class="nc" id="L1426">                            bgImageTiledBothPaint.setShader(shader);</span>
+<span class="nc" id="L1427">                            bgImageTiledBothPaint.setAntiAlias(false);</span>
+                            
+<span class="nc" id="L1429">                            bgPaint = new AsyncPaintPosition(clip, clipP, clipIsPath) {</span>
+                                @Override
+                                public void executeImpl(AndroidGraphics underlying) {
+<span class="nc" id="L1432">                                    Rect dest = new Rect();</span>
+<span class="nc" id="L1433">                                    dest.top = 0;</span>
+<span class="nc" id="L1434">                                    dest.bottom = height;</span>
+<span class="nc" id="L1435">                                    dest.left = 0;</span>
+<span class="nc" id="L1436">                                    dest.right = width;</span>
+<span class="nc" id="L1437">                                    bgImageTiledBothPaint.setAlpha(alpha);</span>
+<span class="nc" id="L1438">                                    underlying.canvas.save();</span>
+<span class="nc" id="L1439">                                    underlying.canvas.translate(x, y);</span>
+<span class="nc" id="L1440">                                    underlying.applyTransform();</span>
+<span class="nc" id="L1441">                                    underlying.canvas.drawRect(dest, bgImageTiledBothPaint);</span>
+<span class="nc" id="L1442">                                    underlying.unapplyTransform();</span>
+<span class="nc" id="L1443">                                    underlying.canvas.restore();</span>
+<span class="nc" id="L1444">                                }</span>
+                                public String toString() {
+<span class="nc" id="L1446">                                    return &quot;ImageTileBoth&quot;;</span>
+                                }
+                            };
+<span class="nc" id="L1449">                            break;</span>
+                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP:
+                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER:
+                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM:
+                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT:
+                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER:
+                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT:
+<span class="nc" id="L1456">                            final Paint bgImageTiledPaint = new Paint();</span>
+<span class="nc" id="L1457">                            final Paint bgColorTiledPaint = new Paint();</span>
+<span class="nc" id="L1458">                            final byte bgtTiledColorAlpha = s.getBgTransparency();</span>
+<span class="nc" id="L1459">                            int c = ((bgtTiledColorAlpha &lt;&lt; 24) &amp; 0xff000000) | (s.getBgColor() &amp; 0xffffff);</span>
+<span class="nc" id="L1460">                            bgColorTiledPaint.setAntiAlias(false);</span>
+<span class="nc" id="L1461">                            bgColorTiledPaint.setStyle(Paint.Style.FILL);</span>
+<span class="nc" id="L1462">                            bgColorTiledPaint.setColor(c);</span>
+<span class="nc" id="L1463">                            bgImageTiledPaint.setAlpha(255);</span>
+<span class="nc" id="L1464">                            final Bitmap bitmapTile = (Bitmap) bgImageOrig.getImage();</span>
+<span class="nc" id="L1465">                            BitmapShader shaderTile = new BitmapShader(bitmapTile, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);</span>
+<span class="nc" id="L1466">                            bgImageTiledPaint.setShader(shaderTile);</span>
+<span class="nc" id="L1467">                            bgImageTiledPaint.setAntiAlias(false);</span>
+                            
+<span class="nc" id="L1469">                            bgPaint = new AsyncPaintPosition(clip, clipP, clipIsPath) {</span>
+                                @Override
+                                public void executeImpl(AndroidGraphics underlying) {
+                                    // fill the solid color
+<span class="nc" id="L1473">                                    underlying.canvas.drawRect(x, y, x + width, y + height, bgColorTiledPaint);</span>
+
+<span class="nc bnc" id="L1475" title="All 7 branches missed.">                                    switch(backgroundType) {</span>
+                                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP:
+<span class="nc" id="L1477">                                            height = Math.min(bitmapTile.getHeight(), height);</span>
+<span class="nc" id="L1478">                                            break;</span>
+                                                    
+                                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER: {
+<span class="nc" id="L1481">                                            int iH = bitmapTile.getHeight();</span>
+<span class="nc" id="L1482">                                            y = y + (height / 2 - iH / 2);</span>
+<span class="nc" id="L1483">                                            height = iH;</span>
+<span class="nc" id="L1484">                                            break;</span>
+                                        }
+                                            
+                                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM: {
+<span class="nc" id="L1488">                                            int iH = bitmapTile.getHeight();</span>
+<span class="nc" id="L1489">                                            y = y + (height - iH);</span>
+<span class="nc" id="L1490">                                            height = iH;</span>
+<span class="nc" id="L1491">                                            break;</span>
+                                        }
+                                        
+                                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT: 
+<span class="nc" id="L1495">                                            width = bitmapTile.getWidth();</span>
+<span class="nc" id="L1496">                                            break;</span>
+                                        
+                                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER: {
+<span class="nc" id="L1499">                                            int iW = bitmapTile.getWidth();</span>
+<span class="nc" id="L1500">                                            x = x + (width / 2 - iW / 2);</span>
+<span class="nc" id="L1501">                                            width = iW;</span>
+<span class="nc" id="L1502">                                            break;</span>
+                                        }
+                                        
+                                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT: {
+<span class="nc" id="L1506">                                            int iW = bitmapTile.getWidth();</span>
+<span class="nc" id="L1507">                                            x = x + width - iW;</span>
+<span class="nc" id="L1508">                                            width = iW;</span>
+                                        }                                        
+                                    }
+<span class="nc" id="L1511">                                    Rect dest = new Rect();</span>
+<span class="nc" id="L1512">                                    dest.top = 0;</span>
+<span class="nc" id="L1513">                                    dest.bottom = height;</span>
+<span class="nc" id="L1514">                                    dest.left = 0;</span>
+<span class="nc" id="L1515">                                    dest.right = width;</span>
+<span class="nc" id="L1516">                                    underlying.canvas.save();</span>
+<span class="nc" id="L1517">                                    underlying.canvas.translate(x, y);</span>
+<span class="nc" id="L1518">                                    underlying.applyTransform();</span>
+<span class="nc" id="L1519">                                    underlying.canvas.drawRect(dest, bgImageTiledPaint);</span>
+<span class="nc" id="L1520">                                    underlying.unapplyTransform();</span>
+<span class="nc" id="L1521">                                    underlying.canvas.restore();</span>
+<span class="nc" id="L1522">                                }</span>
+                                public String toString() {
+<span class="nc" id="L1524">                                    return &quot;BackgroundImageTile&quot;;</span>
+                                }
+                            };
+<span class="nc" id="L1527">                            break;</span>
+                            
+                            case Style.BACKGROUND_IMAGE_ALIGNED_TOP:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_LEFT:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_RIGHT:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_CENTER:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT:
+<span class="nc" id="L1538">                                bgPaint = paintAlignedImage(s, bgImageOrig, backgroundType);</span>
+<span class="nc" id="L1539">                                break;</span>
+
+                            case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
+                            case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
+                            case Style.BACKGROUND_GRADIENT_RADIAL:
+<span class="nc" id="L1544">                                bgPaint = createGradientPaint(s);</span>
+                                break;                            
+                    }
+                }
+<span class="nc bnc" id="L1548" title="All 2 branches missed.">                if(sc == null) {</span>
+<span class="nc" id="L1549">                    sc = new AndroidStyleCache();</span>
+<span class="nc" id="L1550">                    StyleAccessor.setCachedData(s, sc);</span>
+                }
+<span class="nc" id="L1552">                sc.backgroundPainter = bgPaint;</span>
+<span class="nc" id="L1553">            } else {</span>
+<span class="nc" id="L1554">                bgPaint.updateClip(clip, clipP, clipIsPath);</span>
+                /*
+                if (clip == null) {
+                    bgPaint.pendingClipW = cn1View.width;
+                    bgPaint.pendingClipH = cn1View.height;
+                    bgPaint.pendingClipX = 0;
+                    bgPaint.pendingClipY = 0;
+                } else {
+                    bgPaint.pendingClipW = clip.getWidth();
+                    bgPaint.pendingClipH = clip.getHeight();
+                    bgPaint.pendingClipX = clip.getX();
+                    bgPaint.pendingClipY = clip.getY();
+                }
+                */
+            }
+<span class="nc" id="L1569">            bgPaint.pendingX = x;</span>
+<span class="nc" id="L1570">            bgPaint.pendingY = y;</span>
+<span class="nc" id="L1571">            bgPaint.pendingHeight = height;</span>
+<span class="nc" id="L1572">            bgPaint.pendingWidth = width;</span>
+<span class="nc" id="L1573">            bgPaint.pendingAlpha = alpha;</span>
+            
+<span class="nc" id="L1575">            pendingRenderingOperations.add(bgPaint);</span>
+<span class="nc" id="L1576">        }</span>
+
+        private AsyncPaintPosition paintAlignedImage(Style s, final Image bgImageOrig, final byte position) {
+<span class="nc" id="L1579">            final Paint bgImageAlignPaint = new Paint();</span>
+<span class="nc" id="L1580">            final Paint bgImageAlignColorPaint = new Paint();</span>
+<span class="nc" id="L1581">            final byte bgt = s.getBgTransparency();</span>
+<span class="nc" id="L1582">            int cc = ((bgt &lt;&lt; 24) &amp; 0xff000000) | (s.getBgColor() &amp; 0xffffff);</span>
+<span class="nc" id="L1583">            bgImageAlignColorPaint.setAntiAlias(false);</span>
+<span class="nc" id="L1584">            bgImageAlignColorPaint.setStyle(Paint.Style.FILL);</span>
+<span class="nc" id="L1585">            bgImageAlignColorPaint.setColor(cc);</span>
+<span class="nc" id="L1586">            bgImageAlignPaint.setAlpha(255);</span>
+
+<span class="nc" id="L1588">            final Bitmap b = (Bitmap) bgImageOrig.getImage();</span>
+<span class="nc" id="L1589">            final Rect src = new Rect();</span>
+<span class="nc" id="L1590">            final int iW = bgImageOrig.getWidth();</span>
+<span class="nc" id="L1591">            final int iH = bgImageOrig.getHeight();</span>
+<span class="nc" id="L1592">            src.top = 0;</span>
+<span class="nc" id="L1593">            src.bottom = iH;</span>
+<span class="nc" id="L1594">            src.left = 0;</span>
+<span class="nc" id="L1595">            src.right = iW;</span>
+                            
+<span class="nc" id="L1597">            return new AsyncPaintPosition(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void executeImpl(AndroidGraphics underlying) {
+<span class="nc bnc" id="L1600" title="All 2 branches missed.">                    if(alpha &gt; 0) {</span>
+<span class="nc" id="L1601">                        bgImageAlignColorPaint.setAlpha(alpha);</span>
+<span class="nc" id="L1602">                        underlying.canvas.drawRect(x, y, x + width, y + height, bgImageAlignColorPaint);</span>
+                    }
+<span class="nc" id="L1604">                    Rect dest = new Rect();</span>
+<span class="nc bnc" id="L1605" title="All 10 branches missed.">                    switch(position) {</span>
+                        case Style.BACKGROUND_IMAGE_ALIGNED_TOP:
+<span class="nc" id="L1607">                            dest.top = y;</span>
+<span class="nc" id="L1608">                            dest.left = x + (width / 2 - iW / 2);</span>
+<span class="nc" id="L1609">                            break;</span>
+                        case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM:
+<span class="nc" id="L1611">                            dest.top = y + height - iH;</span>
+<span class="nc" id="L1612">                            dest.left = x + (width / 2 - iW / 2);</span>
+<span class="nc" id="L1613">                            break;</span>
+                        case Style.BACKGROUND_IMAGE_ALIGNED_LEFT:
+<span class="nc" id="L1615">                            dest.top = y + (height / 2 - iH / 2);</span>
+<span class="nc" id="L1616">                            dest.left = x;</span>
+<span class="nc" id="L1617">                            break;</span>
+                        case Style.BACKGROUND_IMAGE_ALIGNED_RIGHT:
+<span class="nc" id="L1619">                            dest.top = y + (height / 2 - iH / 2);</span>
+<span class="nc" id="L1620">                            dest.left = x + width - iW;</span>
+<span class="nc" id="L1621">                            break;</span>
+                        case Style.BACKGROUND_IMAGE_ALIGNED_CENTER:
+<span class="nc" id="L1623">                            dest.top = y + (height / 2 - iH / 2);</span>
+<span class="nc" id="L1624">                            dest.left = x + (width / 2 - iW / 2);</span>
+<span class="nc" id="L1625">                            break;</span>
+                        case Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT:
+<span class="nc" id="L1627">                            dest.top = y;</span>
+<span class="nc" id="L1628">                            dest.left = x;</span>
+<span class="nc" id="L1629">                            break;</span>
+                        case Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT:
+<span class="nc" id="L1631">                            dest.top = y;</span>
+<span class="nc" id="L1632">                            dest.left = x + width - iW;</span>
+<span class="nc" id="L1633">                            break;</span>
+                        case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT:
+<span class="nc" id="L1635">                            dest.top = y + (height - iH);</span>
+<span class="nc" id="L1636">                            dest.left = x;</span>
+<span class="nc" id="L1637">                            break;</span>
+                        case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT:
+<span class="nc" id="L1639">                            dest.top = y + (height - iH);</span>
+<span class="nc" id="L1640">                            dest.left = x + width - iW;</span>
+                            break;
+                    }
+<span class="nc" id="L1643">                    dest.bottom = y + iH;</span>
+<span class="nc" id="L1644">                    dest.right = x + iW;</span>
+<span class="nc" id="L1645">                    underlying.canvas.drawBitmap(b, src, dest, bgImageAlignPaint);</span>
+<span class="nc" id="L1646">                }</span>
+                public String toString() {
+<span class="nc" id="L1648">                    return &quot;BackgroundImageAlign&quot;;</span>
+                }
+            };
+        }
+        
+        private AsyncPaintPosition paintBackgroundSolidColor(final byte bgt, Style s, AsyncPaintPosition bgPaint) {
+<span class="nc" id="L1654">            int c = ((bgt &lt;&lt; 24) &amp; 0xff000000) | (s.getBgColor() &amp; 0xffffff);</span>
+<span class="nc" id="L1655">            final Paint pnt = new Paint();</span>
+<span class="nc" id="L1656">            pnt.setStyle(Paint.Style.FILL);</span>
+<span class="nc" id="L1657">            pnt.setColor(c);</span>
+<span class="nc" id="L1658">            pnt.setAntiAlias(false);</span>
+<span class="nc" id="L1659">            bgPaint = new AsyncPaintPosition(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void executeImpl(AndroidGraphics underlying) {
+<span class="nc bnc" id="L1662" title="All 2 branches missed.">                    if(bgt == 0) {</span>
+<span class="nc" id="L1663">                        return;</span>
+                    }
+<span class="nc" id="L1665">                    underlying.canvas.drawRect(x, y, x + width, y + height, pnt);</span>
+<span class="nc" id="L1666">                }</span>
+                public String toString() {
+<span class="nc" id="L1668">                    return &quot;SolidColorBackground&quot;;</span>
+                }
+            };
+<span class="nc" id="L1671">            return bgPaint;</span>
+        }
+
+        class DrawStringCache {
+            String text;
+            int fgColor;
+            CodenameOneTextPaint font;
+
+<span class="nc" id="L1679">            public DrawStringCache(String text, int color, CodenameOneTextPaint font) {</span>
+<span class="nc" id="L1680">                this.text = text;</span>
+<span class="nc" id="L1681">                this.fgColor = color;</span>
+<span class="nc" id="L1682">                this.font = font;</span>
+<span class="nc bnc" id="L1683" title="All 2 branches missed.">                if(font == null) {</span>
+<span class="nc" id="L1684">                    this.font = impl.defaultFont;</span>
+                } 
+<span class="nc" id="L1686">            }</span>
+
+<span class="nc" id="L1688">            public DrawStringCache(String text, Style s) {</span>
+<span class="nc" id="L1689">                this.text = text;</span>
+<span class="nc" id="L1690">                this.fgColor = s.getFgColor();</span>
+<span class="nc" id="L1691">                Object nativeFont = s.getFont().getNativeFont();</span>
+<span class="nc bnc" id="L1692" title="All 2 branches missed.">                if(nativeFont == null) {</span>
+<span class="nc" id="L1693">                    this.font = impl.defaultFont;</span>
+                } else {
+<span class="nc bnc" id="L1695" title="All 2 branches missed.">                    if(nativeFont instanceof AndroidImplementation.NativeFont) {</span>
+<span class="nc" id="L1696">                        nativeFont = ((AndroidImplementation.NativeFont)nativeFont).font;</span>
+                    }
+<span class="nc bnc" id="L1698" title="All 2 branches missed.">                    if(nativeFont == null) {</span>
+<span class="nc" id="L1699">                        nativeFont = impl.defaultFont;</span>
+                    } 
+                }
+<span class="nc" id="L1702">                this.font = (CodenameOneTextPaint)nativeFont;</span>
+<span class="nc" id="L1703">            }</span>
+
+            public boolean equals(Object o) {
+<span class="nc bnc" id="L1706" title="All 8 branches missed.">                return font != null &amp;&amp; o != null &amp;&amp; text != null &amp;&amp;</span>
+<span class="nc bnc" id="L1707" title="All 6 branches missed.">                        (text == ((DrawStringCache)o).text || text.equals(((DrawStringCache)o).text)) &amp;&amp;</span>
+                        fgColor == ((DrawStringCache)o).fgColor &amp;&amp;
+<span class="nc bnc" id="L1709" title="All 2 branches missed.">                        (font == ((DrawStringCache)o).font || font.equals(((DrawStringCache)o).font));</span>
+            }
+
+            public int hashCode() {
+<span class="nc" id="L1713">                return text.hashCode();</span>
+            }
+        }
+
+<span class="fc" id="L1717">        WeakHashMap&lt;DrawStringCache, Bitmap&gt; drawStringCache = new WeakHashMap&lt;DrawStringCache, Bitmap&gt;();</span>
+        
+        @Override
+        public void drawLabelComponent(final int cmpX, final int cmpY, final int cmpHeight, int cmpWidth, final Style style, String text,
+                                       final Bitmap icon, final Bitmap stateIcon, int preserveSpaceForState, final int gap, final boolean rtl, final boolean isOppositeSide,
+                                       final int textPosition, final int stringWidth, final boolean isTickerRunning, final int tickerShiftText, final boolean endsWith3Points, final int valign) {
+<span class="nc bnc" id="L1723" title="All 4 branches missed.">            if (text == null || text.equals(&quot; &quot;)) {</span>
+<span class="nc" id="L1724">                text = &quot;&quot;;</span>
+            }
+<span class="nc" id="L1726">            int fontHeight = 0;</span>
+<span class="nc" id="L1727">            Font cn1Font = style.getFont();</span>
+<span class="nc bnc" id="L1728" title="All 2 branches missed.">            if (text.length() &gt; 0) {</span>
+<span class="nc" id="L1729">                fontHeight = cn1Font.getHeight();</span>
+            } else {
+<span class="nc bnc" id="L1731" title="All 2 branches missed.">                if (icon == null) {</span>
+<span class="nc" id="L1732">                    return;</span>
+                }
+            }
+            
+<span class="nc" id="L1736">            AndroidStyleCache styleCache =  (AndroidStyleCache)StyleAccessor.getCachedData(style);</span>
+<span class="nc bnc" id="L1737" title="All 2 branches missed.">            if(styleCache == null) {</span>
+<span class="nc" id="L1738">                styleCache = new AndroidStyleCache();</span>
+<span class="nc" id="L1739">                StyleAccessor.setCachedData(style, styleCache);</span>
+            }
+<span class="nc bnc" id="L1741" title="All 2 branches missed.">            if(styleCache.textPaint == null) {</span>
+<span class="nc" id="L1742">                Object nativeFont = cn1Font.getNativeFont();</span>
+<span class="nc bnc" id="L1743" title="All 2 branches missed.">                if (nativeFont == null) {</span>
+<span class="nc" id="L1744">                    nativeFont = impl.defaultFont;</span>
+                    
+                    // this is happening too early, some things aren't initialized yet
+<span class="nc bnc" id="L1747" title="All 2 branches missed.">                    if(nativeFont == null) {</span>
+<span class="nc" id="L1748">                        return;</span>
+                    }
+                }
+<span class="nc bnc" id="L1751" title="All 2 branches missed.">                if (nativeFont instanceof AndroidImplementation.NativeFont) {</span>
+<span class="nc" id="L1752">                    styleCache.textPaint = new CodenameOneTextPaint((CodenameOneTextPaint) ((AndroidImplementation.NativeFont) nativeFont).font);</span>
+                } else {
+<span class="nc" id="L1754">                    styleCache.textPaint = new CodenameOneTextPaint((CodenameOneTextPaint) nativeFont);</span>
+                }
+                
+<span class="nc" id="L1757">                int c = (alpha &lt;&lt; 24) | (style.getFgColor() &amp; 0xffffff);</span>
+<span class="nc" id="L1758">                styleCache.textPaint.setColor(c);</span>
+            }          
+<span class="nc" id="L1760">            final CodenameOneTextPaint nativeFont = styleCache.textPaint;</span>
+            
+<span class="nc" id="L1762">            int iconWidth = 0;</span>
+<span class="nc" id="L1763">            int iconHeight = 0;</span>
+<span class="nc bnc" id="L1764" title="All 2 branches missed.">            if(icon != null) {</span>
+<span class="nc" id="L1765">                iconWidth = icon.getWidth();</span>
+<span class="nc" id="L1766">                iconHeight = icon.getHeight();</span>
+            }
+
+<span class="nc" id="L1769">            int textDecoration = style.getTextDecoration();</span>
+<span class="nc" id="L1770">            int stateIconSize = 0;</span>
+<span class="nc" id="L1771">            int stateIconYPosition = 0;</span>
+
+<span class="nc" id="L1773">            int leftPadding = style.getPaddingLeft(rtl);</span>
+<span class="nc" id="L1774">            int rightPadding = style.getPaddingRight(rtl);</span>
+<span class="nc" id="L1775">            int topPadding = style.getPaddingTop();</span>
+<span class="nc" id="L1776">            int bottomPadding = style.getPaddingBottom();</span>
+
+<span class="nc bnc" id="L1778" title="All 2 branches missed.">            if (stateIcon != null) {</span>
+<span class="nc" id="L1779">                stateIconSize = stateIcon.getWidth();</span>
+<span class="nc" id="L1780">                stateIconYPosition = cmpY + topPadding</span>
+                        + (cmpHeight - topPadding
+                        - bottomPadding) / 2 - stateIconSize / 2;
+<span class="nc" id="L1783">                int tX = cmpX;</span>
+<span class="nc bnc" id="L1784" title="All 2 branches missed.">                if (isOppositeSide) {</span>
+<span class="nc bnc" id="L1785" title="All 2 branches missed.">                    if (rtl) {</span>
+<span class="nc" id="L1786">                        tX += leftPadding;</span>
+                    } else {
+<span class="nc" id="L1788">                        tX = tX + cmpWidth - leftPadding - stateIconSize;</span>
+                    }
+<span class="nc" id="L1790">                    cmpWidth -= leftPadding - stateIconSize;</span>
+                } else {
+<span class="nc" id="L1792">                    preserveSpaceForState = stateIconSize + gap;</span>
+<span class="nc bnc" id="L1793" title="All 2 branches missed.">                    if (rtl) {</span>
+<span class="nc" id="L1794">                        tX = tX + cmpWidth - leftPadding - stateIconSize;</span>
+                    } else {
+<span class="nc" id="L1796">                        tX += leftPadding;</span>
+                    }
+                }
+
+<span class="nc" id="L1800">                drawImage(stateIcon, tX, stateIconYPosition);</span>
+            }
+
+            //default for bottom left alignment
+<span class="nc" id="L1804">            int x = cmpX + leftPadding + preserveSpaceForState;</span>
+<span class="nc" id="L1805">            int y = cmpY + topPadding;</span>
+
+<span class="nc" id="L1807">            int align = reverseAlignForBidi(rtl, style.getAlignment());</span>
+
+<span class="nc" id="L1809">            int textPos = reverseAlignForBidi(rtl, textPosition);</span>
+
+            //set initial x,y position according to the alignment and textPosition
+<span class="nc bnc" id="L1812" title="All 4 branches missed.">            switch (align) {</span>
+                case Component.LEFT:
+<span class="nc bnc" id="L1814" title="All 3 branches missed.">                    switch (textPos) {</span>
+                        case Label.LEFT:
+                        case Label.RIGHT:
+<span class="nc bnc" id="L1817" title="All 2 branches missed.">                            y = y + (cmpHeight - (topPadding + bottomPadding + Math.max(((icon != null) ? iconHeight : 0), fontHeight))) / 2;</span>
+<span class="nc" id="L1818">                            break;</span>
+                        case Label.BOTTOM:
+                        case Label.TOP:
+<span class="nc bnc" id="L1821" title="All 2 branches missed.">                            y = y + (cmpHeight - (topPadding + bottomPadding + ((icon != null) ? iconHeight + gap : 0) + fontHeight)) / 2;</span>
+                            break;
+                    }
+<span class="nc" id="L1824">                    break;</span>
+                case Component.CENTER:
+<span class="nc bnc" id="L1826" title="All 3 branches missed.">                    switch (textPos) {</span>
+                        case Label.LEFT:
+                        case Label.RIGHT:
+<span class="nc" id="L1829">                            x = x + (cmpWidth - (preserveSpaceForState</span>
+                                    + leftPadding
+                                    + rightPadding
+<span class="nc bnc" id="L1832" title="All 2 branches missed.">                                    + ((icon != null) ? iconWidth + gap : 0)</span>
+                                    + stringWidth)) / 2;
+<span class="nc" id="L1834">                            x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);</span>
+<span class="nc" id="L1835">                            y = y + (cmpHeight - (topPadding</span>
+                                    + bottomPadding
+<span class="nc bnc" id="L1837" title="All 2 branches missed.">                                    + Math.max(((icon != null) ? iconHeight : 0),</span>
+                                            fontHeight))) / 2;
+<span class="nc" id="L1839">                            break;</span>
+                        case Label.BOTTOM:
+                        case Label.TOP:
+<span class="nc" id="L1842">                            x = x + (cmpWidth - (preserveSpaceForState + leftPadding</span>
+                                    + rightPadding
+<span class="nc bnc" id="L1844" title="All 2 branches missed.">                                    + Math.max(((icon != null) ? iconWidth : 0),</span>
+                                            stringWidth))) / 2;
+<span class="nc" id="L1846">                            x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);</span>
+<span class="nc" id="L1847">                            y = y + (cmpHeight - (topPadding</span>
+                                    + bottomPadding
+<span class="nc bnc" id="L1849" title="All 2 branches missed.">                                    + ((icon != null) ? iconHeight + gap : 0)</span>
+                                    + fontHeight)) / 2;
+                            break;
+                    }
+<span class="nc" id="L1853">                    break;</span>
+                case Component.RIGHT:
+<span class="nc bnc" id="L1855" title="All 3 branches missed.">                    switch (textPos) {</span>
+                        case Label.LEFT:
+                        case Label.RIGHT:
+<span class="nc" id="L1858">                            x = cmpX + cmpWidth - rightPadding</span>
+<span class="nc bnc" id="L1859" title="All 2 branches missed.">                                    - (((icon != null) ? (iconWidth + gap) : 0)</span>
+                                    + stringWidth);
+<span class="nc bnc" id="L1861" title="All 2 branches missed.">                            if (rtl) {</span>
+<span class="nc" id="L1862">                                x = Math.max(x - preserveSpaceForState, cmpX + leftPadding);</span>
+                            } else {
+<span class="nc" id="L1864">                                x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);</span>
+                            }
+<span class="nc" id="L1866">                            y = y + (cmpHeight - (topPadding</span>
+                                    + bottomPadding
+<span class="nc bnc" id="L1868" title="All 2 branches missed.">                                    + Math.max(((icon != null) ? iconHeight : 0),</span>
+                                            fontHeight))) / 2;
+<span class="nc" id="L1870">                            break;</span>
+                        case Label.BOTTOM:
+                        case Label.TOP:
+<span class="nc" id="L1873">                            x = cmpX + cmpWidth - rightPadding</span>
+<span class="nc bnc" id="L1874" title="All 2 branches missed.">                                    - (Math.max(((icon != null) ? (iconWidth) : 0),</span>
+                                            stringWidth));
+<span class="nc" id="L1876">                            x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);</span>
+<span class="nc" id="L1877">                            y = y + (cmpHeight - (topPadding</span>
+                                    + bottomPadding
+<span class="nc bnc" id="L1879" title="All 2 branches missed.">                                    + ((icon != null) ? iconHeight + gap : 0) + fontHeight)) / 2;</span>
+                            break;
+                    }
+<span class="nc" id="L1882">                    break;</span>
+                default:
+                    break;
+            }
+
+<span class="nc" id="L1887">            int textSpaceW = cmpWidth - rightPadding - leftPadding;</span>
+
+<span class="nc bnc" id="L1889" title="All 6 branches missed.">            if (icon != null &amp;&amp; (textPos == Label.RIGHT || textPos == Label.LEFT)) {</span>
+<span class="nc" id="L1890">                textSpaceW = textSpaceW - iconWidth;</span>
+            }
+
+<span class="nc bnc" id="L1893" title="All 2 branches missed.">            if (stateIcon != null) {</span>
+<span class="nc" id="L1894">                textSpaceW = textSpaceW - stateIconSize;</span>
+            } else {
+<span class="nc" id="L1896">                textSpaceW = textSpaceW - preserveSpaceForState;</span>
+            }
+            
+<span class="nc" id="L1899">            final GeneralPath prevClip = new GeneralPath();</span>
+<span class="nc" id="L1900">            getClipShape(prevClip);</span>
+
+<span class="nc" id="L1902">            clipRect(cmpX, cmpY, cmpWidth, cmpHeight);</span>
+            /*
+            if (clip == null) {
+                clip = new Rectangle(cmpX, cmpY, cmpWidth, cmpHeight);
+            } else {
+                clip = clip.intersection(cmpX, cmpY, cmpWidth, cmpHeight);
+            }*/
+
+<span class="nc" id="L1910">            Bitmap stringBmp = null;</span>
+<span class="nc bnc" id="L1911" title="All 10 branches missed.">            if(style.getTextDecoration() == 0 &amp;&amp; cmpWidth &gt; 0 &amp;&amp; stringWidth &gt; 0 &amp;&amp; text.length() &gt; 0 &amp;&amp; fontHeight &gt; 0) {</span>
+<span class="nc" id="L1912">                DrawStringCache dc = new DrawStringCache(text, style);</span>
+<span class="nc" id="L1913">                stringBmp = drawStringCache.get(dc);</span>
+<span class="nc bnc" id="L1914" title="All 2 branches missed.">                if (stringBmp == null) {</span>
+<span class="nc" id="L1915">                    Bitmap bitmap = Bitmap.createBitmap(Math.min(cmpWidth, stringWidth), fontHeight,</span>
+                            Bitmap.Config.ARGB_8888);
+<span class="nc" id="L1917">                    Canvas cnv = new Canvas(bitmap);</span>
+<span class="nc" id="L1918">                    cnv.drawText(text, 0, nativeFont.top() * -1, nativeFont);</span>
+<span class="nc" id="L1919">                    stringBmp = bitmap;</span>
+<span class="nc" id="L1920">                    drawStringCache.put(dc, stringBmp);</span>
+                }
+            }
+
+<span class="nc" id="L1924">            final Bitmap textCache = stringBmp;</span>
+
+            //final int al = alpha;
+<span class="nc" id="L1927">            final String finalText = text;</span>
+<span class="nc" id="L1928">            final int finalTextSpaceW = textSpaceW;</span>
+<span class="nc" id="L1929">            final int finalTextDecoration = textDecoration;</span>
+<span class="nc" id="L1930">            final int finalFontHeight = fontHeight;</span>
+<span class="nc" id="L1931">            final int finalTextPos = textPos;</span>
+
+<span class="nc" id="L1933">            final int finalIconHeight = iconHeight;</span>
+<span class="nc" id="L1934">            final int finalIconWidth = iconWidth;</span>
+            /*
+            final int clipXX = getClipX();
+            final int clipYX = getClipY();
+            final int clipWX = getClipWidth();
+            final int clipHX = getClipHeight();
+            */
+<span class="nc" id="L1941">            final int finalX = x;</span>
+<span class="nc" id="L1942">            final int finalY = y;</span>
+
+<span class="nc" id="L1944">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="nc bnc" id="L1947" title="All 2 branches missed.">                    if (icon == null) {</span>
+                        // no icon only string
+<span class="nc" id="L1949">                        drawLabelString(underlying, nativeFont, finalText, finalX, finalY, finalTextSpaceW, isTickerRunning, tickerShiftText,</span>
+                                finalTextDecoration, rtl, endsWith3Points, stringWidth, finalFontHeight, textCache);
+                    } else {
+<span class="nc" id="L1952">                        int strWidth = stringWidth;</span>
+                        int iconStringWGap;
+                        int iconStringHGap;
+
+<span class="nc bnc" id="L1956" title="All 5 branches missed.">                        switch (finalTextPos) {</span>
+                            case Label.LEFT:
+<span class="nc bnc" id="L1958" title="All 2 branches missed.">                                if (finalIconHeight &gt; finalFontHeight) {</span>
+<span class="nc" id="L1959">                                    iconStringHGap = (finalIconHeight - finalFontHeight) / 2;</span>
+<span class="nc" id="L1960">                                    strWidth = drawLabelStringValign(underlying, nativeFont, finalText, finalX, finalY, finalTextSpaceW, isTickerRunning,</span>
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, iconStringHGap, finalIconHeight,
+                                            finalFontHeight, valign, textCache);
+
+<span class="nc" id="L1964">                                    underlying.canvas.drawBitmap(icon, finalX + strWidth + gap, finalY, underlying.paint);</span>
+                                } else {
+<span class="nc" id="L1966">                                    iconStringHGap = (finalFontHeight - finalIconHeight) / 2;</span>
+<span class="nc" id="L1967">                                    strWidth = drawLabelString(underlying, nativeFont, finalText, finalX, finalY, finalTextSpaceW, isTickerRunning,</span>
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, finalFontHeight, textCache);
+
+<span class="nc" id="L1970">                                    underlying.canvas.drawBitmap(icon, finalX + strWidth + gap, finalY + iconStringHGap, underlying.paint);</span>
+                                }
+<span class="nc" id="L1972">                                break;</span>
+                            case Label.RIGHT:
+<span class="nc bnc" id="L1974" title="All 2 branches missed.">                                if (finalIconHeight &gt; finalFontHeight) {</span>
+<span class="nc" id="L1975">                                    iconStringHGap = (finalIconHeight - finalFontHeight) / 2;</span>
+<span class="nc" id="L1976">                                    underlying.canvas.drawBitmap(icon, finalX, finalY, underlying.paint);</span>
+<span class="nc" id="L1977">                                    underlying.canvas.drawBitmap(icon, finalX, finalY, underlying.paint);</span>
+<span class="nc" id="L1978">                                    drawLabelStringValign(underlying, nativeFont, finalText, finalX + finalIconWidth + gap, finalY, finalTextSpaceW, isTickerRunning,</span>
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, iconStringHGap, finalIconHeight, finalFontHeight,
+                                            valign, textCache);
+                                } else {
+<span class="nc" id="L1982">                                    iconStringHGap = (finalFontHeight - finalIconHeight) / 2;</span>
+<span class="nc" id="L1983">                                    underlying.canvas.drawBitmap(icon, finalX, finalY + iconStringHGap, underlying.paint);</span>
+<span class="nc" id="L1984">                                    drawLabelString(underlying, nativeFont, finalText, finalX + finalIconWidth + gap, finalY, finalTextSpaceW, isTickerRunning,</span>
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, finalFontHeight, textCache);
+                                }
+<span class="nc" id="L1987">                                break;</span>
+                            case Label.BOTTOM:
+                                //center align the smaller
+<span class="nc bnc" id="L1990" title="All 2 branches missed.">                                if (finalIconWidth &gt; strWidth) {</span>
+<span class="nc" id="L1991">                                    iconStringWGap = (finalIconWidth - strWidth) / 2;</span>
+<span class="nc" id="L1992">                                    underlying.canvas.drawBitmap(icon, finalX, finalY, underlying.paint);</span>
+<span class="nc" id="L1993">                                    drawLabelString(underlying, nativeFont, finalText, finalX + iconStringWGap, finalY + finalIconHeight + gap, finalTextSpaceW,</span>
+                                            isTickerRunning, tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, finalFontHeight, textCache);
+                                } else {
+<span class="nc" id="L1996">                                    iconStringWGap = (Math.min(strWidth, finalTextSpaceW) - finalIconWidth) / 2;</span>
+<span class="nc" id="L1997">                                    underlying.canvas.drawBitmap(icon, finalX + iconStringWGap, finalY, underlying.paint);</span>
+
+<span class="nc" id="L1999">                                    drawLabelString(underlying, nativeFont, finalText, finalX, finalY + finalIconHeight + gap, finalTextSpaceW, isTickerRunning,</span>
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, finalFontHeight, textCache);
+                                }
+<span class="nc" id="L2002">                                break;</span>
+                            case Label.TOP:
+                                //center align the smaller
+<span class="nc bnc" id="L2005" title="All 2 branches missed.">                                if (finalIconWidth &gt; strWidth) {</span>
+<span class="nc" id="L2006">                                    iconStringWGap = (finalIconWidth - strWidth) / 2;</span>
+<span class="nc" id="L2007">                                    drawLabelString(underlying, nativeFont, finalText, finalX + iconStringWGap, finalY, finalTextSpaceW, isTickerRunning,</span>
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, finalFontHeight, textCache);
+<span class="nc" id="L2009">                                    underlying.canvas.drawBitmap(icon, finalX, finalY + finalFontHeight + gap, underlying.paint);</span>
+                                } else {
+<span class="nc" id="L2011">                                    iconStringWGap = (Math.min(strWidth, finalTextSpaceW) - finalIconWidth) / 2;</span>
+<span class="nc" id="L2012">                                    drawLabelString(underlying, nativeFont, finalText, finalX, finalY, finalTextSpaceW, isTickerRunning, tickerShiftText,</span>
+                                            finalTextDecoration, rtl, endsWith3Points, strWidth, finalFontHeight, textCache);
+<span class="nc" id="L2014">                                    underlying.canvas.drawBitmap(icon, finalX + iconStringWGap, finalY + finalFontHeight + gap, underlying.paint);</span>
+                                }
+                                break;
+                        }
+                    }
+                    //underlying.setClip(clipXX, clipYX, clipWX, clipHX);
+<span class="nc" id="L2020">                    underlying.setClip(prevClip);</span>
+<span class="nc" id="L2021">                }</span>
+                public String toString() {
+<span class="nc bnc" id="L2023" title="All 2 branches missed.">                    if(icon == null) {</span>
+<span class="nc" id="L2024">                        return &quot;drawLabelComponent null icon&quot;;</span>
+                    }
+<span class="nc bnc" id="L2026" title="All 2 branches missed.">                    if(finalText.length() &gt; 0) {</span>
+<span class="nc" id="L2027">                        return &quot;drawLabelComponent with icon &amp; text&quot;;</span>
+                    } else {
+<span class="nc" id="L2029">                        return &quot;drawLabelComponent with icon&quot;;</span>
+                    }
+                }
+            });
+<span class="nc" id="L2033">            setClip(prevClip);</span>
+            
+<span class="nc" id="L2035">        }</span>
+                
+        /**
+         * Implements the drawString for the text component and adjust the valign
+         * assuming the icon is in one of the sides
+         */
+        private int drawLabelStringValign(AndroidGraphics underlying, 
+                CodenameOneTextPaint nativeFont, String str, int x, int y, int textSpaceW,
+                boolean isTickerRunning, int tickerShiftText, int textDecoration, boolean rtl,
+                boolean endsWith3Points, int textWidth,
+                int iconStringHGap, int iconHeight, int fontHeight, int valign, Bitmap textCache) {
+<span class="nc bnc" id="L2046" title="All 2 branches missed.">            if(str.length() == 0) {</span>
+<span class="nc" id="L2047">                return 0;</span>
+            }
+<span class="nc bnc" id="L2049" title="All 3 branches missed.">            switch (valign) {</span>
+                case Component.TOP:
+<span class="nc" id="L2051">                    return drawLabelString(underlying, nativeFont, str, x, y, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight, textCache);</span>
+                case Component.CENTER:
+<span class="nc" id="L2053">                    return drawLabelString(underlying, nativeFont, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight, textCache);</span>
+                default:
+<span class="nc" id="L2055">                    return drawLabelString(underlying, nativeFont, str, x, y + iconStringHGap, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight, textCache);</span>
+            }
+        }
+
+        /**
+         * Implements the drawString for the text component and adjust the valign
+         * assuming the icon is in one of the sides
+         */
+        private int drawLabelString(AndroidGraphics underlying, CodenameOneTextPaint nativeFont, String text, int x, int y, int textSpaceW,
+                boolean isTickerRunning, int tickerShiftText, int textDecoration, boolean rtl, boolean endsWith3Points, int textWidth,
+                int fontHeight, Bitmap textCache) {
+<span class="nc bnc" id="L2066" title="All 2 branches missed.">            if(text.length() == 0) {</span>
+<span class="nc" id="L2067">                return 0;</span>
+            }
+<span class="nc" id="L2069">            int cx = underlying.getClipX();</span>
+<span class="nc" id="L2070">            int cy = underlying.getClipY();</span>
+<span class="nc" id="L2071">            int cw = underlying.getClipWidth();</span>
+<span class="nc" id="L2072">            int ch = underlying.getClipHeight();</span>
+<span class="nc" id="L2073">            underlying.clipRect(x, cy, textSpaceW, ch);</span>
+
+<span class="nc" id="L2075">            int drawnW = drawLabelText(underlying, textDecoration, rtl, isTickerRunning, endsWith3Points, nativeFont,</span>
+                    textWidth, textSpaceW, tickerShiftText, text, x, y, fontHeight, textCache);
+
+<span class="nc" id="L2078">            underlying.setClip(cx, cy, cw, ch);</span>
+<span class="nc" id="L2079">            return drawnW;</span>
+            //underlying.canvas.drawText(text, x, y - nativeFont.getFontAscent(), nativeFont);
+
+            //return textSpaceW;
+        }
+        
+        private boolean fastCharWidthCheck(String s, int length, int width, int charWidth, Object f) {
+<span class="nc bnc" id="L2086" title="All 2 branches missed.">            if (length * charWidth &lt; width) {</span>
+<span class="nc" id="L2087">                return true;</span>
+            }
+<span class="nc" id="L2089">            length = Math.min(s.length(), length);</span>
+<span class="nc bnc" id="L2090" title="All 2 branches missed.">            return impl.stringWidth(f, s.substring(0, length)) &lt; width;</span>
+        }
+
+        /**
+         * Draws the text of a label
+         *
+         * @param textDecoration decoration information for the text
+         * @param text the text for the label
+         * @param x position for the label
+         * @param y position for the label
+         * @param txtW stringWidth(text) equivalent which is faster than just
+         * invoking string width all the time
+         * @param textSpaceW the width available for the component
+         * @return the space used by the drawing
+         */
+        protected int drawLabelText(AndroidGraphics underlying, int textDecoration, boolean rtl, boolean isTickerRunning,
+                boolean endsWith3Points, CodenameOneTextPaint nativeFont, int txtW, int textSpaceW, int shiftText, String text,
+                int x, int y, int fontHeight, Bitmap textCache) {
+<span class="nc bnc" id="L2108" title="All 4 branches missed.">            if ((!isTickerRunning) || rtl) {</span>
+                //if there is no space to draw the text add ... at the end
+<span class="nc bnc" id="L2110" title="All 4 branches missed.">                if (txtW &gt; textSpaceW &amp;&amp; textSpaceW &gt; 0) {</span>
+                    // Handling of adding 3 points and in fact all text positioning when the text is bigger than
+                    // the allowed space is handled differently in RTL, this is due to the reverse algorithm
+                    // effects - i.e. when the text includes both Hebrew/Arabic and English/numbers then simply
+                    // trimming characters from the end of the text (as done with LTR) won't do.
+                    // Instead we simple reposition the text, and draw the 3 points, this is quite simple, but
+                    // the downside is that a part of a letter may be shown here as well.
+
+<span class="nc bnc" id="L2118" title="All 2 branches missed.">                    if (rtl) {</span>
+<span class="nc bnc" id="L2119" title="All 4 branches missed.">                        if ((!isTickerRunning) &amp;&amp; endsWith3Points) {</span>
+<span class="nc" id="L2120">                            String points = &quot;...&quot;;</span>
+<span class="nc" id="L2121">                            int pointsW = impl.stringWidth(nativeFont, points);</span>
+<span class="nc" id="L2122">                            drawString(underlying, nativeFont, points, shiftText + x, y, textDecoration, fontHeight, textCache);</span>
+<span class="nc" id="L2123">                            clipRect(pointsW + shiftText + x, y, textSpaceW - pointsW, fontHeight);</span>
+                        }
+<span class="nc" id="L2125">                        x = x - txtW + textSpaceW;</span>
+<span class="nc bnc" id="L2126" title="All 2 branches missed.">                    } else if (endsWith3Points) {</span>
+<span class="nc" id="L2127">                        String points = &quot;...&quot;;</span>
+<span class="nc" id="L2128">                        int index = 1;</span>
+<span class="nc" id="L2129">                        int widest = impl.charWidth(nativeFont, 'W');</span>
+<span class="nc" id="L2130">                        int pointsW = impl.stringWidth(nativeFont, points);</span>
+<span class="nc bnc" id="L2131" title="All 4 branches missed.">                        while (fastCharWidthCheck(text, index, textSpaceW - pointsW, widest, nativeFont) &amp;&amp; index &lt; text.length()) {</span>
+<span class="nc" id="L2132">                            index++;</span>
+                        }
+<span class="nc" id="L2134">                        text = text.substring(0, Math.min(text.length(), Math.max(1, index - 1))) + points;</span>
+<span class="nc" id="L2135">                        txtW = impl.stringWidth(nativeFont, text);</span>
+                    }
+                }
+            }
+
+<span class="nc" id="L2140">            drawString(underlying, nativeFont, text, shiftText + x, y, textDecoration, fontHeight, textCache);</span>
+<span class="nc" id="L2141">            return Math.min(txtW, textSpaceW);</span>
+        }
+
+        /**
+         * Draw a string using the current font and color in the x,y coordinates.
+         * The font is drawn from the top position and not the baseline.
+         *
+         * @param nativeFont the font used
+         * @param str the string to be drawn.
+         * @param x the x coordinate.
+         * @param y the y coordinate.
+         * @param textDecoration Text decoration bitmask (See Style's
+         * TEXT_DECORATION_* constants)
+         */
+        private void drawString(AndroidGraphics underlying, CodenameOneTextPaint nativeFont, String str, int x, int y, int textDecoration, int fontHeight, Bitmap textCache) {
+            // this if has only the minor effect of providing a slighly faster execution path
+<span class="nc bnc" id="L2157" title="All 2 branches missed.">            if (textDecoration != 0) {</span>
+<span class="nc bnc" id="L2158" title="All 2 branches missed.">                boolean raised = (textDecoration &amp; Style.TEXT_DECORATION_3D) != 0;</span>
+<span class="nc bnc" id="L2159" title="All 2 branches missed.">                boolean lowerd = (textDecoration &amp; Style.TEXT_DECORATION_3D_LOWERED) != 0;</span>
+<span class="nc bnc" id="L2160" title="All 2 branches missed.">                boolean north = (textDecoration &amp; Style.TEXT_DECORATION_3D_SHADOW_NORTH) != 0;</span>
+<span class="nc bnc" id="L2161" title="All 6 branches missed.">                if (raised || lowerd || north) {</span>
+<span class="nc" id="L2162">                    textDecoration = textDecoration &amp; (~Style.TEXT_DECORATION_3D) &amp; (~Style.TEXT_DECORATION_3D_LOWERED) &amp; (~Style.TEXT_DECORATION_3D_SHADOW_NORTH);</span>
+<span class="nc" id="L2163">                    int c = getColor();</span>
+<span class="nc" id="L2164">                    int a = getAlpha();</span>
+<span class="nc" id="L2165">                    int newColor = 0;</span>
+<span class="nc" id="L2166">                    int offset = -2;</span>
+<span class="nc bnc" id="L2167" title="All 2 branches missed.">                    if (lowerd) {</span>
+<span class="nc" id="L2168">                        offset = 2;</span>
+<span class="nc" id="L2169">                        newColor = 0xffffff;</span>
+<span class="nc bnc" id="L2170" title="All 2 branches missed.">                    } else if (north) {</span>
+<span class="nc" id="L2171">                        offset = 2;</span>
+                    }
+<span class="nc" id="L2173">                    setColor(newColor);</span>
+<span class="nc bnc" id="L2174" title="All 2 branches missed.">                    if (a == 0xff) {</span>
+<span class="nc" id="L2175">                        setAlpha(140);</span>
+                    }
+<span class="nc" id="L2177">                    drawString(underlying, nativeFont, str, x, y + offset, textDecoration, fontHeight, textCache);</span>
+<span class="nc" id="L2178">                    setAlpha(a);</span>
+<span class="nc" id="L2179">                    setColor(c);</span>
+<span class="nc" id="L2180">                    drawString(underlying, nativeFont, str, x, y, textDecoration, fontHeight, textCache);</span>
+<span class="nc" id="L2181">                    return;</span>
+                }
+<span class="nc" id="L2183">                underlying.canvas.drawText(str, x, y - font.top(), nativeFont);</span>
+<span class="nc bnc" id="L2184" title="All 2 branches missed.">                if ((textDecoration &amp; Style.TEXT_DECORATION_UNDERLINE) != 0) {</span>
+<span class="nc" id="L2185">                    underlying.paint.setStyle(Paint.Style.FILL);</span>
+<span class="nc" id="L2186">                    underlying.canvas.drawLine(x, y + fontHeight - 1, x + impl.stringWidth(nativeFont, str), y + fontHeight - 1, underlying.paint);</span>
+                }
+<span class="nc bnc" id="L2188" title="All 2 branches missed.">                if ((textDecoration &amp; Style.TEXT_DECORATION_STRIKETHRU) != 0) {</span>
+<span class="nc" id="L2189">                    underlying.paint.setStyle(Paint.Style.FILL);</span>
+<span class="nc" id="L2190">                    underlying.canvas.drawLine(x, y + fontHeight / 2, x + impl.stringWidth(nativeFont, str), y + fontHeight / 2, underlying.paint);</span>
+                }
+<span class="nc bnc" id="L2192" title="All 2 branches missed.">                if ((textDecoration &amp; Style.TEXT_DECORATION_OVERLINE) != 0) {</span>
+<span class="nc" id="L2193">                    underlying.paint.setStyle(Paint.Style.FILL);</span>
+<span class="nc" id="L2194">                    underlying.canvas.drawLine(x, y, x + impl.stringWidth(nativeFont, str), y, underlying.paint);</span>
+                }
+<span class="nc" id="L2196">            } else {</span>
+<span class="nc bnc" id="L2197" title="All 2 branches missed.">                if(textCache != null) {</span>
+<span class="nc" id="L2198">                    underlying.canvas.drawBitmap(textCache, x, y, nativeFont);</span>
+                } else {
+<span class="nc" id="L2200">                    underlying.canvas.drawText(str, x, y - nativeFont.top(), nativeFont);</span>
+                }
+            }
+<span class="nc" id="L2203">        }</span>
+        
+
+        @Override
+        public void fillArc(final int x, final int y, final int width, final int height, final int startAngle, final int arcAngle) {
+<span class="fc" id="L2208">            final int alph = alpha;</span>
+<span class="fc" id="L2209">            final int col = color;</span>
+<span class="fc" id="L2210">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L2213">                    underlying.setAlpha(alph);</span>
+<span class="fc" id="L2214">                    underlying.setColor(col);</span>
+<span class="fc" id="L2215">                    underlying.fillArc(x, y, width, height, startAngle, arcAngle);</span>
+<span class="fc" id="L2216">                }</span>
+                public String toString() {
+<span class="nc" id="L2218">                    return &quot;fillArc&quot;;</span>
+                }
+            });
+<span class="fc" id="L2221">        }</span>
+
+        @Override
+        public void drawArc(final int x, final int y, final int width, final int height, final int startAngle, final int arcAngle) {
+<span class="fc" id="L2225">            final int alph = alpha;</span>
+<span class="fc" id="L2226">            final int col = color;</span>
+<span class="fc" id="L2227">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L2230">                    underlying.setAlpha(alph);</span>
+<span class="fc" id="L2231">                    underlying.setColor(col);</span>
+<span class="fc" id="L2232">                    underlying.drawArc(x, y, width, height, startAngle, arcAngle);</span>
+<span class="fc" id="L2233">                }</span>
+                public String toString() {
+<span class="nc" id="L2235">                    return &quot;drawArc&quot;;</span>
+                }
+            });
+<span class="fc" id="L2238">        }</span>
+
+        @Override
+        public void drawString(final String str, final int x, final int y) {
+<span class="fc" id="L2242">            final int col = this.color;</span>
+<span class="fc" id="L2243">            Paint fnt = getFont();</span>
+<span class="pc bpc" id="L2244" title="1 of 2 branches missed.">            if(fnt == null) {</span>
+<span class="nc" id="L2245">                fnt = impl.defaultFont;</span>
+            }
+
+<span class="fc" id="L2248">            final CodenameOneTextPaint font = (CodenameOneTextPaint)fnt;</span>
+<span class="fc" id="L2249">            final int alph = this.alpha;</span>
+
+<span class="fc" id="L2251">            Bitmap stringBmp = null;</span>
+<span class="pc bpc" id="L2252" title="1 of 2 branches missed.">            if(!legacyPaintLogic) {</span>
+<span class="nc" id="L2253">                int stringWidth = (int) Math.ceil(font.measureText(str));</span>
+<span class="nc bnc" id="L2254" title="All 2 branches missed.">                if (font.fontHeight &lt; 0) {</span>
+<span class="nc" id="L2255">                    font.fontHeight = font.getFontMetricsInt(font.getFontMetricsInt());</span>
+                }
+
+<span class="nc bnc" id="L2258" title="All 4 branches missed.">                if (stringWidth &gt; 0 &amp;&amp; font.fontHeight &gt; 0) {</span>
+<span class="nc" id="L2259">                    DrawStringCache dc = new DrawStringCache(str, col, font);</span>
+<span class="nc" id="L2260">                    stringBmp = drawStringCache.get(dc);</span>
+<span class="nc bnc" id="L2261" title="All 2 branches missed.">                    if (stringBmp == null) {</span>
+<span class="nc" id="L2262">                        Bitmap bitmap = Bitmap.createBitmap(stringWidth, font.fontHeight,</span>
+                                Bitmap.Config.ARGB_8888);
+<span class="nc" id="L2264">                        Canvas cnv = new Canvas(bitmap);</span>
+<span class="nc" id="L2265">                        int c = 0xff000000 | color;</span>
+<span class="nc" id="L2266">                        font.setColor(c);</span>
+<span class="nc" id="L2267">                        cnv.drawText(str, 0, font.top() * -1, font);</span>
+<span class="nc" id="L2268">                        stringBmp = bitmap;</span>
+<span class="nc" id="L2269">                        drawStringCache.put(dc, stringBmp);</span>
+                    }
+                }
+            }
+
+<span class="fc" id="L2274">            final Bitmap textCache = stringBmp;</span>
+<span class="fc" id="L2275">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="pc bpc" id="L2278" title="1 of 2 branches missed.">                    if(textCache != null) {</span>
+<span class="nc" id="L2279">                        underlying.canvas.drawBitmap(textCache, x, y, underlying.paint);</span>
+                    } else {
+<span class="fc" id="L2281">                        underlying.setFont(font);</span>
+<span class="fc" id="L2282">                        font.setColor(col);</span>
+<span class="fc" id="L2283">                        font.setAlpha(alph);</span>
+<span class="fc" id="L2284">                        underlying.drawString(str, x, y);</span>
+                    }
+<span class="fc" id="L2286">                }</span>
+                public String toString() {
+<span class="nc" id="L2288">                    return &quot;drawString&quot;;</span>
+                }
+            });
+<span class="fc" id="L2291">        }</span>
+
+        @Override
+        public void drawRoundRect(final int x, final int y, final int width, final int height, final int arcWidth, final int arcHeight) {
+<span class="fc" id="L2295">            final int alph = alpha;</span>
+<span class="fc" id="L2296">            final int col = color;</span>
+<span class="fc" id="L2297">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L2300">                    underlying.setAlpha(alph);</span>
+<span class="fc" id="L2301">                    underlying.setColor(col);</span>
+<span class="fc" id="L2302">                    underlying.drawRoundRect(x, y, width, height, arcWidth, arcHeight);</span>
+<span class="fc" id="L2303">                }</span>
+                public String toString() {
+<span class="nc" id="L2305">                    return &quot;drawRoundRect&quot;;</span>
+                }
+            });
+<span class="fc" id="L2308">        }</span>
+
+        @Override
+        public void drawRect(final int x, final int y, final int width, final int height) {
+<span class="fc" id="L2312">            final int alph = alpha;</span>
+<span class="fc" id="L2313">            final int col = color;</span>
+<span class="fc" id="L2314">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L2317">                    underlying.setAlpha(alph);</span>
+<span class="fc" id="L2318">                    underlying.setColor(col);</span>
+<span class="fc" id="L2319">                    underlying.drawRect(x, y, width, height);</span>
+<span class="fc" id="L2320">                }</span>
+                public String toString() {
+<span class="nc" id="L2322">                    return &quot;drawRect&quot;;</span>
+                }
+            });
+<span class="fc" id="L2325">        }</span>
+
+        @Override
+        public void drawRGB(final int[] rgbData, final int offset, final int x, final int y, final int w, final int h, final boolean processAlpha) {
+<span class="fc" id="L2329">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L2332">                    Paint p = underlying.getPaint();</span>
+<span class="fc" id="L2333">                    underlying.setPaint(imagePaint);</span>
+<span class="fc" id="L2334">                    underlying.drawRGB(rgbData, offset, x, y, w, h, processAlpha);</span>
+<span class="fc" id="L2335">                    underlying.setPaint(p);</span>
+<span class="fc" id="L2336">                }</span>
+                public String toString() {
+<span class="nc" id="L2338">                    return &quot;drawRGB&quot;;</span>
+                }
+            });
+<span class="fc" id="L2341">        }</span>
+
+        @Override
+        public void fillPolygon(final int[] xPoints, final int[] yPoints, final int nPoints) {
+<span class="fc" id="L2345">            final int alph = alpha;</span>
+<span class="fc" id="L2346">            final int col = color;</span>
+<span class="fc" id="L2347">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L2350">                    underlying.setAlpha(alph);</span>
+<span class="fc" id="L2351">                    underlying.setColor(col);</span>
+<span class="fc" id="L2352">                    underlying.fillPolygon(xPoints, yPoints, nPoints);</span>
+<span class="fc" id="L2353">                }</span>
+                public String toString() {
+<span class="nc" id="L2355">                    return &quot;fillPolygon&quot;;</span>
+                }
+            });
+<span class="fc" id="L2358">        }</span>
+
+        @Override
+        public void drawPolygon(final int[] xPoints, final int[] yPoints, final int nPoints) {
+<span class="fc" id="L2362">            final int alph = alpha;</span>
+<span class="fc" id="L2363">            final int col = color;</span>
+<span class="fc" id="L2364">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L2367">                    underlying.setAlpha(alph);</span>
+<span class="fc" id="L2368">                    underlying.setColor(col);</span>
+<span class="fc" id="L2369">                    underlying.drawPolygon(xPoints, yPoints, nPoints);</span>
+<span class="fc" id="L2370">                }</span>
+
+                public String toString() {
+<span class="nc" id="L2373">                    return &quot;drawPolygon&quot;;</span>
+                }
+            });
+<span class="fc" id="L2376">        }</span>
+
+        @Override
+        public void drawLine(final int x1, final int y1, final int x2, final int y2) {
+<span class="fc" id="L2380">            final int alph = alpha;</span>
+<span class="fc" id="L2381">            final int col = color;</span>
+<span class="fc" id="L2382">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L2385">                    underlying.setAlpha(alph);</span>
+<span class="fc" id="L2386">                    underlying.setColor(col);</span>
+<span class="fc" id="L2387">                    underlying.drawLine(x1, y1, x2, y2);</span>
+<span class="fc" id="L2388">                }</span>
+                public String toString() {
+<span class="nc" id="L2390">                    return &quot;drawLine&quot;;</span>
+                }
+            });
+<span class="fc" id="L2393">        }</span>
+
+        @Override
+        public void tileImage(final Object img, final int x, final int y, final int w, final int h) {
+<span class="fc" id="L2397">            final int alph = alpha;</span>
+<span class="fc" id="L2398">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L2401">                    Paint p = underlying.getPaint();</span>
+<span class="fc" id="L2402">                    underlying.setPaint(imagePaint);</span>
+<span class="fc" id="L2403">                    imagePaint.setAlpha(alph);</span>
+<span class="fc" id="L2404">                    underlying.tileImage(img, x, y, w, h);</span>
+<span class="fc" id="L2405">                    underlying.setPaint(p);</span>
+<span class="fc" id="L2406">                }</span>
+                public String toString() {
+<span class="nc" id="L2408">                    return &quot;tileImage&quot;;</span>
+                }
+            });
+<span class="fc" id="L2411">        }</span>
+
+        @Override
+        public void drawImage(final Object img, final int x, final int y, final int w, final int h) {
+<span class="fc" id="L2415">            final int alph = alpha;</span>
+<span class="fc" id="L2416">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L2419">                    Paint p = underlying.getPaint();</span>
+<span class="fc" id="L2420">                    underlying.setPaint(imagePaint);</span>
+<span class="fc" id="L2421">                    imagePaint.setAlpha(alph);</span>
+<span class="fc" id="L2422">                    underlying.drawImage(img, x, y, w, h);</span>
+<span class="fc" id="L2423">                    underlying.setPaint(p);</span>
+<span class="fc" id="L2424">                }</span>
+                public String toString() {
+<span class="nc" id="L2426">                    return &quot;drawImageWH&quot;;</span>
+                }
+            });
+<span class="fc" id="L2429">        }</span>
+
+        @Override
+        public void drawImage(final Object img, final int x, final int y) {
+<span class="fc" id="L2433">            final int alph = alpha;</span>
+<span class="fc" id="L2434">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L2437">                    Paint p = underlying.getPaint();</span>
+<span class="fc" id="L2438">                    underlying.setPaint(imagePaint);</span>
+<span class="fc" id="L2439">                    imagePaint.setAlpha(alph);</span>
+<span class="fc" id="L2440">                    underlying.drawImage(img, x, y);</span>
+<span class="fc" id="L2441">                    underlying.setPaint(p);</span>
+<span class="fc" id="L2442">                }</span>
+                public String toString() {
+<span class="nc" id="L2444">                    return &quot;drawImage&quot;;</span>
+                }
+            });
+<span class="fc" id="L2447">        }</span>
+
+        public void drawPath(final Path p, final Stroke stroke) {
+<span class="fc" id="L2450">            final int alph = alpha;</span>
+<span class="fc" id="L2451">            final int col = color;</span>
+<span class="fc" id="L2452">            final Path path = new Path();</span>
+<span class="fc" id="L2453">            path.set(p);</span>
+<span class="fc" id="L2454">            final Stroke st = new Stroke();</span>
+<span class="fc" id="L2455">            st.setStroke(stroke);</span>
+<span class="fc" id="L2456">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L2459">                    underlying.setAlpha(alph);</span>
+<span class="fc" id="L2460">                    underlying.setColor(col);</span>
+<span class="fc" id="L2461">                    underlying.drawPath(path, st);</span>
+<span class="fc" id="L2462">                }</span>
+                public String toString() {
+<span class="nc" id="L2464">                    return &quot;drawPath&quot;;</span>
+                }
+            });
+<span class="fc" id="L2467">        }</span>
+
+        public void fillPath(final Path p) {
+<span class="fc" id="L2470">            final int alph = alpha;</span>
+<span class="fc" id="L2471">            final int col = color;</span>
+<span class="fc" id="L2472">            final Path path = new Path();</span>
+<span class="fc" id="L2473">            path.set(p);</span>
+<span class="fc" id="L2474">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L2477">                    underlying.setAlpha(alph);</span>
+<span class="fc" id="L2478">                    underlying.setColor(col);</span>
+                    //underlying.setTransform(transform);
+<span class="fc" id="L2480">                    underlying.fillPath(path);</span>
+<span class="fc" id="L2481">                }</span>
+                public String toString() {
+<span class="nc" id="L2483">                    return &quot;fillPath&quot;;</span>
+                }
+            });
+<span class="fc" id="L2486">        }</span>
+
+        public void setTransform(final Transform transform) {
+<span class="fc" id="L2489">            getTransform().setTransform(transform);</span>
+<span class="fc" id="L2490">            transformDirty = true;</span>
+<span class="fc" id="L2491">            inverseTransformDirty = true;</span>
+<span class="fc" id="L2492">            clipFresh = false;</span>
+<span class="fc" id="L2493">            final Transform fTransform = Transform.makeIdentity();</span>
+<span class="fc" id="L2494">            fTransform.setTransform(transform);</span>
+            //this.transform = fTransform;
+<span class="fc" id="L2496">            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {</span>
+                @Override
+                public void execute(AndroidGraphics underlying) {
+<span class="fc" id="L2499">                    underlying.setTransform(fTransform);</span>
+<span class="fc" id="L2500">                }</span>
+
+                @Override
+                public void executeWithClip(AndroidGraphics underlying) {
+                    // We don't need the clip for the setTransform() op
+<span class="fc" id="L2505">                    execute(underlying);</span>
+<span class="fc" id="L2506">                }</span>
+
+                public String toString() {
+<span class="nc" id="L2509">                    return &quot;setTransform&quot;;</span>
+                }
+            });
+<span class="fc" id="L2512">        }</span>
+
+        public Transform getTransform() {
+<span class="fc bfc" id="L2515" title="All 2 branches covered.">            if (transform == null) {</span>
+<span class="fc" id="L2516">                transform = Transform.makeIdentity();</span>
+            }
+<span class="fc" id="L2518">            return transform;</span>
+        }
+
+        @Override
+        Paint getPaint() {
+<span class="fc" id="L2523">            return super.getPaint();</span>
+        }
+        
+        @Override
+        void setColor(final int clr) {
+<span class="fc" id="L2528">            this.color = clr;</span>
+            
+            // workaround for potential OOM
+<span class="pc bpc" id="L2531" title="3 of 4 branches missed.">            if(pendingRenderingOperations.size() &gt; 20000 &amp;&amp; impl.isMinimized()) {</span>
+<span class="nc" id="L2532">                pendingRenderingOperations.clear();</span>
+            }
+<span class="fc" id="L2534">        }</span>
+
+        private CodenameOneTextPaint font;
+
+        @Override
+        void setFont(final CodenameOneTextPaint font) {
+<span class="fc" id="L2540">            this.font = font;</span>
+<span class="fc" id="L2541">        }</span>
+
+        @Override
+        Paint getFont() {
+<span class="fc" id="L2545">            return font;</span>
+        }
+
+        @Override
+        void setCanvas(Canvas canvas) {
+            //super.setCanvas(canvas); 
+<span class="nc" id="L2551">        }</span>
+    }
+
+    public boolean alwaysRepaintAll() {
+<span class="fc" id="L2555">        return true;</span>
+    }
+
+    @Override
+    protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
+<span class="nc" id="L2560">        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);</span>
+        //do not let other views steal the focus from the main view
+<span class="nc bnc" id="L2562" title="All 4 branches missed.">        if(!gainFocus &amp;&amp; implementation.hasViewAboveBelow()){</span>
+<span class="nc" id="L2563">            requestFocus();</span>
+<span class="nc bnc" id="L2564" title="All 2 branches missed.">            if(implementation.getCurrentForm() != null){</span>
+<span class="nc" id="L2565">                implementation.getCurrentForm().repaint();</span>
+            }
+        }
+<span class="nc" id="L2568">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
