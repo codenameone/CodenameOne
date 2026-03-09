@@ -64,7 +64,7 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
         unzipProject(zip, projectDir);
 
         int exitCode = runMavenCompile(projectDir, homeDir, javaHome);
-        assertEquals(0, exitCode, "Generated project should compile with selected JDK. Version=" + version.label);
+        assertTrue(exitCode == 0, "Generated project should compile with selected JDK. Version=" + version.label + " | exitCode=" + exitCode);
     }
 
     private byte[] createProjectZip(ProjectOptions options, String appName, String packageName) throws IOException {
