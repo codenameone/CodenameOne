@@ -50,6 +50,7 @@ public class Initializr extends Lifecycle {
         final boolean[] roundedButtons = new boolean[]{true};
         final boolean[] includeLocalizationBundles = new boolean[]{true};
         final ProjectOptions.PreviewLanguage[] previewLanguage = new ProjectOptions.PreviewLanguage[]{ProjectOptions.PreviewLanguage.ENGLISH};
+        final ProjectOptions.JavaVersion[] javaVersion = new ProjectOptions.JavaVersion[]{ProjectOptions.JavaVersion.JAVA_8};
         final RadioButton[] templateButtons = new RadioButton[Template.values().length];
         final SpanLabel summaryLabel = new SpanLabel();
         final TemplatePreviewPanel previewPanel = new TemplatePreviewPanel(selectedTemplate[0]);
@@ -69,7 +70,7 @@ public class Initializr extends Lifecycle {
             public void run() {
                 ProjectOptions options = new ProjectOptions(
                         selectedThemeMode[0], selectedAccent[0], roundedButtons[0],
-                        includeLocalizationBundles[0], previewLanguage[0]
+                        includeLocalizationBundles[0], previewLanguage[0], javaVersion[0]
                 );
                 previewPanel.setTemplate(selectedTemplate[0]);
                 previewPanel.setOptions(options);
@@ -99,6 +100,7 @@ public class Initializr extends Lifecycle {
         final Container idePanel = createIdeSelectorPanel(selectedIde, refresh);
         final Container themePanel = createThemeOptionsPanel(selectedThemeMode, selectedAccent, roundedButtons, refresh);
         final Container localizationPanel = createLocalizationPanel(includeLocalizationBundles, previewLanguage, refresh, previewPanel);
+        final Container javaPanel = createJavaOptionsPanel(javaVersion, refresh);
         themePanelRef[0] = themePanel;
         final Container settingsPanel = BoxLayout.encloseY(summaryLabel);
 
@@ -106,6 +108,7 @@ public class Initializr extends Lifecycle {
         advancedAccordion.addContent("IDE", idePanel);
         advancedAccordion.addContent("Theme Customization", themePanel);
         advancedAccordion.addContent("Localization", localizationPanel);
+        advancedAccordion.addContent("Java Version", javaPanel);
         advancedAccordion.addContent("Current Settings", settingsPanel);
         advancedAccordion.setAutoClose(false);
         advancedAccordion.setScrollable(false);
@@ -133,7 +136,7 @@ public class Initializr extends Lifecycle {
             String packageName = packageField.getText() == null ? "" : packageField.getText().trim();
             ProjectOptions options = new ProjectOptions(
                     selectedThemeMode[0], selectedAccent[0], roundedButtons[0],
-                    includeLocalizationBundles[0], previewLanguage[0]
+                    includeLocalizationBundles[0], previewLanguage[0], javaVersion[0]
             );
             GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName, options).generate();
         });
@@ -312,6 +315,31 @@ public class Initializr extends Lifecycle {
                 labeledField("Accent", accentRow),
                 rounded
         );
+    }
+
+
+    private Container createJavaOptionsPanel(ProjectOptions.JavaVersion[] javaVersion, Runnable onSelectionChanged) {
+        Container selector = new Container(new GridLayout(2, 1));
+        selector.setUIID("InitializrChoicesGrid");
+        ButtonGroup group = new ButtonGroup();
+
+        for (ProjectOptions.JavaVersion version : ProjectOptions.JavaVersion.values()) {
+            RadioButton button = new RadioButton(version.label);
+            button.setToggle(true);
+            button.setUIID("InitializrChoice");
+            group.add(button);
+            selector.add(button);
+            if (version == javaVersion[0]) {
+                button.setSelected(true);
+            }
+            button.addActionListener(evt -> {
+                if (button.isSelected()) {
+                    javaVersion[0] = version;
+                    onSelectionChanged.run();
+                }
+            });
+        }
+        return selector;
     }
 
     private Container createTemplateSelector(Template[] selectedTemplate, RadioButton[] templateButtons, Runnable onSelectionChanged) {
@@ -509,6 +537,7 @@ public class Initializr extends Lifecycle {
                 + "Rounded Buttons: " + (options.roundedButtons ? "Yes" : "No") + "\n"
                 + "Localization Bundles: " + (options.includeLocalizationBundles ? "Yes" : "No") + "\n"
                 + "Preview Language: " + options.previewLanguage.label + "\n"
+                + "Java: " + options.javaVersion.label + "\n"
                 + "Kotlin: " + (template.IS_KOTLIN ? "Yes" : "No");
     }
 

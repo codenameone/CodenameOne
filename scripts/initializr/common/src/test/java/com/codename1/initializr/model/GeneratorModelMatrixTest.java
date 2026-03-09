@@ -21,7 +21,28 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 validateCombination(template, ide);
             }
         }
+        validateExperimentalJava17Generation();
         return true;
+    }
+
+
+    private void validateExperimentalJava17Generation() throws Exception {
+        String mainClassName = "DemoExperimentalJava17";
+        String packageName = "com.acme.experimental.java17";
+        ProjectOptions options = new ProjectOptions(
+                ProjectOptions.ThemeMode.LIGHT,
+                ProjectOptions.Accent.DEFAULT,
+                true,
+                true,
+                ProjectOptions.PreviewLanguage.ENGLISH,
+                ProjectOptions.JavaVersion.JAVA_17_EXPERIMENTAL
+        );
+
+        byte[] zipData = createProjectZip(IDE.INTELLIJ, Template.BAREBONES, mainClassName, packageName, options);
+        Map<String, byte[]> entries = readZipEntries(zipData);
+
+        assertCommonPom(entries, Template.BAREBONES, packageName, mainClassName, true);
+        assertSettings(entries, Template.BAREBONES, packageName, mainClassName, true);
     }
 
     private void validateCombination(Template template, IDE ide) throws Exception {
@@ -34,8 +55,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertIdeFiles(ide, entries, mainClassName);
         assertGitIgnore(entries);
         assertRootPom(entries, packageName, mainClassName);
-        assertCommonPom(entries, template, packageName, mainClassName);
-        assertSettings(entries, template, packageName, mainClassName);
+        assertCommonPom(entries, template, packageName, mainClassName, false);
+        assertSettings(entries, template, packageName, mainClassName, false);
         assertMainSourceFile(entries, template, packageName, mainClassName);
         assertLocalizationBundles(entries, template);
         assertNoTemplatePlaceholders(entries, template);
@@ -44,6 +65,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     private static byte[] createProjectZip(IDE ide, Template template, String appName, String packageName) throws IOException {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         GeneratorModel.create(ide, template, appName, packageName).writeProjectZip(output);
+        return output.toByteArray();
+    }
+
+    private static byte[] createProjectZip(IDE ide, Template template, String appName, String packageName, ProjectOptions options) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        GeneratorModel.create(ide, template, appName, packageName, options).writeProjectZip(output);
         return output.toByteArray();
     }
 
@@ -97,13 +124,20 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertFalse(pom.indexOf("myappname") >= 0, "Root pom still contains placeholder app name");
     }
 
-    private void assertCommonPom(Map<String, byte[]> entries, Template template, String packageName, String mainClassName) {
+    private void assertCommonPom(Map<String, byte[]> entries, Template template, String packageName, String mainClassName, boolean expectJava17) {
         String pom = getText(entries, "common/pom.xml");
         assertContains(pom, packageName, "Common pom should include package");
         assertContains(pom, mainClassName.toLowerCase(), "Common pom should include app artifact");
         assertContains(pom, "<artifactId>codenameone-javase</artifactId>", "Common pom should include codenameone-javase test dependency");
         assertContains(pom, "<artifactId>serializer</artifactId>", "Common pom should include xalan serializer for CN1 generate-gui-sources");
         assertContains(pom, "<version>2.7.3</version>", "Common pom should pin serializer version expected by CN1 plugin classpath");
+        if (expectJava17) {
+            assertContains(pom, "<source>17</source>", "Common pom should use Java 17 source when selected");
+            assertContains(pom, "<target>17</target>", "Common pom should use Java 17 target when selected");
+        } else {
+            assertContains(pom, "<source>1.8</source>", "Common pom should default to Java 8 source");
+            assertContains(pom, "<target>1.8</target>", "Common pom should default to Java 8 target");
+        }
         if (template == Template.GRUB) {
             assertContains(pom, "<artifactId>" + mainClassName.toLowerCase() + "-CodeRAD</artifactId>", "Grub common pom should include local CodeRAD cn1lib dependency");
             assertContains(pom, "<version>1.0-SNAPSHOT</version>", "Grub common pom should use local snapshot CodeRAD cn1lib");
@@ -117,12 +151,17 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertFalse(pom.indexOf("myappname") >= 0, "Common pom still contains placeholder app name");
     }
 
-    private void assertSettings(Map<String, byte[]> entries, Template template, String packageName, String mainClassName) {
+    private void assertSettings(Map<String, byte[]> entries, Template template, String packageName, String mainClassName, boolean expectJava17) {
         String settings = getText(entries, "common/codenameone_settings.properties");
         assertContains(settings, "codename1.packageName=" + packageName, "Settings should include requested package");
         assertContains(settings, "codename1.mainName=" + mainClassName, "Settings should include requested main class");
         assertContains(settings, "codename1.displayName=" + mainClassName, "Settings should include requested display name");
         assertContains(settings, "codename1.kotlin=" + String.valueOf(template.IS_KOTLIN), "Settings should include template kotlin flag");
+        if (expectJava17) {
+            assertContains(settings, "codename1.arg.java.version=17", "Settings should include Java 17 version when selected");
+        } else {
+            assertFalse(settings.indexOf("codename1.arg.java.version=17") >= 0, "Settings should not force Java 17 by default");
+        }
     }
 
     private void assertMainSourceFile(Map<String, byte[]> entries, Template template, String packageName, String mainClassName) {
