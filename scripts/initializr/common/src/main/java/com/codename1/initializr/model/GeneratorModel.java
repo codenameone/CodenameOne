@@ -179,12 +179,16 @@ public class GeneratorModel {
         content = StringUtil.replaceAll(content, "myappname", appName.toLowerCase());
         if ("common/codenameone_settings.properties".equals(targetPath)) {
             content = replaceProperty(content, "codename1.kotlin", String.valueOf(template.IS_KOTLIN));
+            content = applyJavaVersionSettings(content);
         }
         if (options.includeLocalizationBundles && isBareTemplate()) {
             content = injectLocalizationBootstrap(targetPath, content);
         }
         if (isBareTemplate() && "common/src/main/css/theme.css".equals(targetPath)) {
             content += buildThemeOverrides();
+        }
+        if ("common/pom.xml".equals(targetPath)) {
+            content = applyJavaVersionToPom(content);
         }
         if ("pom.xml".equals(targetPath)) {
             content = replaceTagValue(content, "cn1.plugin.version", CN1_PLUGIN_VERSION);
@@ -195,6 +199,23 @@ public class GeneratorModel {
         return content.getBytes("UTF-8");
     }
 
+
+
+    private String applyJavaVersionSettings(String content) {
+        if (options.javaVersion == ProjectOptions.JavaVersion.JAVA_17_EXPERIMENTAL) {
+            content = replaceProperty(content, "codename1.arg.java.version", "17");
+        }
+        return content;
+    }
+
+    private String applyJavaVersionToPom(String content) {
+        if (options.javaVersion != ProjectOptions.JavaVersion.JAVA_17_EXPERIMENTAL) {
+            return content;
+        }
+        content = StringUtil.replaceAll(content, "<source>1.8</source>", "<source>17</source>");
+        content = StringUtil.replaceAll(content, "<target>1.8</target>", "<target>17</target>");
+        return content;
+    }
 
     private String injectLocalizationBootstrap(String targetPath, String content) {
         String javaMainPath = "common/src/main/java/" + packageName.replace('.', '/') + "/" + appName + ".java";

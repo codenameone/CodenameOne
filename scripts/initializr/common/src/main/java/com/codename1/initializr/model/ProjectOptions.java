@@ -43,22 +43,41 @@ public final class ProjectOptions {
         ORANGE
     }
 
+    public enum JavaVersion {
+        JAVA_8("Java 8"),
+        JAVA_17_EXPERIMENTAL("Java 17 (Experimental)");
+
+        public final String label;
+
+        JavaVersion(String label) {
+            this.label = label;
+        }
+
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
     public final ThemeMode themeMode;
     public final Accent accent;
     public final boolean roundedButtons;
     public final boolean includeLocalizationBundles;
     public final PreviewLanguage previewLanguage;
+    public final JavaVersion javaVersion;
 
     public ProjectOptions(ThemeMode themeMode, Accent accent, boolean roundedButtons,
-                          boolean includeLocalizationBundles, PreviewLanguage previewLanguage) {
+                          boolean includeLocalizationBundles, PreviewLanguage previewLanguage,
+                          JavaVersion javaVersion) {
         this.themeMode = themeMode;
         this.accent = accent;
         this.roundedButtons = roundedButtons;
         this.includeLocalizationBundles = includeLocalizationBundles;
         this.previewLanguage = previewLanguage == null ? PreviewLanguage.ENGLISH : previewLanguage;
+        this.javaVersion = javaVersion == null ? JavaVersion.JAVA_8 : javaVersion;
     }
 
     public static ProjectOptions defaults() {
-        return new ProjectOptions(ThemeMode.LIGHT, Accent.DEFAULT, true, true, PreviewLanguage.ENGLISH);
+        return new ProjectOptions(ThemeMode.LIGHT, Accent.DEFAULT, true, true, PreviewLanguage.ENGLISH, JavaVersion.JAVA_8);
     }
 }
