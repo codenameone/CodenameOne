@@ -472,7 +472,7 @@ public class GeneratorModel {
     public static String buildThemeOverrides(ProjectOptions options) {
         ProjectOptions effective = options == null ? ProjectOptions.defaults() : options;
         if (effective.customThemeCss != null && effective.customThemeCss.trim().length() > 0) {
-            return "\n\n/* Initializr Advanced Theme Overrides */\n" + effective.customThemeCss + "\n";
+            return "\n\n/* Initializr Appended Custom CSS */\n" + effective.customThemeCss + "\n";
         }
         if (isDefaultBarebonesOptions(effective)) {
             return "";

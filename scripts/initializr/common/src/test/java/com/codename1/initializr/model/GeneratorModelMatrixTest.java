@@ -24,12 +24,13 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateExperimentalJava17Generation();
         validateExperimentalJava17RegressionFixes();
         validateAdvancedThemeCssGeneration();
+        validateAppendedCustomCssGeneration();
         return true;
     }
 
 
 
-    private void validateAdvancedThemeCssGeneration() throws Exception {
+    private void validateAppendedCustomCssGeneration() throws Exception {
         String mainClassName = "DemoAdvancedTheme";
         String packageName = "com.acme.advanced.theme";
         String customCss = "Button {\n    border-radius: 0;\n}\n";
@@ -47,7 +48,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         Map<String, byte[]> entries = readZipEntries(zipData);
 
         String themeCss = getText(entries, "common/src/main/css/theme.css");
-        assertContains(themeCss, "Initializr Advanced Theme Overrides", "Theme CSS should include advanced mode marker");
+        assertContains(themeCss, "Initializr Appended Custom CSS", "Theme CSS should include appended custom CSS marker");
         assertContains(themeCss, "border-radius: 0", "Theme CSS should include custom advanced CSS");
     }
 
