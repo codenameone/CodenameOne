@@ -185,7 +185,7 @@ public class GeneratorModel {
             content = injectLocalizationBootstrap(targetPath, content);
         }
         if (isBareTemplate() && "common/src/main/css/theme.css".equals(targetPath)) {
-            content += buildThemeOverrides();
+            content += buildThemeCss();
         }
         if ("common/pom.xml".equals(targetPath)) {
             content = applyJavaVersionToPom(content);
@@ -469,13 +469,17 @@ public class GeneratorModel {
                 .append("Open the project folder in VS Code and make sure Java + Maven extensions are installed.\n\n");
     }
 
-    private String buildThemeOverrides() {
-        if (isDefaultBarebonesOptions()) {
+    public static String buildThemeOverrides(ProjectOptions options) {
+        ProjectOptions effective = options == null ? ProjectOptions.defaults() : options;
+        if (effective.customThemeCss != null && effective.customThemeCss.trim().length() > 0) {
+            return "\n\n/* Initializr Advanced Theme Overrides */\n" + effective.customThemeCss + "\n";
+        }
+        if (isDefaultBarebonesOptions(effective)) {
             return "";
         }
         StringBuilder out = new StringBuilder("\n\n/* Initializr Theme Overrides */\n");
 
-        if (options.themeMode == ProjectOptions.ThemeMode.DARK) {
+        if (effective.themeMode == ProjectOptions.ThemeMode.DARK) {
             out.append("Form {\n")
                     .append("    background-color: #0f172a;\n")
                     .append("    color: #e2e8f0;\n")
@@ -491,7 +495,7 @@ public class GeneratorModel {
                     .append("    color: #e2e8f0;\n")
                     .append("}\n");
 
-            if (options.accent == ProjectOptions.Accent.DEFAULT) {
+            if (effective.accent == ProjectOptions.Accent.DEFAULT) {
                 out.append("Button {\n")
                         .append("    color: #e2e8f0;\n")
                         .append("    background-color: #1f2937;\n")
@@ -504,14 +508,14 @@ public class GeneratorModel {
                         .append("}\n");
                 return out.toString();
             }
-        } else if (options.accent == ProjectOptions.Accent.DEFAULT) {
+        } else if (effective.accent == ProjectOptions.Accent.DEFAULT) {
             // Light + Clean intentionally inherits template defaults (rounded ignored).
             return "";
         }
 
-        int accent = resolveAccentColor();
+        int accent = resolveAccentColor(effective);
         int accentPressed = darkenColor(accent, 0.22f);
-        String buttonRadius = options.roundedButtons ? "3mm" : "0";
+        String buttonRadius = effective.roundedButtons ? "3mm" : "0";
         out.append("Button {\n")
                 .append("    background-color: ").append(toCssColor(accent)).append(";\n")
                 .append("    color: #ffffff;\n")
@@ -527,12 +531,12 @@ public class GeneratorModel {
         return out.toString();
     }
 
-    private boolean isDefaultBarebonesOptions() {
+    private static boolean isDefaultBarebonesOptions(ProjectOptions options) {
         return options.themeMode == ProjectOptions.ThemeMode.LIGHT
                 && options.accent == ProjectOptions.Accent.DEFAULT;
     }
 
-    private int resolveAccentColor() {
+    private static int resolveAccentColor(ProjectOptions options) {
         if (options.accent == ProjectOptions.Accent.DEFAULT) {
             return 0x0f766e;
         }
@@ -543,6 +547,11 @@ public class GeneratorModel {
             return 0xea580c;
         }
         return 0x0f766e;
+    }
+
+
+    private String buildThemeCss() {
+        return buildThemeOverrides(options);
     }
 
     private static String toCssColor(int color) {

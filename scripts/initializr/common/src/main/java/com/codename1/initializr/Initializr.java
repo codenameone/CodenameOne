@@ -23,6 +23,7 @@ import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -51,6 +52,8 @@ public class Initializr extends Lifecycle {
         final boolean[] includeLocalizationBundles = new boolean[]{false};
         final ProjectOptions.PreviewLanguage[] previewLanguage = new ProjectOptions.PreviewLanguage[]{ProjectOptions.PreviewLanguage.ENGLISH};
         final ProjectOptions.JavaVersion[] javaVersion = new ProjectOptions.JavaVersion[]{ProjectOptions.JavaVersion.JAVA_8};
+        final boolean[] advancedThemeMode = new boolean[]{false};
+        final String[] customThemeCss = new String[]{""};
         final RadioButton[] templateButtons = new RadioButton[Template.values().length];
         final SpanLabel summaryLabel = new SpanLabel();
         final TemplatePreviewPanel previewPanel = new TemplatePreviewPanel(selectedTemplate[0]);
@@ -70,7 +73,8 @@ public class Initializr extends Lifecycle {
             public void run() {
                 ProjectOptions options = new ProjectOptions(
                         selectedThemeMode[0], selectedAccent[0], roundedButtons[0],
-                        includeLocalizationBundles[0], previewLanguage[0], javaVersion[0]
+                        includeLocalizationBundles[0], previewLanguage[0], javaVersion[0],
+                        advancedThemeMode[0] ? customThemeCss[0] : null
                 );
                 previewPanel.setTemplate(selectedTemplate[0]);
                 previewPanel.setOptions(options);
@@ -98,7 +102,7 @@ public class Initializr extends Lifecycle {
                 createTemplateSelector(selectedTemplate, templateButtons, refresh)
         );
         final Container idePanel = createIdeSelectorPanel(selectedIde, refresh);
-        final Container themePanel = createThemeOptionsPanel(selectedThemeMode, selectedAccent, roundedButtons, refresh);
+        final Container themePanel = createThemeOptionsPanel(selectedThemeMode, selectedAccent, roundedButtons, advancedThemeMode, customThemeCss, refresh);
         final Container localizationPanel = createLocalizationPanel(includeLocalizationBundles, previewLanguage, refresh, previewPanel);
         final Container javaPanel = createJavaOptionsPanel(javaVersion, refresh);
         themePanelRef[0] = themePanel;
@@ -136,7 +140,8 @@ public class Initializr extends Lifecycle {
             String packageName = packageField.getText() == null ? "" : packageField.getText().trim();
             ProjectOptions options = new ProjectOptions(
                     selectedThemeMode[0], selectedAccent[0], roundedButtons[0],
-                    includeLocalizationBundles[0], previewLanguage[0], javaVersion[0]
+                    includeLocalizationBundles[0], previewLanguage[0], javaVersion[0],
+                    advancedThemeMode[0] ? customThemeCss[0] : null
             );
             GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName, options).generate();
         });
@@ -261,6 +266,8 @@ public class Initializr extends Lifecycle {
     private Container createThemeOptionsPanel(ProjectOptions.ThemeMode[] selectedThemeMode,
                                               ProjectOptions.Accent[] selectedAccent,
                                               boolean[] roundedButtons,
+                                              boolean[] advancedThemeMode,
+                                              String[] customThemeCss,
                                               Runnable onSelectionChanged) {
         Container modeRow = new Container(new GridLayout(1, 2));
         modeRow.setUIID("InitializrChoicesGrid");
@@ -310,10 +317,34 @@ public class Initializr extends Lifecycle {
             onSelectionChanged.run();
         });
 
+        CheckBox advanced = new CheckBox("Advanced Theme Mode (Edit CSS)");
+        advanced.setUIID("InitializrChoice");
+        advanced.setSelected(advancedThemeMode[0]);
+
+        TextArea cssEditor = new TextArea(customThemeCss[0], 8, 30);
+        cssEditor.setUIID("InitializrField");
+        cssEditor.setHint("/* Optional CSS overrides generated into theme.css */\nButton {\n    border-radius: 0;\n}");
+        cssEditor.setGrowByContent(true);
+        cssEditor.setEnabled(advancedThemeMode[0]);
+
+        advanced.addActionListener(e -> {
+            advancedThemeMode[0] = advanced.isSelected();
+            cssEditor.setEnabled(advancedThemeMode[0]);
+            onSelectionChanged.run();
+        });
+        cssEditor.addDataChangedListener((type, index) -> {
+            customThemeCss[0] = cssEditor.getText();
+            if (advancedThemeMode[0]) {
+                onSelectionChanged.run();
+            }
+        });
+
         return BoxLayout.encloseY(
                 labeledField("Mode", modeRow),
                 labeledField("Accent", accentRow),
-                rounded
+                rounded,
+                advanced,
+                labeledField("Custom Theme CSS", cssEditor)
         );
     }
 
@@ -538,6 +569,7 @@ public class Initializr extends Lifecycle {
                 + "Localization Bundles: " + (options.includeLocalizationBundles ? "Yes" : "No") + "\n"
                 + "Preview Language: " + options.previewLanguage.label + "\n"
                 + "Java: " + options.javaVersion.label + "\n"
+                + "Advanced Theme CSS: " + (options.customThemeCss == null || options.customThemeCss.trim().length() == 0 ? "No" : "Yes") + "\n"
                 + "Kotlin: " + (template.IS_KOTLIN ? "Yes" : "No");
     }
 

@@ -6,6 +6,7 @@ import com.codename1.initializr.model.ProjectOptions.PreviewLanguage;
 import com.codename1.initializr.model.Template;
 import com.codename1.io.Log;
 import com.codename1.io.Properties;
+import com.codename1.ui.css.CSSThemeCompiler;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -17,6 +18,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.MutableResource;
 import com.codename1.ui.util.Resources;
 
 import java.io.InputStream;
@@ -85,6 +87,7 @@ public class TemplatePreviewPanel {
         form.getToolbar().addMaterialCommandToSideMenu("Hello Command",
                 FontImage.MATERIAL_CHECK, 4, e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
         applyLivePreviewOptions(form, helloButton, null, options);
+        applyLiveCssOverrides(form, options);
         return form;
     }
 
@@ -150,6 +153,35 @@ public class TemplatePreviewPanel {
             Log.e(err);
             return null;
         }
+    }
+
+    private void applyLiveCssOverrides(Form form, ProjectOptions options) {
+        restoreThemeDefaults();
+        String generatedCss = com.codename1.initializr.model.GeneratorModel.buildThemeOverrides(options);
+        if (generatedCss == null || generatedCss.trim().length() == 0) {
+            return;
+        }
+        MutableResource resource = new MutableResource();
+        CSSThemeCompiler compiler = new CSSThemeCompiler();
+        compiler.compile(generatedCss, resource, "InitializrLiveTheme");
+        Hashtable generatedTheme = resource.getTheme("InitializrLiveTheme");
+        if (generatedTheme == null || generatedTheme.isEmpty()) {
+            return;
+        }
+        UIManager.getInstance().addThemeProps(generatedTheme);
+        form.refreshTheme();
+    }
+
+    private void restoreThemeDefaults() {
+        Resources resources = Resources.getGlobalResources();
+        if (resources == null) {
+            return;
+        }
+        String[] names = resources.getThemeResourceNames();
+        if (names == null || names.length == 0) {
+            return;
+        }
+        UIManager.getInstance().setThemeProps(resources.getTheme(names[0]));
     }
 
     private void updateMode() {
