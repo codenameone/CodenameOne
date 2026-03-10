@@ -1,6 +1,7 @@
 package com.codename1.ui.css;
 
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Component;
 import com.codename1.ui.Image;
 import com.codename1.ui.plaf.CSSBorder;
 import com.codename1.ui.util.MutableResource;
@@ -23,13 +24,14 @@ public class CSSThemeCompilerTest extends UITestBase {
                 + "@constants{spacing: 4px; primaryColor: var(--primary);}"
                 + "Button{color:var(--primary);background-color:#112233;padding:1px 2px;cn1-derive:Label;}"
                 + "Button:pressed{border-width:2px;border-style:solid;border-color:#ffffff;cn1-mutable-image:btnBg #ff00ff;}"
-                + "Label{margin:2px 4px 6px 8px;}",
+                + "Label{margin:2px 4px 6px 8px;}"
+                + "Button{color:pink;text-align:center;}",
                 resource,
                 "Theme"
         );
 
         Hashtable theme = resource.getTheme("Theme");
-        assertEquals("aabbcc", theme.get("Button.fgColor"));
+        assertEquals("ffc0cb", theme.get("Button.fgColor"));
         assertEquals("112233", theme.get("Button.bgColor"));
         assertEquals("255", theme.get("Button.transparency"));
         assertEquals("1,2,1,2", theme.get("Button.padding"));
@@ -38,6 +40,7 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("#abc", theme.get("@primary"));
         assertEquals("4px", theme.get("@spacing"));
         assertEquals("#abc", theme.get("@primarycolor"));
+        assertEquals(String.valueOf(Component.CENTER), String.valueOf(theme.get("Button.align")));
         assertTrue(theme.get("Button.press#border") instanceof CSSBorder);
 
         Image mutable = resource.getImage("btnBg");

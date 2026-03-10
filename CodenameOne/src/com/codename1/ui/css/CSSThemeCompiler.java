@@ -3,6 +3,7 @@
  */
 package com.codename1.ui.css;
 
+import com.codename1.ui.Component;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 import com.codename1.ui.plaf.CSSBorder;
@@ -166,6 +167,13 @@ public class CSSThemeCompiler {
             theme.put(uiid + "." + statePrefix + "font", value);
             return true;
         }
+        if ("text-align".equals(property)) {
+            String align = normalizeAlignment(value);
+            if (align != null) {
+                theme.put(uiid + "." + statePrefix + "align", align);
+            }
+            return true;
+        }
         return false;
     }
 
@@ -267,10 +275,26 @@ public class CSSThemeCompiler {
     }
 
     private String normalizeHexColor(String cssColor) {
-        String value = cssColor.trim();
-        if ("transparent".equalsIgnoreCase(value)) {
+        String value = cssColor.trim().toLowerCase();
+        if ("transparent".equals(value)) {
             return "000000";
         }
+
+        if (value.startsWith("rgb(") && value.endsWith(")")) {
+            String[] parts = splitOnComma(value.substring(4, value.length() - 1));
+            if (parts.length == 3) {
+                int r = clampColor(parts[0]);
+                int g = clampColor(parts[1]);
+                int b = clampColor(parts[2]);
+                return toHexColor((r << 16) | (g << 8) | b);
+            }
+        }
+
+        String keyword = cssColorKeyword(value);
+        if (keyword != null) {
+            return keyword;
+        }
+
         if (value.startsWith("#")) {
             value = value.substring(1);
         }
@@ -279,7 +303,61 @@ public class CSSThemeCompiler {
                     + value.charAt(1) + value.charAt(1)
                     + value.charAt(2) + value.charAt(2);
         }
-        return value.toLowerCase();
+        if (value.length() != 6) {
+            return "000000";
+        }
+        return value;
+    }
+
+    private String normalizeAlignment(String value) {
+        String v = value == null ? "" : value.trim().toLowerCase();
+        if ("left".equals(v) || "start".equals(v)) {
+            return String.valueOf(Component.LEFT);
+        }
+        if ("center".equals(v)) {
+            return String.valueOf(Component.CENTER);
+        }
+        if ("right".equals(v) || "end".equals(v)) {
+            return String.valueOf(Component.RIGHT);
+        }
+        return null;
+    }
+
+    private String cssColorKeyword(String value) {
+        if ("black".equals(value)) return "000000";
+        if ("white".equals(value)) return "ffffff";
+        if ("red".equals(value)) return "ff0000";
+        if ("green".equals(value)) return "008000";
+        if ("blue".equals(value)) return "0000ff";
+        if ("pink".equals(value)) return "ffc0cb";
+        if ("orange".equals(value)) return "ffa500";
+        if ("yellow".equals(value)) return "ffff00";
+        if ("purple".equals(value)) return "800080";
+        if ("gray".equals(value) || "grey".equals(value)) return "808080";
+        return null;
+    }
+
+    private int clampColor(String value) {
+        try {
+            int out = Integer.parseInt(value.trim());
+            if (out < 0) {
+                return 0;
+            }
+            if (out > 255) {
+                return 255;
+            }
+            return out;
+        } catch (RuntimeException err) {
+            return 0;
+        }
+    }
+
+    private String toHexColor(int color) {
+        String hex = Integer.toHexString(color & 0xffffff);
+        while (hex.length() < 6) {
+            hex = "0" + hex;
+        }
+        return hex;
     }
 
     private String normalizeBox(String cssValue) {
@@ -396,6 +474,25 @@ public class CSSThemeCompiler {
         }
         out.add(input.substring(start));
         return out.toArray(new String[out.size()]);
+    }
+
+    private String[] splitOnComma(String input) {
+        ArrayList<String> parts = new ArrayList<String>();
+        int start = 0;
+        for (int i = 0; i < input.length(); i++) {
+            if (input.charAt(i) == ',') {
+                String token = input.substring(start, i).trim();
+                if (token.length() > 0) {
+                    parts.add(token);
+                }
+                start = i + 1;
+            }
+        }
+        String tail = input.substring(start).trim();
+        if (tail.length() > 0) {
+            parts.add(tail);
+        }
+        return parts.toArray(new String[parts.size()]);
     }
 
     private String[] splitOnWhitespace(String input) {
