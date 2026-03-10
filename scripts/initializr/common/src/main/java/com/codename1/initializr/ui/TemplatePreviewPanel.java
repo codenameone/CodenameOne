@@ -186,14 +186,20 @@ public class TemplatePreviewPanel {
 
     private void updateMode() {
         previewHolder.removeAll();
-        if (template == Template.BAREBONES || template == Template.KOTLIN) {
-            Form liveForm = createBarebonesPreviewForm(options);
-            liveFormPreview = new InterFormContainer(liveForm);
-            liveFormPreview.setUIID("InitializrLiveFrame");
-            previewHolder.add(BorderLayout.CENTER, liveFormPreview);
-        } else {
-            staticPreview.setImage(Resources.getGlobalResources().getImage(template.IMAGE_NAME));
-            previewHolder.add(BorderLayout.CENTER, staticPreview);
+        try {
+            if (template == Template.BAREBONES || template == Template.KOTLIN) {
+                Form liveForm = createBarebonesPreviewForm(options);
+                liveFormPreview = new InterFormContainer(liveForm);
+                liveFormPreview.setUIID("InitializrLiveFrame");
+                previewHolder.add(BorderLayout.CENTER, liveFormPreview);
+            } else {
+                staticPreview.setImage(Resources.getGlobalResources().getImage(template.IMAGE_NAME));
+                previewHolder.add(BorderLayout.CENTER, staticPreview);
+            }
+        } catch (CSSThemeCompiler.CSSSyntaxException cssError) {
+            staticPreviewFallback.setText("Custom CSS error: " + cssError.getMessage());
+            previewHolder.add(BorderLayout.CENTER, staticPreviewFallback);
+            throw cssError;
         }
         previewHolder.revalidate();
     }

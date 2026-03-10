@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class CSSThemeCompilerTest extends UITestBase {
 
@@ -47,4 +48,17 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertNotNull(mutable);
         assertNotNull(theme.get("Button.press#bgImage"));
     }
+    @Test
+    public void testThrowsOnMalformedCss() {
+        CSSThemeCompiler compiler = new CSSThemeCompiler();
+        MutableResource resource = new MutableResource();
+
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                compiler.compile("Button{color:#12;}", resource, "Theme")
+        );
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                compiler.compile("Button{color:#ff00ff;text-align:middle;}", resource, "Theme")
+        );
+    }
+
 }

@@ -41,6 +41,12 @@ import java.util.Hashtable;
 /// - `var(--name)` dereferencing in declaration values.
 public class CSSThemeCompiler {
 
+    public static class CSSSyntaxException extends IllegalArgumentException {
+        public CSSSyntaxException(String message) {
+            super(message);
+        }
+    }
+
     public void compile(String css, MutableResource resources, String themeName) {
         Hashtable theme = resources.getTheme(themeName);
         if (theme == null) {
@@ -82,7 +88,7 @@ public class CSSThemeCompiler {
         }
         int close = stripped.indexOf('}', open + 1);
         if (close <= open) {
-            return;
+            throw new CSSSyntaxException("Unterminated @constants block");
         }
         Declaration[] declarations = parseDeclarations(stripped.substring(open + 1, close));
         for (Declaration declaration : declarations) {
@@ -169,9 +175,7 @@ public class CSSThemeCompiler {
         }
         if ("text-align".equals(property)) {
             String align = normalizeAlignment(value);
-            if (align != null) {
-                theme.put(uiid + "." + statePrefix + "align", align);
-            }
+            theme.put(uiid + "." + statePrefix + "align", align);
             return true;
         }
         return false;
@@ -275,19 +279,26 @@ public class CSSThemeCompiler {
     }
 
     private String normalizeHexColor(String cssColor) {
-        String value = cssColor.trim().toLowerCase();
+        String value = cssColor == null ? "" : cssColor.trim().toLowerCase();
+        if (value.length() == 0) {
+            throw new CSSSyntaxException("Color value cannot be empty");
+        }
         if ("transparent".equals(value)) {
             return "000000";
         }
 
-        if (value.startsWith("rgb(") && value.endsWith(")")) {
-            String[] parts = splitOnComma(value.substring(4, value.length() - 1));
-            if (parts.length == 3) {
-                int r = clampColor(parts[0]);
-                int g = clampColor(parts[1]);
-                int b = clampColor(parts[2]);
-                return toHexColor((r << 16) | (g << 8) | b);
+        if (value.startsWith("rgb(")) {
+            if (!value.endsWith(")")) {
+                throw new CSSSyntaxException("Malformed rgb() color: " + cssColor);
             }
+            String[] parts = splitOnComma(value.substring(4, value.length() - 1));
+            if (parts.length != 3) {
+                throw new CSSSyntaxException("rgb() must have exactly 3 components: " + cssColor);
+            }
+            int r = parseRgbChannel(parts[0], cssColor);
+            int g = parseRgbChannel(parts[1], cssColor);
+            int b = parseRgbChannel(parts[2], cssColor);
+            return toHexColor((r << 16) | (g << 8) | b);
         }
 
         String keyword = cssColorKeyword(value);
@@ -303,8 +314,8 @@ public class CSSThemeCompiler {
                     + value.charAt(1) + value.charAt(1)
                     + value.charAt(2) + value.charAt(2);
         }
-        if (value.length() != 6) {
-            return "000000";
+        if (value.length() != 6 || !isHexColor(value)) {
+            throw new CSSSyntaxException("Unsupported color value: " + cssColor);
         }
         return value;
     }
@@ -320,7 +331,7 @@ public class CSSThemeCompiler {
         if ("right".equals(v) || "end".equals(v)) {
             return String.valueOf(Component.RIGHT);
         }
-        return null;
+        throw new CSSSyntaxException("Unsupported text-align value: " + value);
     }
 
     private String cssColorKeyword(String value) {
@@ -357,19 +368,30 @@ public class CSSThemeCompiler {
         return null;
     }
 
-    private int clampColor(String value) {
+    private int parseRgbChannel(String value, String originalColor) {
+        int out;
         try {
-            int out = Integer.parseInt(value.trim());
-            if (out < 0) {
-                return 0;
-            }
-            if (out > 255) {
-                return 255;
-            }
-            return out;
+            out = Integer.parseInt(value.trim());
         } catch (RuntimeException err) {
-            return 0;
+            throw new CSSSyntaxException("Invalid rgb() channel value in " + originalColor + ": " + value);
         }
+        if (out < 0 || out > 255) {
+            throw new CSSSyntaxException("rgb() channel out of range in " + originalColor + ": " + value);
+        }
+        return out;
+    }
+
+    private boolean isHexColor(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            boolean hex = (c >= '0' && c <= '9')
+                    || (c >= 'a' && c <= 'f')
+                    || (c >= 'A' && c <= 'F');
+            if (!hex) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private String toHexColor(int color) {
@@ -410,19 +432,31 @@ public class CSSThemeCompiler {
         ArrayList<Rule> out = new ArrayList<Rule>();
         int pos = 0;
         while (pos < stripped.length()) {
+            while (pos < stripped.length() && Character.isWhitespace(stripped.charAt(pos))) {
+                pos++;
+            }
+            if (pos >= stripped.length()) {
+                break;
+            }
             int open = stripped.indexOf('{', pos);
             if (open < 0) {
-                break;
+                throw new CSSSyntaxException("Missing '{' in CSS rule near: " + stripped.substring(pos));
             }
             int close = stripped.indexOf('}', open + 1);
             if (close < 0) {
-                break;
+                throw new CSSSyntaxException("Missing '}' for CSS rule: " + stripped.substring(pos, open).trim());
+            }
+            if (stripped.indexOf('{', open + 1) > -1 && stripped.indexOf('{', open + 1) < close) {
+                throw new CSSSyntaxException("Nested '{' is not supported in CSS block: " + stripped.substring(pos, open).trim());
             }
 
             String selectors = stripped.substring(pos, open).trim();
             if (selectors.startsWith("@constants")) {
                 pos = close + 1;
                 continue;
+            }
+            if (selectors.length() == 0) {
+                throw new CSSSyntaxException("Missing selector before '{'");
             }
 
             String body = stripped.substring(open + 1, close).trim();
@@ -431,7 +465,7 @@ public class CSSThemeCompiler {
             for (String selectorEntry : selectorsList) {
                 String selector = selectorEntry.trim();
                 if (selector.length() == 0) {
-                    continue;
+                    throw new CSSSyntaxException("Empty selector in selector list: " + selectors);
                 }
                 Rule rule = new Rule();
                 rule.selector = selector;
@@ -451,12 +485,17 @@ public class CSSThemeCompiler {
             char c = css.charAt(i);
             if (c == '/' && i + 1 < css.length() && css.charAt(i + 1) == '*') {
                 i += 2;
+                boolean closed = false;
                 while (i + 1 < css.length()) {
                     if (css.charAt(i) == '*' && css.charAt(i + 1) == '/') {
                         i += 2;
+                        closed = true;
                         break;
                     }
                     i++;
+                }
+                if (!closed) {
+                    throw new CSSSyntaxException("Unterminated CSS comment");
                 }
                 continue;
             }
@@ -470,13 +509,20 @@ public class CSSThemeCompiler {
         ArrayList<Declaration> out = new ArrayList<Declaration>();
         String[] segments = splitOnChar(body, ';');
         for (String line : segments) {
-            int colon = line.indexOf(':');
-            if (colon <= 0) {
+            String trimmed = line.trim();
+            if (trimmed.length() == 0) {
                 continue;
             }
+            int colon = trimmed.indexOf(':');
+            if (colon <= 0 || colon == trimmed.length() - 1) {
+                throw new CSSSyntaxException("Malformed declaration: " + trimmed);
+            }
             Declaration dec = new Declaration();
-            dec.property = line.substring(0, colon).trim().toLowerCase();
-            dec.value = line.substring(colon + 1).trim();
+            dec.property = trimmed.substring(0, colon).trim().toLowerCase();
+            dec.value = trimmed.substring(colon + 1).trim();
+            if (dec.property.length() == 0 || dec.value.length() == 0) {
+                throw new CSSSyntaxException("Malformed declaration: " + trimmed);
+            }
             out.add(dec);
         }
         return out.toArray(new Declaration[out.size()]);

@@ -24,6 +24,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.css.CSSThemeCompiler;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -57,6 +58,8 @@ public class Initializr extends Lifecycle {
         final SpanLabel summaryLabel = new SpanLabel();
         final TemplatePreviewPanel previewPanel = new TemplatePreviewPanel(selectedTemplate[0]);
         final Container[] themePanelRef = new Container[1];
+        final Label customCssError = new Label("");
+        final boolean[] customCssValid = new boolean[]{true};
 
         appNameField.setUIID("InitializrField");
         packageField.setUIID("InitializrField");
@@ -67,6 +70,9 @@ public class Initializr extends Lifecycle {
         packageError.setHidden(true);
         packageError.setVisible(false);
         summaryLabel.setUIID("InitializrSummary");
+        customCssError.setUIID("InitializrValidationError");
+        customCssError.setHidden(true);
+        customCssError.setVisible(false);
 
         final Runnable refresh = new Runnable() {
             public void run() {
@@ -75,8 +81,19 @@ public class Initializr extends Lifecycle {
                         includeLocalizationBundles[0], previewLanguage[0], javaVersion[0],
                         customThemeCss[0]
                 );
-                previewPanel.setTemplate(selectedTemplate[0]);
-                previewPanel.setOptions(options);
+                customCssValid[0] = true;
+                customCssError.setText("");
+                customCssError.setHidden(true);
+                customCssError.setVisible(false);
+                try {
+                    previewPanel.setTemplate(selectedTemplate[0]);
+                    previewPanel.setOptions(options);
+                } catch (CSSThemeCompiler.CSSSyntaxException cssErr) {
+                    customCssValid[0] = false;
+                    customCssError.setText("Custom CSS Error: " + cssErr.getMessage());
+                    customCssError.setHidden(false);
+                    customCssError.setVisible(true);
+                }
                 boolean canCustomizeTheme = supportsLivePreview(selectedTemplate[0]);
                 if (themePanelRef[0] != null) {
                     setEnabledRecursive(themePanelRef[0], canCustomizeTheme);
@@ -101,7 +118,7 @@ public class Initializr extends Lifecycle {
                 createTemplateSelector(selectedTemplate, templateButtons, refresh)
         );
         final Container idePanel = createIdeSelectorPanel(selectedIde, refresh);
-        final Container themePanel = createThemeOptionsPanel(selectedThemeMode, selectedAccent, roundedButtons, customThemeCss, refresh);
+        final Container themePanel = createThemeOptionsPanel(selectedThemeMode, selectedAccent, roundedButtons, customThemeCss, customCssError, refresh);
         final Container localizationPanel = createLocalizationPanel(includeLocalizationBundles, previewLanguage, refresh, previewPanel);
         final Container javaPanel = createJavaOptionsPanel(javaVersion, refresh);
         themePanelRef[0] = themePanel;
@@ -129,9 +146,9 @@ public class Initializr extends Lifecycle {
         generateButton.setUIID("InitializrPrimaryButton");
 
         generateButton.addActionListener(e -> {
-            if (!validateInputs(appNameField, packageField)) {
+            if (!validateInputs(appNameField, packageField) || !customCssValid[0]) {
                 updateValidationErrorLabels(appNameField, packageField, appNameError, packageError);
-                ToastBar.showErrorMessage("Please fix validation errors before generating.");
+                ToastBar.showErrorMessage(customCssValid[0] ? "Please fix validation errors before generating." : "Please fix custom CSS errors before generating.");
                 form.revalidate();
                 return;
             }
@@ -266,6 +283,7 @@ public class Initializr extends Lifecycle {
                                               ProjectOptions.Accent[] selectedAccent,
                                               boolean[] roundedButtons,
                                               String[] customThemeCss,
+                                              Label customCssError,
                                               Runnable onSelectionChanged) {
         Container modeRow = new Container(new GridLayout(1, 2));
         modeRow.setUIID("InitializrChoicesGrid");
@@ -328,7 +346,8 @@ public class Initializr extends Lifecycle {
                 labeledField("Mode", modeRow),
                 labeledField("Accent", accentRow),
                 rounded,
-                labeledField("Append Custom CSS", cssEditor)
+                labeledField("Append Custom CSS", cssEditor),
+                customCssError
         );
     }
 
