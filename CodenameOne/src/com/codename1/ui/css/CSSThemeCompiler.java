@@ -324,16 +324,36 @@ public class CSSThemeCompiler {
     }
 
     private String cssColorKeyword(String value) {
-        if ("black".equals(value)) return "000000";
-        if ("white".equals(value)) return "ffffff";
-        if ("red".equals(value)) return "ff0000";
-        if ("green".equals(value)) return "008000";
-        if ("blue".equals(value)) return "0000ff";
-        if ("pink".equals(value)) return "ffc0cb";
-        if ("orange".equals(value)) return "ffa500";
-        if ("yellow".equals(value)) return "ffff00";
-        if ("purple".equals(value)) return "800080";
-        if ("gray".equals(value) || "grey".equals(value)) return "808080";
+        if ("black".equals(value)) {
+            return "000000";
+        }
+        if ("white".equals(value)) {
+            return "ffffff";
+        }
+        if ("red".equals(value)) {
+            return "ff0000";
+        }
+        if ("green".equals(value)) {
+            return "008000";
+        }
+        if ("blue".equals(value)) {
+            return "0000ff";
+        }
+        if ("pink".equals(value)) {
+            return "ffc0cb";
+        }
+        if ("orange".equals(value)) {
+            return "ffa500";
+        }
+        if ("yellow".equals(value)) {
+            return "ffff00";
+        }
+        if ("purple".equals(value)) {
+            return "800080";
+        }
+        if ("gray".equals(value) || "grey".equals(value)) {
+            return "808080";
+        }
         return null;
     }
 
