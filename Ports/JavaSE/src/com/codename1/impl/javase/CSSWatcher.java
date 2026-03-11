@@ -151,9 +151,9 @@ public class CSSWatcher implements Runnable {
     }
 
     /**
-     * Adds likely l10n locations derived from the CSS file and current working directory.
+     * Adds likely l10n/i18n locations derived from the CSS file and current working directory.
      * <p>We include relative common-module paths because JavaSE watch is often launched
-     * from the `javase` module while CSS/l10n are in `../common/src/main`.</p>
+     * from the `javase` module while CSS/localization resources are in `../common/src/main`.</p>
      */
     void addLocalizationCandidates(File cssFile, List<File> out) {
         if (cssFile == null) {
@@ -164,13 +164,17 @@ public class CSSWatcher implements Runnable {
             File srcMainDirectory = cssDirectory.getParentFile();
             if (srcMainDirectory != null) {
                 out.add(new File(srcMainDirectory, "l10n"));
+                out.add(new File(srcMainDirectory, "i18n"));
             }
         }
 
         File workingDirectory = new File(System.getProperty("user.dir"));
         out.add(new File(workingDirectory, "l10n"));
+        out.add(new File(workingDirectory, "i18n"));
         out.add(new File(workingDirectory, "src/main/l10n"));
+        out.add(new File(workingDirectory, "src/main/i18n"));
         out.add(new File(workingDirectory, "../common/src/main/l10n"));
+        out.add(new File(workingDirectory, "../common/src/main/i18n"));
     }
 
     /**

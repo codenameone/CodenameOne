@@ -8,5 +8,5 @@ public class WebsiteThemeNativeImpl {
     public boolean isSupported() {
         return false;
     }
-
+    public void notifyUiReady() {}
 }
