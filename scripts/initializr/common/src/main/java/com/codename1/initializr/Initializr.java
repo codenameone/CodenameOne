@@ -24,7 +24,6 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.TextArea;
-import com.codename1.ui.css.CSSThemeCompiler;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -88,7 +87,7 @@ public class Initializr extends Lifecycle {
                 try {
                     previewPanel.setTemplate(selectedTemplate[0]);
                     previewPanel.setOptions(options);
-                } catch (CSSThemeCompiler.CSSSyntaxException cssErr) {
+                } catch (IllegalArgumentException cssErr) {
                     customCssValid[0] = false;
                     customCssError.setText("Custom CSS Error: " + cssErr.getMessage());
                     customCssError.setHidden(false);

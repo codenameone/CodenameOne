@@ -45,6 +45,10 @@ public class CSSThemeCompiler {
         public CSSSyntaxException(String message) {
             super(message);
         }
+
+        public CSSSyntaxException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
     public void compile(String css, MutableResource resources, String themeName) {
@@ -373,7 +377,7 @@ public class CSSThemeCompiler {
         try {
             out = Integer.parseInt(value.trim());
         } catch (RuntimeException err) {
-            throw new CSSSyntaxException("Invalid rgb() channel value in " + originalColor + ": " + value);
+            throw new CSSSyntaxException("Invalid rgb() channel value in " + originalColor + ": " + value, err);
         }
         if (out < 0 || out > 255) {
             throw new CSSSyntaxException("rgb() channel out of range in " + originalColor + ": " + value);

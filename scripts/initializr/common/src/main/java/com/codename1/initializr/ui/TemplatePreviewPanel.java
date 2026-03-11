@@ -196,7 +196,7 @@ public class TemplatePreviewPanel {
                 staticPreview.setImage(Resources.getGlobalResources().getImage(template.IMAGE_NAME));
                 previewHolder.add(BorderLayout.CENTER, staticPreview);
             }
-        } catch (CSSThemeCompiler.CSSSyntaxException cssError) {
+        } catch (IllegalArgumentException cssError) {
             staticPreviewFallback.setText("Custom CSS error: " + cssError.getMessage());
             previewHolder.add(BorderLayout.CENTER, staticPreviewFallback);
             throw cssError;
