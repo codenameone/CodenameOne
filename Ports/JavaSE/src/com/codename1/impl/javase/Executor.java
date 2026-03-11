@@ -108,7 +108,7 @@ public class Executor {
         int dotPos = version.indexOf('.');
         int dashPos = version.indexOf('-');
         return Integer.parseInt(version.substring(0,
-                dotPos > -1 ? dotPos : dashPos > -1 ? dashPos : 1));
+                dotPos > -1 ? dotPos : dashPos > -1 ? dashPos : version.length()));
     }
     
     static void setMacApplicationEventHandled(Object event, boolean handled) {

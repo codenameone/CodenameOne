@@ -22,6 +22,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             }
         }
         validateExperimentalJava17Generation();
+        validateExperimentalJava17RegressionFixes();
         return true;
     }
 
@@ -45,6 +46,44 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertSettings(entries, Template.BAREBONES, packageName, mainClassName, true);
         assertMainSourceFile(entries, Template.BAREBONES, packageName, mainClassName, true);
         assertLocalizationBundles(entries, Template.BAREBONES, true);
+    }
+
+    private void validateExperimentalJava17RegressionFixes() throws Exception {
+        String mainClassName = "DemoExperimentalJava17Regression";
+        String packageName = "com.acme.experimental.java17regression";
+        ProjectOptions options = new ProjectOptions(
+                ProjectOptions.ThemeMode.LIGHT,
+                ProjectOptions.Accent.DEFAULT,
+                true,
+                true,
+                ProjectOptions.PreviewLanguage.ENGLISH,
+                ProjectOptions.JavaVersion.JAVA_17_EXPERIMENTAL
+        );
+
+        byte[] zipData = createProjectZip(IDE.INTELLIJ, Template.BAREBONES, mainClassName, packageName, options);
+        Map<String, byte[]> entries = readZipEntries(zipData);
+
+        String intellijMisc = getText(entries, ".idea/misc.xml");
+        assertContains(intellijMisc, "languageLevel=\"JDK_17\"", "IntelliJ misc.xml should use Java 17 language level for Java 17 projects");
+        assertFalse(intellijMisc.indexOf("project-jdk-name=") >= 0, "IntelliJ misc.xml should not pin a specific JDK name");
+        assertFalse(intellijMisc.indexOf("project-jdk-type=") >= 0, "IntelliJ misc.xml should not pin a specific JDK type");
+
+        String intellijWorkspace = getText(entries, ".idea/workspace.xml");
+        assertContains(intellijWorkspace, "<configuration name=\"Run in Simulator\"", "IntelliJ workspace should include Run in Simulator profile");
+        assertContains(intellijWorkspace, "--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED",
+                "Run in Simulator profile should export com.apple.eawt for JDK 17+");
+
+        String androidPom = getText(entries, "android/pom.xml");
+        assertContains(androidPom, "<artifactId>maven-jar-plugin</artifactId>", "Android module should configure maven-jar-plugin explicitly");
+        assertContains(androidPom, "<version>3.4.1</version>", "Android module should pin maven-jar-plugin version");
+        assertContains(androidPom, "<id>default-jar</id>", "Android module should target default-jar execution");
+        assertContains(androidPom, "<phase>none</phase>", "Android module should disable default-jar execution to avoid duplicate attach in cn1:build");
+
+        String iosPom = getText(entries, "ios/pom.xml");
+        assertContains(iosPom, "<artifactId>maven-jar-plugin</artifactId>", "iOS module should configure maven-jar-plugin explicitly");
+        assertContains(iosPom, "<version>3.4.1</version>", "iOS module should pin maven-jar-plugin version");
+        assertContains(iosPom, "<id>default-jar</id>", "iOS module should target default-jar execution");
+        assertContains(iosPom, "<phase>none</phase>", "iOS module should disable default-jar execution to avoid duplicate attach in cn1:build");
     }
 
     private void validateCombination(Template template, IDE ide) throws Exception {
@@ -122,6 +161,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(pom, packageName, "Root pom should include package as groupId");
         assertContains(pom, mainClassName.toLowerCase(), "Root pom should include app artifact/name");
         assertContains(pom, "<cn1.plugin.version>7.0.227</cn1.plugin.version>", "Root pom should use current CN1 plugin version");
+        assertContains(pom, "<cn1.version>7.0.227</cn1.version>", "Root pom should align CN1 runtime version with plugin version");
         assertFalse(pom.indexOf("com.example.myapp") >= 0, "Root pom still contains placeholder package");
         assertFalse(pom.indexOf("myappname") >= 0, "Root pom still contains placeholder app name");
     }

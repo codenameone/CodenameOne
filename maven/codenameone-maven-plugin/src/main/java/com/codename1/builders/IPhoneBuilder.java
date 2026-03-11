@@ -2641,20 +2641,26 @@ public class IPhoneBuilder extends Executor {
     private String[] getStubCompileSourceTarget(String javacPath) {
         String source = "1.6";
         String target = "1.6";
+        int major = -1;
+        String version = null;
         try {
             String versionOutput = execString(tmpFile != null ? tmpFile : new File("."), javacPath, "-version");
             if (versionOutput != null && versionOutput.trim().length() > 0) {
                 String[] parts = versionOutput.trim().split("\\s+");
-                String version = parts[parts.length - 1];
-                int major = getMajorVersionInt(version, -1);
-                if (major >= 9) {
-                    source = "8";
-                    target = "8";
-                    log("JDK " + version + " does not support -source/-target 1.6. Compiling iOS stubs with -source/-target 8.");
-                }
+                version = parts[parts.length - 1];
+                major = getMajorVersionInt(version, -1);
             }
         } catch (Exception ex) {
             debug("Failed to resolve javac version for iOS stub compile: " + ex.getMessage());
+        }
+        if (major < 0) {
+            version = System.getProperty("java.version");
+            major = getMajorVersionInt(version, -1);
+        }
+        if (major >= 9) {
+            source = "8";
+            target = "8";
+            log("JDK " + version + " does not support -source/-target 1.6. Compiling iOS stubs with -source/-target 8.");
         }
         return new String[]{source, target};
     }
