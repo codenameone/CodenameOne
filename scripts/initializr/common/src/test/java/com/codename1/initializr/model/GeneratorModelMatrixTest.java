@@ -25,6 +25,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateExperimentalJava17RegressionFixes();
         validateAdvancedThemeCssGeneration();
         validateAppendedCustomCssGeneration();
+        validateCustomCssWithoutPresetOverrides();
         return true;
     }
 
@@ -48,8 +49,33 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         Map<String, byte[]> entries = readZipEntries(zipData);
 
         String themeCss = getText(entries, "common/src/main/css/theme.css");
+        assertContains(themeCss, "Initializr Theme Overrides", "Theme CSS should include generated theme overrides marker");
+        assertContains(themeCss, "background-color: #1d4ed8", "Theme CSS should preserve selected accent overrides when custom CSS is appended");
         assertContains(themeCss, "Initializr Appended Custom CSS", "Theme CSS should include appended custom CSS marker");
         assertContains(themeCss, "border-radius: 0", "Theme CSS should include custom advanced CSS");
+    }
+
+    private void validateCustomCssWithoutPresetOverrides() throws Exception {
+        String mainClassName = "DemoCustomOnly";
+        String packageName = "com.acme.custom.only";
+        String customCss = "Button {\n    border-radius: 0;\n}\n";
+        ProjectOptions options = new ProjectOptions(
+                ProjectOptions.ThemeMode.LIGHT,
+                ProjectOptions.Accent.DEFAULT,
+                true,
+                true,
+                ProjectOptions.PreviewLanguage.ENGLISH,
+                ProjectOptions.JavaVersion.JAVA_8,
+                customCss
+        );
+
+        byte[] zipData = createProjectZip(IDE.INTELLIJ, Template.BAREBONES, mainClassName, packageName, options);
+        Map<String, byte[]> entries = readZipEntries(zipData);
+
+        String themeCss = getText(entries, "common/src/main/css/theme.css");
+        assertFalse(themeCss.indexOf("Initializr Theme Overrides") >= 0, "Theme CSS should not add preset overrides for light/default mode");
+        assertContains(themeCss, "Initializr Appended Custom CSS", "Theme CSS should include custom CSS marker in custom-only mode");
+        assertContains(themeCss, "border-radius: 0", "Theme CSS should include custom CSS in custom-only mode");
     }
 
     private void validateExperimentalJava17Generation() throws Exception {

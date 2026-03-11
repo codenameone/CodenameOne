@@ -471,13 +471,15 @@ public class GeneratorModel {
 
     public static String buildThemeOverrides(ProjectOptions options) {
         ProjectOptions effective = options == null ? ProjectOptions.defaults() : options;
-        if (effective.customThemeCss != null && effective.customThemeCss.trim().length() > 0) {
-            return "\n\n/* Initializr Appended Custom CSS */\n" + effective.customThemeCss + "\n";
-        }
-        if (isDefaultBarebonesOptions(effective)) {
+        String customCss = normalizeCustomCss(effective.customThemeCss);
+        boolean hasCustomCss = customCss.length() > 0;
+        if (isDefaultBarebonesOptions(effective) && !hasCustomCss) {
             return "";
         }
-        StringBuilder out = new StringBuilder("\n\n/* Initializr Theme Overrides */\n");
+        StringBuilder out = new StringBuilder();
+        if (!isDefaultBarebonesOptions(effective)) {
+            out.append("\n\n/* Initializr Theme Overrides */\n");
+        }
 
         if (effective.themeMode == ProjectOptions.ThemeMode.DARK) {
             out.append("Form {\n")
@@ -506,11 +508,14 @@ public class GeneratorModel {
                         .append("    background-color: #334155;\n")
                         .append("    border: 1px solid #64748b;\n")
                         .append("}\n");
+                appendCustomCss(out, customCss);
                 return out.toString();
             }
         } else if (effective.accent == ProjectOptions.Accent.DEFAULT) {
-            // Light + Clean intentionally inherits template defaults (rounded ignored).
-            return "";
+            // Light + Clean intentionally inherits template defaults (rounded ignored) unless custom CSS is provided.
+            out.setLength(0);
+            appendCustomCss(out, customCss);
+            return out.toString();
         }
 
         int accent = resolveAccentColor(effective);
@@ -528,7 +533,25 @@ public class GeneratorModel {
                 .append("    color: #ffffff;\n")
                 .append("    border-radius: ").append(buttonRadius).append(";\n")
                 .append("}\n");
+        appendCustomCss(out, customCss);
         return out.toString();
+    }
+
+    private static String normalizeCustomCss(String css) {
+        if (css == null) {
+            return "";
+        }
+        String trimmed = css.trim();
+        return trimmed.length() == 0 ? "" : trimmed;
+    }
+
+    private static void appendCustomCss(StringBuilder out, String customCss) {
+        if (customCss.length() == 0) {
+            return;
+        }
+        out.append("\n/* Initializr Appended Custom CSS */\n")
+                .append(customCss)
+                .append('\n');
     }
 
     private static boolean isDefaultBarebonesOptions(ProjectOptions options) {
