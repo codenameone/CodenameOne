@@ -1,9 +1,11 @@
 package com.codename1.ui.css;
 
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Image;
 import com.codename1.ui.plaf.CSSBorder;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.MutableResource;
 import java.util.Hashtable;
 import org.junit.jupiter.api.Test;
@@ -41,8 +43,15 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("#abc", theme.get("@primary"));
         assertEquals("4px", theme.get("@spacing"));
         assertEquals("#abc", theme.get("@primarycolor"));
-        assertEquals(String.valueOf(Component.CENTER), String.valueOf(theme.get("Button.align")));
+        assertEquals(Integer.valueOf(Component.CENTER), theme.get("Button.align"));
         assertTrue(theme.get("Button.press#border") instanceof CSSBorder);
+
+
+        UIManager.getInstance().addThemeProps(theme);
+        Button runtimeButton = new Button("Runtime");
+        runtimeButton.setUIID("Button");
+        assertEquals(0xffc0cb, runtimeButton.getUnselectedStyle().getFgColor());
+        assertEquals(Component.CENTER, runtimeButton.getUnselectedStyle().getAlignment());
 
         Image mutable = resource.getImage("btnBg");
         assertNotNull(mutable);

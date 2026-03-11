@@ -178,7 +178,7 @@ public class CSSThemeCompiler {
             return true;
         }
         if ("text-align".equals(property)) {
-            String align = normalizeAlignment(value);
+            Integer align = normalizeAlignment(value);
             theme.put(uiid + "." + statePrefix + "align", align);
             return true;
         }
@@ -324,16 +324,16 @@ public class CSSThemeCompiler {
         return value;
     }
 
-    private String normalizeAlignment(String value) {
+    private Integer normalizeAlignment(String value) {
         String v = value == null ? "" : value.trim().toLowerCase();
         if ("left".equals(v) || "start".equals(v)) {
-            return String.valueOf(Component.LEFT);
+            return Integer.valueOf(Component.LEFT);
         }
         if ("center".equals(v)) {
-            return String.valueOf(Component.CENTER);
+            return Integer.valueOf(Component.CENTER);
         }
         if ("right".equals(v) || "end".equals(v)) {
-            return String.valueOf(Component.RIGHT);
+            return Integer.valueOf(Component.RIGHT);
         }
         throw new CSSSyntaxException("Unsupported text-align value: " + value);
     }

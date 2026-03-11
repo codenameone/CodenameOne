@@ -210,7 +210,6 @@ public class Initializr extends Lifecycle {
             String selected = languagePicker.getSelectedString();
             previewLanguage[0] = findLanguageByLabel(selected);
             onSelectionChanged.run();
-            previewPanel.showUpdatedLivePreview();
         });
 
         return BoxLayout.encloseY(includeBundles, labeledField("Preview Language", languagePicker));
