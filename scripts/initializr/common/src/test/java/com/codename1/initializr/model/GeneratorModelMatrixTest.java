@@ -22,6 +22,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             }
         }
         validateExperimentalJava17Generation();
+        validateExperimentalJava17RegressionFixes();
         return true;
     }
 
@@ -45,6 +46,40 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertSettings(entries, Template.BAREBONES, packageName, mainClassName, true);
         assertMainSourceFile(entries, Template.BAREBONES, packageName, mainClassName, true);
         assertLocalizationBundles(entries, Template.BAREBONES, true);
+    }
+
+    private void validateExperimentalJava17RegressionFixes() throws Exception {
+        String mainClassName = "DemoExperimentalJava17Regression";
+        String packageName = "com.acme.experimental.java17regression";
+        ProjectOptions options = new ProjectOptions(
+                ProjectOptions.ThemeMode.LIGHT,
+                ProjectOptions.Accent.DEFAULT,
+                true,
+                true,
+                ProjectOptions.PreviewLanguage.ENGLISH,
+                ProjectOptions.JavaVersion.JAVA_17_EXPERIMENTAL
+        );
+
+        byte[] zipData = createProjectZip(IDE.INTELLIJ, Template.BAREBONES, mainClassName, packageName, options);
+        Map<String, byte[]> entries = readZipEntries(zipData);
+
+        String intellijMisc = getText(entries, ".idea/misc.xml");
+        assertContains(intellijMisc, "languageLevel=\"JDK_17\"", "IntelliJ misc.xml should use Java 17 language level for Java 17 projects");
+        assertFalse(intellijMisc.indexOf("project-jdk-name=") >= 0, "IntelliJ misc.xml should not pin a specific JDK name");
+        assertFalse(intellijMisc.indexOf("project-jdk-type=") >= 0, "IntelliJ misc.xml should not pin a specific JDK type");
+
+        String intellijWorkspace = getText(entries, ".idea/workspace.xml");
+        assertContains(intellijWorkspace, "<configuration name=\"Run in Simulator\"", "IntelliJ workspace should include Run in Simulator profile");
+        assertContains(intellijWorkspace, "--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED",
+                "Run in Simulator profile should export com.apple.eawt for JDK 17+");
+
+        String androidPom = getText(entries, "android/pom.xml");
+        assertContains(androidPom, "<artifactId>maven-jar-plugin</artifactId>", "Android module should configure maven-jar-plugin explicitly");
+        assertContains(androidPom, "<skip>true</skip>", "Android module should skip maven-jar-plugin to avoid duplicate attach in cn1:build");
+
+        String iosPom = getText(entries, "ios/pom.xml");
+        assertContains(iosPom, "<artifactId>maven-jar-plugin</artifactId>", "iOS module should configure maven-jar-plugin explicitly");
+        assertContains(iosPom, "<skip>true</skip>", "iOS module should skip maven-jar-plugin to avoid duplicate attach in cn1:build");
     }
 
     private void validateCombination(Template template, IDE ide) throws Exception {

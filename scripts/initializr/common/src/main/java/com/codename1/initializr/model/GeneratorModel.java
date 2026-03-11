@@ -190,8 +190,17 @@ public class GeneratorModel {
         if ("common/pom.xml".equals(targetPath)) {
             content = applyJavaVersionToPom(content);
         }
+        if (".idea/misc.xml".equals(targetPath)) {
+            content = normalizeIntellijMiscXml(content);
+        }
+        if (".idea/workspace.xml".equals(targetPath)) {
+            content = applySimulatorJvmExportToIdeaWorkspace(content);
+        }
         if ("pom.xml".equals(targetPath)) {
             content = replaceTagValue(content, "cn1.plugin.version", CN1_PLUGIN_VERSION);
+        }
+        if ("android/pom.xml".equals(targetPath) || "ios/pom.xml".equals(targetPath)) {
+            content = hardenPlatformModulePomAgainstDoubleJarAttach(content);
         }
         if ("javase/pom.xml".equals(targetPath)) {
             content = normalizeJavasePom(content);
@@ -215,6 +224,90 @@ public class GeneratorModel {
         content = StringUtil.replaceAll(content, "<source>1.8</source>", "<source>17</source>");
         content = StringUtil.replaceAll(content, "<target>1.8</target>", "<target>17</target>");
         return content;
+    }
+
+    private String normalizeIntellijMiscXml(String content) {
+        String languageLevel = options.javaVersion == ProjectOptions.JavaVersion.JAVA_17_EXPERIMENTAL ? "JDK_17" : "JDK_1_8";
+        content = removeXmlAttribute(content, "project-jdk-name");
+        content = removeXmlAttribute(content, "project-jdk-type");
+        content = setXmlAttribute(content, "languageLevel", languageLevel);
+        return content;
+    }
+
+    private static String removeXmlAttribute(String xml, String attributeName) {
+        String pattern = attributeName + "=\"";
+        int pos = xml.indexOf(pattern);
+        if (pos < 0) {
+            return xml;
+        }
+        int valueStart = pos + pattern.length();
+        int valueEnd = xml.indexOf('"', valueStart);
+        if (valueEnd < 0) {
+            return xml;
+        }
+        int removeStart = pos;
+        while (removeStart > 0 && xml.charAt(removeStart - 1) == ' ') {
+            removeStart--;
+        }
+        return xml.substring(0, removeStart) + xml.substring(valueEnd + 1);
+    }
+
+    private static String setXmlAttribute(String xml, String attributeName, String value) {
+        String pattern = attributeName + "=\"";
+        int pos = xml.indexOf(pattern);
+        if (pos < 0) {
+            return xml;
+        }
+        int valueStart = pos + pattern.length();
+        int valueEnd = xml.indexOf('"', valueStart);
+        if (valueEnd < 0) {
+            return xml;
+        }
+        return xml.substring(0, valueStart) + value + xml.substring(valueEnd);
+    }
+
+    private static String applySimulatorJvmExportToIdeaWorkspace(String content) {
+        String configHeader = "<configuration name=\"Run in Simulator\"";
+        int start = content.indexOf(configHeader);
+        if (start < 0) {
+            return content;
+        }
+        int end = content.indexOf("</configuration>", start);
+        if (end < 0) {
+            return content;
+        }
+        String segment = content.substring(start, end);
+        String exportArg = "--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED";
+        if (segment.indexOf(exportArg) >= 0) {
+            return content;
+        }
+        segment = StringUtil.replaceAll(segment, "<option name=\"vmOptions\" value=\"\" />",
+                "<option name=\"vmOptions\" value=\"" + exportArg + "\" />");
+        return content.substring(0, start) + segment + content.substring(end);
+    }
+
+    private static String hardenPlatformModulePomAgainstDoubleJarAttach(String pom) {
+        if (pom.indexOf("<artifactId>maven-jar-plugin</artifactId>") >= 0) {
+            if (pom.indexOf("<skip>true</skip>") >= 0) {
+                return pom;
+            }
+            return StringUtil.replaceAll(pom,
+                    "<artifactId>maven-jar-plugin</artifactId>",
+                    "<artifactId>maven-jar-plugin</artifactId>\n"
+                            + "                <configuration>\n"
+                            + "                    <skip>true</skip>\n"
+                            + "                </configuration>");
+        }
+        return StringUtil.replaceAll(pom,
+                "<plugins>\n",
+                "<plugins>\n"
+                        + "            <plugin>\n"
+                        + "                <groupId>org.apache.maven.plugins</groupId>\n"
+                        + "                <artifactId>maven-jar-plugin</artifactId>\n"
+                        + "                <configuration>\n"
+                        + "                    <skip>true</skip>\n"
+                        + "                </configuration>\n"
+                        + "            </plugin>\n");
     }
 
     private String injectLocalizationBootstrap(String targetPath, String content) {
