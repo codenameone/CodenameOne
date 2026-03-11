@@ -85,6 +85,19 @@ class GeofenceManagerTest extends UITestBase {
         assertFalse(locationManager.removedIds.contains("near"));
     }
 
+
+    @FormTest
+    void updateForceRefreshHandlesMissingPersistedActiveFenceMap() {
+        Geofence geofence = createGeofence("rehydrated", 0.0, 0.0, 50, -1L);
+        manager.add(geofence);
+        manager.update(1000);
+
+        storage.deleteStorageFile("$AsyncGeoStreamer.activegeofences$");
+
+        assertDoesNotThrow(() -> manager.update(1000, true));
+        assertTrue(locationManager.removedIds.contains("rehydrated"));
+    }
+
     @FormTest
     void updateWithNullLocationRegistersBackgroundListener() {
         locationManager.setCurrentLocation(null);

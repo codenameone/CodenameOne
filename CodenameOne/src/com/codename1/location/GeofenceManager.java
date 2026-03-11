@@ -502,6 +502,7 @@ public final class GeofenceManager implements Iterable<Geofence> {
         LocationManager.getLocationManager().setBackgroundLocationListener(null);
         List<String> activeIds = new ArrayList<String>(getActiveKeys(false));
         List<String> activeKeys = getActiveKeys(false);
+        Map<String, Geofence> activeFences = getActiveFences(false);
         for (String id : activeIds) {
             Geofence g = getFences(false).get(id);
             if (!forceRefresh && g != null) {
