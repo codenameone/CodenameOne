@@ -75,11 +75,15 @@ public class GeneratorModelMatrixTest extends AbstractTest {
 
         String androidPom = getText(entries, "android/pom.xml");
         assertContains(androidPom, "<artifactId>maven-jar-plugin</artifactId>", "Android module should configure maven-jar-plugin explicitly");
-        assertContains(androidPom, "<skip>true</skip>", "Android module should skip maven-jar-plugin to avoid duplicate attach in cn1:build");
+        assertContains(androidPom, "<version>3.4.1</version>", "Android module should pin maven-jar-plugin version");
+        assertContains(androidPom, "<id>default-jar</id>", "Android module should target default-jar execution");
+        assertContains(androidPom, "<phase>none</phase>", "Android module should disable default-jar execution to avoid duplicate attach in cn1:build");
 
         String iosPom = getText(entries, "ios/pom.xml");
         assertContains(iosPom, "<artifactId>maven-jar-plugin</artifactId>", "iOS module should configure maven-jar-plugin explicitly");
-        assertContains(iosPom, "<skip>true</skip>", "iOS module should skip maven-jar-plugin to avoid duplicate attach in cn1:build");
+        assertContains(iosPom, "<version>3.4.1</version>", "iOS module should pin maven-jar-plugin version");
+        assertContains(iosPom, "<id>default-jar</id>", "iOS module should target default-jar execution");
+        assertContains(iosPom, "<phase>none</phase>", "iOS module should disable default-jar execution to avoid duplicate attach in cn1:build");
     }
 
     private void validateCombination(Template template, IDE ide) throws Exception {

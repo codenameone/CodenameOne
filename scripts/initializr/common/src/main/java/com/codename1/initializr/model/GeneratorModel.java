@@ -287,27 +287,34 @@ public class GeneratorModel {
     }
 
     private static String hardenPlatformModulePomAgainstDoubleJarAttach(String pom) {
+        String pluginBlock =
+                "<plugin>\n" +
+                "                <groupId>org.apache.maven.plugins</groupId>\n" +
+                "                <artifactId>maven-jar-plugin</artifactId>\n" +
+                "                <version>3.4.1</version>\n" +
+                "                <executions>\n" +
+                "                    <execution>\n" +
+                "                        <id>default-jar</id>\n" +
+                "                        <phase>none</phase>\n" +
+                "                    </execution>\n" +
+                "                </executions>\n" +
+                "            </plugin>\n";
         if (pom.indexOf("<artifactId>maven-jar-plugin</artifactId>") >= 0) {
-            if (pom.indexOf("<skip>true</skip>") >= 0) {
+            if (pom.indexOf("<id>default-jar</id>") >= 0 && pom.indexOf("<phase>none</phase>") >= 0) {
                 return pom;
             }
-            return StringUtil.replaceAll(pom,
-                    "<artifactId>maven-jar-plugin</artifactId>",
-                    "<artifactId>maven-jar-plugin</artifactId>\n"
-                            + "                <configuration>\n"
-                            + "                    <skip>true</skip>\n"
-                            + "                </configuration>");
+            int pluginsTag = pom.indexOf("<plugins>\n");
+            if (pluginsTag >= 0) {
+                int firstPluginStart = pom.indexOf("<plugin>", pluginsTag);
+                if (firstPluginStart >= 0) {
+                    return pom.substring(0, firstPluginStart) + pluginBlock + pom.substring(firstPluginStart);
+                }
+            }
+            return pom;
         }
         return StringUtil.replaceAll(pom,
                 "<plugins>\n",
-                "<plugins>\n"
-                        + "            <plugin>\n"
-                        + "                <groupId>org.apache.maven.plugins</groupId>\n"
-                        + "                <artifactId>maven-jar-plugin</artifactId>\n"
-                        + "                <configuration>\n"
-                        + "                    <skip>true</skip>\n"
-                        + "                </configuration>\n"
-                        + "            </plugin>\n");
+                "<plugins>\n" + pluginBlock);
     }
 
     private String injectLocalizationBootstrap(String targetPath, String content) {
