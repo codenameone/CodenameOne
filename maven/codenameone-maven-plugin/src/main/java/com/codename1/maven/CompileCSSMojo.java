@@ -83,8 +83,8 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
                 if (parent == null) {
                     continue;
                 }
-                File localizationSibling = new File(parent, "l10n");
-                if (hasLocalizationDirectory(localizationSibling)) {
+                File localizationSibling = findLocalizationSibling(parent);
+                if (localizationSibling != null) {
                     return localizationSibling;
                 }
             }
@@ -92,16 +92,31 @@ public class CompileCSSMojo extends AbstractCN1Mojo {
 
         File cn1ProjectDir = getCN1ProjectDir();
         if (cn1ProjectDir != null) {
-            File defaultLocalization = new File(cn1ProjectDir, path("src", "main", "l10n"));
-            if (hasLocalizationDirectory(defaultLocalization)) {
-                return defaultLocalization;
+            File sourceLocalization = findLocalizationSibling(new File(cn1ProjectDir, path("src", "main")));
+            if (sourceLocalization != null) {
+                return sourceLocalization;
             }
-            File rootLocalization = new File(cn1ProjectDir, "l10n");
-            if (hasLocalizationDirectory(rootLocalization)) {
+            File rootLocalization = findLocalizationSibling(cn1ProjectDir);
+            if (rootLocalization != null) {
                 return rootLocalization;
             }
         }
 
+        return null;
+    }
+
+    private File findLocalizationSibling(File parent) {
+        if (parent == null) {
+            return null;
+        }
+        File l10n = new File(parent, "l10n");
+        if (hasLocalizationDirectory(l10n)) {
+            return l10n;
+        }
+        File i18n = new File(parent, "i18n");
+        if (hasLocalizationDirectory(i18n)) {
+            return i18n;
+        }
         return null;
     }
 

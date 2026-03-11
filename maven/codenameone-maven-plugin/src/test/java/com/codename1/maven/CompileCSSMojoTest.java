@@ -26,7 +26,7 @@ class CompileCSSMojoTest {
 
     @Test
     void addsLocalizationDirectoryToDesignerInvocation(@TempDir Path tempDir) throws Exception {
-        Path projectDir = setupProject(tempDir, true);
+        Path projectDir = setupProject(tempDir, "l10n");
         TestCompileCSSMojo mojo = createMojo(projectDir);
 
         mojo.executeImpl();
@@ -40,7 +40,7 @@ class CompileCSSMojoTest {
 
     @Test
     void skipsLocalizationArgumentWhenDirectoryMissing(@TempDir Path tempDir) throws Exception {
-        Path projectDir = setupProject(tempDir, false);
+        Path projectDir = setupProject(tempDir, null);
         TestCompileCSSMojo mojo = createMojo(projectDir);
 
         mojo.executeImpl();
@@ -51,7 +51,7 @@ class CompileCSSMojoTest {
 
     @Test
     void addsLocalizationArgumentWhenDirectoryIsEmpty(@TempDir Path tempDir) throws Exception {
-        Path projectDir = setupProject(tempDir, false);
+        Path projectDir = setupProject(tempDir, null);
         Files.createDirectories(projectDir.resolve("src/main/l10n"));
         TestCompileCSSMojo mojo = createMojo(projectDir);
 
@@ -62,6 +62,20 @@ class CompileCSSMojoTest {
         int index = args.indexOf("-l");
         assertTrue(index >= 0 && index + 1 < args.size(), "Expected localization directory argument after -l");
         assertEquals(projectDir.resolve("src/main/l10n").toFile().getAbsolutePath(), args.get(index + 1));
+    }
+
+    @Test
+    void addsI18nDirectoryToDesignerInvocation(@TempDir Path tempDir) throws Exception {
+        Path projectDir = setupProject(tempDir, "i18n");
+        TestCompileCSSMojo mojo = createMojo(projectDir);
+
+        mojo.executeImpl();
+
+        List<String> args = mojo.getRecordingJava().getCommandLineArguments();
+        assertTrue(args.contains("-l"), "Expected -l argument when i18n directory exists");
+        int index = args.indexOf("-l");
+        assertTrue(index >= 0 && index + 1 < args.size(), "Expected localization directory argument after -l");
+        assertEquals(projectDir.resolve("src/main/i18n").toFile().getAbsolutePath(), args.get(index + 1));
     }
 
     private TestCompileCSSMojo createMojo(Path projectDir) throws IOException {
@@ -87,7 +101,7 @@ class CompileCSSMojoTest {
         return mojo;
     }
 
-    private Path setupProject(Path tempDir, boolean includeLocalization) throws IOException {
+    private Path setupProject(Path tempDir, String localizationDirName) throws IOException {
         Path projectDir = tempDir.resolve("project");
         Files.createDirectories(projectDir);
         Files.createDirectories(projectDir.resolve("src/main/java"));
@@ -107,8 +121,8 @@ class CompileCSSMojoTest {
                 "</project>"
         ));
 
-        if (includeLocalization) {
-            Path localizationDir = Files.createDirectories(projectDir.resolve("src/main/l10n"));
+        if (localizationDirName != null) {
+            Path localizationDir = Files.createDirectories(projectDir.resolve("src/main").resolve(localizationDirName));
             Files.write(localizationDir.resolve("Messages.properties"), Arrays.asList("greeting=Hello"));
         }
 
