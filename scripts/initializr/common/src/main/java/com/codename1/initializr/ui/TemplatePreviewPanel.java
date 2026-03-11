@@ -14,7 +14,6 @@ import com.codename1.ui.Dialog;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.InterFormContainer;
-import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
@@ -30,7 +29,6 @@ public class TemplatePreviewPanel {
     private final Container root;
     private final Container previewHolder;
     private final ImageViewer staticPreview;
-    private final Label staticPreviewFallback;
     private InterFormContainer liveFormPreview;
 
     private Template template;
@@ -40,9 +38,6 @@ public class TemplatePreviewPanel {
         this.template = template;
 
         staticPreview = new ImageViewer();
-        staticPreviewFallback = new Label("Preview unavailable");
-        staticPreviewFallback.setUIID("InitializrTip");
-
         previewHolder = new Container(new BorderLayout());
         previewHolder.setUIID("InitializrPreviewHolder");
 
@@ -69,8 +64,9 @@ public class TemplatePreviewPanel {
     public void showUpdatedLivePreview() {
         if (template == Template.BAREBONES || template == Template.KOTLIN) {
             Form liveForm = createBarebonesPreviewForm(options);
-            liveFormPreview = new InterFormContainer(liveForm);
-            liveFormPreview.setUIID("InitializrLiveFrame");
+            InterFormContainer next = new InterFormContainer(liveForm);
+            next.setUIID("InitializrLiveFrame");
+            liveFormPreview = next;
             previewHolder.removeAll();
             previewHolder.add(BorderLayout.CENTER, liveFormPreview);
             previewHolder.revalidate();
@@ -87,6 +83,9 @@ public class TemplatePreviewPanel {
         form.getToolbar().addMaterialCommandToSideMenu("Hello Command",
                 FontImage.MATERIAL_CHECK, 4, e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
         applyLivePreviewOptions(form, helloButton, null, options);
+        if (options.customThemeCss != null && options.customThemeCss.trim().length() > 0) {
+            helloButton.setUIID("Button");
+        }
         applyLiveCssOverrides(form, options);
         return form;
     }
@@ -185,21 +184,17 @@ public class TemplatePreviewPanel {
     }
 
     private void updateMode() {
-        previewHolder.removeAll();
-        try {
-            if (template == Template.BAREBONES || template == Template.KOTLIN) {
-                Form liveForm = createBarebonesPreviewForm(options);
-                liveFormPreview = new InterFormContainer(liveForm);
-                liveFormPreview.setUIID("InitializrLiveFrame");
-                previewHolder.add(BorderLayout.CENTER, liveFormPreview);
-            } else {
-                staticPreview.setImage(Resources.getGlobalResources().getImage(template.IMAGE_NAME));
-                previewHolder.add(BorderLayout.CENTER, staticPreview);
-            }
-        } catch (IllegalArgumentException cssError) {
-            staticPreviewFallback.setText("Custom CSS error: " + cssError.getMessage());
-            previewHolder.add(BorderLayout.CENTER, staticPreviewFallback);
-            throw cssError;
+        if (template == Template.BAREBONES || template == Template.KOTLIN) {
+            Form liveForm = createBarebonesPreviewForm(options);
+            InterFormContainer next = new InterFormContainer(liveForm);
+            next.setUIID("InitializrLiveFrame");
+            liveFormPreview = next;
+            previewHolder.removeAll();
+            previewHolder.add(BorderLayout.CENTER, liveFormPreview);
+        } else {
+            staticPreview.setImage(Resources.getGlobalResources().getImage(template.IMAGE_NAME));
+            previewHolder.removeAll();
+            previewHolder.add(BorderLayout.CENTER, staticPreview);
         }
         previewHolder.revalidate();
     }
