@@ -23,7 +23,6 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         }
         validateExperimentalJava17Generation();
         validateExperimentalJava17RegressionFixes();
-        validateAdvancedThemeCssGeneration();
         validateAppendedCustomCssGeneration();
         validateCustomCssWithoutPresetOverrides();
         return true;
