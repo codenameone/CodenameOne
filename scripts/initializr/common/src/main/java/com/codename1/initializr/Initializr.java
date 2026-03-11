@@ -48,7 +48,7 @@ public class Initializr extends Lifecycle {
         final ProjectOptions.ThemeMode[] selectedThemeMode = new ProjectOptions.ThemeMode[]{ProjectOptions.ThemeMode.LIGHT};
         final ProjectOptions.Accent[] selectedAccent = new ProjectOptions.Accent[]{ProjectOptions.Accent.DEFAULT};
         final boolean[] roundedButtons = new boolean[]{true};
-        final boolean[] includeLocalizationBundles = new boolean[]{true};
+        final boolean[] includeLocalizationBundles = new boolean[]{false};
         final ProjectOptions.PreviewLanguage[] previewLanguage = new ProjectOptions.PreviewLanguage[]{ProjectOptions.PreviewLanguage.ENGLISH};
         final ProjectOptions.JavaVersion[] javaVersion = new ProjectOptions.JavaVersion[]{ProjectOptions.JavaVersion.JAVA_8};
         final RadioButton[] templateButtons = new RadioButton[Template.values().length];

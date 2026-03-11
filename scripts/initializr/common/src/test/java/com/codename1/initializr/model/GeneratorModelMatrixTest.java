@@ -43,6 +43,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
 
         assertCommonPom(entries, Template.BAREBONES, packageName, mainClassName, true);
         assertSettings(entries, Template.BAREBONES, packageName, mainClassName, true);
+        assertMainSourceFile(entries, Template.BAREBONES, packageName, mainClassName, true);
+        assertLocalizationBundles(entries, Template.BAREBONES, true);
     }
 
     private void validateCombination(Template template, IDE ide) throws Exception {
@@ -57,8 +59,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertRootPom(entries, packageName, mainClassName);
         assertCommonPom(entries, template, packageName, mainClassName, false);
         assertSettings(entries, template, packageName, mainClassName, false);
-        assertMainSourceFile(entries, template, packageName, mainClassName);
-        assertLocalizationBundles(entries, template);
+        assertMainSourceFile(entries, template, packageName, mainClassName, false);
+        assertLocalizationBundles(entries, template, false);
         assertNoTemplatePlaceholders(entries, template);
     }
 
@@ -119,7 +121,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String pom = getText(entries, "pom.xml");
         assertContains(pom, packageName, "Root pom should include package as groupId");
         assertContains(pom, mainClassName.toLowerCase(), "Root pom should include app artifact/name");
-        assertContains(pom, "<cn1.plugin.version>7.0.250</cn1.plugin.version>", "Root pom should use current CN1 plugin version");
+        assertContains(pom, "<cn1.plugin.version>7.0.227</cn1.plugin.version>", "Root pom should use current CN1 plugin version");
         assertFalse(pom.indexOf("com.example.myapp") >= 0, "Root pom still contains placeholder package");
         assertFalse(pom.indexOf("myappname") >= 0, "Root pom still contains placeholder app name");
     }
@@ -164,7 +166,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         }
     }
 
-    private void assertMainSourceFile(Map<String, byte[]> entries, Template template, String packageName, String mainClassName) {
+    private void assertMainSourceFile(Map<String, byte[]> entries, Template template, String packageName, String mainClassName, boolean expectLocalizationBundles) {
         String packagePath = StringUtil.replaceAll(packageName, ".", "/");
         String path;
         if (template.IS_KOTLIN) {
@@ -176,8 +178,17 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(mainSource, "package " + packageName, "Main source package was not refactored");
         assertContains(mainSource, mainClassName, "Main source class was not renamed");
         if (template == Template.BAREBONES || template == Template.KOTLIN) {
-            assertContains(mainSource, "setBundle", "Barebones starter should install localization bundle");
-            assertContains(mainSource, "messages", "Barebones starter should load i18n messages properties");
+            if (expectLocalizationBundles) {
+                assertContains(mainSource, "setBundle", "Barebones starter should install localization bundle");
+                assertContains(mainSource, "messages", "Barebones starter should load i18n messages properties");
+                if (template == Template.BAREBONES) {
+                    assertContains(mainSource, "super.init(context);", "Java starter should call Lifecycle init before localization bootstrap");
+                } else {
+                    assertContains(mainSource, "super.init(context)", "Kotlin starter should call Lifecycle init before localization bootstrap");
+                }
+            } else {
+                assertFalse(mainSource.indexOf("setBundle") >= 0, "Barebones starter should not install localization bundle by default");
+            }
         }
         if (template == Template.GRUB) {
             String grubModel = getText(entries, "common/src/main/java/" + packagePath + "/models/AccountModel.java");
@@ -191,11 +202,17 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     }
 
 
-    private void assertLocalizationBundles(Map<String, byte[]> entries, Template template) {
+    private void assertLocalizationBundles(Map<String, byte[]> entries, Template template, boolean expectLocalizationBundles) {
         if (template == Template.BAREBONES || template == Template.KOTLIN) {
-            assertNotNull(entries.get("common/src/main/resources/messages.properties"), "Barebones templates should include default localization bundle");
-            assertNotNull(entries.get("common/src/main/resources/messages_ar.properties"), "Barebones templates should include Arabic localization bundle");
-            assertNotNull(entries.get("common/src/main/resources/messages_he.properties"), "Barebones templates should include Hebrew localization bundle");
+            if (expectLocalizationBundles) {
+                assertNotNull(entries.get("common/src/main/resources/messages.properties"), "Barebones templates should include default localization bundle");
+                assertNotNull(entries.get("common/src/main/resources/messages_ar.properties"), "Barebones templates should include Arabic localization bundle");
+                assertNotNull(entries.get("common/src/main/resources/messages_he.properties"), "Barebones templates should include Hebrew localization bundle");
+            } else {
+                assertNull(entries.get("common/src/main/resources/messages.properties"), "Barebones templates should not include localization bundles by default");
+                assertNull(entries.get("common/src/main/resources/messages_ar.properties"), "Barebones templates should not include Arabic localization bundle by default");
+                assertNull(entries.get("common/src/main/resources/messages_he.properties"), "Barebones templates should not include Hebrew localization bundle by default");
+            }
             return;
         }
         assertNull(entries.get("common/src/main/resources/messages.properties"), "Non-bare templates should not receive default localization bundle");

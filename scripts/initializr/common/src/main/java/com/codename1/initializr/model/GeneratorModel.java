@@ -18,7 +18,7 @@ import java.util.Map;
 import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
-    private static final String CN1_PLUGIN_VERSION = "7.0.250";
+    private static final String CN1_PLUGIN_VERSION = "7.0.227";
     private static final String GENERATED_GITIGNORE =
             "**/target/\n" +
             ".idea/\n" +
@@ -236,6 +236,7 @@ public class GeneratorModel {
         content = StringUtil.replaceAll(content, "import static com.codename1.ui.CN.*;\n", "import static com.codename1.ui.CN.*;\nimport com.codename1.l10n.L10NManager;\nimport com.codename1.ui.plaf.UIManager;\nimport java.util.Hashtable;\n");
         String method = "\n    @Override\n"
                 + "    public void init(Object context) {\n"
+                + "        super.init(context);\n"
                 + "        String language = L10NManager.getInstance().getLanguage();\n"
                 + "        Hashtable<String, String> bundle = Resources.getGlobalResources().getL10N(\"messages\", language);\n"
                 + "        UIManager.getInstance().setBundle(bundle);\n"
@@ -253,6 +254,7 @@ public class GeneratorModel {
         }
         content = StringUtil.replaceAll(content, "import com.codename1.system.Lifecycle\n", "import com.codename1.system.Lifecycle\nimport com.codename1.l10n.L10NManager\nimport com.codename1.ui.plaf.UIManager\nimport com.codename1.ui.util.Resources\nimport java.util.Hashtable\n");
         String method = "\n    override fun init(context: Any?) {\n"
+                + "        super.init(context)\n"
                 + "        val language = L10NManager.getInstance().language\n"
                 + "        val bundle: Hashtable<String, String>? = Resources.getGlobalResources().getL10N(\"messages\", language)\n"
                 + "        UIManager.getInstance().setBundle(bundle)\n"
