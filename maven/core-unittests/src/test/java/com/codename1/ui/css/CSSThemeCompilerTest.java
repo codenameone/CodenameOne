@@ -28,7 +28,8 @@ public class CSSThemeCompilerTest extends UITestBase {
                 + "Button{color:var(--primary);background-color:#112233;padding:1px 2px;cn1-derive:Label;}"
                 + "Button:pressed{border-width:2px;border-style:solid;border-color:#ffffff;cn1-mutable-image:btnBg #ff00ff;}"
                 + "Label{margin:2px 4px 6px 8px;}"
-                + "Button{color:pink;text-align:center;}",
+                + "Button{color:pink;text-align:center;border:1px solid #00ff00;}"
+                + "Button.pressed{color:#00ff00;}",
                 resource,
                 "Theme"
         );
@@ -44,14 +45,15 @@ public class CSSThemeCompilerTest extends UITestBase {
         assertEquals("4px", theme.get("@spacing"));
         assertEquals("#abc", theme.get("@primarycolor"));
         assertEquals(Integer.valueOf(Component.CENTER), theme.get("Button.align"));
-        assertTrue(theme.get("Button.press#border") instanceof CSSBorder);
-
+        assertTrue(theme.get("Button.border") instanceof CSSBorder);
+        assertEquals("00ff00", theme.get("Button.press#fgColor"));
 
         UIManager.getInstance().addThemeProps(theme);
         Button runtimeButton = new Button("Runtime");
         runtimeButton.setUIID("Button");
         assertEquals(0xffc0cb, runtimeButton.getUnselectedStyle().getFgColor());
         assertEquals(Component.CENTER, runtimeButton.getUnselectedStyle().getAlignment());
+        assertNotNull(runtimeButton.getUnselectedStyle().getBorder());
 
         Image mutable = resource.getImage("btnBg");
         assertNotNull(mutable);
@@ -67,6 +69,9 @@ public class CSSThemeCompilerTest extends UITestBase {
         );
         assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
                 compiler.compile("Button{color:#ff00ff;text-align:middle;}", resource, "Theme")
+        );
+        assertThrows(CSSThemeCompiler.CSSSyntaxException.class, () ->
+                compiler.compile("Button:hover{color:#ff00ff;}", resource, "Theme")
         );
     }
 

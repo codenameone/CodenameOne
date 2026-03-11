@@ -212,11 +212,69 @@ public class CSSThemeCompiler {
         if (!isBorderProperty(property)) {
             return false;
         }
+        if ("border".equals(property)) {
+            String expanded = expandBorderShorthand(value);
+            if (expanded.length() == 0) {
+                return true;
+            }
+            if (borderCss.length() > 0) {
+                borderCss.append(';');
+            }
+            borderCss.append(expanded);
+            return true;
+        }
         if (borderCss.length() > 0) {
             borderCss.append(';');
         }
         borderCss.append(property).append(':').append(value);
         return true;
+    }
+
+    private String expandBorderShorthand(String value) {
+        String[] parts = splitOnWhitespace(value);
+        if (parts.length == 0) {
+            throw new CSSSyntaxException("border shorthand is missing value");
+        }
+        String width = null;
+        String style = null;
+        String color = null;
+        for (String part : parts) {
+            String token = part.trim().toLowerCase();
+            if (token.length() == 0) {
+                continue;
+            }
+            if (width == null && (token.endsWith("px") || token.endsWith("mm") || token.endsWith("pt") || token.endsWith("%") || "0".equals(token))) {
+                width = part;
+                continue;
+            }
+            if (style == null && ("none".equals(token) || "solid".equals(token) || "dashed".equals(token) || "dotted".equals(token))) {
+                style = token;
+                continue;
+            }
+            if (color == null) {
+                normalizeHexColor(part);
+                color = part;
+                continue;
+            }
+            throw new CSSSyntaxException("Unsupported border shorthand token: " + part);
+        }
+        StringBuilder out = new StringBuilder();
+        if (width != null) {
+            out.append("border-width:").append(width);
+        }
+        if (style != null) {
+            if (out.length() > 0) {
+                out.append(';');
+            }
+            out.append("border-style:").append(style);
+        }
+        if (color != null) {
+            if (out.length() > 0) {
+                out.append(';');
+            }
+            out.append("border-color:").append(color);
+        }
+        return out.toString();
     }
 
     private String resolveVars(Hashtable theme, String value) {
@@ -239,10 +297,21 @@ public class CSSThemeCompiler {
     private String[] selector(String selector) {
         String statePrefix = "";
         String uiid = selector.trim();
+
         int pseudoPos = uiid.indexOf(':');
-        if (pseudoPos > -1) {
-            String pseudo = uiid.substring(pseudoPos + 1).trim();
-            uiid = uiid.substring(0, pseudoPos).trim();
+        int classStatePos = uiid.indexOf('.');
+        int statePos = -1;
+        if (pseudoPos > -1 && classStatePos > -1) {
+            statePos = Math.min(pseudoPos, classStatePos);
+        } else if (pseudoPos > -1) {
+            statePos = pseudoPos;
+        } else if (classStatePos > -1) {
+            statePos = classStatePos;
+        }
+
+        if (statePos > -1) {
+            String pseudo = uiid.substring(statePos + 1).trim();
+            uiid = uiid.substring(0, statePos).trim();
             statePrefix = statePrefix(pseudo);
         }
         if ("*".equals(uiid) || uiid.length() == 0) {
@@ -261,7 +330,7 @@ public class CSSThemeCompiler {
         if ("disabled".equals(pseudo)) {
             return "dis#";
         }
-        return "";
+        throw new CSSSyntaxException("Unsupported pseudo state: " + pseudo);
     }
 
     private Image createSolidImage(String color) {
