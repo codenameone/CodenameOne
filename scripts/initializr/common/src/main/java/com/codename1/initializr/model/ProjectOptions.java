@@ -78,6 +78,6 @@ public final class ProjectOptions {
     }
 
     public static ProjectOptions defaults() {
-        return new ProjectOptions(ThemeMode.LIGHT, Accent.DEFAULT, true, true, PreviewLanguage.ENGLISH, JavaVersion.JAVA_8);
+        return new ProjectOptions(ThemeMode.LIGHT, Accent.DEFAULT, true, false, PreviewLanguage.ENGLISH, JavaVersion.JAVA_8);
     }
 }
