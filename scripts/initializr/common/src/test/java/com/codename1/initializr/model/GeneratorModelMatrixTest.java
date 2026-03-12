@@ -2,6 +2,8 @@ package com.codename1.initializr.model;
 
 import com.codename1.io.Util;
 import com.codename1.testing.AbstractTest;
+import com.codename1.ui.css.CSSThemeCompiler;
+import com.codename1.ui.util.MutableResource;
 import com.codename1.util.StringUtil;
 import net.sf.zipme.ZipEntry;
 import net.sf.zipme.ZipInputStream;
@@ -25,6 +27,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateExperimentalJava17RegressionFixes();
         validateAppendedCustomCssGeneration();
         validateCustomCssWithoutPresetOverrides();
+        validateThemeCssCompilesForAllVariants();
         return true;
     }
 
@@ -75,6 +78,40 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertFalse(themeCss.indexOf("Initializr Theme Overrides") >= 0, "Theme CSS should not add preset overrides for light/default mode");
         assertContains(themeCss, "Initializr Appended Custom CSS", "Theme CSS should include custom CSS marker in custom-only mode");
         assertContains(themeCss, "border-radius: 0", "Theme CSS should include custom CSS in custom-only mode");
+    }
+
+    private void validateThemeCssCompilesForAllVariants() {
+        for (ProjectOptions.ThemeMode mode : ProjectOptions.ThemeMode.values()) {
+            for (ProjectOptions.Accent accent : ProjectOptions.Accent.values()) {
+                validateThemeCssCompiles(new ProjectOptions(
+                        mode,
+                        accent,
+                        true,
+                        true,
+                        ProjectOptions.PreviewLanguage.ENGLISH,
+                        ProjectOptions.JavaVersion.JAVA_8
+                ));
+                validateThemeCssCompiles(new ProjectOptions(
+                        mode,
+                        accent,
+                        false,
+                        true,
+                        ProjectOptions.PreviewLanguage.ENGLISH,
+                        ProjectOptions.JavaVersion.JAVA_8,
+                        "Button { border-radius: 0; }"
+                ));
+            }
+        }
+    }
+
+    private void validateThemeCssCompiles(ProjectOptions options) {
+        String css = GeneratorModel.buildThemeOverrides(options);
+        if (css == null || css.trim().length() == 0) {
+            return;
+        }
+        MutableResource resource = new MutableResource();
+        new CSSThemeCompiler().compile(css, resource, "CompileCheckTheme");
+        assertNotNull(resource.getTheme("CompileCheckTheme"), "Generated CSS should compile to a theme");
     }
 
     private void validateExperimentalJava17Generation() throws Exception {

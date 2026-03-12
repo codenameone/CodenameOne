@@ -156,19 +156,49 @@ public class TemplatePreviewPanel {
 
     private void applyLiveCssOverrides(Form form, ProjectOptions options) {
         restoreThemeDefaults();
-        String generatedCss = com.codename1.initializr.model.GeneratorModel.buildThemeOverrides(options);
-        if (generatedCss == null || generatedCss.trim().length() == 0) {
+        ProjectOptions baseOptions = new ProjectOptions(
+                options.themeMode,
+                options.accent,
+                options.roundedButtons,
+                options.includeLocalizationBundles,
+                options.previewLanguage,
+                options.javaVersion,
+                null
+        );
+        String generatedCss = com.codename1.initializr.model.GeneratorModel.buildThemeOverrides(baseOptions);
+        applyCompiledTheme(generatedCss, "InitializrLiveThemeBase");
+
+        String customCss = normalizeCustomCss(options.customThemeCss);
+        if (customCss.length() > 0) {
+            String wrappedCustomCss = "\n/* Initializr Appended Custom CSS */\n" + customCss + "\n";
+            try {
+                applyCompiledTheme(wrappedCustomCss, "InitializrLiveThemeCustom");
+            } catch (RuntimeException err) {
+                throw new IllegalArgumentException(err.getMessage(), err);
+            }
+        }
+        form.refreshTheme();
+    }
+
+    private void applyCompiledTheme(String css, String themeName) {
+        if (css == null || css.trim().length() == 0) {
             return;
         }
         MutableResource resource = new MutableResource();
         CSSThemeCompiler compiler = new CSSThemeCompiler();
-        compiler.compile(generatedCss, resource, "InitializrLiveTheme");
-        Hashtable generatedTheme = resource.getTheme("InitializrLiveTheme");
-        if (generatedTheme == null || generatedTheme.isEmpty()) {
-            return;
+        compiler.compile(css, resource, themeName);
+        Hashtable generatedTheme = resource.getTheme(themeName);
+        if (generatedTheme != null && !generatedTheme.isEmpty()) {
+            UIManager.getInstance().addThemeProps(generatedTheme);
         }
-        UIManager.getInstance().addThemeProps(generatedTheme);
-        form.refreshTheme();
+    }
+
+    private String normalizeCustomCss(String css) {
+        if (css == null) {
+            return "";
+        }
+        String trimmed = css.trim();
+        return trimmed.length() == 0 ? "" : trimmed;
     }
 
     private void restoreThemeDefaults() {
