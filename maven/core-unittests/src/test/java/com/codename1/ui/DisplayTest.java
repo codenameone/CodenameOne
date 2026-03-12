@@ -5,6 +5,9 @@ import com.codename1.ui.plaf.Style;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 public class DisplayTest extends UITestBase {
@@ -109,6 +112,21 @@ public class DisplayTest extends UITestBase {
         } finally {
             display.setEnableAsyncStackTraces(oldEnable);
         }
+    }
+
+    @Test
+    void testReadArrayStackArgumentUsesProvidedStack() throws Exception {
+        Display display = Display.getInstance();
+        Field stackField = Display.class.getDeclaredField("inputEventStackTmp");
+        stackField.setAccessible(true);
+        stackField.set(display, new int[]{0, 999, 999});
+
+        Method readArray = Display.class.getDeclaredMethod("readArrayStackArgument", int[].class, int.class);
+        readArray.setAccessible(true);
+
+        int[] sourceStack = new int[]{2, 10, 20};
+        int[] decoded = (int[]) readArray.invoke(display, sourceStack, 0);
+        assertArrayEquals(new int[]{10, 20}, decoded);
     }
 
 }

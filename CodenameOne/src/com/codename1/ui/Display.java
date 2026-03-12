@@ -2206,11 +2206,12 @@ public final class Display extends CN1Constants {
         return recursivePointerReleaseB;
     }
 
-    private int[] readArrayStackArgument(int offset) {
-        int[] a = new int[inputEventStackTmp[offset]];
+    private int[] readArrayStackArgument(int[] stack, int offset) {
+        int length = stack[offset];
+        int[] a = new int[length];
         offset++;
         int alen = a.length;
-        System.arraycopy(inputEventStackTmp, offset + 0, a, 0, alen);
+        System.arraycopy(stack, offset + 0, a, 0, alen);
         return a;
     }
 
@@ -2268,9 +2269,9 @@ public final class Display extends CN1Constants {
                 dragOccured = false;
                 dragPathLength = 0;
                 pointerPressedAndNotReleasedOrDragged = true;
-                int[] array1 = readArrayStackArgument(offset);
+                int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
                 offset += array1.length + 1;
-                int[] array2 = readArrayStackArgument(offset);
+                int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
                 offset += array2.length + 1;
                 f.pointerPressed(array1, array2);
                 eventForm = f;
@@ -2311,9 +2312,9 @@ public final class Display extends CN1Constants {
                 // make sure the released event is sent to the same Form that got a
                 // pressed event
                 if (xy == f || f.shouldSendPointerReleaseToOtherForm()) { //NOPMD CompareObjectsWithEquals
-                    int[] array1 = readArrayStackArgument(offset);
+                    int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
                     offset += array1.length + 1;
-                    int[] array2 = readArrayStackArgument(offset);
+                    int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
                     offset += array2.length + 1;
                     f.pointerReleased(array1, array1);
                 }
@@ -2338,9 +2339,9 @@ public final class Display extends CN1Constants {
             case POINTER_DRAGGED_MULTI: {
                 dragOccured = true;
                 pointerPressedAndNotReleasedOrDragged = false;
-                int[] array1 = readArrayStackArgument(offset);
+                int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
                 offset += array1.length + 1;
-                int[] array2 = readArrayStackArgument(offset);
+                int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
                 offset += array2.length + 1;
                 f.pointerDragged(array1, array2);
                 break;
