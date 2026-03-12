@@ -3,6 +3,7 @@
  */
 package com.codename1.ui.css;
 
+import com.codename1.ui.Component;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 import com.codename1.ui.plaf.CSSBorder;
@@ -39,6 +40,16 @@ import java.util.Hashtable;
 /// - `@constants { name: value; other: value; }`
 /// - `var(--name)` dereferencing in declaration values.
 public class CSSThemeCompiler {
+
+    public static class CSSSyntaxException extends IllegalArgumentException {
+        public CSSSyntaxException(String message) {
+            super(message);
+        }
+
+        public CSSSyntaxException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
 
     public void compile(String css, MutableResource resources, String themeName) {
         Hashtable theme = resources.getTheme(themeName);
@@ -81,7 +92,7 @@ public class CSSThemeCompiler {
         }
         int close = stripped.indexOf('}', open + 1);
         if (close <= open) {
-            return;
+            throw new CSSSyntaxException("Unterminated @constants block");
         }
         Declaration[] declarations = parseDeclarations(stripped.substring(open + 1, close));
         for (Declaration declaration : declarations) {
@@ -166,6 +177,11 @@ public class CSSThemeCompiler {
             theme.put(uiid + "." + statePrefix + "font", value);
             return true;
         }
+        if ("text-align".equals(property)) {
+            Integer align = normalizeAlignment(value);
+            theme.put(uiid + "." + statePrefix + "align", align);
+            return true;
+        }
         return false;
     }
 
@@ -196,11 +212,69 @@ public class CSSThemeCompiler {
         if (!isBorderProperty(property)) {
             return false;
         }
+        if ("border".equals(property)) {
+            String expanded = expandBorderShorthand(value);
+            if (expanded.length() == 0) {
+                return true;
+            }
+            if (borderCss.length() > 0) {
+                borderCss.append(';');
+            }
+            borderCss.append(expanded);
+            return true;
+        }
         if (borderCss.length() > 0) {
             borderCss.append(';');
         }
         borderCss.append(property).append(':').append(value);
         return true;
+    }
+
+    private String expandBorderShorthand(String value) {
+        String[] parts = splitOnWhitespace(value);
+        if (parts.length == 0) {
+            throw new CSSSyntaxException("border shorthand is missing value");
+        }
+        String width = null;
+        String style = null;
+        String color = null;
+        for (String part : parts) {
+            String token = part.trim().toLowerCase();
+            if (token.length() == 0) {
+                continue;
+            }
+            if (width == null && (token.endsWith("px") || token.endsWith("mm") || token.endsWith("pt") || token.endsWith("%") || "0".equals(token))) {
+                width = part;
+                continue;
+            }
+            if (style == null && ("none".equals(token) || "solid".equals(token) || "dashed".equals(token) || "dotted".equals(token))) {
+                style = token;
+                continue;
+            }
+            if (color == null) {
+                normalizeHexColor(part);
+                color = part;
+                continue;
+            }
+            throw new CSSSyntaxException("Unsupported border shorthand token: " + part);
+        }
+        StringBuilder out = new StringBuilder();
+        if (width != null) {
+            out.append("border-width:").append(width);
+        }
+        if (style != null) {
+            if (out.length() > 0) {
+                out.append(';');
+            }
+            out.append("border-style:").append(style);
+        }
+        if (color != null) {
+            if (out.length() > 0) {
+                out.append(';');
+            }
+            out.append("border-color:").append(color);
+        }
+        return out.toString();
     }
 
     private String resolveVars(Hashtable theme, String value) {
@@ -223,10 +297,21 @@ public class CSSThemeCompiler {
     private String[] selector(String selector) {
         String statePrefix = "";
         String uiid = selector.trim();
+
         int pseudoPos = uiid.indexOf(':');
-        if (pseudoPos > -1) {
-            String pseudo = uiid.substring(pseudoPos + 1).trim();
-            uiid = uiid.substring(0, pseudoPos).trim();
+        int classStatePos = uiid.indexOf('.');
+        int statePos = -1;
+        if (pseudoPos > -1 && classStatePos > -1) {
+            statePos = Math.min(pseudoPos, classStatePos);
+        } else if (pseudoPos > -1) {
+            statePos = pseudoPos;
+        } else if (classStatePos > -1) {
+            statePos = classStatePos;
+        }
+
+        if (statePos > -1) {
+            String pseudo = uiid.substring(statePos + 1).trim();
+            uiid = uiid.substring(0, statePos).trim();
             statePrefix = statePrefix(pseudo);
         }
         if ("*".equals(uiid) || uiid.length() == 0) {
@@ -245,7 +330,7 @@ public class CSSThemeCompiler {
         if ("disabled".equals(pseudo)) {
             return "dis#";
         }
-        return "";
+        throw new CSSSyntaxException("Unsupported pseudo state: " + pseudo);
     }
 
     private Image createSolidImage(String color) {
@@ -267,10 +352,33 @@ public class CSSThemeCompiler {
     }
 
     private String normalizeHexColor(String cssColor) {
-        String value = cssColor.trim();
-        if ("transparent".equalsIgnoreCase(value)) {
+        String value = cssColor == null ? "" : cssColor.trim().toLowerCase();
+        if (value.length() == 0) {
+            throw new CSSSyntaxException("Color value cannot be empty");
+        }
+        if ("transparent".equals(value)) {
             return "000000";
         }
+
+        if (value.startsWith("rgb(")) {
+            if (!value.endsWith(")")) {
+                throw new CSSSyntaxException("Malformed rgb() color: " + cssColor);
+            }
+            String[] parts = splitOnComma(value.substring(4, value.length() - 1));
+            if (parts.length != 3) {
+                throw new CSSSyntaxException("rgb() must have exactly 3 components: " + cssColor);
+            }
+            int r = parseRgbChannel(parts[0], cssColor);
+            int g = parseRgbChannel(parts[1], cssColor);
+            int b = parseRgbChannel(parts[2], cssColor);
+            return toHexColor((r << 16) | (g << 8) | b);
+        }
+
+        String keyword = cssColorKeyword(value);
+        if (keyword != null) {
+            return keyword;
+        }
+
         if (value.startsWith("#")) {
             value = value.substring(1);
         }
@@ -279,7 +387,92 @@ public class CSSThemeCompiler {
                     + value.charAt(1) + value.charAt(1)
                     + value.charAt(2) + value.charAt(2);
         }
-        return value.toLowerCase();
+        if (value.length() != 6 || !isHexColor(value)) {
+            throw new CSSSyntaxException("Unsupported color value: " + cssColor);
+        }
+        return value;
+    }
+
+    private Integer normalizeAlignment(String value) {
+        String v = value == null ? "" : value.trim().toLowerCase();
+        if ("left".equals(v) || "start".equals(v)) {
+            return Integer.valueOf(Component.LEFT);
+        }
+        if ("center".equals(v)) {
+            return Integer.valueOf(Component.CENTER);
+        }
+        if ("right".equals(v) || "end".equals(v)) {
+            return Integer.valueOf(Component.RIGHT);
+        }
+        throw new CSSSyntaxException("Unsupported text-align value: " + value);
+    }
+
+    private String cssColorKeyword(String value) {
+        if ("black".equals(value)) {
+            return "000000";
+        }
+        if ("white".equals(value)) {
+            return "ffffff";
+        }
+        if ("red".equals(value)) {
+            return "ff0000";
+        }
+        if ("green".equals(value)) {
+            return "008000";
+        }
+        if ("blue".equals(value)) {
+            return "0000ff";
+        }
+        if ("pink".equals(value)) {
+            return "ffc0cb";
+        }
+        if ("orange".equals(value)) {
+            return "ffa500";
+        }
+        if ("yellow".equals(value)) {
+            return "ffff00";
+        }
+        if ("purple".equals(value)) {
+            return "800080";
+        }
+        if ("gray".equals(value) || "grey".equals(value)) {
+            return "808080";
+        }
+        return null;
+    }
+
+    private int parseRgbChannel(String value, String originalColor) {
+        int out;
+        try {
+            out = Integer.parseInt(value.trim());
+        } catch (RuntimeException err) {
+            throw new CSSSyntaxException("Invalid rgb() channel value in " + originalColor + ": " + value, err);
+        }
+        if (out < 0 || out > 255) {
+            throw new CSSSyntaxException("rgb() channel out of range in " + originalColor + ": " + value);
+        }
+        return out;
+    }
+
+    private boolean isHexColor(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            boolean hex = (c >= '0' && c <= '9')
+                    || (c >= 'a' && c <= 'f')
+                    || (c >= 'A' && c <= 'F');
+            if (!hex) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String toHexColor(int color) {
+        String hex = Integer.toHexString(color & 0xffffff);
+        while (hex.length() < 6) {
+            hex = "0" + hex;
+        }
+        return hex;
     }
 
     private String normalizeBox(String cssValue) {
@@ -312,19 +505,31 @@ public class CSSThemeCompiler {
         ArrayList<Rule> out = new ArrayList<Rule>();
         int pos = 0;
         while (pos < stripped.length()) {
+            while (pos < stripped.length() && Character.isWhitespace(stripped.charAt(pos))) {
+                pos++;
+            }
+            if (pos >= stripped.length()) {
+                break;
+            }
             int open = stripped.indexOf('{', pos);
             if (open < 0) {
-                break;
+                throw new CSSSyntaxException("Missing '{' in CSS rule near: " + stripped.substring(pos));
             }
             int close = stripped.indexOf('}', open + 1);
             if (close < 0) {
-                break;
+                throw new CSSSyntaxException("Missing '}' for CSS rule: " + stripped.substring(pos, open).trim());
+            }
+            if (stripped.indexOf('{', open + 1) > -1 && stripped.indexOf('{', open + 1) < close) {
+                throw new CSSSyntaxException("Nested '{' is not supported in CSS block: " + stripped.substring(pos, open).trim());
             }
 
             String selectors = stripped.substring(pos, open).trim();
             if (selectors.startsWith("@constants")) {
                 pos = close + 1;
                 continue;
+            }
+            if (selectors.length() == 0) {
+                throw new CSSSyntaxException("Missing selector before '{'");
             }
 
             String body = stripped.substring(open + 1, close).trim();
@@ -333,7 +538,7 @@ public class CSSThemeCompiler {
             for (String selectorEntry : selectorsList) {
                 String selector = selectorEntry.trim();
                 if (selector.length() == 0) {
-                    continue;
+                    throw new CSSSyntaxException("Empty selector in selector list: " + selectors);
                 }
                 Rule rule = new Rule();
                 rule.selector = selector;
@@ -353,12 +558,17 @@ public class CSSThemeCompiler {
             char c = css.charAt(i);
             if (c == '/' && i + 1 < css.length() && css.charAt(i + 1) == '*') {
                 i += 2;
+                boolean closed = false;
                 while (i + 1 < css.length()) {
                     if (css.charAt(i) == '*' && css.charAt(i + 1) == '/') {
                         i += 2;
+                        closed = true;
                         break;
                     }
                     i++;
+                }
+                if (!closed) {
+                    throw new CSSSyntaxException("Unterminated CSS comment");
                 }
                 continue;
             }
@@ -372,13 +582,20 @@ public class CSSThemeCompiler {
         ArrayList<Declaration> out = new ArrayList<Declaration>();
         String[] segments = splitOnChar(body, ';');
         for (String line : segments) {
-            int colon = line.indexOf(':');
-            if (colon <= 0) {
+            String trimmed = line.trim();
+            if (trimmed.length() == 0) {
                 continue;
             }
+            int colon = trimmed.indexOf(':');
+            if (colon <= 0 || colon == trimmed.length() - 1) {
+                throw new CSSSyntaxException("Malformed declaration: " + trimmed);
+            }
             Declaration dec = new Declaration();
-            dec.property = line.substring(0, colon).trim().toLowerCase();
-            dec.value = line.substring(colon + 1).trim();
+            dec.property = trimmed.substring(0, colon).trim().toLowerCase();
+            dec.value = trimmed.substring(colon + 1).trim();
+            if (dec.property.length() == 0 || dec.value.length() == 0) {
+                throw new CSSSyntaxException("Malformed declaration: " + trimmed);
+            }
             out.add(dec);
         }
         return out.toArray(new Declaration[out.size()]);
@@ -396,6 +613,25 @@ public class CSSThemeCompiler {
         }
         out.add(input.substring(start));
         return out.toArray(new String[out.size()]);
+    }
+
+    private String[] splitOnComma(String input) {
+        ArrayList<String> parts = new ArrayList<String>();
+        int start = 0;
+        for (int i = 0; i < input.length(); i++) {
+            if (input.charAt(i) == ',') {
+                String token = input.substring(start, i).trim();
+                if (token.length() > 0) {
+                    parts.add(token);
+                }
+                start = i + 1;
+            }
+        }
+        String tail = input.substring(start).trim();
+        if (tail.length() > 0) {
+            parts.add(tail);
+        }
+        return parts.toArray(new String[parts.size()]);
     }
 
     private String[] splitOnWhitespace(String input) {

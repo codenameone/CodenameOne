@@ -19,6 +19,22 @@ import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
     private static final String CN1_PLUGIN_VERSION = "7.0.227";
+    private static final String PREVIEW_BUTTON_SELECTOR =
+            "Button, InitializrLiveButtonDarkClean, "
+                    + "InitializrLiveButtonLightTealRound, InitializrLiveButtonLightTealSquare, "
+                    + "InitializrLiveButtonDarkTealRound, InitializrLiveButtonDarkTealSquare, "
+                    + "InitializrLiveButtonLightBlueRound, InitializrLiveButtonLightBlueSquare, "
+                    + "InitializrLiveButtonDarkBlueRound, InitializrLiveButtonDarkBlueSquare, "
+                    + "InitializrLiveButtonLightOrangeRound, InitializrLiveButtonLightOrangeSquare, "
+                    + "InitializrLiveButtonDarkOrangeRound, InitializrLiveButtonDarkOrangeSquare";
+    private static final String PREVIEW_BUTTON_PRESSED_SELECTOR =
+            "Button.pressed, InitializrLiveButtonDarkClean.pressed, "
+                    + "InitializrLiveButtonLightTealRound.pressed, InitializrLiveButtonLightTealSquare.pressed, "
+                    + "InitializrLiveButtonDarkTealRound.pressed, InitializrLiveButtonDarkTealSquare.pressed, "
+                    + "InitializrLiveButtonLightBlueRound.pressed, InitializrLiveButtonLightBlueSquare.pressed, "
+                    + "InitializrLiveButtonDarkBlueRound.pressed, InitializrLiveButtonDarkBlueSquare.pressed, "
+                    + "InitializrLiveButtonLightOrangeRound.pressed, InitializrLiveButtonLightOrangeSquare.pressed, "
+                    + "InitializrLiveButtonDarkOrangeRound.pressed, InitializrLiveButtonDarkOrangeSquare.pressed";
     private static final String GENERATED_GITIGNORE =
             "**/target/\n" +
             ".idea/\n" +
@@ -185,7 +201,7 @@ public class GeneratorModel {
             content = injectLocalizationBootstrap(targetPath, content);
         }
         if (isBareTemplate() && "common/src/main/css/theme.css".equals(targetPath)) {
-            content += buildThemeOverrides();
+            content += buildThemeCss();
         }
         if ("common/pom.xml".equals(targetPath)) {
             content = applyJavaVersionToPom(content);
@@ -469,13 +485,19 @@ public class GeneratorModel {
                 .append("Open the project folder in VS Code and make sure Java + Maven extensions are installed.\n\n");
     }
 
-    private String buildThemeOverrides() {
-        if (isDefaultBarebonesOptions()) {
+    public static String buildThemeOverrides(ProjectOptions options) {
+        ProjectOptions effective = options == null ? ProjectOptions.defaults() : options;
+        String customCss = normalizeCustomCss(effective.customThemeCss);
+        boolean hasCustomCss = customCss.length() > 0;
+        if (isDefaultBarebonesOptions(effective) && !hasCustomCss) {
             return "";
         }
-        StringBuilder out = new StringBuilder("\n\n/* Initializr Theme Overrides */\n");
+        StringBuilder out = new StringBuilder();
+        if (!isDefaultBarebonesOptions(effective)) {
+            out.append("\n\n/* Initializr Theme Overrides */\n");
+        }
 
-        if (options.themeMode == ProjectOptions.ThemeMode.DARK) {
+        if (effective.themeMode == ProjectOptions.ThemeMode.DARK) {
             out.append("Form {\n")
                     .append("    background-color: #0f172a;\n")
                     .append("    color: #e2e8f0;\n")
@@ -491,7 +513,7 @@ public class GeneratorModel {
                     .append("    color: #e2e8f0;\n")
                     .append("}\n");
 
-            if (options.accent == ProjectOptions.Accent.DEFAULT) {
+            if (effective.accent == ProjectOptions.Accent.DEFAULT) {
                 out.append("Button {\n")
                         .append("    color: #e2e8f0;\n")
                         .append("    background-color: #1f2937;\n")
@@ -502,16 +524,19 @@ public class GeneratorModel {
                         .append("    background-color: #334155;\n")
                         .append("    border: 1px solid #64748b;\n")
                         .append("}\n");
+                appendCustomCss(out, customCss);
                 return out.toString();
             }
-        } else if (options.accent == ProjectOptions.Accent.DEFAULT) {
-            // Light + Clean intentionally inherits template defaults (rounded ignored).
-            return "";
+        } else if (effective.accent == ProjectOptions.Accent.DEFAULT) {
+            // Light + Clean intentionally inherits template defaults (rounded ignored) unless custom CSS is provided.
+            out.setLength(0);
+            appendCustomCss(out, customCss);
+            return out.toString();
         }
 
-        int accent = resolveAccentColor();
+        int accent = resolveAccentColor(effective);
         int accentPressed = darkenColor(accent, 0.22f);
-        String buttonRadius = options.roundedButtons ? "3mm" : "0";
+        String buttonRadius = effective.roundedButtons ? "3mm" : "0";
         out.append("Button {\n")
                 .append("    background-color: ").append(toCssColor(accent)).append(";\n")
                 .append("    color: #ffffff;\n")
@@ -524,15 +549,104 @@ public class GeneratorModel {
                 .append("    color: #ffffff;\n")
                 .append("    border-radius: ").append(buttonRadius).append(";\n")
                 .append("}\n");
+        appendCustomCss(out, customCss);
         return out.toString();
     }
 
-    private boolean isDefaultBarebonesOptions() {
+    private static String normalizeCustomCss(String css) {
+        if (css == null) {
+            return "";
+        }
+        String trimmed = css.trim();
+        if (trimmed.length() == 0) {
+            return "";
+        }
+        return normalizeCustomCssForCompiler(trimmed);
+    }
+
+    public static String normalizeCustomCssForCompiler(String css) {
+        String out = css;
+        out = expandPreviewButtonAliases(out);
+        out = replaceKnownNamedColors(out);
+        out = addAlignFallback(out);
+        return out;
+    }
+
+    private static String expandPreviewButtonAliases(String css) {
+        String out = css;
+        out = StringUtil.replaceAll(out, "Button.pressed {", PREVIEW_BUTTON_PRESSED_SELECTOR + " {");
+        out = StringUtil.replaceAll(out, "Button.pressed{", PREVIEW_BUTTON_PRESSED_SELECTOR + "{");
+        out = StringUtil.replaceAll(out, "Button {", PREVIEW_BUTTON_SELECTOR + " {");
+        out = StringUtil.replaceAll(out, "Button{", PREVIEW_BUTTON_SELECTOR + "{");
+        return out;
+    }
+
+    private static String replaceKnownNamedColors(String css) {
+        String out = css;
+        out = replaceCssColorValue(out, "pink", "#ffc0cb");
+        out = replaceCssColorValue(out, "orange", "#ffa500");
+        out = replaceCssColorValue(out, "purple", "#800080");
+        out = replaceCssColorValue(out, "yellow", "#ffff00");
+        out = replaceCssColorValue(out, "gray", "#808080");
+        out = replaceCssColorValue(out, "grey", "#808080");
+        return out;
+    }
+
+    private static String replaceCssColorValue(String css, String namedColor, String hexColor) {
+        String out = css;
+        out = StringUtil.replaceAll(out, ": " + namedColor + ";", ": " + hexColor + ";");
+        out = StringUtil.replaceAll(out, ":" + namedColor + ";", ":" + hexColor + ";");
+        out = StringUtil.replaceAll(out, ": " + namedColor + " ;", ": " + hexColor + " ;");
+        out = StringUtil.replaceAll(out, ":" + namedColor + " ;", ":" + hexColor + " ;");
+        out = StringUtil.replaceAll(out, ": " + namedColor.toUpperCase() + ";", ": " + hexColor + ";");
+        out = StringUtil.replaceAll(out, ":" + namedColor.toUpperCase() + ";", ":" + hexColor + ";");
+        return out;
+    }
+
+    private static String addAlignFallback(String css) {
+        String out = css;
+        int searchFrom = 0;
+        while (searchFrom < out.length()) {
+            int idx = indexOfIgnoreCase(out, "text-align", searchFrom);
+            if (idx < 0) {
+                break;
+            }
+            int colon = out.indexOf(':', idx);
+            if (colon < 0) {
+                break;
+            }
+            int semi = out.indexOf(';', colon);
+            if (semi < 0) {
+                break;
+            }
+            String value = out.substring(colon + 1, semi).trim();
+            String fallback = "\n    align: " + value + ";";
+            out = out.substring(0, semi + 1) + fallback + out.substring(semi + 1);
+            searchFrom = semi + fallback.length() + 1;
+        }
+        return out;
+    }
+
+    private static int indexOfIgnoreCase(String text, String needle, int fromIndex) {
+        String lowerText = text.toLowerCase();
+        return lowerText.indexOf(needle.toLowerCase(), fromIndex);
+    }
+
+    private static void appendCustomCss(StringBuilder out, String customCss) {
+        if (customCss.length() == 0) {
+            return;
+        }
+        out.append("\n/* Initializr Appended Custom CSS */\n")
+                .append(customCss)
+                .append('\n');
+    }
+
+    private static boolean isDefaultBarebonesOptions(ProjectOptions options) {
         return options.themeMode == ProjectOptions.ThemeMode.LIGHT
                 && options.accent == ProjectOptions.Accent.DEFAULT;
     }
 
-    private int resolveAccentColor() {
+    private static int resolveAccentColor(ProjectOptions options) {
         if (options.accent == ProjectOptions.Accent.DEFAULT) {
             return 0x0f766e;
         }
@@ -543,6 +657,11 @@ public class GeneratorModel {
             return 0xea580c;
         }
         return 0x0f766e;
+    }
+
+
+    private String buildThemeCss() {
+        return buildThemeOverrides(options);
     }
 
     private static String toCssColor(int color) {

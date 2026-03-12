@@ -6,6 +6,7 @@ import com.codename1.initializr.model.ProjectOptions.PreviewLanguage;
 import com.codename1.initializr.model.Template;
 import com.codename1.io.Log;
 import com.codename1.io.Properties;
+import com.codename1.ui.css.CSSThemeCompiler;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -13,10 +14,10 @@ import com.codename1.ui.Dialog;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.InterFormContainer;
-import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.MutableResource;
 import com.codename1.ui.util.Resources;
 
 import java.io.InputStream;
@@ -28,19 +29,17 @@ public class TemplatePreviewPanel {
     private final Container root;
     private final Container previewHolder;
     private final ImageViewer staticPreview;
-    private final Label staticPreviewFallback;
     private InterFormContainer liveFormPreview;
 
     private Template template;
     private ProjectOptions options = ProjectOptions.defaults();
+    private Form lastLiveForm;
+    private Button lastLiveHelloButton;
 
     public TemplatePreviewPanel(Template template) {
         this.template = template;
 
         staticPreview = new ImageViewer();
-        staticPreviewFallback = new Label("Preview unavailable");
-        staticPreviewFallback.setUIID("InitializrTip");
-
         previewHolder = new Container(new BorderLayout());
         previewHolder.setUIID("InitializrPreviewHolder");
 
@@ -67,8 +66,9 @@ public class TemplatePreviewPanel {
     public void showUpdatedLivePreview() {
         if (template == Template.BAREBONES || template == Template.KOTLIN) {
             Form liveForm = createBarebonesPreviewForm(options);
-            liveFormPreview = new InterFormContainer(liveForm);
-            liveFormPreview.setUIID("InitializrLiveFrame");
+            InterFormContainer next = new InterFormContainer(liveForm);
+            next.setUIID("InitializrLiveFrame");
+            liveFormPreview = next;
             previewHolder.removeAll();
             previewHolder.add(BorderLayout.CENTER, liveFormPreview);
             previewHolder.revalidate();
@@ -76,16 +76,29 @@ public class TemplatePreviewPanel {
     }
 
     private Form createBarebonesPreviewForm(ProjectOptions options) {
+        restoreThemeDefaults();
         installBundle(options);
         Form form = new Form("Hi World", BoxLayout.y());
         Button helloButton = new Button("Hello World");
+        helloButton.setName("previewHelloButton");
         helloButton.setUIID("Button");
         helloButton.addActionListener(e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
         form.add(helloButton);
         form.getToolbar().addMaterialCommandToSideMenu("Hello Command",
                 FontImage.MATERIAL_CHECK, 4, e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
         applyLivePreviewOptions(form, helloButton, null, options);
+        applyCustomCssToPreview(form, options.customThemeCss);
+        lastLiveForm = form;
+        lastLiveHelloButton = helloButton;
         return form;
+    }
+
+    Form getLastLiveFormForTesting() {
+        return lastLiveForm;
+    }
+
+    Button getLastLiveHelloButtonForTesting() {
+        return lastLiveHelloButton;
     }
 
     private void installBundle(ProjectOptions options) {
@@ -152,15 +165,61 @@ public class TemplatePreviewPanel {
         }
     }
 
+    private void applyCustomCssToPreview(Form form, String rawCustomCss) {
+        String customCss = normalizeCustomCss(rawCustomCss);
+        if (customCss.length() == 0) {
+            form.refreshTheme();
+            return;
+        }
+        String wrappedCustomCss = "\n/* Initializr Appended Custom CSS */\n" + customCss + "\n";
+        try {
+            CSSThemeCompiler compiler = new CSSThemeCompiler();
+            MutableResource resource = new MutableResource();
+            compiler.compile(wrappedCustomCss, resource, "InitializrLiveThemeCustom");
+            Hashtable customTheme = resource.getTheme("InitializrLiveThemeCustom");
+            if (customTheme != null && !customTheme.isEmpty()) {
+                UIManager.getInstance().addThemeProps(customTheme);
+            }
+            form.refreshTheme();
+        } catch (RuntimeException err) {
+            throw new IllegalArgumentException(err.getMessage(), err);
+        }
+    }
+
+    private String normalizeCustomCss(String css) {
+        if (css == null) {
+            return "";
+        }
+        String trimmed = css.trim();
+        if (trimmed.length() == 0) {
+            return "";
+        }
+        return com.codename1.initializr.model.GeneratorModel.normalizeCustomCssForCompiler(trimmed);
+    }
+
+    private void restoreThemeDefaults() {
+        Resources resources = Resources.getGlobalResources();
+        if (resources == null) {
+            return;
+        }
+        String[] names = resources.getThemeResourceNames();
+        if (names == null || names.length == 0) {
+            return;
+        }
+        UIManager.getInstance().setThemeProps(resources.getTheme(names[0]));
+    }
+
     private void updateMode() {
-        previewHolder.removeAll();
         if (template == Template.BAREBONES || template == Template.KOTLIN) {
             Form liveForm = createBarebonesPreviewForm(options);
-            liveFormPreview = new InterFormContainer(liveForm);
-            liveFormPreview.setUIID("InitializrLiveFrame");
+            InterFormContainer next = new InterFormContainer(liveForm);
+            next.setUIID("InitializrLiveFrame");
+            liveFormPreview = next;
+            previewHolder.removeAll();
             previewHolder.add(BorderLayout.CENTER, liveFormPreview);
         } else {
             staticPreview.setImage(Resources.getGlobalResources().getImage(template.IMAGE_NAME));
+            previewHolder.removeAll();
             previewHolder.add(BorderLayout.CENTER, staticPreview);
         }
         previewHolder.revalidate();

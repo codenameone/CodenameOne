@@ -65,16 +65,24 @@ public final class ProjectOptions {
     public final boolean includeLocalizationBundles;
     public final PreviewLanguage previewLanguage;
     public final JavaVersion javaVersion;
+    public final String customThemeCss;
 
     public ProjectOptions(ThemeMode themeMode, Accent accent, boolean roundedButtons,
                           boolean includeLocalizationBundles, PreviewLanguage previewLanguage,
                           JavaVersion javaVersion) {
+        this(themeMode, accent, roundedButtons, includeLocalizationBundles, previewLanguage, javaVersion, null);
+    }
+
+    public ProjectOptions(ThemeMode themeMode, Accent accent, boolean roundedButtons,
+                          boolean includeLocalizationBundles, PreviewLanguage previewLanguage,
+                          JavaVersion javaVersion, String customThemeCss) {
         this.themeMode = themeMode;
         this.accent = accent;
         this.roundedButtons = roundedButtons;
         this.includeLocalizationBundles = includeLocalizationBundles;
         this.previewLanguage = previewLanguage == null ? PreviewLanguage.ENGLISH : previewLanguage;
         this.javaVersion = javaVersion == null ? JavaVersion.JAVA_8 : javaVersion;
+        this.customThemeCss = customThemeCss;
     }
 
     public static ProjectOptions defaults() {
