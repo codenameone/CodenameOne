@@ -80,6 +80,22 @@ public class InitializrThemeInteractionTest extends AbstractTest {
                 "Named color 'pink' should normalize and apply in preview");
         assertEqual(Component.CENTER, pinkCenteredHello.getUnselectedStyle().getAlignment(),
                 "text-align: center should apply in preview");
+
+        clickByLabel("DARK");
+        clickByLabel("TEAL");
+        Button pinkDarkTealHello = getPreviewHelloButton();
+        assertEqual("InitializrLiveButtonDarkTealRound", pinkDarkTealHello.getUIID(),
+                "Mode/accent toggles should still update UIID after pink custom CSS");
+        assertEqual(0xffc0cb, pinkDarkTealHello.getUnselectedStyle().getFgColor(),
+                "Button selector custom color should apply even in dark/teal mode");
+        assertEqual(Component.CENTER, pinkDarkTealHello.getUnselectedStyle().getAlignment(),
+                "Button selector custom alignment should apply even in dark/teal mode");
+
+        clickByLabel("LIGHT");
+        clickByLabel("CLEAN");
+        Button pinkBackToCleanHello = getPreviewHelloButton();
+        assertEqual(0xffc0cb, pinkBackToCleanHello.getUnselectedStyle().getFgColor(),
+                "Button selector custom color should still apply after returning to clean mode");
         return true;
     }
 

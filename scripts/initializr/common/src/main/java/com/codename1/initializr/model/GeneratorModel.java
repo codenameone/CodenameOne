@@ -19,6 +19,22 @@ import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
     private static final String CN1_PLUGIN_VERSION = "7.0.227";
+    private static final String PREVIEW_BUTTON_SELECTOR =
+            "Button, InitializrLiveButtonDarkClean, "
+                    + "InitializrLiveButtonLightTealRound, InitializrLiveButtonLightTealSquare, "
+                    + "InitializrLiveButtonDarkTealRound, InitializrLiveButtonDarkTealSquare, "
+                    + "InitializrLiveButtonLightBlueRound, InitializrLiveButtonLightBlueSquare, "
+                    + "InitializrLiveButtonDarkBlueRound, InitializrLiveButtonDarkBlueSquare, "
+                    + "InitializrLiveButtonLightOrangeRound, InitializrLiveButtonLightOrangeSquare, "
+                    + "InitializrLiveButtonDarkOrangeRound, InitializrLiveButtonDarkOrangeSquare";
+    private static final String PREVIEW_BUTTON_PRESSED_SELECTOR =
+            "Button.pressed, InitializrLiveButtonDarkClean.pressed, "
+                    + "InitializrLiveButtonLightTealRound.pressed, InitializrLiveButtonLightTealSquare.pressed, "
+                    + "InitializrLiveButtonDarkTealRound.pressed, InitializrLiveButtonDarkTealSquare.pressed, "
+                    + "InitializrLiveButtonLightBlueRound.pressed, InitializrLiveButtonLightBlueSquare.pressed, "
+                    + "InitializrLiveButtonDarkBlueRound.pressed, InitializrLiveButtonDarkBlueSquare.pressed, "
+                    + "InitializrLiveButtonLightOrangeRound.pressed, InitializrLiveButtonLightOrangeSquare.pressed, "
+                    + "InitializrLiveButtonDarkOrangeRound.pressed, InitializrLiveButtonDarkOrangeSquare.pressed";
     private static final String GENERATED_GITIGNORE =
             "**/target/\n" +
             ".idea/\n" +
@@ -550,8 +566,18 @@ public class GeneratorModel {
 
     public static String normalizeCustomCssForCompiler(String css) {
         String out = css;
+        out = expandPreviewButtonAliases(out);
         out = replaceKnownNamedColors(out);
         out = addAlignFallback(out);
+        return out;
+    }
+
+    private static String expandPreviewButtonAliases(String css) {
+        String out = css;
+        out = StringUtil.replaceAll(out, "Button.pressed {", PREVIEW_BUTTON_PRESSED_SELECTOR + " {");
+        out = StringUtil.replaceAll(out, "Button.pressed{", PREVIEW_BUTTON_PRESSED_SELECTOR + "{");
+        out = StringUtil.replaceAll(out, "Button {", PREVIEW_BUTTON_SELECTOR + " {");
+        out = StringUtil.replaceAll(out, "Button{", PREVIEW_BUTTON_SELECTOR + "{");
         return out;
     }
 
