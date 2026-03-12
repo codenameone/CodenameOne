@@ -191,7 +191,10 @@ public class TemplatePreviewPanel {
             return "";
         }
         String trimmed = css.trim();
-        return trimmed.length() == 0 ? "" : trimmed;
+        if (trimmed.length() == 0) {
+            return "";
+        }
+        return com.codename1.initializr.model.GeneratorModel.normalizeCustomCssForCompiler(trimmed);
     }
 
     private void restoreThemeDefaults() {

@@ -71,6 +71,15 @@ public class InitializrThemeInteractionTest extends AbstractTest {
         assertNotNull(lightOrangeHello, "Preview button should exist after switching back with custom CSS");
         assertEqual("InitializrLiveButtonLightOrangeRound", lightOrangeHello.getUIID(),
                 "Accent toggles should keep working after custom CSS is set");
+
+        setText("appendCustomCssEditor", "Button { color: pink; text-align: center; }");
+        waitFor(100);
+        clickByLabel("CLEAN");
+        Button pinkCenteredHello = getPreviewHelloButton();
+        assertEqual(0xffc0cb, pinkCenteredHello.getUnselectedStyle().getFgColor(),
+                "Named color 'pink' should normalize and apply in preview");
+        assertEqual(Component.CENTER, pinkCenteredHello.getUnselectedStyle().getAlignment(),
+                "text-align: center should apply in preview");
         return true;
     }
 

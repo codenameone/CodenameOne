@@ -542,7 +542,68 @@ public class GeneratorModel {
             return "";
         }
         String trimmed = css.trim();
-        return trimmed.length() == 0 ? "" : trimmed;
+        if (trimmed.length() == 0) {
+            return "";
+        }
+        return normalizeCustomCssForCompiler(trimmed);
+    }
+
+    public static String normalizeCustomCssForCompiler(String css) {
+        String out = css;
+        out = replaceKnownNamedColors(out);
+        out = addAlignFallback(out);
+        return out;
+    }
+
+    private static String replaceKnownNamedColors(String css) {
+        String out = css;
+        out = replaceCssColorValue(out, "pink", "#ffc0cb");
+        out = replaceCssColorValue(out, "orange", "#ffa500");
+        out = replaceCssColorValue(out, "purple", "#800080");
+        out = replaceCssColorValue(out, "yellow", "#ffff00");
+        out = replaceCssColorValue(out, "gray", "#808080");
+        out = replaceCssColorValue(out, "grey", "#808080");
+        return out;
+    }
+
+    private static String replaceCssColorValue(String css, String namedColor, String hexColor) {
+        String out = css;
+        out = StringUtil.replaceAll(out, ": " + namedColor + ";", ": " + hexColor + ";");
+        out = StringUtil.replaceAll(out, ":" + namedColor + ";", ":" + hexColor + ";");
+        out = StringUtil.replaceAll(out, ": " + namedColor + " ;", ": " + hexColor + " ;");
+        out = StringUtil.replaceAll(out, ":" + namedColor + " ;", ":" + hexColor + " ;");
+        out = StringUtil.replaceAll(out, ": " + namedColor.toUpperCase() + ";", ": " + hexColor + ";");
+        out = StringUtil.replaceAll(out, ":" + namedColor.toUpperCase() + ";", ":" + hexColor + ";");
+        return out;
+    }
+
+    private static String addAlignFallback(String css) {
+        String out = css;
+        int searchFrom = 0;
+        while (searchFrom < out.length()) {
+            int idx = indexOfIgnoreCase(out, "text-align", searchFrom);
+            if (idx < 0) {
+                break;
+            }
+            int colon = out.indexOf(':', idx);
+            if (colon < 0) {
+                break;
+            }
+            int semi = out.indexOf(';', colon);
+            if (semi < 0) {
+                break;
+            }
+            String value = out.substring(colon + 1, semi).trim();
+            String fallback = "\n    align: " + value + ";";
+            out = out.substring(0, semi + 1) + fallback + out.substring(semi + 1);
+            searchFrom = semi + fallback.length() + 1;
+        }
+        return out;
+    }
+
+    private static int indexOfIgnoreCase(String text, String needle, int fromIndex) {
+        String lowerText = text.toLowerCase();
+        return lowerText.indexOf(needle.toLowerCase(), fromIndex);
     }
 
     private static void appendCustomCss(StringBuilder out, String customCss) {
