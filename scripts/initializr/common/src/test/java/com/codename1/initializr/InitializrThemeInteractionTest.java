@@ -1,0 +1,71 @@
+package com.codename1.initializr;
+
+import com.codename1.testing.AbstractTest;
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+
+public class InitializrThemeInteractionTest extends AbstractTest {
+
+    @Override
+    public boolean shouldExecuteOnEDT() {
+        return true;
+    }
+
+    @Override
+    public boolean runTest() throws Exception {
+        new Initializr().runApp();
+        Form current = Display.getInstance().getCurrent();
+        assertNotNull(current, "Initializr should show a form");
+
+        Button initialHello = getPreviewHelloButton();
+        assertNotNull(initialHello, "Preview should include Hello World button");
+        assertEqual("Button", initialHello.getUIID(), "Default preview should start in clean light mode");
+
+        clickByLabel("DARK");
+        Button darkHello = getPreviewHelloButton();
+        assertNotNull(darkHello, "Preview button should still exist after switching to dark mode");
+        assertEqual("InitializrLiveButtonDarkClean", darkHello.getUIID(), "Dark mode should update preview button UIID");
+
+        clickByLabel("TEAL");
+        Button darkTealHello = getPreviewHelloButton();
+        assertNotNull(darkTealHello, "Preview button should still exist after switching accent");
+        assertEqual("InitializrLiveButtonDarkTealRound", darkTealHello.getUIID(), "Teal accent should update preview button UIID");
+
+        clickByLabel("LIGHT");
+        Button lightTealHello = getPreviewHelloButton();
+        assertNotNull(lightTealHello, "Preview button should still exist after switching back to light mode");
+        assertEqual("InitializrLiveButtonLightTealRound", lightTealHello.getUIID(), "Light mode should update preview button UIID");
+
+        setText("appendCustomCssEditor", "Button { border-radius: 0; }");
+        waitFor(100);
+
+        clickByLabel("DARK");
+        clickByLabel("BLUE");
+        Button darkBlueHello = getPreviewHelloButton();
+        assertNotNull(darkBlueHello, "Preview button should exist after applying custom CSS and toggling");
+        assertEqual("InitializrLiveButtonDarkBlueRound", darkBlueHello.getUIID(),
+                "Mode/accent toggles should still update preview with custom CSS");
+
+        clickByLabel("LIGHT");
+        clickByLabel("ORANGE");
+        Button lightOrangeHello = getPreviewHelloButton();
+        assertNotNull(lightOrangeHello, "Preview button should exist after switching back with custom CSS");
+        assertEqual("InitializrLiveButtonLightOrangeRound", lightOrangeHello.getUIID(),
+                "Accent toggles should keep working after custom CSS is set");
+        return true;
+    }
+
+    private void clickByLabel(String text) {
+        clickButtonByLabel(text);
+        waitFor(50);
+    }
+
+    private Button getPreviewHelloButton() {
+        Component component = findByName("previewHelloButton");
+        assertNotNull(component, "Unable to find preview hello button");
+        assertTrue(component instanceof Button, "previewHelloButton should be a Button");
+        return (Button) component;
+    }
+}

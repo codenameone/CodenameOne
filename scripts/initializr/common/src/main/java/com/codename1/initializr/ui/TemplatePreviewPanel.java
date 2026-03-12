@@ -6,7 +6,6 @@ import com.codename1.initializr.model.ProjectOptions.PreviewLanguage;
 import com.codename1.initializr.model.Template;
 import com.codename1.io.Log;
 import com.codename1.io.Properties;
-import com.codename1.ui.css.CSSThemeCompiler;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -17,7 +16,6 @@ import com.codename1.ui.InterFormContainer;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
-import com.codename1.ui.util.MutableResource;
 import com.codename1.ui.util.Resources;
 
 import java.io.InputStream;
@@ -79,13 +77,14 @@ public class TemplatePreviewPanel {
         installBundle(options);
         Form form = new Form("Hi World", BoxLayout.y());
         Button helloButton = new Button("Hello World");
+        helloButton.setName("previewHelloButton");
         helloButton.setUIID("Button");
         helloButton.addActionListener(e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
         form.add(helloButton);
         form.getToolbar().addMaterialCommandToSideMenu("Hello Command",
                 FontImage.MATERIAL_CHECK, 4, e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
         applyLivePreviewOptions(form, helloButton, null, options);
-        applyLiveCssOverrides(form, options);
+        validateCustomCss(options.customThemeCss);
         lastLiveForm = form;
         lastLiveHelloButton = helloButton;
         return form;
@@ -163,42 +162,17 @@ public class TemplatePreviewPanel {
         }
     }
 
-    private void applyLiveCssOverrides(Form form, ProjectOptions options) {
-        restoreThemeDefaults();
-        ProjectOptions baseOptions = new ProjectOptions(
-                options.themeMode,
-                options.accent,
-                options.roundedButtons,
-                options.includeLocalizationBundles,
-                options.previewLanguage,
-                options.javaVersion,
-                null
-        );
-        String generatedCss = com.codename1.initializr.model.GeneratorModel.buildThemeOverrides(baseOptions);
-        applyCompiledTheme(generatedCss, "InitializrLiveThemeBase");
-
-        String customCss = normalizeCustomCss(options.customThemeCss);
+    private void validateCustomCss(String rawCustomCss) {
+        String customCss = normalizeCustomCss(rawCustomCss);
         if (customCss.length() > 0) {
             String wrappedCustomCss = "\n/* Initializr Appended Custom CSS */\n" + customCss + "\n";
             try {
-                applyCompiledTheme(wrappedCustomCss, "InitializrLiveThemeCustom");
+                com.codename1.ui.css.CSSThemeCompiler compiler = new com.codename1.ui.css.CSSThemeCompiler();
+                com.codename1.ui.util.MutableResource resource = new com.codename1.ui.util.MutableResource();
+                compiler.compile(wrappedCustomCss, resource, "InitializrLiveThemeValidation");
             } catch (RuntimeException err) {
                 throw new IllegalArgumentException(err.getMessage(), err);
             }
-        }
-        form.refreshTheme();
-    }
-
-    private void applyCompiledTheme(String css, String themeName) {
-        if (css == null || css.trim().length() == 0) {
-            return;
-        }
-        MutableResource resource = new MutableResource();
-        CSSThemeCompiler compiler = new CSSThemeCompiler();
-        compiler.compile(css, resource, themeName);
-        Hashtable generatedTheme = resource.getTheme(themeName);
-        if (generatedTheme != null && !generatedTheme.isEmpty()) {
-            UIManager.getInstance().addThemeProps(generatedTheme);
         }
     }
 
@@ -208,18 +182,6 @@ public class TemplatePreviewPanel {
         }
         String trimmed = css.trim();
         return trimmed.length() == 0 ? "" : trimmed;
-    }
-
-    private void restoreThemeDefaults() {
-        Resources resources = Resources.getGlobalResources();
-        if (resources == null) {
-            return;
-        }
-        String[] names = resources.getThemeResourceNames();
-        if (names == null || names.length == 0) {
-            return;
-        }
-        UIManager.getInstance().setThemeProps(resources.getTheme(names[0]));
     }
 
     private void updateMode() {

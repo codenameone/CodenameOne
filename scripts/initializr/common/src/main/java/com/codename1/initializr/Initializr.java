@@ -332,6 +332,7 @@ public class Initializr extends Lifecycle {
         });
 
         TextArea cssEditor = new TextArea(customThemeCss[0], 8, 30);
+        cssEditor.setName("appendCustomCssEditor");
         cssEditor.setUIID("InitializrField");
         cssEditor.setHint("/* Appended to generated theme.css */\nButton {\n    border-radius: 0;\n}");
         cssEditor.setGrowByContent(true);
