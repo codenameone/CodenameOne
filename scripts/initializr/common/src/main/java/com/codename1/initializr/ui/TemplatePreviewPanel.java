@@ -6,6 +6,7 @@ import com.codename1.initializr.model.ProjectOptions.PreviewLanguage;
 import com.codename1.initializr.model.Template;
 import com.codename1.io.Log;
 import com.codename1.io.Properties;
+import com.codename1.ui.css.CSSThemeCompiler;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -16,6 +17,7 @@ import com.codename1.ui.InterFormContainer;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.MutableResource;
 import com.codename1.ui.util.Resources;
 
 import java.io.InputStream;
@@ -74,6 +76,7 @@ public class TemplatePreviewPanel {
     }
 
     private Form createBarebonesPreviewForm(ProjectOptions options) {
+        restoreThemeDefaults();
         installBundle(options);
         Form form = new Form("Hi World", BoxLayout.y());
         Button helloButton = new Button("Hello World");
@@ -84,7 +87,7 @@ public class TemplatePreviewPanel {
         form.getToolbar().addMaterialCommandToSideMenu("Hello Command",
                 FontImage.MATERIAL_CHECK, 4, e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
         applyLivePreviewOptions(form, helloButton, null, options);
-        validateCustomCss(options.customThemeCss);
+        applyCustomCssToPreview(form, options.customThemeCss);
         lastLiveForm = form;
         lastLiveHelloButton = helloButton;
         return form;
@@ -162,17 +165,24 @@ public class TemplatePreviewPanel {
         }
     }
 
-    private void validateCustomCss(String rawCustomCss) {
+    private void applyCustomCssToPreview(Form form, String rawCustomCss) {
         String customCss = normalizeCustomCss(rawCustomCss);
-        if (customCss.length() > 0) {
-            String wrappedCustomCss = "\n/* Initializr Appended Custom CSS */\n" + customCss + "\n";
-            try {
-                com.codename1.ui.css.CSSThemeCompiler compiler = new com.codename1.ui.css.CSSThemeCompiler();
-                com.codename1.ui.util.MutableResource resource = new com.codename1.ui.util.MutableResource();
-                compiler.compile(wrappedCustomCss, resource, "InitializrLiveThemeValidation");
-            } catch (RuntimeException err) {
-                throw new IllegalArgumentException(err.getMessage(), err);
+        if (customCss.length() == 0) {
+            form.refreshTheme();
+            return;
+        }
+        String wrappedCustomCss = "\n/* Initializr Appended Custom CSS */\n" + customCss + "\n";
+        try {
+            CSSThemeCompiler compiler = new CSSThemeCompiler();
+            MutableResource resource = new MutableResource();
+            compiler.compile(wrappedCustomCss, resource, "InitializrLiveThemeCustom");
+            Hashtable customTheme = resource.getTheme("InitializrLiveThemeCustom");
+            if (customTheme != null && !customTheme.isEmpty()) {
+                UIManager.getInstance().addThemeProps(customTheme);
             }
+            form.refreshTheme();
+        } catch (RuntimeException err) {
+            throw new IllegalArgumentException(err.getMessage(), err);
         }
     }
 
@@ -182,6 +192,18 @@ public class TemplatePreviewPanel {
         }
         String trimmed = css.trim();
         return trimmed.length() == 0 ? "" : trimmed;
+    }
+
+    private void restoreThemeDefaults() {
+        Resources resources = Resources.getGlobalResources();
+        if (resources == null) {
+            return;
+        }
+        String[] names = resources.getThemeResourceNames();
+        if (names == null || names.length == 0) {
+            return;
+        }
+        UIManager.getInstance().setThemeProps(resources.getTheme(names[0]));
     }
 
     private void updateMode() {

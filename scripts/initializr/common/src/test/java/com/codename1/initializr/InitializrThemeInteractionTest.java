@@ -38,8 +38,23 @@ public class InitializrThemeInteractionTest extends AbstractTest {
         assertNotNull(lightTealHello, "Preview button should still exist after switching back to light mode");
         assertEqual("InitializrLiveButtonLightTealRound", lightTealHello.getUIID(), "Light mode should update preview button UIID");
 
-        setText("appendCustomCssEditor", "Button { border-radius: 0; }");
+        clickByLabel("CLEAN");
+        Button cleanBeforeCustom = getPreviewHelloButton();
+        int baselineCleanBg = cleanBeforeCustom.getUnselectedStyle().getBgColor();
+        assertNotEqual(0x010203, baselineCleanBg, "Baseline clean mode color should differ from custom CSS probe color");
+
+        setText("appendCustomCssEditor",
+                "Button { background-color: #010203; color: #ffffff; }\n"
+                        + "InitializrLiveButtonDarkBlueRound { background-color: #112233; color: #ffffff; }");
         waitFor(100);
+
+        Button cleanCustomHello = getPreviewHelloButton();
+        assertNotNull(cleanCustomHello, "Preview button should exist after custom CSS in clean mode");
+        assertEqual("Button", cleanCustomHello.getUIID(), "Clean accent should map to base Button UIID");
+        assertNotEqual(baselineCleanBg, cleanCustomHello.getUnselectedStyle().getBgColor(),
+                "Custom CSS should change preview button color from baseline");
+        assertEqual(0x010203, cleanCustomHello.getUnselectedStyle().getBgColor(),
+                "Custom CSS should apply to preview button style");
 
         clickByLabel("DARK");
         clickByLabel("BLUE");
@@ -47,6 +62,8 @@ public class InitializrThemeInteractionTest extends AbstractTest {
         assertNotNull(darkBlueHello, "Preview button should exist after applying custom CSS and toggling");
         assertEqual("InitializrLiveButtonDarkBlueRound", darkBlueHello.getUIID(),
                 "Mode/accent toggles should still update preview with custom CSS");
+        assertEqual(0x112233, darkBlueHello.getUnselectedStyle().getBgColor(),
+                "Custom CSS should apply to non-clean preview UIID selectors");
 
         clickByLabel("LIGHT");
         clickByLabel("ORANGE");
