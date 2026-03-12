@@ -33,6 +33,8 @@ public class TemplatePreviewPanel {
 
     private Template template;
     private ProjectOptions options = ProjectOptions.defaults();
+    private Form lastLiveForm;
+    private Button lastLiveHelloButton;
 
     public TemplatePreviewPanel(Template template) {
         this.template = template;
@@ -83,11 +85,18 @@ public class TemplatePreviewPanel {
         form.getToolbar().addMaterialCommandToSideMenu("Hello Command",
                 FontImage.MATERIAL_CHECK, 4, e -> Dialog.show("Hello Codename One", "Welcome to Codename One", "OK", null));
         applyLivePreviewOptions(form, helloButton, null, options);
-        if (options.customThemeCss != null && options.customThemeCss.trim().length() > 0) {
-            helloButton.setUIID("Button");
-        }
         applyLiveCssOverrides(form, options);
+        lastLiveForm = form;
+        lastLiveHelloButton = helloButton;
         return form;
+    }
+
+    Form getLastLiveFormForTesting() {
+        return lastLiveForm;
+    }
+
+    Button getLastLiveHelloButtonForTesting() {
+        return lastLiveHelloButton;
     }
 
     private void installBundle(ProjectOptions options) {
