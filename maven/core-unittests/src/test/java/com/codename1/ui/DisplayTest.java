@@ -1,5 +1,6 @@
 package com.codename1.ui;
 
+import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.plaf.Style;
 import org.junit.jupiter.api.AfterEach;
@@ -119,14 +120,51 @@ public class DisplayTest extends UITestBase {
         Display display = Display.getInstance();
         Field stackField = Display.class.getDeclaredField("inputEventStackTmp");
         stackField.setAccessible(true);
+        int[] originalStack = (int[]) stackField.get(display);
         stackField.set(display, new int[]{0, 999, 999});
 
-        Method readArray = Display.class.getDeclaredMethod("readArrayStackArgument", int[].class, int.class);
-        readArray.setAccessible(true);
+        try {
+            Method readArray = Display.class.getDeclaredMethod("readArrayStackArgument", int[].class, int.class);
+            readArray.setAccessible(true);
 
-        int[] sourceStack = new int[]{2, 10, 20};
-        int[] decoded = (int[]) readArray.invoke(display, sourceStack, 0);
-        assertArrayEquals(new int[]{10, 20}, decoded);
+            int[] sourceStack = new int[]{2, 10, 20};
+            int[] decoded = (int[]) readArray.invoke(display, sourceStack, 0);
+            assertArrayEquals(new int[]{10, 20}, decoded);
+        } finally {
+            stackField.set(display, originalStack);
+        }
+    }
+
+    @FormTest
+    void testInputEventStackRemainsBoundedForPointerBurst() throws Exception {
+        Display display = Display.getInstance();
+        Field stackField = Display.class.getDeclaredField("inputEventStack");
+        stackField.setAccessible(true);
+        Field stackTmpField = Display.class.getDeclaredField("inputEventStackTmp");
+        stackTmpField.setAccessible(true);
+        Field pointerField = Display.class.getDeclaredField("inputEventStackPointer");
+        pointerField.setAccessible(true);
+        int[] originalStack = (int[]) stackField.get(display);
+        int[] originalStackTmp = (int[]) stackTmpField.get(display);
+        int originalPointer = pointerField.getInt(display);
+
+        try {
+            stackField.set(display, new int[4]);
+            stackTmpField.set(display, new int[4]);
+            pointerField.setInt(display, 0);
+
+            for (int i = 0; i < 20; i++) {
+                display.pointerPressed(new int[]{10}, new int[]{10});
+                display.pointerReleased(new int[]{10}, new int[]{10});
+            }
+
+            int[] bounded = (int[]) stackField.get(display);
+            assertEquals(4, bounded.length);
+        } finally {
+            stackField.set(display, originalStack);
+            stackTmpField.set(display, originalStackTmp);
+            pointerField.setInt(display, originalPointer);
+        }
     }
 
 }

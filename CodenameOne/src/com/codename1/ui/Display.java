@@ -1813,12 +1813,19 @@ public final class Display extends CN1Constants {
             if (this.dropEvents) {
                 return;
             }
+            if (!hasInputEventStackCapacity(2)) {
+                return;
+            }
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = code;
             inputEventStackPointer++;
             lock.notifyAll();
         }
+    }
+
+    private boolean hasInputEventStackCapacity(int additionalSlots) {
+        return inputEventStackPointer + additionalSlots < inputEventStack.length;
     }
 
     /// Checks if the control key is currently down.  Only relevant for desktop ports.
@@ -1924,6 +1931,9 @@ public final class Display extends CN1Constants {
             if (this.dropEvents) {
                 return;
             }
+            if (!hasInputEventStackCapacity(3)) {
+                return;
+            }
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = x;
@@ -1937,6 +1947,9 @@ public final class Display extends CN1Constants {
     private void addPointerEvent(int type, int[] x, int[] y) {
         synchronized (lock) {
             if (this.dropEvents) {
+                return;
+            }
+            if (!hasInputEventStackCapacity(3 + x.length + y.length)) {
                 return;
             }
             inputEventStack[inputEventStackPointer] = type;
@@ -1968,6 +1981,9 @@ public final class Display extends CN1Constants {
                     inputEventStack[lastDragOffset + 1] = y;
                     inputEventStack[lastDragOffset + 2] = (int) (System.currentTimeMillis() - displayInitTime);
                 } else {
+                    if (!hasInputEventStackCapacity(4)) {
+                        return;
+                    }
                     inputEventStack[inputEventStackPointer] = POINTER_DRAGGED;
                     inputEventStackPointer++;
                     lastDragOffset = inputEventStackPointer;
@@ -1992,6 +2008,9 @@ public final class Display extends CN1Constants {
                 return;
             }
             try {
+                if (!hasInputEventStackCapacity(4)) {
+                    return;
+                }
                 inputEventStack[inputEventStackPointer] = type;
                 inputEventStackPointer++;
                 inputEventStack[inputEventStackPointer] = x;
@@ -2118,6 +2137,9 @@ public final class Display extends CN1Constants {
 
     private void addSizeChangeEvent(int type, int w, int h) {
         synchronized (lock) {
+            if (!hasInputEventStackCapacity(3)) {
+                return;
+            }
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = w;
@@ -2154,6 +2176,9 @@ public final class Display extends CN1Constants {
 
     private void addNotifyEvent(int type) {
         synchronized (lock) {
+            if (!hasInputEventStackCapacity(1)) {
+                return;
+            }
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
             lock.notifyAll();
