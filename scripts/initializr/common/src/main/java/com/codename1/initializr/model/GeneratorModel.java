@@ -216,7 +216,7 @@ public class GeneratorModel {
             content = replaceTagValue(content, "cn1.plugin.version", CN1_PLUGIN_VERSION);
             content = replaceTagValue(content, "cn1.version", CN1_PLUGIN_VERSION);
         }
-        if ("android/pom.xml".equals(targetPath) || "ios/pom.xml".equals(targetPath)) {
+        if ("android/pom.xml".equals(targetPath) || "ios/pom.xml".equals(targetPath) || "javascript/pom.xml".equals(targetPath)) {
             content = hardenPlatformModulePomAgainstDoubleJarAttach(content);
         }
         if ("javase/pom.xml".equals(targetPath)) {
