@@ -71,10 +71,12 @@ GENERATOR_MODEL="$ROOT_DIR/scripts/initializr/common/src/main/java/com/codename1
 MATRIX_TEST="$ROOT_DIR/scripts/initializr/common/src/test/java/com/codename1/initializr/model/GeneratorModelMatrixTest.java"
 while IFS= read -r pom; do
   replace_file "$pom" "s|<cn1\\.plugin\\.version>[^<]+</cn1\\.plugin\\.version>|<cn1.plugin.version>$VERSION</cn1.plugin.version>|g;"
+  replace_file "$pom" "s|<cn1\\.version>[^<]+</cn1\\.version>|<cn1.version>$VERSION</cn1.version>|g;"
 done < <(find "$ROOT_INITIALIZR_DIR" -name pom.xml -type f)
 
 replace_file "$GENERATOR_MODEL" "s|private static final String CN1_PLUGIN_VERSION = \\\"[^\\\"]+\\\";|private static final String CN1_PLUGIN_VERSION = \\\"$VERSION\\\";|g;"
 replace_file "$MATRIX_TEST" "s|<cn1\\.plugin\\.version>[^<]+</cn1\\.plugin\\.version>|<cn1.plugin.version>$VERSION</cn1.plugin.version>|g;"
+replace_file "$MATRIX_TEST" "s|<cn1\\.version>[^<]+</cn1\\.version>|<cn1.version>$VERSION</cn1.version>|g;"
 
 
 echo "Updated Initializr Codename One versions to $VERSION"

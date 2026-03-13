@@ -18,7 +18,7 @@ import java.util.Map;
 import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
-    private static final String CN1_PLUGIN_VERSION = "7.0.227";
+    private static final String CN1_PLUGIN_VERSION = "7.0.228";
     private static final String PREVIEW_BUTTON_SELECTOR =
             "Button, InitializrLiveButtonDarkClean, "
                     + "InitializrLiveButtonLightTealRound, InitializrLiveButtonLightTealSquare, "
@@ -593,14 +593,50 @@ public class GeneratorModel {
     }
 
     private static String replaceCssColorValue(String css, String namedColor, String hexColor) {
-        String out = css;
-        out = StringUtil.replaceAll(out, ": " + namedColor + ";", ": " + hexColor + ";");
-        out = StringUtil.replaceAll(out, ":" + namedColor + ";", ":" + hexColor + ";");
-        out = StringUtil.replaceAll(out, ": " + namedColor + " ;", ": " + hexColor + " ;");
-        out = StringUtil.replaceAll(out, ":" + namedColor + " ;", ":" + hexColor + " ;");
-        out = StringUtil.replaceAll(out, ": " + namedColor.toUpperCase() + ";", ": " + hexColor + ";");
-        out = StringUtil.replaceAll(out, ":" + namedColor.toUpperCase() + ";", ":" + hexColor + ";");
-        return out;
+        StringBuilder out = new StringBuilder();
+        int from = 0;
+        while (from < css.length()) {
+            int colon = css.indexOf(':', from);
+            if (colon < 0) {
+                out.append(css.substring(from));
+                break;
+            }
+            out.append(css.substring(from, colon + 1));
+            int valueStart = colon + 1;
+            while (valueStart < css.length() && Character.isWhitespace(css.charAt(valueStart))) {
+                valueStart++;
+            }
+            int valueEnd = valueStart + namedColor.length();
+            if (matchesIgnoreCase(css, valueStart, namedColor)) {
+                int semiPos = valueEnd;
+                while (semiPos < css.length() && Character.isWhitespace(css.charAt(semiPos))) {
+                    semiPos++;
+                }
+                if (semiPos < css.length() && css.charAt(semiPos) == ';') {
+                    out.append(css.substring(colon + 1, valueStart));
+                    out.append(hexColor);
+                    out.append(css.substring(valueEnd, semiPos + 1));
+                    from = semiPos + 1;
+                    continue;
+                }
+            }
+            from = colon + 1;
+        }
+        return out.toString();
+    }
+
+    private static boolean matchesIgnoreCase(String text, int start, String token) {
+        if (start < 0 || start + token.length() > text.length()) {
+            return false;
+        }
+        for (int i = 0; i < token.length(); i++) {
+            char a = Character.toLowerCase(text.charAt(start + i));
+            char b = Character.toLowerCase(token.charAt(i));
+            if (a != b) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static String addAlignFallback(String css) {
