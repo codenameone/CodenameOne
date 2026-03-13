@@ -96,6 +96,27 @@ public class InitializrThemeInteractionTest extends AbstractTest {
         Button pinkBackToCleanHello = getPreviewHelloButton();
         assertEqual(0xffc0cb, pinkBackToCleanHello.getUnselectedStyle().getFgColor(),
                 "Button selector custom color should still apply after returning to clean mode");
+
+        // Invalid intermediate CSS edits should not freeze theme/accent toggles in preview.
+        setText("appendCustomCssEditor", "Button { color: pink;");
+        waitFor(100);
+        clickByLabel("DARK");
+        clickByLabel("ORANGE");
+        Button fallbackDarkOrangeHello = getPreviewHelloButton();
+        assertEqual("InitializrLiveButtonDarkOrangeRound", fallbackDarkOrangeHello.getUIID(),
+                "Theme toggles should continue updating while CSS is temporarily invalid");
+        assertEqual(0xffc0cb, fallbackDarkOrangeHello.getUnselectedStyle().getFgColor(),
+                "Preview should retain last valid custom CSS while invalid CSS is being edited");
+
+        setText("appendCustomCssEditor", "Button { color: orange; }");
+        waitFor(100);
+        clickByLabel("LIGHT");
+        clickByLabel("TEAL");
+        Button recoveredLightTealHello = getPreviewHelloButton();
+        assertEqual("InitializrLiveButtonLightTealRound", recoveredLightTealHello.getUIID(),
+                "Theme toggles should still work after recovering from invalid CSS");
+        assertEqual(0xffa500, recoveredLightTealHello.getUnselectedStyle().getFgColor(),
+                "Recovered valid CSS should apply after invalid intermediate edit");
         return true;
     }
 

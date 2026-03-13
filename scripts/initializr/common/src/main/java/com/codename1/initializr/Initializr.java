@@ -25,6 +25,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
@@ -53,6 +54,8 @@ public class Initializr extends Lifecycle {
         final ProjectOptions.PreviewLanguage[] previewLanguage = new ProjectOptions.PreviewLanguage[]{ProjectOptions.PreviewLanguage.ENGLISH};
         final ProjectOptions.JavaVersion[] javaVersion = new ProjectOptions.JavaVersion[]{ProjectOptions.JavaVersion.JAVA_8};
         final String[] customThemeCss = new String[]{""};
+        final String[] lastValidCustomThemeCss = new String[]{""};
+        final TextArea[] customCssEditorRef = new TextArea[1];
         final RadioButton[] templateButtons = new RadioButton[Template.values().length];
         final SpanLabel summaryLabel = new SpanLabel();
         final TemplatePreviewPanel previewPanel = new TemplatePreviewPanel(selectedTemplate[0]);
@@ -75,10 +78,15 @@ public class Initializr extends Lifecycle {
 
         final Runnable refresh = new Runnable() {
             public void run() {
+                String liveCustomCss = "";
+                if (customCssEditorRef[0] != null && customCssEditorRef[0].getText() != null) {
+                    liveCustomCss = customCssEditorRef[0].getText();
+                }
+                customThemeCss[0] = liveCustomCss;
                 ProjectOptions options = new ProjectOptions(
                         selectedThemeMode[0], selectedAccent[0], roundedButtons[0],
                         includeLocalizationBundles[0], previewLanguage[0], javaVersion[0],
-                        customThemeCss[0]
+                        liveCustomCss
                 );
                 customCssValid[0] = true;
                 customCssError.setText("");
@@ -87,11 +95,20 @@ public class Initializr extends Lifecycle {
                 try {
                     previewPanel.setTemplate(selectedTemplate[0]);
                     previewPanel.setOptions(options);
+                    lastValidCustomThemeCss[0] = liveCustomCss;
                 } catch (IllegalArgumentException cssErr) {
                     customCssValid[0] = false;
                     customCssError.setText("Custom CSS Error: " + cssErr.getMessage());
                     customCssError.setHidden(false);
                     customCssError.setVisible(true);
+                    // Keep the preview responsive to theme toggles while the current CSS is invalid.
+                    ProjectOptions fallbackOptions = new ProjectOptions(
+                            selectedThemeMode[0], selectedAccent[0], roundedButtons[0],
+                            includeLocalizationBundles[0], previewLanguage[0], javaVersion[0],
+                            lastValidCustomThemeCss[0]
+                    );
+                    previewPanel.setTemplate(selectedTemplate[0]);
+                    previewPanel.setOptions(fallbackOptions);
                 }
                 boolean canCustomizeTheme = supportsLivePreview(selectedTemplate[0]);
                 if (themePanelRef[0] != null) {
@@ -117,7 +134,7 @@ public class Initializr extends Lifecycle {
                 createTemplateSelector(selectedTemplate, templateButtons, refresh)
         );
         final Container idePanel = createIdeSelectorPanel(selectedIde, refresh);
-        final Container themePanel = createThemeOptionsPanel(selectedThemeMode, selectedAccent, roundedButtons, customThemeCss, customCssError, refresh);
+        final Container themePanel = createThemeOptionsPanel(selectedThemeMode, selectedAccent, roundedButtons, customThemeCss, customCssEditorRef, customCssError, refresh);
         final Container localizationPanel = createLocalizationPanel(includeLocalizationBundles, previewLanguage, refresh, previewPanel);
         final Container javaPanel = createJavaOptionsPanel(javaVersion, refresh);
         themePanelRef[0] = themePanel;
@@ -153,10 +170,14 @@ public class Initializr extends Lifecycle {
             }
             String appName = appNameField.getText() == null ? "" : appNameField.getText().trim();
             String packageName = packageField.getText() == null ? "" : packageField.getText().trim();
+            String liveCustomCss = "";
+            if (customCssEditorRef[0] != null && customCssEditorRef[0].getText() != null) {
+                liveCustomCss = customCssEditorRef[0].getText();
+            }
             ProjectOptions options = new ProjectOptions(
                     selectedThemeMode[0], selectedAccent[0], roundedButtons[0],
                     includeLocalizationBundles[0], previewLanguage[0], javaVersion[0],
-                    customThemeCss[0]
+                    liveCustomCss
             );
             GeneratorModel.create(selectedIde[0], selectedTemplate[0], appName, packageName, options).generate();
         });
@@ -281,6 +302,7 @@ public class Initializr extends Lifecycle {
                                               ProjectOptions.Accent[] selectedAccent,
                                               boolean[] roundedButtons,
                                               String[] customThemeCss,
+                                              TextArea[] customCssEditorRef,
                                               Label customCssError,
                                               Runnable onSelectionChanged) {
         Container modeRow = new Container(new GridLayout(1, 2));
@@ -336,9 +358,18 @@ public class Initializr extends Lifecycle {
         cssEditor.setUIID("InitializrField");
         cssEditor.setHint("/* Appended to generated theme.css */\nButton {\n    border-radius: 0;\n}");
         cssEditor.setGrowByContent(true);
-        cssEditor.addDataChangedListener((type, index) -> {
-            customThemeCss[0] = cssEditor.getText();
-            onSelectionChanged.run();
+        customCssEditorRef[0] = cssEditor;
+        cssEditor.addDataChangedListener((type, index) -> onSelectionChanged.run());
+        cssEditor.addActionListener(e -> onSelectionChanged.run());
+        cssEditor.addFocusListener(new FocusListener() {
+            @Override
+            public void focusGained(Component cmp) {
+            }
+
+            @Override
+            public void focusLost(Component cmp) {
+                onSelectionChanged.run();
+            }
         });
 
         return BoxLayout.encloseY(

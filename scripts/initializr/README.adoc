@@ -41,3 +41,25 @@ The project should work in IntelliJ out of the box.  No need to copy any files.
 == Help and Support
 
 See the https://www.codenameone.com[Codename One Web Site].
+
+== Running Initializr Against Local Codename One Sources
+
+To test Initializr with local (workspace) Codename One changes instead of Maven Central releases:
+
+. Build/install local Codename One Maven artifacts:
++
+[source,bash]
+----
+cd ../../maven
+mvn -DskipTests install
+----
+
+. Build Initializr with the local workspace profile:
++
+[source,bash]
+----
+cd ../scripts/initializr
+./mvnw package -Dcodename1.platform=javascript -Dcodename1.buildTarget=javascript -Dcn1.localWorkspace=true
+----
+
+This switches Initializr to `8.0-SNAPSHOT` so JavaScript builds use your local Codename One code.

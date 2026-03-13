@@ -17,6 +17,8 @@ public class TemplatePreviewPanelThemeTest extends AbstractTest {
     public boolean runTest() throws Exception {
         validateModeAndAccentUiidUpdates();
         validateThemeTogglesStillApplyWithCustomCss();
+        validateRepeatedCustomCssEditsDoNotBreakToggles();
+        validateRecoveryAfterInvalidIntermediateCss();
         return true;
     }
 
@@ -65,5 +67,62 @@ public class TemplatePreviewPanelThemeTest extends AbstractTest {
                 ProjectOptions.JavaVersion.JAVA_8,
                 customCss
         );
+    }
+
+    private void validateRepeatedCustomCssEditsDoNotBreakToggles() {
+        TemplatePreviewPanel panel = new TemplatePreviewPanel(Template.BAREBONES);
+
+        panel.setOptions(options(ProjectOptions.ThemeMode.DARK, ProjectOptions.Accent.DEFAULT, true,
+                "Button { color: pink; }"));
+        Button pinkButton = panel.getLastLiveHelloButtonForTesting();
+        assertEqual(0xffc0cb, pinkButton.getUnselectedStyle().getFgColor(),
+                "First custom CSS edit should apply pink color");
+
+        panel.setOptions(options(ProjectOptions.ThemeMode.DARK, ProjectOptions.Accent.DEFAULT, true,
+                "Button { color: orange; }"));
+        Button orangeButton = panel.getLastLiveHelloButtonForTesting();
+        assertEqual(0xffa500, orangeButton.getUnselectedStyle().getFgColor(),
+                "Second custom CSS edit should replace previous color");
+        assertEqual("InitializrLiveButtonDarkClean", orangeButton.getUIID(),
+                "Dark clean UIID should remain stable after repeated custom CSS edits");
+
+        panel.setOptions(options(ProjectOptions.ThemeMode.LIGHT, ProjectOptions.Accent.TEAL, true,
+                "Button { color: orange; }"));
+        Button lightTealButton = panel.getLastLiveHelloButtonForTesting();
+        assertEqual("InitializrLiveButtonLightTealRound", lightTealButton.getUIID(),
+                "Theme toggles should keep updating UIID after repeated CSS edits");
+        assertEqual(0xffa500, lightTealButton.getUnselectedStyle().getFgColor(),
+                "Updated custom CSS should persist across theme toggles");
+
+        panel.setOptions(options(ProjectOptions.ThemeMode.LIGHT, ProjectOptions.Accent.TEAL, true, ""));
+        Button clearedCssButton = panel.getLastLiveHelloButtonForTesting();
+        assertNotEqual(0xffa500, clearedCssButton.getUnselectedStyle().getFgColor(),
+                "Clearing custom CSS should remove previous custom fgColor");
+    }
+
+    private void validateRecoveryAfterInvalidIntermediateCss() {
+        TemplatePreviewPanel panel = new TemplatePreviewPanel(Template.BAREBONES);
+
+        panel.setOptions(options(ProjectOptions.ThemeMode.DARK, ProjectOptions.Accent.DEFAULT, true,
+                "Button { color: pink; }"));
+        Button pinkButton = panel.getLastLiveHelloButtonForTesting();
+        assertEqual(0xffc0cb, pinkButton.getUnselectedStyle().getFgColor(),
+                "Known-good CSS should apply before invalid intermediate edit");
+
+        try {
+            panel.setOptions(options(ProjectOptions.ThemeMode.DARK, ProjectOptions.Accent.DEFAULT, true,
+                    "Button { color: pink;"));
+            fail("Invalid custom CSS should fail fast");
+        } catch (IllegalArgumentException expected) {
+            // expected
+        }
+
+        panel.setOptions(options(ProjectOptions.ThemeMode.LIGHT, ProjectOptions.Accent.ORANGE, true,
+                "Button { color: orange; }"));
+        Button recoveredButton = panel.getLastLiveHelloButtonForTesting();
+        assertEqual("InitializrLiveButtonLightOrangeRound", recoveredButton.getUIID(),
+                "Preview should recover after invalid intermediate CSS edit");
+        assertEqual(0xffa500, recoveredButton.getUnselectedStyle().getFgColor(),
+                "Recovered valid CSS should apply after invalid edit");
     }
 }

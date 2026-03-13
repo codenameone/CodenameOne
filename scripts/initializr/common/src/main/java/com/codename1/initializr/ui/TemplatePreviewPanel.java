@@ -4,9 +4,9 @@ import com.codename1.components.ImageViewer;
 import com.codename1.initializr.model.ProjectOptions;
 import com.codename1.initializr.model.ProjectOptions.PreviewLanguage;
 import com.codename1.initializr.model.Template;
+import com.codename1.initializr.css.CSSThemeCompiler;
 import com.codename1.io.Log;
 import com.codename1.io.Properties;
-import com.codename1.ui.css.CSSThemeCompiler;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -54,6 +54,9 @@ public class TemplatePreviewPanel {
     }
 
     public void setTemplate(Template template) {
+        if (this.template == template) {
+            return;
+        }
         this.template = template;
         updateMode();
     }
