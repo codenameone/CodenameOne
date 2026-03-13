@@ -54,6 +54,7 @@ public class Initializr extends Lifecycle {
         final ProjectOptions.PreviewLanguage[] previewLanguage = new ProjectOptions.PreviewLanguage[]{ProjectOptions.PreviewLanguage.ENGLISH};
         final ProjectOptions.JavaVersion[] javaVersion = new ProjectOptions.JavaVersion[]{ProjectOptions.JavaVersion.JAVA_8};
         final String[] customThemeCss = new String[]{""};
+        final String[] lastValidCustomThemeCss = new String[]{""};
         final TextArea[] customCssEditorRef = new TextArea[1];
         final RadioButton[] templateButtons = new RadioButton[Template.values().length];
         final SpanLabel summaryLabel = new SpanLabel();
@@ -94,11 +95,20 @@ public class Initializr extends Lifecycle {
                 try {
                     previewPanel.setTemplate(selectedTemplate[0]);
                     previewPanel.setOptions(options);
+                    lastValidCustomThemeCss[0] = liveCustomCss;
                 } catch (IllegalArgumentException cssErr) {
                     customCssValid[0] = false;
                     customCssError.setText("Custom CSS Error: " + cssErr.getMessage());
                     customCssError.setHidden(false);
                     customCssError.setVisible(true);
+                    // Keep the preview responsive to theme toggles while the current CSS is invalid.
+                    ProjectOptions fallbackOptions = new ProjectOptions(
+                            selectedThemeMode[0], selectedAccent[0], roundedButtons[0],
+                            includeLocalizationBundles[0], previewLanguage[0], javaVersion[0],
+                            lastValidCustomThemeCss[0]
+                    );
+                    previewPanel.setTemplate(selectedTemplate[0]);
+                    previewPanel.setOptions(fallbackOptions);
                 }
                 boolean canCustomizeTheme = supportsLivePreview(selectedTemplate[0]);
                 if (themePanelRef[0] != null) {

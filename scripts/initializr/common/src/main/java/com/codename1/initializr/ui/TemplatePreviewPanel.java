@@ -54,6 +54,9 @@ public class TemplatePreviewPanel {
     }
 
     public void setTemplate(Template template) {
+        if (this.template == template) {
+            return;
+        }
         this.template = template;
         updateMode();
     }
