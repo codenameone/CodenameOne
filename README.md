@@ -1,5 +1,5 @@
 <h1 align=center>
- <img align=center width="100%" src="https://www.codenameone.com/wp-content/uploads/2021/08/CN1-Banner-Dark-Blue.jpg" />
+ <img align=center width="100%" src="https://www.codenameone.com/github/CN1-Banner-Dark-Blue.jpg" />
 </h1>
 
 ![GitHub repo size](https://img.shields.io/github/repo-size/codenameone/CodenameOne?style=flat-square)
@@ -40,7 +40,7 @@ It's a complete mobile platform featuring virtual machines, simulator, design to
 
 <br>
 
-<img align="right" src="https://www.codenameone.com/img/github/content/runs-instantly.png" height="200">
+<img align="right" src="https://www.codenameone.com/github/runs-instantly.png" height="200">
 
 ### Codename One's Simulator Runs Instantly
 
@@ -50,7 +50,7 @@ This means faster debugging cycle and faster development process!
 
 <br>
 
-<img align="left" src="https://www.codenameone.com/img/github/content/large-selection-skins.png" height="200">
+<img align="left" src="https://www.codenameone.com/github/large-selection-skins.png" height="200">
 
 ### Large Selection of Device Skins
 
@@ -62,7 +62,7 @@ You can edit and contribute skins in their own open source project [here](https:
 
 <br>
 
-<img align="right" src="https://www.codenameone.com/img/github/content/interactive-console.png" height="200">
+<img align="right" src="https://www.codenameone.com/github/interactive-console.png" height="200">
 
 ### Interactive Console
 
@@ -72,7 +72,7 @@ This lets you investigate issues and experiment without even the small overhead 
 
 <br>
 
-<img align="left" src="https://www.codenameone.com/img/github/content/live-reload.png" height="200">
+<img align="left" src="https://www.codenameone.com/github/live-reload.png" height="200">
 
 ### Live Reload
 
@@ -82,7 +82,7 @@ Note that this is often superior to the interactive console but there are limita
 
 <br>
 
-<img align="right" src="https://www.codenameone.com/img/github/content/css-live-update.png" height="200">
+<img align="right" src="https://www.codenameone.com/github/css-live-update.png" height="200">
 
 ### CSS Live Update
 
@@ -92,7 +92,7 @@ This makes the process of styling an application remarkably easy and fast.
 
 <br>
 
-<img align="left" src="https://www.codenameone.com/img/github/content/component-inspector.png" height="200">
+<img align="left" src="https://www.codenameone.com/github/component-inspector.png" height="200">
 
 ### Component Inspector
 
@@ -101,7 +101,7 @@ This tool makes it easy to find out where that extra padding is coming from or w
 
 <br>
 
-<img align="right" src="https://www.codenameone.com/img/github/content/network-monitor.png" height="200">
+<img align="right" src="https://www.codenameone.com/github/network-monitor.png" height="200">
 
 ### Network Monitor
 
@@ -109,7 +109,7 @@ See all of the network connections that your app makes using the Network Monitor
 
 <br>
 
-<img align="left" src="https://www.codenameone.com/img/github/content/record-ui-unit-tests.png" height="200">
+<img align="left" src="https://www.codenameone.com/github/record-ui-unit-tests.png" height="200">
 
 ### Record UI Unit Tests
 
@@ -131,7 +131,7 @@ On platforms that do not support Java natively, such as iOS, the app’s JVM byt
 
 #### The figure below shows the build process for each supported platform:
 
-<a href="https://www.codenameone.com/img/github/codename-one-architecture.jpg" target="_blank"><img width="70%" src="https://www.codenameone.com/img/github/codename-one-architecture.jpg"></a>
+<a href="https://www.codenameone.com/img/github/codename-one-architecture.jpg" target="_blank"><img width="70%" src="https://www.codenameone.com/github/codename-one-architecture.jpg"></a>
 
 You can click the image to enlarge or view a PDF version [here](https://www.codenameone.com/img/github/architecture.pdf).
 
@@ -253,7 +253,7 @@ Codename One maintains a fork of iKVM which is a JVM for CLR. This modified port
 
 ## Getting Help & FAQ
 
-<img align="right" src="http://codenameone.com/img/blog/new_icon.png" height="150">
+<img align="right" src="http://codenameone.com/github/new_icon.png" height="150">
 
 We provide support over at [StackOverflow when you tag using codenameone](http://stackoverflow.com/tags/codenameone), you can ask anything there and we try to be pretty responsive. [The StackOverflow link](http://stackoverflow.com/tags/codenameone) also serves as an excellent community driven FAQ since it literally maps user questions to answers.
 
