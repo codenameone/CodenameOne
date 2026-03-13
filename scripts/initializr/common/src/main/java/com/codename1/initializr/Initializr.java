@@ -25,6 +25,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
@@ -336,16 +337,39 @@ public class Initializr extends Lifecycle {
         cssEditor.setUIID("InitializrField");
         cssEditor.setHint("/* Appended to generated theme.css */\nButton {\n    border-radius: 0;\n}");
         cssEditor.setGrowByContent(true);
-        cssEditor.addDataChangedListener((type, index) -> {
-            customThemeCss[0] = cssEditor.getText();
+        Runnable applyCustomCss = () -> {
+            String text = cssEditor.getText();
+            if (text == null) {
+                text = "";
+            }
+            if (text.equals(customThemeCss[0])) {
+                return;
+            }
+            customThemeCss[0] = text;
             onSelectionChanged.run();
+        };
+        cssEditor.addDataChangedListener((type, index) -> applyCustomCss.run());
+        cssEditor.addActionListener(e -> applyCustomCss.run());
+        cssEditor.addFocusListener(new FocusListener() {
+            @Override
+            public void focusGained(Component cmp) {
+            }
+
+            @Override
+            public void focusLost(Component cmp) {
+                applyCustomCss.run();
+            }
         });
+        Button applyCssButton = new Button("Apply CSS");
+        applyCssButton.setUIID("InitializrChoice");
+        applyCssButton.addActionListener(e -> applyCustomCss.run());
 
         return BoxLayout.encloseY(
                 labeledField("Mode", modeRow),
                 labeledField("Accent", accentRow),
                 rounded,
                 labeledField("Append Custom CSS", cssEditor),
+                applyCssButton,
                 customCssError
         );
     }
