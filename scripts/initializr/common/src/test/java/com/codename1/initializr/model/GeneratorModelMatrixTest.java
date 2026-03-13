@@ -171,6 +171,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(iosPom, "<version>3.4.1</version>", "iOS module should pin maven-jar-plugin version");
         assertContains(iosPom, "<id>default-jar</id>", "iOS module should target default-jar execution");
         assertContains(iosPom, "<phase>none</phase>", "iOS module should disable default-jar execution to avoid duplicate attach in cn1:build");
+
+        String javascriptPom = getText(entries, "javascript/pom.xml");
+        assertContains(javascriptPom, "<artifactId>maven-jar-plugin</artifactId>", "JavaScript module should configure maven-jar-plugin explicitly");
+        assertContains(javascriptPom, "<version>3.4.1</version>", "JavaScript module should pin maven-jar-plugin version");
+        assertContains(javascriptPom, "<id>default-jar</id>", "JavaScript module should target default-jar execution");
+        assertContains(javascriptPom, "<phase>none</phase>", "JavaScript module should disable default-jar execution to avoid duplicate attach in cn1:build");
     }
 
     private void validateCombination(Template template, IDE ide) throws Exception {
