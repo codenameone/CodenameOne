@@ -1,8 +1,12 @@
-package com.codenameone.examples.hellocodenameone;
+package com.codenameone.examples.hellocodenameone.tests;
 
-import com.codename1.testing.AbstractTest;
+public class Java17Tests extends BaseTest {
+    @Override
+    public boolean shouldTakeScreenshot() {
+        return false;
+    }
 
-public class Java17LanguageFeaturesTest extends AbstractTest {
+    //record MyRecord(int val, String otherVal) {}
 
     @Override
     public boolean runTest() throws Exception {
@@ -11,6 +15,7 @@ public class Java17LanguageFeaturesTest extends AbstractTest {
 
         var message = switch (greeting.length()) {
             case 5 -> greeting + " " + target;
+            //case 7 -> new MyRecord(2, "V");
             default -> "unexpected";
         };
 
@@ -21,7 +26,7 @@ public class Java17LanguageFeaturesTest extends AbstractTest {
 
         assertEqual("Hello Codename One", message);
         assertEqual("Java 17 language features\nshould compile in tests.\n", textBlock);
-
+        done();
         return true;
     }
 }

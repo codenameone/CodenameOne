@@ -33,6 +33,7 @@ public class OrientationLockScreenshotTest extends BaseTest {
     }
 
     private void waitForOrientation(Form form, boolean portrait, int attemptsLeft, Runnable onDone) {
+        waitFor(50);
         if (CN.isPortrait() == portrait || attemptsLeft <= 0) {
             onDone.run();
             return;
