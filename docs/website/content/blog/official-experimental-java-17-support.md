@@ -4,8 +4,8 @@ date: '2026-03-14'
 author: Shai Almog
 slug: official-experimental-java-17-support
 url: /blog/official-experimental-java-17-support/
-description: Codename One projects generated with the Initializr can now use official experimental Java 17 support, with most modern targets expected to work and more JDK support planned next.
-feed_html: '<img src="https://www.codenameone.com/blog/official-experimental-java-17-support.jpg" alt="Official Experimental Java 17 Support for Codename One Projects" /> Codename One projects generated with the Initializr can now use official experimental Java 17 support, with most modern targets expected to work and more JDK support planned next.'
+description: Codename One projects generated with the Initializr can now use official experimental Java 17 support, with record support arriving in Codename One 7.0.229 on March 20, 2026, and more JDK support planned next.
+feed_html: '<img src="https://www.codenameone.com/blog/official-experimental-java-17-support.jpg" alt="Official Experimental Java 17 Support for Codename One Projects" /> Codename One projects generated with the Initializr can now use official experimental Java 17 support, with record support arriving in Codename One 7.0.229 on March 20, 2026, and more JDK support planned next.'
 ---
 
 ![Official Experimental Java 17 Support for Codename One Projects](/blog/official-experimental-java-17-support.jpg)
@@ -32,6 +32,8 @@ There are a few caveats you should know before jumping in:
 
 This support includes modern language syntax that makes day to day code much nicer to write.
 
+At the moment this includes features like `var`, switch expressions and text blocks. Record support is planned for Codename One `7.0.229`, slated for release on March 20, 2026.
+
 For example, `var` lets us remove obvious type boilerplate from local variables:
 
 ```java
@@ -57,7 +59,18 @@ var textBlock = """
         """;
 ```
 
-That means you can start using language improvements that make code cleaner and easier to read.
+Record syntax is also queued for Codename One `7.0.229`, slated for release on March 20, 2026, so Java 17 projects will be able to use compact immutable data carriers too.
+
+For example, this record will compile once `7.0.229` is available on March 20, 2026:
+
+```java
+record Person(String name, int age) {}
+
+var person = new Person("Duke", 29);
+System.out.println(person.name());
+```
+
+That means you can start using language improvements that make code cleaner and easier to read, and records will join that list in `7.0.229` on March 20, 2026.
 
 This still does not include support for newer JDK APIs such as streams. As mentioned in the previous post, if you need streams today there is already a cn1lib solution for that, and we hope to improve the built-in story over time.
 

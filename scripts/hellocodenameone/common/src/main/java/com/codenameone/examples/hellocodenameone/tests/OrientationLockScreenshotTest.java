@@ -17,6 +17,7 @@ public class OrientationLockScreenshotTest extends BaseTest {
             protected void onShowCompleted() {
                 CN.lockOrientation(false);
                 waitForOrientation(this, false, () -> {
+                    waitFor(50);
                     Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("landscape");
                     CN.lockOrientation(true);
                     waitForOrientation(this, true, OrientationLockScreenshotTest.this::done);
@@ -33,7 +34,6 @@ public class OrientationLockScreenshotTest extends BaseTest {
     }
 
     private void waitForOrientation(Form form, boolean portrait, int attemptsLeft, Runnable onDone) {
-        waitFor(50);
         if (CN.isPortrait() == portrait || attemptsLeft <= 0) {
             onDone.run();
             return;
