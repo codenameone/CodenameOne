@@ -3607,9 +3607,15 @@ public class AndroidGradleBuilder extends Executor {
 
         String compileSdkVersion = "'android-21'";
 
-        String java8P2 = "";
-        if(useJava8SourceLevel) {
-            java8P2 = "    compileOptions {\n" +
+        int projectJavaVersion = parseVersionStringAsInt(request.getArg("java.version", "8"));
+        String javaCompileOptions = "";
+        if (projectJavaVersion >= 17 && useGradle8) {
+            javaCompileOptions = "    compileOptions {\n" +
+                    "        sourceCompatibility JavaVersion.toVersion(17)\n" +
+                    "        targetCompatibility JavaVersion.toVersion(17)\n" +
+                    "    }\n";
+        } else if(useJava8SourceLevel) {
+            javaCompileOptions = "    compileOptions {\n" +
                     "        sourceCompatibility JavaVersion.VERSION_1_8\n" +
                     "        targetCompatibility JavaVersion.VERSION_1_8\n" +
                     "    }\n";
@@ -3770,7 +3776,7 @@ public class AndroidGradleBuilder extends Executor {
                 + multidex
                 + request.getArg("android.xgradle_default_config", "")
                 + "    }\n"
-                + java8P2
+                + javaCompileOptions
                 + "    sourceSets {\n"
                 + "        main {\n"
                 + "            aidl.srcDirs = ['src/main/java']\n"
