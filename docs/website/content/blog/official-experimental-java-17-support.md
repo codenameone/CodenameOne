@@ -88,6 +88,56 @@ A few other useful things landed over the past week.
 
 The [Initializr](/initializr/) now includes more advanced CSS theme editing with live preview, and there were several follow-up fixes to make theming behave more reliably. This is relevant if you are starting a fresh project anyway, because the [Initializr](/initializr/) has become a much stronger starting point than it was even a couple of weeks ago.
 
+We also finished updating all macOS build servers to use Xcode 26.
+
+Another useful update is a newer version of the Codename One Bluetooth LE cn1lib, available in the [bluetoothle-codenameone repository](https://github.com/codenameone/bluetoothle-codenameone). This library now uses a native Codename One bridge implementation adapted from the original Bluetooth LE plugin lineage.
+
+If you are using a Maven-based Codename One project, add it with:
+
+```xml
+<dependency>
+    <groupId>com.codenameone</groupId>
+    <artifactId>cn1-bluetooth-lib</artifactId>
+    <version>1.0.0</version>
+    <type>pom</type>
+</dependency>
+```
+
+If you are using a classic Codename One project, you can still integrate it as a `.cn1lib` by adding the library to your project's `lib/` directory, running `Refresh Libs`, and rebuilding. The library requires Java 8.
+
+Here is a small usage sample:
+
+```java
+final Bluetooth bt = new Bluetooth();
+Form main = new Form("Bluetooth Demo");
+main.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
+main.add(new Button(new Command("enable bluetooth") {
+    @Override
+    public void actionPerformed(ActionEvent evt) {
+        try {
+            if (!bt.isEnabled()) {
+                bt.enable();
+            }
+            if (!bt.hasPermission()) {
+                bt.requestPermission();
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+}));
+main.add(new Button(new Command("initialize") {
+    @Override
+    public void actionPerformed(ActionEvent evt) {
+        try {
+            bt.initialize(true, false, "bluetoothleplugin");
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+}));
+```
+
 ## Try Java 17 on a Real Project
 
 If you have been waiting for a more modern Java syntax level in Codename One, this is the time to give it a try.
