@@ -278,4 +278,8 @@ public final class Class<T> implements java.lang.reflect.Type {
     public boolean isLocalClass() {
         return false;
     }
+
+    public boolean isRecord() {
+        return this != java.lang.Record.class && java.lang.Record.class.isAssignableFrom(this);
+    }
 }
