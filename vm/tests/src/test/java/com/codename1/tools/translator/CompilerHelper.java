@@ -203,10 +203,6 @@ public class CompilerHelper {
         // Find a suitable compiler (e.g. JDK 8 targeting 1.8)
         List<CompilerConfig> compilers = getAvailableCompilers("1.8");
         if (compilers.isEmpty()) {
-            // Fallback for environment where maybe we just run with what we have
-            compilers = getAvailableCompilers("1.5");
-        }
-        if (compilers.isEmpty()) {
              throw new RuntimeException("No suitable compiler found");
         }
         CompilerConfig config = compilers.get(0);
