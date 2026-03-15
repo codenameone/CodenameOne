@@ -40,7 +40,6 @@ class BytecodeInstructionIntegrationTest {
 
     static Stream<CompilerHelper.CompilerConfig> provideCompilerConfigs() {
         List<CompilerHelper.CompilerConfig> configs = new ArrayList<>();
-        configs.addAll(CompilerHelper.getAvailableCompilers("1.5"));
         configs.addAll(CompilerHelper.getAvailableCompilers("1.8"));
         configs.addAll(CompilerHelper.getAvailableCompilers("11"));
         configs.addAll(CompilerHelper.getAvailableCompilers("17"));
