@@ -13,3 +13,5 @@ description: "Watch the lesson and follow the accompanying resources."
 ---
 
 > Module 1: Course Lessons
+
+{{< youtube p6UFNw0nGik >}}
