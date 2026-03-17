@@ -1106,6 +1106,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 //if this property already exists with a different value the
                 //install will fail
                 if(!merged.get(key).equals(libProps.getProperty(key))){
+                    if ("codename1.arg.java.version".equals(key)) {
+                        // Preserve the project's java version when it is equal to or greater than
+                        // the library requirement. This is validated above and allows using
+                        // Java 8 cn1libs in Java 11/17+ projects.
+                        continue;
+                    }
                     throw new PropertyConflictException(libraryName, "Property " + key + " has a conflict");
                 }
             }
