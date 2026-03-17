@@ -1,0 +1,105 @@
+continuing with the style form for the
+final two pieces
+the color
+and font picker
+moving on to the color picker the ui for
+this component is relatively simple
+we accept a color value and provide a
+callback whenever the color value
+changed
+these are the pieces that make up the
+component
+three sliders for picking a color
+channel
+the text field and a label whose
+background color is used to preview the
+selected color
+let's take a quick peek
+at color customizer before we proceed
+i can spend a while discussing the color
+customizer but there is really very
+little to discuss
+we create a round thumb image and place
+it on an editable slider component
+honestly this code is a bit of a mess
+and should have been in the theme
+but because of the special nature of
+this form
+i couldn't place this stuff
+in the theme
+so i had to do it here
+that's a major reason for this method
+so the code would be a bit more bearable
+every time a channel color changes
+we update the color with a new value and
+shift the channel color
+into place for integration with the
+other current channels in the current
+color
+let's take a second and check out update
+color
+update color just sets the color into
+place and calls on success
+for us
+it also updates the text field with the
+right hex color
+an important piece is that update color
+uses
+acquire lock and release lock
+which we need to guard against
+recursive access
+when we invoke set text to update the
+hex value
+when the user drags
+the slider
+it triggers a text change event
+but since lock isn't acquired by the
+text event it won't do the change
+the same is true
+the other way around
+if it wasn't we'd run into an infinite
+loop where changing the text updates the
+slider
+and vice versa to infinity
+speaking about the hex text field
+we acquire the lock here too
+and update the various channels as
+needed
+the method is relatively
+simple
+let's move on to the font editor which
+is in some regards even more elaborate
+than the color editor
+this starts with code that tries to
+calculate the font size
+once a font is loaded its size is
+determined in pixels not in millimeters
+but we want
+to size it in millimeters as that's more
+portable
+so we need some way to infer that
+here we loop over the values and try to
+infer the millimeter value for a given
+pixel value
+from the list
+appropriately we will pick the right
+string from the list
+in the picker
+moving on we have the buttons within the
+button group
+that allow us to pick the right style
+for the resulting font
+we have the text preview obviously
+but that's relatively simple
+when we pick a size we need to update
+the size all around appropriately
+and delivered to the callback method
+and finally we have one huge action
+listener that handles all of the buttons
+to give give each one its right style so
+a button for bold will apply the right
+font and so forth
+with italic etc
+there are probably more elegant ways to
+do this but honestly fonts are always a
+huge pain regardless of what you choose

@@ -1,0 +1,74 @@
+the hardest part in the mock-up is
+behind us the next stage is the French
+container which lists friends requests
+and potential friends suggestions
+the friends container is a simple UI and
+simple class we have a few UI IDs within
+this class that I'll cover soon
+when I get to the CSS related changes
+let's look at the code
+we extend container instead of infinite
+container as we don't need it in this
+case
+technically I could have gone with an
+infinite approach but I wanted to keep
+things simple
+the container arranges elements
+vertically using box layout since this
+isn't a form it's not scrollable by
+default so we need to enable
+scrollability because the parent form
+isn't scrollable
+add pull to refresh removes the elements
+and recreates the UI
+init fills up the container it's invoked
+when the class is created or refreshed
+the Avatar and the side of the friend
+appears as an 18 millimeter image
+we use a blank image as the placeholder
+for the URL image so the Avatar will
+download dynamically to the local cache
+if we have friend suggestions we Loop
+over friend requests and add them with
+the avatar for each one notice we used
+the URL image create cached image API to
+fetch the Avatar URL instead of get
+Avatar Facebook used square images here
+so it made sense to use something else
+for this functionality
+we do the same for the friend suggestion
+list under a different title
+next we have the friend request entry
+method
+we create the button labels based on the
+type of request
+we place the name above the buttons
+using a box layout on the Y Asus then
+place the two buttons within a grid
+layout giving them the same size
+the Avatar is placed in the west since
+its size is constant we place the
+content in the center which gives it
+space to grow
+the titles above the listing are created
+in the init method with this code block
+there this handles the red circle with
+the number next to the title
+in order to complete this we need a few
+CSS changes
+the subtitle is just a gray slightly
+larger font
+the red circle has padding that is large
+enough to make it visible the size is
+close enough so it will align reasonably
+with the friend subtitle
+friend name looks smaller than friend
+subtitle but it's really because friends
+subtitle is written in uppercase
+the confirm button is a standard button
+with rounded corners and a specific
+background
+the delete button removes the background
+and adds a pixel wide border around it
+with that the friend suggestion UI
+should work and run as expected

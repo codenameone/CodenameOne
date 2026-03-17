@@ -1,0 +1,78 @@
+in the final segment we'll review how
+this was integrated into the main code
+i won't review every form but i'll look
+at base navigation form which hasn't
+changed much and i'll review one other
+form that represents the changes made
+in the base navigation form not a lot
+has changed besides inheriting the ui
+abstraction
+in the previous iterations we had this
+code in the init method and now it's
+moved into the init toolbar method
+other than that it's pretty much the
+same
+the subclasses of base navigation form
+are more of the same so i wanted to
+focus
+on one of the forms that isn't a
+subclass of that
+and
+chose address form
+it now derives from ui abstraction
+directly
+and as you can see
+not a whole lot has changed as a result
+of that
+in the validation code you will notice
+that instead of just
+binding the submit button i invoked
+the add submit button from the base
+class since i don't know where the ok
+button will be
+instead of binding listeners i use
+the on back override to implement ok
+back behavior
+but it works exactly the same as before
+the same is true for
+on ok
+which also works exactly the same as
+before
+both are invoked because we returned
+true
+from has ok
+back method
+we also override the color theme of the
+toolbar but this will only apply to the
+phone ui and not for the tablet ui
+i i know this seems a bit much for a
+four-part module but the work we did
+here was relatively simple
+adapting to tablets
+isn't hard work
+one of the reasons it took four modules
+is the fact that codename one is very
+flexible
+and provides mostly low a low level api
+the obvious question is why not move the
+abstraction layer up a notch and make
+tablet support an implicit part of
+codename one
+that's something we're considering but
+so far it was very hard to pin down the
+exact api we want
+in this case we were able to simplify a
+lot
+as we knew the application domain
+however
+in codename one proper
+we would need a more flexible api
+and an abstraction like that can lead to
+replication
+once we commit the ap to an api
+we are stuck with it for years
+or even forever
+so we are rather cautious
+with this api
+thanks for watching i hope you found
+this informative

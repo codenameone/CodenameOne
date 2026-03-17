@@ -1,0 +1,62 @@
+camera support can be a book in its own
+right
+so i'm keeping this to the bare minimum
+we'll use the camera kit cn1 lib to
+implement camera support in the
+application
+since that isn't supported everywhere
+for instance the simulator
+will implement a fallback to use the
+capture api in those cases
+before we proceed we need to install the
+camera kit cn1 lib from the codename one
+extension manager
+following that we need to refresh libs
+so we can use that api
+the main form defines the camera button
+on the top left portion of the form
+we need to bind our ui to that call we
+need to add a new camera method
+this leads us to the new camera method
+if camera kit is null which will happen
+in the simulator
+we need to fall back to use the capture
+api
+captcha is trivial to use it just
+returns a file path for the image or
+null if the user canceled the operation
+here we use one of the new create
+methods we added to image picker then
+launch the new post form as usual
+the new camera form class provides a
+custom camera ui
+this leads us to the camera form class
+which implements a camera viewport we
+use a layered layout so we can place
+widgets on top of the camera view
+scrolling should be disabled as we can't
+scroll a camera layered layout doesn't
+implicitly disable scrolling like border
+layout
+events from the camera notify us of
+things such as image capture which is
+the only thing we handle here at this
+time
+this adds the camera viewport to the ui
+so we can see what we are capturing
+this button allows us to capture a photo
+of what we are seeing
+this is
+really basic i didn't handle video flash
+zoom or any other important feature we
+can handle all of those things but that
+would mean building a camera app which
+is a task in its own right
+so i've left it at that for now
+however once you do this you can see how
+this leads directly into
+the post ui and everything comes
+together for media posting
+media uploading has a lot of nuances and
+complexities are then touched due to
+time and breadth

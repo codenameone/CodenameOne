@@ -1,0 +1,226 @@
+we'll start with common strategies and
+performance pitfalls
+this list is by no means exhaustive but
+it represents a lot of experience we've
+had over the years
+Dont block the ET
+don't block the edt
+this is the number one performance tip
+if you have one takeaway from this it
+should be this statement
+the event dispatch thread is the thread
+that is invoked for every listener event
+or paint operation it does everything in
+codename one
+the edt runs a cycle that's supposed to
+finish
+well below the 16 millisecond mark
+that's important because the edt is only
+one part and after it is done the native
+thread needs to perform some work as
+well
+if you perform lengthy operations on the
+edt such as passing you might see a
+performance penalty to be fair we do
+these things too a lot of our demos
+perform some passing and image loading
+on the edt
+most apis must be invoked on the edt
+which makes it hard to avoid blocking it
+the core workaround for this penalty is
+to delegate work into another thread
+we can do this with the network manager
+which implicitly uses the network thread
+for communication
+you can also open a thread to do
+intensive work and return to the edt
+with a call serially invocation
+a simple example of this
+would be something something like this
+we launch a separate thread to run slow
+code and then return the response to the
+edt
+with qual serially
+one approach to offload processing is
+invoke block which spawns a thread while
+blocking the edt in a non-destructive
+way
+this makes development very convenient
+as you can avoid nested callbacks
+however invoke and block is more
+expensive in terms of performance than a
+regular thread and callback approach
+so if you are concerned about
+performance invoking block might not be
+the best option
+these concerns should also apply to the
+add to cue and weight method from the
+network manager which would also incur a
+similar cost
+one of the tricks i did
+in the uber application for features
+such as
+shadows
+was leverage the core serially on idle
+method
+this method works like call serially but
+it invokes the code only when the edt is
+idle
+idle state happens when the edt is ready
+to sleep
+and doesn't have too much to do
+initially i rendered the component
+without a shadow
+and added the shadow after the fact
+using a call like this
+Thread safety
+threads aren't magic
+this is somewhat contradictory to the
+recent statements but threads aren't
+enough
+developers often perform a slow
+operation on a thread only to discover
+that rendering is seriously impacted
+mobile cpus aren't as fast as people
+think
+and
+they are bad at task switching
+if you spawn a thread that takes too
+long and uses a lot of cpu resources it
+will starve the edt
+and potentially cause rendering to be
+sluggish as a result
+in fact we force the edt to sleep with
+every cycle
+so it won't starve the native rendering
+thread
+the solution is to explicitly yield the
+thread occasionally
+if you don't do i o
+notice that if you are reading or
+writing to a stream
+the underlying kernel stream reading
+code should yield the cpu for you
+assuming you have a long calculation
+you can just
+sprinkle util dot slip sleep one or even
+longer through the thread code to make
+sure the cpu delegates time to other
+threads
+while we are on the subject i'd like to
+say a couple of things about thread
+safety
+creating threads is important but
+performance synchronization is often
+challenging and error prone
+it might negatively impact the
+performance benefit delivered
+from threads to begin with
+one of the advantages of the single
+thread approach in the edt is that we
+can avoid synchronization almost
+entirely within the codename one code
+this reduces overhead noticeably as
+synchronization is a very expensive
+operation
+that can be optimized by a compiler
+and even impacts jets
+if you need to use a thread i would
+recommend the easy thread class which
+simplifies the process of communicating
+with the edt
+in a way similar to call serially
+caching is at the core of almost every
+optimization you will make
+caching can be as simple as keeping a
+value in a variable or as complex as
+weak references with purge strategies
+a core decision about caching
+is where to cache and what to cache
+let's say i have this code
+should we cache the image or should we
+cache the label
+there is no simple answer
+normally i wouldn't cache the label
+preferring to cache the form
+but the logic of image caching is tricky
+if i keep an image and then create a
+scaled version of that image i'll
+effectively have two instances of that
+image in ram
+the only tip i can give about this is
+awareness
+look at the things you cache and try to
+avoid caching in the wrong place
+notice that a two gigabyte ram device
+doesn't allocate that ram to the
+application
+the application gets far less and this
+should be further restricted as device
+os's kill applications that take up too
+much ram
+Reuse
+that brings up a common question
+should we reuse form instances
+in the past we used to recommend that
+developers discard form instances
+once they were done with them
+then if they needed to go back to the
+form they could create a new instance
+this was the strategy and the old call
+name one gui builder and it has
+advantages in terms of ram usage
+however
+it makes some things very hard to code
+going back to the exact previous state
+of the form
+and it is arguably slower in terms of
+performance
+today for the most part we
+advocate the use the use of form
+instances
+but not dialogues which are more
+transient by nature
+the logic behind reuse relates to the
+amount of ram available on the devices
+and taking taken up by a form
+it should be okay for the most part the
+problems start with forms that contain
+many images
+in those cases we need a strategy to
+purge memory when leaving the form
+there are some elements that might be
+expensive to cache such as images
+in these cases we want to cache the data
+for the performance benefit but if we
+don't have enough ram
+we'd rather discard it
+this is in fact the strategy taken by
+encoded image which i'll discuss later
+javasc has built-in classes that cover a
+lot of the details
+such as weak reference soft reference
+etc
+unfortunately soft references which are
+the most useful option aren't available
+the solution is available in the cn
+class
+javasc also offers
+weak hash map which we refactored into
+com codename one dot ui dot util
+it uses the soft reference
+references built
+into codename one
+this class is essentially a regular map
+that can lose its value objects when
+memory gets low
+Cache
+another common class for caching is the
+cache map unlike weak hashmap it caches
+data and saves extra data to storage
+so it's meant to cache data that you
+might fetch from the network or a
+similar source it makes sense for larger
+elements
+for small cached data
+i would just use the preferences

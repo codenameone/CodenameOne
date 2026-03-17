@@ -12,53 +12,36 @@ description: Getting started guide for NetBeans developers
 youtube_id: 73d65cvyQv4
 thumbnail: https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-21.jpg
 ---
-
 {{< youtube "73d65cvyQv4" >}} 
+The first Codename One application you build in NetBeans should be deliberately simple. [Create the project with the initializr](/initializr/), open it in NetBeans as a Maven project, and aim for an app that starts in the simulator, shows a form, and responds to one button press. The video uses the old NetBeans plugin flow, which is no longer the recommended way to start a project, but the underlying lesson is still the same: begin with a tiny app that teaches you the lifecycle and the development loop.
 
-#### Basic introductory usage of Codename One
+The package name is one of the first things worth deciding carefully. It may look unimportant in a hello world app, but later it becomes part of signing, native packaging, and store submission. A stable reverse-domain package name will save you from an annoying rename once the project begins to grow.
 
-For details please check out the [download section](/download/). **Note:** The [plugins.netbeans.org](http://plugins.netbeans.org/) server has been down frequently in the past couple of months preventing automatic installation.  
-Please follow the instructions [here](/blog/netbeans-plugin-update-center/) as a workaround if the instructions above don’t work.
+After the project opens, look at the generated application class before making larger changes. `init()` is for one-time application setup, `start()` is where you create and show the first form, `stop()` handles the app moving to the background, and `destroy()` is there for shutdown cleanup. Those methods are the backbone of a Codename One app, and understanding them early makes the rest of the framework much easier to follow.
 
-###### Transcript
+For the actual hello world UI, keep it boring on purpose. Create a form, add a button, and have the button show a dialog. That is enough to prove that the project opens correctly, the lifecycle is working, the UI renders, and action listeners are firing. You do not need complex navigation or custom components to learn the right first lessons.
 
-In this short video we’ll walk you thru the very basics of Codename One.
+The simulator is still the fastest place to validate this work. Run the app, switch device skins if needed, and make sure the form behaves the way you expect. Once that loop is stable, send a native build. Android is usually the easiest first target. iOS is still more demanding because of certificates and provisioning, so it is normal to get Android working first and then return to Apple signing later.
 
-Codename One allows Java developers to write native mobile apps for all devices easily. It’s open source, free and works with all IDE’s.
+One part of the video does need an explicit update. It moves naturally from the generated app into the older theme designer and resource editor. For new projects, CSS is now the better default for styling and l10n property bundles are the better default for localization. The designer and resource editor are still supported, but they are not where most modern Codename One projects should start.
 
-We can install Codename One by going to the plugin update center, typing in "Codename" and following the installation wizard.  
-We can now create a new project, we need to select Codename One and once we do so we are faced with the "New Project Dialog".
+So the modern NetBeans version of this lesson is straightforward: start from the initializr, import the Maven project, understand the lifecycle, build a tiny interactive form, verify it in the simulator, then send a device build. From there, keep the app logic in code, style with CSS, and use property bundles when you localize.
 
-In this dialog we must first define the package name, you must pick a correct package name as changing this later is challenging.  
-Next we can pick one of the builtin themes. If you want something very bare bones go with native, I will use red for this demo.  
-Last but not least we need to pick the app type, I recommend checking out the getting started app. However, for simplicity’s sake I’m picking the "Bare Bones" hand coded application as it contains the least amount of code.
+## Further Reading
 
-When we press the finish button the new app is created in the IDE. You will notice two major files, the theme resource file and the main source file. Let’s look at the generated code.  
-In the main file we have four life cycle methods: init, start, stop and destroy.
+- [Initializr](/initializr/)
+- [Getting Started](/getting-started/)
+- [Hello World](/hello-world/)
+- [Development Environment](/development-environment/)
+- [Build Server](/build-server/)
+- [Themeing](/themeing/)
+- [Moving To Maven](/blog/moving-to-maven/)
 
-Init is called once per application launch to setup things such as themes. You should use this instead of using the constructor.  
-Start is invoked when the app is started or restored from minimized state. You use it to show the UI.  
-Stop is invoked when the app is minimized & destroy might be invoked for a complete exit.
+<!--
+Full transcript retained in docs/website/video-transcripts/73d65cvyQv4.txt for future video recreation.
 
-Let’s add a button to the new app: the code is rather trivial. We just add a button object to the parent form. We then bind an action listener to the button and show a dialog within that action logic.  
-We can now run the simulator in the IDE by pressing the play button, you can manipulate the simulator using the simulate menu. You can switch devices using the skins menu as such.
-
-Next we’ll open the designer by double clicking the theme file. The theme allows us to customize the appearance of the application. We can double click any entry or add new entries to customize their look. E.g. we set the button foreground to yellow and we can now rerun the simulator with this result.
-
-Next we’ll open the designer by double clicking the theme file. The theme allows us to customize the appearance of the application. We can double click any entry or add new entries to customize their look. E.g. we set the button foreground to yellow and we can now rerun the simulator with this result.
-
-The designer tool is also used for countless other features, such as: resolution independent images, localization and more!
-
-The most important thing is running the resulting app on my devices, to do that we right click the project and select send Android build. You will notice there are many other build targets e.g. iOS. etc.).  
-Once a build is made navigate to the [build server at codenameone.com](/build-server/) and select your build entry. You can then either email the link to yourself using the dedicated button or just scan the QR code in the page. This will allow you to download and install the app to your device.
-
-Here is actual device footage for the app we just built!
-
-iOS. apps are slightly more challenging, we need certificates from Apple in order to build a native app. For those you need an Apple developer account, once you have that in order just use the certificate wizard to generate all of the required certificates and you can then follow the exact same procedure used for Android.
-
-Thanks for watching, please let us know what you think and get help at [codenameone.com](https://www.codenameone.com/).
-
----
+Future video outline: start from the initializr and NetBeans Maven import, explain the lifecycle methods in the generated application class, build a one-button hello world form, validate it in the simulator, then send an Android build and note the extra certificate work needed for iOS. Close by showing that CSS and l10n property bundles are now the preferred styling and localization workflow.
+-->
 
 ## Discussion
 

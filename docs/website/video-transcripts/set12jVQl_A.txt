@@ -1,0 +1,335 @@
+Hello guys, welcome to another
+installment of how do I and today I want
+to talk to you about something that is
+immensely important to all of us
+performance. Now this is a big subject
+so I'll try to cover it as much as I can
+but still be relatively brief. So go
+into the if you don't experience good
+performance with code name one then
+please talk to us in the forums check
+the developer guide and uh go over other
+things. I'll provide as many tips as I
+can but obviously the platform is huge
+and contains a lot of hidden information
+in it and things sometimes don't act as
+you would expect. So let's go over the
+Lists
+basics here of what
+uh the pitfalls people usually run into
+in
+performance. So let's start with lists.
+If you used a list and you made made use
+of your own custom list model or list
+renderer, then there are several
+pitfalls within these two tools. So to
+explain that, let's look at the API
+itself. The API for the list model is
+here under list. And normally if you
+don't actually create your own model,
+then you shouldn't have a problem. The
+only problem you would have is if you
+have a list that's already showing on
+the screen.
+that if you have a list that's already
+showing on the screen, you might have a
+problem if you repeatedly call uh the
+default list models add item entry or
+remove item
+entry. And the reason behind
+this is that both of these methods are
+rel uh they every time you add an item
+or remove an item, the list model needs
+to fire an event and notify the list. So
+if you do that repeatedly, add lots of
+items, remove lots of items all the
+time, then the data change event is
+fired to the parent list and you're
+effectively causing lots of events. All
+of them trigger repaints and are very
+expensive and they're very hard to pull.
+So to change a lot of data list, you're
+better off replacing the entire model
+than firing this event cons constantly.
+So that's really important if you're
+using the default list. If you implement
+your own list, however, you should make
+the methods like get and get item at be
+very very very fast. If you can't make
+them, if you connect to the internet or
+do any other heavy lifting sort of
+things, then what you should do is
+return immediately with fake data or any
+data something and then update them
+later on. It's crucial because these
+methods are called all the time and very
+frequently and we rely on them being
+cached locally. This is hugely important
+and you should observe that when making
+a network uh bound list or something
+like that and using the list model
+properly. The same holds true for the
+renderer. A common mistake people make
+is when they call the renderer
+component, they return a new instance of
+a component. Never ever do that. That
+sort of uh blocks your performance
+instantly, thrushes the garbage
+collector and creates uh a lot of
+garbage because this method is called a
+lot. It's not called per the number of
+the items because we have animations
+within the list and things like that. It
+can be called repeatedly o repeatedly
+over and over and over and over again.
+So take that into consideration.
+whenever you're building any form of uh
+interface on top of the list
+component. So that those two things are
+important and I urge you to pay
+attention to them.
+Uh the next issue is if you're doing any
+sort of drawing of strings or things
+like that, the string width method
+uh which is supported by fonts and
+allows you to essentially measure the
+width of a string is really really
+really slow on some platforms, not on
+all of them. And that's a feature of the
+platform because uh actually measuring
+the width of a string is much more
+complicated than it might seem. you need
+to go through the glyphing process and
+everything. So, uh that's one of the
+reasons why our label implementation
+isn't multi-line by default
+automatically
+uh and why text area is much slower than
+label. So if you want to build something
+that's efficient, I suggest you use
+labels and not try to have line breaks
+automatically because you would get far
+worse performance
+uh because of the repeated calls to
+string width. Now we have internal
+optimizations for that that sort of make
+lots of assumptions and try to uh reduce
+the cost of string width. So it's not a
+log in of uh of the cost because you
+essentially need to measure every
+characters with it's I I
+digress. But still automatic line
+breaking is far more expensive than you
+deciding in advance. Okay, I want to
+break a line here. So don't thrush
+string with w with you'd be surprised
+how how much of the performance costs we
+pay in codeame one is related to that
+particular method that's uh that's
+difficult to optimize
+uh bitmap fonts are deprecated in
+codeame one we recommend you use true
+type fonts for everything they perform
+as fast as any font but unfortunately
+they're unsupported in the low-end
+devices ES uh in J2ME and stuff like
+that. So we are aware of some people
+still choosing to use bitmap fonts
+despite their many disadvantages. One of
+which is their performance.
+Surprisingly, they actually work faster
+than uh system fonts in some
+cases, but uh they work slower on other
+platforms and it's it's a matter of uh
+uh it's really difficult to assess their
+performance on real world devices. So,
+we recommend people don't use them uh at
+all. They're more expensive in terms of
+memory. They're they're not
+internationalizable.
+they have many problems. So, we just
+don't recommend people use them at all
+and we have deprecated
+them. Uh, small images doesn't seem like
+such a performance issue and it isn't.
+If you're drawing one small image, then
+no big deal. It doesn't cost you almost
+anything to draw an image small or
+large. The problem is when you draw
+small images and you draw lots of small
+images. So for instance using a one
+pixel image and tiling it in the
+background that's really really really
+slow and the reason for that is how the
+GPU works. Essentially every time you
+draw to the screen you need to go back
+and forth between the CPU and uh the
+graphic processing unit and going back
+and forth there is really expensive for
+doing lots of small operations. you
+you're better off uh doing larger
+operations. So in that same coin, it is
+much faster to draw an image than draw
+lots of lines or draw lots of graphic
+primitives. So you're better off just
+drawing a bit map image that's as large
+as reasonably possible. Keep in mind
+that larger images might take more
+memory and might not look good on
+smaller device. And my next point about
+uh scaling is also very important. So
+anyway, small images are generally
+problematic if you draw if you choose to
+make lots of small images uh small image
+drawings. That's that's a big cost.
+That's why when we cut borders, we
+recommend you cut relatively larger im
+portions of the border for the nine
+piece borders. See my tutorial on that.
+It's just much much faster. And we find
+that this is a great piece of uh cost in
+ter terms of performance for some of our
+users. Now image
+scale is an issue uh where images uh if
+you invoke the method image scale scaled
+sorry I missed that here. It should be
+scaled really not image scale. Uh that
+method creates a new image that is
+essentially scaled to the given
+resolution. The thing is that this
+method while it works it
+produces not the highest quality image
+because it doesn't do any interpolation
+or anything it cost you in terms of
+performance still because we do all of
+this in Java code and but it's although
+it's relatively fast the problem is uh
+twofold the first there's a problem in
+memory here uh once you invoke image
+scaled you effectively uh get an image
+that is much larger in terms of RAM. Uh
+the default images you get in code name
+one and you I suggest you read the image
+section in the developer guide. It's
+it's really complex but interesting I
+think
+fascinating. Uh the image section in uh
+and that discusses it. Images don't
+actually take their full size. they take
+the size of uh the compressed image, the
+PNG or the JPEG that you chose, which
+isn't much. However, when you invoke
+scale, the image will automatically take
+up uh the width, the scale width you've
+selected times the height* 4 and
+possibly times two again for iPhone and
+other
+platforms. So, that is a pretty huge
+size. So for instance, if you want to
+set a background image for an iPad 3,
+which
+is48x536, then you'd have to do
+*
+uh 1536 * 4 * 2 because we keep the
+image twice both in RAM and and on GPU
+on the OpenGL uh section. So don't use
+that method whenever possible. The
+substitute is to use uh the draw
+version. The if we will go into the
+graphics section here
+uh then you have a method which isn't
+ideal. Normally you'd uh the best
+approach when working with icons and
+things like that is to use a method like
+uh
+uh when working with graphics like that
+is to use a method uh uh like a
+multi-image or something like that when
+working with icons. But if you need
+something like scaling, we suggest use a
+method like this which is automatically
+used when uh when we set a scaled
+background or things like that. This
+doesn't have the cost of uh uh the RAM
+overhead and it's better in general
+because it's usually handled by the GPU
+on devices like J2ME. Unfortunately, it
+isn't supported. So this works only with
+uh the smarter devices out
+there. Uh the two last things uh so the
+Issues
+problem is in our developer guide that
+this is not always uh immediately
+obvious that the roundrect issue is u
+problematic. Uh the roundrect issue is
+related to um the fact that when we draw
+round rect that is really simp easy and
+simple just drawing a roundre wctck. The
+problem is when we combine it with a
+background image and
+transparency and that's where things
+start to
+fail because there is uh we don't have
+roundrect clipping or the ability to
+construct things in such a way. So the
+performance of this is remarkably
+remarkably slow and the memory overhead
+is use uh nine piece images. Don't use
+this. This is really really really
+really really really
+really
+slow. Uh we have it there mostly for
+historical reasons. Uh we'll probably
+deprecate it because it is so slow. Uh I
+would strongly recommend you don't use
+it and use instead uh ninepiece images.
+So don't use the roundrect border uh
+unless you you're doing something really
+trivial and even then you're better off
+using a npiece image which is properly
+multi anti-aliased and etc. So don't use
+that uh at least not in the current
+version of code name
+one. Uh last but not not least is uh
+translucency. Translucency is really
+fast on modern devices. You shouldn't
+worry about that. it should work okay.
+Obviously, if you do lots of layers of
+translucency, you will pay for that. So,
+take that into consideration. However,
+if you're targeting older devices,
+specifically Symbian, Symbian sucks in
+terms of translucency. This is a
+well-known issue with uh the Symbian
+devices. So, just don't use translucent
+images or any form of
+translucency if you want good
+performance on a Symbian device. they
+are just really slow with it and there
+isn't much we can do about that. That's
+uh a known issue with that device family
+and the problem is that some of our
+themes use translucency quite heavily.
+So they won't perform as well on that on
+those particular
+devices. Uh so you might want to
+optimize uh those themes. Now to track
+performance issues is relatively simple.
+just create a blank theme or a theme
+without that much information in it and
+try to reproduce the issue there. This
+often helps you in finding whether the
+performance is related to a theme
+element or to something within your
+application and work through a process
+of elimination uh trying to get uh an
+insight into which portion is causing uh
+the performance effect that you are
+seeing. Obviously, this isn't always a
+trivial case because without the theme,
+it is often harder to to truly perceive
+performance. But uh but sometimes that
+helps. So, thank you again for watching
+this tutorial and I hope you've enjoyed
+it and uh uh learned something from it.
+Thanks.

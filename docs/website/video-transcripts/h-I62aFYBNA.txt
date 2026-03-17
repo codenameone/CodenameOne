@@ -1,0 +1,78 @@
+with this last part we'll finally finish
+the server code
+post web service is even simpler than
+user web service as it delegates to the
+post service class which is smaller
+the per service prefixes all calls with
+post as opposed to the user web service
+which used slash user
+this class carries a one-to-one
+relationship to the post-service class
+we make no use of other services
+the methods here can throw a permission
+exception which as usual what will
+translate to an error dao
+the methods of the class translate the
+business logic to uh web service as
+before they are trivial for the most
+part
+list and feed just return pageable data
+for the given user notice that every
+method here accepts the auth header
+when making a new post or comment the
+dao object is passed along with the
+header this allows for clean client-side
+code that can be unaware of the
+authorization for the most part
+that's it the class itself is a trivial
+wrapper around the service
+class this brings us to the last class
+we will cover in the server before going
+back to the client the media web service
+the media web service is as simple as
+the post web service but has a few
+gotchas due to the complexity of mime
+types and file upload
+the media is mapped to the slash media
+base url
+again the class can throw a permission
+exception which will translate to an
+error dial
+now that we got the main boilerplate out
+of the way let's look at the methods
+this lets us fetch a public image or
+media file it assumes the media is
+public and so we need no authorization
+the idea of the media is passed in the
+url path
+itself
+we get the mime type from the media
+entry in the database since media can be
+literally anything
+an all request will also return friends
+only media entry
+and is thus marked as all
+other than the alt entry it's identical
+to the public request
+upload is a multi-part upload request
+that accepts a file with additional
+metadata as a multi-part request
+multipart is a part of the http
+specification that includes specific
+structure
+for submitting a file in a web-based
+form
+codename one has built-in support for
+uploading files using multipart request
+so this is pretty convenient solution
+for file upload with that we are done
+with the server
+this has been a lot of work for the
+server but most of it was simple
+boilerplate
+the server isn't hard technically in
+fact it's simple and that's a bit boring
+but we had to get through that in order
+to get the more interesting pieces the
+following lessons would be far more
+interesting as a result

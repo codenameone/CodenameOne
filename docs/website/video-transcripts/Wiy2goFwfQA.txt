@@ -1,0 +1,30 @@
+i've discussed the star settings as part
+of the star form
+here is the class itself
+the style setting
+class
+is a standard property business object
+class which means it can be persisted
+implicitly into the database and
+serialized to the server using
+json web services
+to support this in the app storage i've
+added an insert or update method which
+implicitly checks if a style exists in
+the database
+and if not it adds it
+the fetch style method works in a very
+similar way to the api i showed for
+fetching the app storage
+but a bit simpler
+in that sense fetch styles
+is similar as it fetches the list of all
+the styles
+the last bit of changes just consists of
+creating the tables
+and setting the primary key
+so this class can be
+properly saved
+into sql
+thanks for watching i hope you found
+this informative

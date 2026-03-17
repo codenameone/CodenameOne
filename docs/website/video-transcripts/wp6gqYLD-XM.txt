@@ -1,0 +1,69 @@
+facebook allows you to attach an image
+while you are editing a post
+this includes some nuanced behaviors i
+would like to skip
+instead i'll use the gallery icon next
+to the post to create a dedicated image
+video post
+i've changed a lot in image picker
+so much so that it literally doubled in
+size
+the first change includes support for
+picking video or photo
+the image picker method is refactored to
+a more generic pick method
+that works with both images and videos
+this is the same code as before
+notice that if the mode
+is image only the new video pick
+functionality would be irrelevant
+assuming the callback isn't null which
+can happen on cancellation
+this
+points to a file system storage path
+to the image or video file
+we check the extension to see if this is
+an image otherwise we assume video
+since sl is
+lowercase we don't need to ignore case
+the encoded image is created and a
+callback is invoked for the case of an
+image
+in the case of a video
+we don't need to save the file as it's
+very transient when compared to image
+files
+when uploading we need to check if this
+is a video right now i oversimplified
+all uploads are marked as jpeg or mp4
+that isn't correct for most cases
+the mime type should defer in some cases
+but for the sake of simplicity i chose
+to keep it this way
+since we create the image in this class
+it makes sense to provide a get image
+method for users of the new create
+methods which i'll address now
+there are a few additional changes we
+need in the class to support custom
+capturing
+when we capture an image using a low
+level api we don't need the pick method
+and we'll just submit the data directly
+in these cases we we need a different
+api
+but want to retain the picker as we use
+it later in the code
+the factory method creates a picker with
+a pre-existing file
+we read the file into an encoded image
+to create a picker instance
+in this factory method we already have
+the battery data of the image
+we make
+up a fake file name
+for the update process
+obviously an event would be redundant
+for these two use cases
+this will be clearer when we reach the
+camera portion later

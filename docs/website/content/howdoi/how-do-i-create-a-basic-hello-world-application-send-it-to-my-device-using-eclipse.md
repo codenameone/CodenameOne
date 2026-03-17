@@ -11,50 +11,36 @@ description: Getting started guide for Eclipse developers
 youtube_id: fmNpMFLwABA
 thumbnail: https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-21.jpg
 ---
-
 {{< youtube "fmNpMFLwABA" >}} 
+The first Codename One application you build in Eclipse should be intentionally small. [Create the project with the initializr](/initializr/), import it into Eclipse as a Maven project, and aim for something that starts in the simulator, shows a form, and responds when you press a button. The video is out of date in one important way: it starts from the old Eclipse plugin workflow. The actual lesson is still valid, but the modern setup is Maven-based and does not depend on the legacy IDE plugins.
 
-#### Installing The Eclipse Plugin
+One of the first choices that matters is the package name. It is easy to treat that as temporary when you are just building a sample app, but package names become part of the app's identity and eventually affect signing, store metadata, and native packaging. Pick a stable reverse-domain package from the beginning so you do not have to rename it later when the project is already in motion.
 
-For details please check out the [download section](/download/).
+Once the project is open, spend a few minutes reading the generated application class. Codename One applications still revolve around `init()`, `start()`, `stop()`, and `destroy()`. `init()` is where one-time setup belongs. `start()` is where you build and show the first UI. `stop()` handles the app moving into the background, and `destroy()` is there for shutdown cleanup. Understanding those lifecycle methods is one of the most useful things a hello world app can teach.
 
-In this short video we’ll walk you thru the very basics of Codename One.
+Keep the first screen simple. Create a `Form`, add a button, attach an action listener, and show a dialog when the button is pressed. That tiny exercise proves that the project imports correctly, the application starts, the UI appears, and events are firing. You do not need more than that to confirm that the environment is healthy.
 
-Codename One allows Java developers to write native mobile apps for all devices easily. It’s open source, free and works with all IDE’s.
+The simulator should be your primary feedback loop at this stage. Run the app, switch device skins if you want to see how the layout behaves, and make sure the form survives the normal stop-and-start flow. Device builds matter, but they come after the simulator loop is already stable. In practice Android is usually the easiest first target. iOS generally comes later because certificates and provisioning need to be set up before the build becomes useful.
 
-We can install Codename One by going to the plugin update center, typing in "Codename" and following the installation wizard.  
-We can now create a new project, we need to select Codename One and once we do so we are faced with the "New Project Dialog".
+Styling and localization are the other places where the old workflow needs translation. The video moves from the basic app into the theme designer and resource editor because that was a common path at the time. For new projects, CSS is the better default for styling and l10n property bundles are the better default for localization. The older tools still work, but they are no longer the path most new apps should start with.
 
-In this dialog we must first define the package name, you must pick a correct package name as changing this later is challenging.  
-Next we can pick one of the builtin themes. If you want something very bare bones go with native, I will use red for this demo.  
-Last but not least we need to pick the app type, I recommend checking out the getting started app. However, for simplicity’s sake I’m picking the "Bare Bones" hand coded application as it contains the least amount of code.
+That leaves a straightforward modern workflow: generate a Maven project, choose a good package name, understand the lifecycle, build one small interactive form, validate it in the simulator, and then send a device build. Once those basics are in place, you can keep building in normal Java code while using CSS for styling and property bundles for localization.
 
-When we press the finish button the new app is created in the IDE. You will notice two major files, the theme resource file and the main source file. Let’s look at the generated code.  
-In the main file we have four life cycle methods: init, start, stop and destroy.
+## Further Reading
 
-Init is called once per application launch to setup things such as themes. You should use this instead of using the constructor.  
-Start is invoked when the app is started or restored from minimized state. You use it to show the UI.  
-Stop is invoked when the app is minimized & destroy might be invoked for a complete exit.
+- [Initializr](/initializr/)
+- [Getting Started](/getting-started/)
+- [Hello World](/hello-world/)
+- [Development Environment](/development-environment/)
+- [Build Server](/build-server/)
+- [Themeing](/themeing/)
+- [Moving To Maven](/blog/moving-to-maven/)
 
-Let’s add a button to the new app: the code is rather trivial. We just add a button object to the parent form. We then bind an action listener to the button and show a dialog within that action logic.  
-We can now run the simulator in the IDE by pressing the play button, you can manipulate the simulator using the simulate menu. You can switch devices using the skins menu as such.
+<!--
+Full transcript retained in docs/website/video-transcripts/fmNpMFLwABA.txt for future video recreation.
 
-Next we’ll open the designer by double clicking the theme file. The theme allows us to customize the appearance of the application. We can double click any entry or add new entries to customize their look. E.g. we set the button foreground to yellow and we can now rerun the simulator with this result.
-
-Next we’ll open the designer by double clicking the theme file. The theme allows us to customize the appearance of the application. We can double click any entry or add new entries to customize their look. E.g. we set the button foreground to yellow and we can now rerun the simulator with this result.
-
-The designer tool is also used for countless other features, such as: resolution independent images, localization and more!
-
-The most important thing is running the resulting app on my devices, to do that we right click the project and select send Android build. You will notice there are many other build targets e.g. iOS. etc.).  
-Once a build is made navigate to the [build server at codenameone.com](/build-server/) and select your build entry. You can then either email the link to yourself using the dedicated button or just scan the QR code in the page. This will allow you to download and install the app to your device.
-
-Here is actual device footage for the app we just built!
-
-iOS. apps are slightly more challenging, we need certificates from Apple in order to build a native app. For those you need an Apple developer account, once you have that in order just use the certificate wizard to generate all of the required certificates and you can then follow the exact same procedure used for Android.
-
-Thanks for watching, please let us know what you think and get help at [codenameone.com](https://www.codenameone.com/).
-
----
+Future video outline: start from the initializr and Eclipse Maven import instead of the old plugin flow, explain the lifecycle methods in the generated app, build one tiny interactive form, run it in the simulator, then send an Android build and briefly explain the extra iOS signing steps. Close by noting that new projects should usually use CSS for styling and l10n property bundles for localization.
+-->
 
 ## Discussion
 

@@ -1,0 +1,155 @@
+hello guys uh some this time I want to
+show you how to track performance in
+your
+application so to do this I'm going to
+use the kitchen sync demo and not the
+uhow world because I want to show off
+some of the tools that perform much
+better with a more elaborate application
+like the kitchen sink so here I just ran
+Debugger
+the debugger the standard Java debugger
+it works just as it would in any
+standard Java project and you should use
+it here I have an actual breako on
+something but
+that's something else uh you can use it
+just like you would any uh debugger I
+can just open uh say the kitchen sink
+here or I can even just pause it and
+instantly see where everything is for
+instance where the EDT is where
+everything is standing in case something
+got stuck so
+here I have uh the standard kitchen sink
+say I want to break on the effects and
+see what's going in there I can just go
+into the
+effects section right here place a break
+point and debug it really convenient I
+Debug
+can just hover over everything inspect
+everything and see where everything is I
+hope you're familiar with these tools
+they're really really useful and I'm
+showing them just because Java
+developers often don't look at them but
+we offer a lot
+more so for instance if you want to see
+uh if you have violations in the EDT so
+the EDT is one of the most important
+things in COD name
+one when
+EDT Violations
+uh when every event or every paint
+operation happens in code name when it
+happens on the event dispatch thread the
+EDT and if you if if your code is too
+slow and executes on the EDT well your
+application will be slow if on the other
+hand your code is
+um uh accessing the EDT on a separate
+thread then you might get uh crash or uh
+behaviors that are just unexplainable
+and really really hard to
+track so the EDT um debugging tool here
+which I've activated will show you when
+EDT Debugging Tool
+you have an EDT violation but the thing
+is it's not always totally accurate
+because of the way things are
+implemented sometimes so for instance it
+will fail on something like this uh see
+it says it took too long to render a
+frame which is probably true and then it
+detects a violation of the EDT because
+there are some issues there related to
+the native components so that's what
+essentially you'll see when you get a
+violation the problem is you also see it
+every time you edit text and you'll
+notice that you actually see the
+violation here as a stack pointing you
+at the specific method that did
+something supposedly bad in this
+particular case we didn't do anything
+bad it was completely fine it's
+just uh text input doesn't really uh
+work well with this tool but it's a
+really really useful tool for when
+things don't act as you would expect
+them to and it also gives you warnings
+about things like uh slow rendering for
+certain things and and all sorts so
+that's that's a cool tool the second one
+Network Monitor
+I've showed in previous uh session so I
+won't spend too much time on it is the
+network monitor so if I use something
+like a web service and I send the web
+service request I'll actually see the
+request appear here I see the details of
+the request the response length
+everything and the full response data
+including headers including everything
+some headers are are trimmed just
+because of uh some limitations uh of uh
+the Java environment but it's pretty
+complete for the most
+part uh the next thing test recorder I
+won't go into there's a separate
+tutorial I'll talk about testing all all
+Performance Monitor
+as well uh but the last thing I want to
+do is talk about the performance
+Monitor and the performance monitor is
+very interesting tool notice I'm playing
+a bit with the UI and suddenly I see the
+components that are in the UI now here
+because the UI was hand coded most UI
+components don't have a name because I
+didn't actually name them but in
+agreeable UI you will actually see names
+and you can arrange uh the components by
+the speed they take to render which
+obviously the big container takes the
+longest to render uh but it will tell
+you what is taking up the most time and
+Memory Monitor
+what is drawn the most amount of times
+in a particular screen and that is
+useful information now you'll notice
+that here we had some additional
+information uh dumped into the screen
+like images being created so this is
+very interesting for you guys if uh you
+have a user interface where memory is
+running out for some reason well you can
+use this tool to
+monitor uh which image are being created
+and images are usually the main reason
+for memory issues and it tells you
+pretty much how much memory and how much
+uh in terms of size every image created
+takes and that's again very useful
+information to keep in mind when working
+with a tool like that so I hope you've
+enjoyed this short tutorial and I hope
+you will make use of uh the tools we
+have available for uh testing
+performance and debugging and and I hope
+you'll be able to resolve your issues
+and if not talk to us in the discussion
+forum where we'll try and help you uh
+with these
+things uh I didn't go into things like
+logging and everything because that's
+not so much the the a part of it but you
+should be should be using the log apis
+of cod name
+one which provide a very useful way to
+debugging on the devices at least in
+terms of
+logging so that's all for now and thanks
+thank you for
+watching

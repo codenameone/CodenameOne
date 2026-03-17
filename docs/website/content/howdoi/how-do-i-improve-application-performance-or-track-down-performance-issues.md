@@ -11,17 +11,34 @@ description: Covers the basics of "what is slow" and how to find out what is bog
 youtube_id: set12jVQl_A
 thumbnail: https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-28.jpg
 ---
-
 {{< youtube "set12jVQl_A" >}} 
 
-#### Details
+Performance work gets easier once you stop thinking in terms of vague slowness and start looking for specific expensive patterns. In Codename One, the same categories of mistakes show up repeatedly: too much work on the EDT, heavy list renderers, unnecessary image churn, overly dynamic text measurement, and drawing strategies that look harmless in code but cost a lot at runtime.
 
-Some basic notes:
+Lists are one of the first places to inspect. If you are using a list model, avoid changing it one item at a time when what you really mean is "replace a lot of data". Repeated add/remove events trigger repeated notification and repaint work. If you need to make a large change, replacing the model or batching the change is usually much cheaper than firing a long stream of individual updates.
 
-  * 90% of the performance problems we see relate to people using gradients. Don’t use gradients, use images.
-  * The video doesn’t mention image locking, that is something that could be important is some complex usages. The second part of [this blog post](/blog/in-a-pinch/) discusses that.
+Custom list models and renderers need even more discipline. Methods such as `getItemAt()` must be fast. They should not block on network access or heavy computation. If a list depends on remote data, return quickly and update later when the data arrives. The same principle applies to renderers: do not construct a fresh component tree every time the renderer is asked for output. Reuse renderer components and update their state. Creating components repeatedly inside the renderer is one of the easiest ways to destroy scrolling performance.
 
----
+Text measurement is another hidden cost. Automatic line breaking and repeated calls that depend on string width can be expensive, especially when they happen frequently during rendering. If a screen is performance-sensitive, prefer simpler label usage and avoid forcing the UI to re-measure large amounts of text over and over when a more stable layout would do.
+
+Images deserve just as much attention. A few sensible image draws are often cheaper than a huge number of tiny draw operations. That is one reason very small tiled images, overly fragmented borders, and repeated low-level drawing primitives can become surprisingly expensive. The old note about gradients is also still worth keeping: decorative gradients are a surprisingly common source of avoidable cost, and in many cases a simple image or cleaner styling choice is the better tradeoff.
+
+Image scaling is another common trap. If you call scaling methods casually, you may be creating larger in-memory images than you realize. The source asset might be small on disk, but the scaled runtime image can cost a lot more RAM. That means scaling should be deliberate, cached where appropriate, and revisited if memory pressure starts to climb.
+
+The right workflow is to measure first, then optimize. Use the performance tools, identify the component or pattern that is actually expensive, and fix that specific thing. Do not rewrite major pieces of a screen just because it feels slow. In Codename One, a small renderer mistake or image decision can dominate the cost of an otherwise reasonable UI.
+
+## Further Reading
+
+- [Performance Network Monitors](/performance-network-monitors/)
+- [Developer Guide](/developer-guide/)
+- [How Do I Find Problems In My Application, Using The Codename One Tools And The Standard IDE Tools](/how-do-i/how-do-i-find-problems-in-my-application-using-the-codename-one-tools-and-the-standard-ide-tools/)
+- [In A Pinch](/blog/in-a-pinch/)
+
+<!--
+Full transcript retained in docs/website/video-transcripts/set12jVQl_A.txt for future video recreation.
+
+Future video outline: explain how to think about performance in terms of measurable costs, then cover list models, list renderers, text measurement, image scaling, gradients, and memory pressure with concrete examples of what to avoid and what to do instead.
+-->
 
 ## Discussion
 

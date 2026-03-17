@@ -11,31 +11,33 @@ description: Track down issues that occur on the device or in production using t
 youtube_id: C3PLjAWQ-XA
 thumbnail: https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-13-1.jpg
 ---
+{{< youtube "C3PLjAWQ-XA" >}}
 
-{{< youtube "C3PLjAWQ-XA" >}} 
+Crash protection is about getting useful failure information out of production devices instead of trying to reproduce every rare crash locally. In a framework that targets a wide range of devices and operating systems, that is not optional for serious apps. Some failures only show up in the field.
 
-#### Transcript
+The underlying tool is the Codename One `Log` API. Use `Log.p()` for ordinary diagnostic messages and `Log.e()` for exceptions. That matters because ordinary Java console habits such as `System.out.println()` and `printStackTrace()` are not the right production tools across all Codename One targets. If you want logs that are portable and useful, go through the framework logging APIs.
 
-In this video I’ll discuss the crash protection pro feature. Crash protection makes debugging application issues on devices in production possible. It does that by providing you with crash logs and information.  
-But before we begin we need to clarify that crash protection is a pro level feature which means it is only available to pro subscribers or higher due to the heavy usage of production email servers.
+Crash protection builds on top of that logging infrastructure. The usual pattern is to bind crash protection early in application startup so uncaught runtime exceptions are captured automatically. That gives you a fallback path even when the user cannot explain what happened or when the device is nowhere near your development environment.
 
-As I said before crash protection automatically emails your account when there is an error in production.  
-It also includes a logging system which is available for all users, this logging system allows you to log exceptions with their full call stack.  
-You can also trigger the emailing of the log manually. A good example for that would be if your application logic determined an error condition you could send a crash log to your account.
+Manual log sending is useful too. Not every failure is an uncaught crash. Sometimes the app reaches a bad state, detects a server-side inconsistency, or encounters a condition you know should be reported even though the application continues running. In those cases, sending the log explicitly can be more valuable than waiting for an unhandled exception.
 
-Crash protection is based around the Log class which prints out information that you can then follow to understand your production failures. This is crucial with a tool like Codename One where the breadth of supported devices is so huge you can’t possibly anticipate every eventuality.  
-Log.p() prints out log information, you can print any arbitrary string and should generally use this instead of System.out.println(). Log.e() prints out an exception and its stack trace. Notice that printStackTrace() will not work on some platforms and will not provide the desired effect.  
-To send the log manually we can just call sendLog() it will instantly send the log to the email of the user who built the app.
+One detail the video explains well is the tradeoff around swallowing user-visible error dialogs. During development, an obvious error popup can be useful. In production, that same behavior can create a poor user experience. Whether you suppress the default dialog or not should be an intentional product decision, not an accident.
 
-Typical applications have a bindCrashProtection call in their init(Object) callback method. This call handles all uncaught exceptions and automatically sends an email if an exception was thrown in runtime and wasn’t handled. Notice the argument for the bind method is set to true. This argument means that exception error messages are swallowed. Normally if the event dispatch thread has an error we catch that exception and show an error dialog. That’s great during development but might be worse than crashing in production… When you pass true it means this error message is consumed and the user won’t see it.  
-Notice that bindCrashProtection doesn’t do anything on the simulator to avoid "noise" when you are trying to debug an app.  
-Bind crash protection tries to catch all exceptions but it focuses mostly on the event dispatch thread exceptions. You can also handle those manually
+EDT error handling is part of this story as well. A lot of visible Codename One failures show up on the event dispatch thread. If you need custom behavior, you can listen for EDT errors yourself, log them, and decide how much of the default user-facing handling should still happen. The built-in crash protection binding is still the best default for most applications because it covers the common cases with less custom code.
 
-Event dispatch thread exceptions can be caught by using the EDT error listener from the CN class or from Display. If you consume the event object the error message won’t reach the EDT and an error dialog won’t be shown to the user. Notice that the exception is logged near the end with the Log.e() method and sent manually. You can create your own custom EDT error handler although we’d recommend the bind method which also tracks uncaught exceptions on other threads.
+The key point is that crash reporting works best when it is part of a broader logging discipline. If the log already contains meaningful context leading up to the failure, the crash report becomes much more useful. If the only thing in the log is the final exception, you will still know that the app failed, but you may not know why.
 
-Thanks for watching, I hope you found this helpful
+## Further Reading
 
----
+- [Developer Guide](/developer-guide/)
+- [How Do I Find Problems In My Application, Using The Codename One Tools And The Standard IDE Tools](/how-do-i/how-do-i-find-problems-in-my-application-using-the-codename-one-tools-and-the-standard-ide-tools/)
+- [How Do I Debug On An Android Device](/how-do-i/how-do-i-debug-on-an-android-device/)
+
+<!--
+Full transcript retained in docs/website/video-transcripts/C3PLjAWQ-XA.txt for future video recreation.
+
+Future video outline: explain the role of portable logging, show `Log.p()` and `Log.e()`, bind crash protection during startup, send a manual log for a detected error condition, and compare the development-time and production-time handling of EDT exceptions and user-visible error dialogs.
+-->
 
 ## Discussion
 

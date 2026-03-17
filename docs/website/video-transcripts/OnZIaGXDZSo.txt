@@ -1,0 +1,154 @@
+next we'll explore the comments ui
+i've simplified the comments ui a bit
+mostly to keep the code short and
+understandable
+i could support arbitrary depth threaded
+comments and various other capabilities
+but this creates some usability issues
+eventually as space narrows and it
+becomes harder to follow the discussion
+thread
+so i limited the replies to top level
+comments only and try to simplify the
+user experience a bit
+i also used pearl shaped comments
+instead of round rectangles they just
+look nice and i left it at that
+Text Field
+let's check out the code
+this is the text field where the user
+can type
+in his own comments to submit
+comments are placed in a scrollable box
+layout container
+in the center of the form
+when we press reply to a specific
+comment its id is placed here
+the border layout is needed so we can
+place the text field input in the bottom
+of the form
+we don't add the text field directly
+though we also add a send button with it
+by wrapping them both into a border
+layout together
+i used static import of font image so
+this line will work correctly
+if the send button or the done button in
+the virtual keyboard is pressed
+we post the comment currently within the
+text field
+this adds the existing comment to the ui
+Post Comment
+there were a few methods mentioned in
+this code that we need to go over
+specifically post comment add comment
+let's start with the former
+we connect to the server so we need to
+show a blocking ui dialog
+we construct a comment object and set
+the values to for it
+notice we don't need the comment id as
+that's generated in the server
+the server api does the heavy lifting of
+submitting the comment
+when we are done we need to explicitly
+clear the text field otherwise the
+submitted comment would still be there
+we animate the ui to valid state after
+the addition of the comment
+Add Comment
+this naturally leads to the add comment
+method
+create comment creates the visual
+representation of a comment we'll
+discuss it next
+the comment doesn't have a parent if the
+comment doesn't have a parent
+we'll just add directly to the list of
+comments
+we search through the hierarchy to find
+the parent comment component
+assuming we find it
+we can nest the component
+every parent
+component comment component has a
+container for replies children
+that's nested into it
+if the child container isn't there yet
+we create it dynamically and add it
+notice
+that we add to a specific offset within
+the container so the comments appear
+below the parent
+if the child container already exists
+we can add to it directly notice that
+since comments are already sorted by
+time
+adding to the end will always work
+correctly and consistently
+with that we effectively implemented one
+level of comment nesting we can further
+generalize the nesting logic to allow
+additional or even infinite levels of
+nesting but as i said earlier this might
+have usability issues
+Create Comment
+finally we need a few additional methods
+to implement the creation of the comment
+etc
+create comment generates the
+component that represents this given
+comment and potentially the reply button
+the comment itself is just a text area
+with a comment ui id
+we make that text uneditable
+fetch an avatar image for the chat
+i could have used rounding and similar
+effects but i chose to keep the code
+simple
+if we reply to a specific comment we
+just change the id of the parent comment
+the comment instance is stored in the
+components client properties so we can
+later connect them in the find
+find parent comment method
+Find Parent Comment
+find parent comment loops through the
+container and finds the component
+matching this component id
+if the comment we are looking at
+has the same id
+then we can return
+this component
+in this case the component matching this
+id doesn't exist or isn't there yet
+if this meth in this method we return an
+image matching the user's avatar which
+is exposed via slash user slash avatar
+slash ur user id
+on the server
+Comment Form
+with that comments form is nearly done
+we need a css style for comment
+it's
+black text over light gray background in
+perl rounded shape
+the one thing to notice
+is the padding
+we need a lot of it to keep the text
+away from the curve of the border
+now commons form should just work once
+we plug it in
+to do that we need to go to create news
+item in news feed container while we are
+here
+we might as well implement the like
+functionality too
+we set the like toggle buttons
+selected state if the user already liked
+this post we invoke like on a click
+this is already implemented in the
+server api so this is just one call
+we add the action listener that invokes
+the comments from a form and that's it
+like and comments should work

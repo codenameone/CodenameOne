@@ -1,0 +1,136 @@
+in this video we cover some of the
+additional forms in the app and how
+we'll address them
+starting with the details form
+Details Form
+the details form becomes far simpler
+once most of the data moves to the title
+area
+the remaining details are mostly billing
+which has its own form
+and miscellaneous information such as
+email url etc
+Billing Form
+the billing form is important not just
+because we wanted the details to feel
+less cluttered but also conceptually
+billing usually needs to stand
+on its own as people seek it out and
+expect help specifically for that
+feature
+it's another relatively simple form that
+could probably be created with instant
+ui
+the build form is pretty much a copy and
+paste with slightly different buttons
+i think consistency is a virtue in this
+case
+here's where things get interesting
+the details form allows us to navigate
+to a styling form
+this styling form allows us to click on
+an area within the ui of the restaurant
+app so we can customize that area
+Color/Font Settings
+when a user touches the restaurant ui
+below you should see a pop-up dialog
+with a set of options for customization
+based on the option picked
+a different ui
+will be shown
+if foreground or background is selected
+we'll open a color picker that allows us
+to either type in an html color or
+fiddle with intensities to set the right
+foreground or background color
+Set Font
+the font ui should have a very limited
+set of options
+mostly around basic styling
+unfortunately including
+files as problematic as we can't open
+such a file dynamically on all oss
+Set Image (icon, background, Dish) Set Dish Image
+when image background or icon is
+customized we should get a ui that
+allows us to crop the icon to the right
+size
+appropriately so this image sizes will
+always appear correctly
+on the device when the final app is
+built
+this is important
+images are too large that are too large
+might also burden the server
+so we limit image size in kilobytes on
+the server
+when we adapt the image size locally
+we can pretty much guarantee it's not a
+huge image
+that will cross a problematic threshold
+Address/Location Settings Address/Location
+the details form will contain a lot of
+details and including
+all the fields required for restaurant
+address
+would be overwhelming
+so it might make sense to separate it to
+a different form
+that includes all of that
+one important detail
+we need
+is the geographic location of the
+restaurant so we can launch
+accurate navigation
+to the location
+the buttons in this ui
+allow us to request location from the
+gps instead of typing in
+latitude longitude coordinates
+the about the tails form should allow
+setting the html
+for the about form in the original
+design i wanted both the ability to set
+a url
+for an about page and the ability to
+embed html but eventually i settled on
+setting the url only
+Skipped
+these are features that should probably
+be a part of the app in the future
+to keep the app simple i decided to
+focus on the core
+and remove as much of the things that
+aren't essential
+removing features is probably one of the
+most important things you can do
+when designing an app
+Implementation Plan
+a plan can be something you write down
+or have in your head
+but without when you are constantly
+putting out
+fires
+and you never get anywhere
+an organized plan with process
+with a process prevents you from
+wavering back and forth and keeps you
+dealing with the priorities
+i decided on a depth first
+implementation where we will get a
+specific set of forms working first and
+then slowly add features
+breadth first is also a good direction
+but i prefer depth first as it allows me
+to validate the whole process from end
+to end relatively early and i think
+that's crucial
+this is especially important in this
+relatively complex app where we might
+run into conceptual issues that will
+require
+re-evaluation of some early designs and
+plans
+thanks for watching
+next we'll start implementing the core
+ui elements

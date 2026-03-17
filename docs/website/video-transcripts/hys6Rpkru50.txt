@@ -1,0 +1,95 @@
+i'm continuing where i left off with the
+show user edit form method
+a quick reminder this is the final
+output of the show user edit form
+i want this form to be low maintenance
+as user properties would be added
+frequently
+and this might become a bottleneck
+the solution for that is instant ui
+which automatically creates user
+interfaces from property objects
+there are obviously constraints we need
+to adhere to
+so the ui would be usable
+we'll discuss those
+these properties don't fit into the ui
+notice birthday uses a long value
+instead of date
+and so it's hard to map to the ui
+when i implemented this i thought about
+converting the birthday from long to a
+date object but eventually decided
+against that
+dates are very flaky as java implicitly
+includes time zone
+and we naturally think of them as
+calendar dates
+birthday is a perfect example of this
+serialization via json with date objects
+is painful so i wanted to avoid that
+the solution is a bit convoluted
+but it works
+i added a metadata entry and hid it from
+the serialization code
+i'll discuss that later when we go over
+the changes to the user object
+the gender string is a multiple choice
+option
+so we have the labels and values for the
+choices so the right ui is shown
+this creates a container that lets us
+edit the content of the me
+object
+i add some padding and make the
+container scrollable
+since it contains text components and
+they must have a scrollable parent
+instant ui implicitly binds the ui to
+the user object
+so we unbind when leaving the form
+when we save the changes asynchronously
+this creates a dynamic editable form
+one of the cheap chief benefits here is
+that the generated ui can be improved
+seamlessly with no change to your code
+this won't create the image from before
+though
+since the property names don't have
+spaces
+and
+right
+casing this won't look like that we also
+need to add a birthday property to match
+that ui
+this is a meta property that looks like
+a date field but delegates everything to
+the actual birthday property
+we also add the birthday date property
+to the index
+the
+display labels for every property are
+set here
+if we didn't do this we'd see the
+property names instead
+the birthday date would be ignored from
+json map code so it won't mess
+with the other logic
+there is a bit of css we need to
+implement for the entire settings form
+this is the white border surrounding the
+avatar
+we need some padding to make the border
+visible
+the margin on top pushes it down so it
+will peek below the cover image
+the camera circle is black over gray
+with a small enough size so it won't
+intrude
+we want the title area to have margin at
+the bottom so the avatar image will peak
+out
+this is a big enough label for the name
+of the user below the
+the avatar image
+with that settings are done

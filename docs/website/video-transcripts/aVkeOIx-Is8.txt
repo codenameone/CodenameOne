@@ -1,0 +1,178 @@
+in this module we'll discuss animations
+first a word of caution
+don't overdo it
+animations aren't about making things
+flashy or good looking
+when you read apples or google's
+documentation on animations they are
+always explained
+the first animation type exists to draw
+attention to something
+a good example is when we enter a new
+form and want the user to notice a
+specific important feature
+we can animate it
+if we have more than one animation going
+on the user will be distracted and will
+miss out on our highlight
+an example for this is an animation on
+an important button so the user will
+notice it
+the second common use case is
+confirmation
+one example of this is a form transition
+in ios forms move from left
+from right to left
+when we dig deeper into the app
+when we go back they move in the
+opposite direction
+thus confirming that we are going back
+we also have a cover transition that is
+used to signify global functionality
+that resides outside of the navigation
+stack
+but this sort of animation is important
+in many such cases
+elements animate outside
+when we delete them so we will get a
+sense of confirmation that deletion did
+occur
+we have a lot of animation types that
+allow you to deliver these use cases
+as well as many frivolous effects if you
+so
+desire we'll start with transitions
+these are pretty much the first
+animation types people notice when
+running an app
+here i'll demonstrate transitions on a
+form
+but we can apply a transition to a
+dialog or an arbitrary component by
+using the
+container.replace method
+using transitions is trivial we just
+apply them to a form a dialogue or use
+them and replace
+the rest just works
+we have several built-in transitions
+common transitions include things such
+as slide cover fade etc
+flip transition is a card like 3d effect
+that relies on device native perspective
+transform
+it will look pretty different on devices
+and the simulator
+morph
+converts one component to another and is
+aimed at the material design paradigm
+where a ui element in one form
+transforms to another when moving to a
+new form
+bubble transition is also inspired by
+material design
+and represents a dialogue growing into
+place using a bubbling effect
+for most the most part we use common
+transition for almost all transitions
+i mentioned slide fade cover etc
+slide is the default transition codename
+one except for ios where the transition
+is slide fade
+by default
+this is a special case transition that
+slides the body
+while fading the and sliding the title
+elements at a different pace
+the theme has common constants to define
+the default transition to the various
+types of elements
+so you can define the default transition
+for form dialog etc
+directly from the theme without changing
+the code
+when we apply a transition to a form
+we have both an in
+and out transition
+this is often confusing
+for dialogues the transition in is what
+we show when the dialogue is shown and
+the transition out is played when the
+dialog is disposed
+so we usually need both
+for forms we usually only use transition
+out by convention
+there are some
+edge cases where both would make sense
+but they are pretty rare
+and unless you build your own custom
+transition you will probably never need
+to transition in
+on form
+these are the uncover and cover
+transitions running on the cart action
+when i pick this transition i mostly try
+to be consistent with other apps but in
+retrospect using cover for this feature
+makes perfect sense
+as it's outside of the regular
+navigation stack
+i use the morph transition to move from
+a thumbnail to the full screen image
+the effect has its kinks
+but it works
+exiting from the morph isn't as
+attractive
+so i chose to use the uncover
+in the reverse direction
+going into the code we can see the show
+checkout method
+which shows how the transition is
+applied
+to the form
+notice we apply both cover and uncover
+respectively so the effect of going in
+and going out of the form
+remains
+another important thing to notice
+is that we save the old transition out
+of the parent form
+the reason for this is that we'd like to
+restore the old transition when we go
+out so cover won't be used for all
+future navigation
+this is restored here when we press the
+x button
+that's handled in the constructor of the
+checkout
+form
+the dish effect is a bit more nuanced
+morph transition works by converting one
+component to another component
+in this case we convert the thumb
+component matching the dish id
+to the background image
+notice that these map to the name
+properties of the respective components
+the reason for this
+is that a transition can be defined and
+cloned
+before a form exists
+or while a form changes
+by binding to a component name we
+effectively
+disconnect the transition from a
+specific component instance
+notice that every thumb also has the id
+appended to it
+this allows us to distinguish between
+different entries within the form
+we use the show listener to restore the
+original transition out
+since a new form instance of dish view
+form
+is created every time this shouldn't be
+a problem
+if this wasn't the case we would have
+needed a remove show listener
+too

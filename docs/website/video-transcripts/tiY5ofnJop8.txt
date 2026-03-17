@@ -1,0 +1,120 @@
+the restaurant app maker
+is an application that we will build
+together based on the restaurant app i
+introduced earlier
+it generates a custom application
+for a specific restaurant
+unlike the restaurant app which is
+pretty standard
+and for which we could derive
+inspiration from existing apps
+this is a relatively fresh idea there
+aren't many app makers out there
+and the few that are in the market are
+web-based
+so we need to design something without
+any psd
+and still have something that looks
+reasonably good
+when when we are faced with a task like
+this the solution is the construction
+i break the problem into smaller
+manageable problems and attack each one
+individually
+the best place to start is the user
+interface even though we don't have a
+design
+it helps to visualize a problem before
+we get to the implementation details
+and ui is a great place to start
+this is the first page of details that
+the restaurant app will need within it
+so we'll need to build an app that
+accepts all of this information and some
+of the information from the next page
+notice that this is only a partial list
+and some of the things here like color
+scheme or fonts
+can be pretty challenging
+this is a mock-up design i created after
+looking at several app maker sites
+i understood most of them use a
+tabbed-based ui so
+that's where i started
+i took the information that we need from
+the list of items and placed it into the
+app
+the thing is
+that this was a bad direction
+once i drew that it became relatively
+clear that this isn't what i want
+i left it because i think it's useful
+for you to see the path i took to reach
+the end result
+the other issue is the boring details
+stuff
+one of the most important things for any
+app
+is a first impression
+it's crucial that the first screen of
+the app
+looks good by default and keeps users
+engaged otherwise they might skip the
+app entirely
+opening with the details
+makes sense for a developer but doesn't
+make sense from a user interface
+design standpoint
+this is my second attempt
+the elements on the left are the side
+menu elements
+the core design is inspired by material
+design with the floating action button
+and toolbar elements
+dishes use the material design grid
+design
+and focus on the food image
+this is important as pictures sell
+a lot
+of the more complex details have default
+values
+so
+a
+user can launch the app and instantly
+see his custom app in action
+with almost no work
+to see the app you can just press the
+play button which will preview the app
+locally
+a lot of the elements in the title are
+editable
+you can edit the title background using
+the edit background
+and this will impact the final app
+both the title and tagline are text
+fields
+and can be edited in place
+i considered making the dish editable in
+place
+but eventually decided to have a
+separate form
+to edit it
+as we can go into a lot of details
+for the new dish
+edit dish form i drew inspiration from
+material design again
+i used a gradient so the title will be
+readable on top of of the dish image and
+use the material design floating action
+button
+that is placed on the border of the
+title
+the reason for that placement was so we
+don't click delete dish
+or the description
+by accident
+the camera button is meant as a generic
+action to pick an image not necessarily
+through a camera
+i chose to enable delete through here
+as it removes clutter from the main form

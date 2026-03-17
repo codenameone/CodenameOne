@@ -1,0 +1,87 @@
+in the previous module
+we built a mock-up for restaurant
+application from pre-existing psd files
+but it had
+a lot of missing features and some
+design
+issues are several missing pieces in the
+app design most importantly missing form
+designs
+we need a dish view that we will see
+when clicking the more info button for a
+dish we need an about form
+this isn't mentioned in the design but
+it's crucial in every app
+we can use it for disclaimers licenses
+marketing and much
+more contact us is important for any
+restaurant
+so this is also an essential ui element
+the side menu should allow us to reach
+those additional forms
+and as we stand right now we don't have
+a design for that element
+before we continue it's important to
+understand the motivation
+this isn't a design class it's still a
+programming class
+in fact the designs i came up with are
+subpar
+understanding design is hugely
+beneficial for us as developers
+the specific example
+is
+excellent
+where
+we only got parts of the designs but
+still need to deliver something
+but a better example is that we develop
+a sense of
+what designers need and see
+this helps us develop
+taste and perspective
+it allows us to distinguish between good
+and bad design it also teaches us to
+demand the right thing from our
+designers
+and communicate with them more
+effectively
+a blank
+page is both liberating and frightening
+for designer
+and a developer alike
+we don't have that here we have an
+existing imperfect design that we can
+build on
+top one of the mistakes developers make
+is
+overly focusing on the external
+appearance of a design instead of
+understanding its intentions and
+motivations
+i think
+laziness is
+one of the great qualities of a good
+developer it encourages us to build
+great reusable software
+the same principle applies to design
+reuse
+sentiment bears repeating
+good design
+is consistent and follows
+common conventions
+another tip that bears repeating
+is avoiding the core factor
+back in the lure days
+we added a cube transition effect
+between forms
+this instantly became the only way
+developers transitioned between forms
+and that looked awful
+apple's design rarely does things for
+the sake of pretty
+every animation conveys a meaning
+when things swoosh in
+an apple ui
+it's always to convey direction deletion
+or some other deeper purpose

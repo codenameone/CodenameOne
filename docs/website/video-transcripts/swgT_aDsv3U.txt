@@ -1,0 +1,164 @@
+the implementation code for android and
+ios is pretty trivial and is almost
+identical to the code we already saw
+from braintree
+the best way to implement a native
+interface is to send a build with the
+include source option
+we can then open the source code in
+xcode or android studio and implement
+the native interface there
+then we can copy the native interface
+code back into codename one
+project and continue working like before
+i don't always do that with android
+since i find android studio to be slow
+and painful to work with but if the
+native interface is complicated it's
+sometimes better than the alternative
+another important point to notice is the
+different threads
+when we call the native code we usually
+do so from our edt which isn't the
+native os thread
+if the edt is blocked or waiting on the
+native thread things can get ugly
+so it's important to understand which
+thread you are using and for what
+purpose
+this is the android implementation of
+the native interface
+let's
+go over the various pieces
+pretty much every sample code from any
+third-party library will assume you
+derived the activity class which is
+pretty common
+so most will just use this to indicate
+your activity class in codename one you
+will need to get the current activity
+luckily this is pretty easy as we have a
+class called android native util
+which provides a few helper method for
+android native code including get
+activity
+as i mentioned before this method is
+invoked on the codename one thread and
+so it might
+cause an issue since android has its own
+native thread where things should
+execute
+run on ui thread is android's equivalent
+of the edt and this means the rest of
+the code will run in the android native
+thread
+unless stated otherwise code is expected
+to run on the native os thread so this
+is a good move for most cases
+this might beg the question
+why not do it for everything
+why aren't native interface calls
+implicitly invoked on the native os
+thread
+the answer is that it's not always true
+for for instance in i o methods
+we wouldn't need the dispatch to it
+it's also unclear if call is synchronous
+or asynchronous and dispatching includes
+an overhead
+moving on we can see that
+the start activity for result call
+that we had in the original code
+however in this case we invoke it on
+android native util
+since we don't derive from activity
+we also pass activity as an argument
+start activity for result is a special
+method that triggers callbacks
+calls within the activity
+to allow this common use case the
+android native util version includes an
+intent result listener class that has
+passed to that method
+and receives callback invocations
+the callback from the braintree code can
+have several results
+such as ok error or cancel
+just like in the ios version
+here we just invoke the static callback
+method on result and pass the data
+the ios version of the code looks a bit
+like a mess
+the main reason is the long method names
+that are part of our vm
+they might look intimidating at first
+but as we go over the code you will see
+that this isn't as hard as it looks
+the dispatch async call is identical to
+call serially or
+run on ui thread it executes the lambda
+block on the native ios event dispatch
+thread
+the next two lines are practically
+identical to the braintree code
+we'll discuss the lambda callback soon
+but first let's look at the present view
+controller you will recall this was
+invoked on self and the original code
+which was the view controller in
+codename one we have a global view
+controller which you can use with that
+syntax instead of using
+self for most such code
+once we get into the callback code the
+logic is a bit different
+it looks a bit long but you will notice
+that a method invocation is just a
+really long c function call
+it starts with a package name
+followed by the class name followed by
+the argument types and possibly by the
+return type
+all of which are required to make a
+method unique and see
+the arguments we pass
+start with a constant that allows us to
+pass additional arguments
+there are several argument types like
+this i suggest checking out the
+developer guide to fully understand this
+argument but it generally represents the
+thread context
+the next argument is the string
+for which we use the special from ns
+string method to generate a javalang
+string
+since the method is static
+we don't need to pass an object context
+or deal with the v table
+this makes the call far simpler
+a lot of developers shy away from native
+interfaces which is a shame
+they are slightly challenging but they
+are
+surmountable challenges
+some things are cryptic but as you saw
+in the example we practically copied and
+pasted the native code from braintree
+with very few changes and this was a
+relatively complex api to support
+a huge pain is in the error logs on both
+platforms
+android is actually regressed in this
+sense and became far worse
+i would suggest asking our team on the
+forum or stack overflow when you are
+stuck with such errors google is
+hugely helpful in finding solution for
+these sort of errors
+working with the native ide to implement
+the native interface stubs is a great
+time saver especially if you are a
+relative novice
+thanks for watching i hope you found
+this educational

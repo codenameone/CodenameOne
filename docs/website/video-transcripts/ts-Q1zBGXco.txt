@@ -1,0 +1,86 @@
+in this final part we'll discuss the
+checkout form
+yes i said form
+i know it looks like a dialogue but i
+chose to implement it as a form and if
+you look at it closely you will see why
+the functionality of the checkout ui
+is outside of the receipt section
+which we would normally think of as the
+dialog
+both the x button and
+the order button ours are outside of
+that ui
+hence this should appear as a form
+to get this appearance
+we grab a screenshot of the existing
+form
+by drawing it onto an image
+we then blur and tint the screenshot
+and set it as the background of our form
+we also
+use cover transition which provides that
+cool ios style transition
+for the checkout ui
+the close button is just a button placed
+in the north of the form
+i considered using a toolbar and
+eventually chose to just place
+components in the north area
+both
+would have worked
+out to
+identical results
+so there was no real reason to use
+components
+here i construct the title and close
+button
+it's mostly one long line of code
+if we ignore the code required to
+implement the x
+the checkout button is placed in the
+south
+again
+not a lot of functionality for that
+the dish container code is a bit
+simplistic
+i extracted it to a separate method
+that just constructs a border layout
+entry with the image title and the price
+you might recall the dialogue top uid
+from css
+and cutting tutorial
+this is effectively the background of
+the receipt
+the same would be true for the dialog
+bottom
+which is also from css
+i can go on a bit
+but most of the functionality of the app
+should be straightforward by now
+one of the main things i hope you
+learned from this module is the
+attention to detail and compromises
+required in building a mobile app
+when building an app i always start with
+the mockup
+it lets me gain perspective of the
+functionality and communicate with
+non-technical people
+about the effort
+the original psd
+looked trivial
+but some tricks
+like the even sized container for the
+grid layout or even
+the layout i chose
+weren't as simple
+other effects that might have seemed
+hard like the receipt ui
+were
+much easier
+just a nine piece border
+thanks for finishing this module i hope
+everything was clear to you and please
+feel free to ask questions and make
+comments so we can improve

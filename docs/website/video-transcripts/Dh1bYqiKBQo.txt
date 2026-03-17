@@ -1,0 +1,116 @@
+in this module we'll talk about the
+process of adapting the application to
+look good
+on tablets and desktops
+by default apps work as is in those form
+factors but this can produce a situation
+when app feels like a scaled up phone
+app
+The Problem
+case in point if we run the current app
+on a tablet it looks horrible
+it just doesn't fit
+the images look bad and overscaled
+the side menu and elements
+positioning doesn't make use of the
+available space
+this is how the app looks after the
+changes we will review today
+the icons and the layout look great
+the side menu is permanent and doesn't
+change as we move through the elements
+the app feels more like an app that was
+designed for tablets
+and can work reasonably well on a
+desktop
+Desktop
+when we switch to other entries such as
+the details entry
+the form doesn't change only the content
+in the center
+you will notice that instead of using
+commands in the title area
+we use large and convenient buttons at
+the bottom
+which is possible now since we have more
+screen real estate
+Form
+this is the key
+with a regular app every entry is a form
+and with a tablet app that doesn't work
+as nicely
+although it is possible to do so it's
+often not the best approach
+usually for tablet apps
+we like having one form and replacing
+the content within
+to achieve this we derive a common base
+class instead of form
+to implement that i just looked at
+everything that failed when i switched
+the base class
+and we implemented this in an
+abstraction class
+the implementation for form is pretty
+straightforward
+as a result
+UI abstraction
+going to the base navigation form
+the changes here are instantly familiar
+we now derive from ui abstraction
+instead of four
+let's open up ui abstraction and see
+what we have there
+ui abstraction opens with an inner class
+representing the form delegate
+this is effectively the class that
+implements the standard form-based
+navigation
+naturally it does derive from form
+as
+all the calls apply to it
+so instead of inheritance we now have a
+form of composition
+the constructor for ui abstraction
+accepts the title and layout which are
+both passed onwards to the form and the
+default behavior
+we don't need the fourth set of form
+constructors in this case
+this is a special callback
+that subclasses can override
+since many forms have an ok cancel pair
+of buttons i generally generalize that
+code so if a ui abstraction subclass
+overrides this method to return true
+we add an ok
+or cancel
+this allows us to have toolbar commands
+in regular forms and ok cancel buttons
+in tablet mode
+we implement this in the form in a very
+generic way
+we just add a command and implicitly
+show the previous form
+we have an on back callback that allows
+the subclass of the ui abstraction to
+intercept this behavior and bind logic
+to the cancel operation
+ok is identical with two small
+differences
+the first is the fact that on ok is
+invoked instead of on back
+the second is that we keep a reference
+to the ok button
+we need that for the validation code so
+validators can still
+disable the ok button
+if the input is valid
+scrolling down a bit
+we can see several methods of form that
+we overrode to provide sensible
+toolbar behavior in all cases
+if you look at the existing forms before
+this change you will see most of the
+forms already had similar code within
+them

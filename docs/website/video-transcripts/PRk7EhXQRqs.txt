@@ -1,0 +1,213 @@
+setting up a server in the cloud is
+probably one of the most tedious tasks
+we need to do
+even if you are a corporate developer
+who never has to do this i think there
+is a lot of value in understanding what
+goes into this
+this module is aimed at a quick and
+dirty deployment the goal of this
+tutorial isn't to teach you scaling or
+complex ideas
+just just to follow through all the
+before we begin we need to make some
+changes to the pom file
+this is one of the coolest features in
+spring boot and that says a lot
+you can generate an executable binary
+script that's installed in front of the
+jar
+that means you can literally type the
+name of the jar file on linux and it
+will run
+no java minus jar or anything like that
+this might seem trivial but the truly
+amazing thing is that you can use it as
+a service on linux
+which means you can bind it to common
+system services in etc in a d
+if you are not deeply familiar with
+linux that might not seem like much
+but it makes setting up the server much
+easier
+App Engine
+i'm a big believer in sustainability
+if running your startup's backend is
+five dollars per month
+that gives you a pretty decent chance of
+running without breaking the bank
+a lot of startups including ourselves
+make the mistake of over scaling
+we used app engine which was very
+alluring at the time
+the problem is that costs quickly
+ballooned to thousands of dollars per
+month
+which was totally unjustified
+using a vps is safe and scales with the
+need of your business
+but let's go on and talk about the
+server itself
+Server
+i used mariadb instead of mysql in
+production
+on the desktop i preferred mysql since
+it had a better installer for mac os 10.
+mariadb is a fork of mysql that is
+pretty much compatible
+i normally prefer to have a similar
+environment on production and
+development
+but in this case i use a mac instead of
+linux anyway
+so i just went with it
+SSH
+i use ssh to log into the server
+if you use linux or mac this is just a
+command line
+for windows users there are a lot a lot
+of free ssh clients in the wild and you
+can use them
+Linode
+we'll start on the linode site
+i'm skipping some of the points related
+to signer billing etc
+i just select the vps type which in this
+case is the cheapest option
+i create a new server instance
+Operating System
+once the server is active we need to
+install an operating system
+Deploy
+i choose to deploy a new image which in
+this case refers to the disk image
+effectively this means operating system
+install
+i choose centos because i'm used to it
+and it's well supported
+i type in the root password
+which is something you need to remember
+so don't lose that
+then deploy
+once i do that the server will take some
+time to set up
+after it's done
+press boot to start up
+the new vps
+User vs Root
+once the server is booted you can ssh to
+it with your root password notice that
+you should normally use a user rather
+than root as usage of the root user
+should be restricted to a minimum
+root is all powerful
+you want to reduce usage of root for a
+few reasons
+the obvious one is that mistakes and
+root can be costly
+but another reason can be that if your
+system was compromised with lower
+privileges
+a hacker has a good chance of elevating
+these privileges
+every time you use root
+a few years back
+apache was hacked
+and
+the hacker
+relied on a vulnerability in a script on
+the site to gain access
+the thing is the script was running
+under a regular user that isn't rude so
+he couldn't really do much
+he uploaded an exploit that would give
+him access to root
+only if a root user
+executed a specific command
+and bingo he got rude had someone not
+used root
+the hacker would have been stuck in
+purgatory
+for a long
+time
+Create a new user
+so
+the thing we need to do when we get to
+the server
+is create a new user called builder
+we'll use that user to run everything
+you will notice the sharp character
+that is the command prompt of
+a root
+user on unix
+Passwd command
+when root invokes the passwd command it
+doesn't ask for the existing password
+as
+root can override can override that
+just type in the new password and verify
+it
+in linux we install packages and
+dependencies are resolved automatically
+the underlying system in centos is rpm
+which stands for red hat package manager
+centos is a fork of red hat
+yum takes that to the next level by
+connecting to servers and searching for
+the rpm packages
+and all the dependencies
+and then
+fetching everything you need to install
+wget is a tool that can perform http
+requests to download a file from command
+line
+since we don't have a
+display opening a browser isn't really
+practical and this is reasonably
+convenient
+jdk hack
+this is a bit of a dirty trick
+if you try to download the jdk you will
+notice there is no way to get the
+download link
+oracle hides it until you check a box
+which means you need to set
+a cookie to get it
+that's really annoying and the only way
+i found to download the jdk directly to
+the box
+was this hack
+the alternative which i've used in the
+past is to download the jdk onto my mac
+and then use the scp command to copy it
+to the server
+that's really slow as i need to download
+and then upload the file
+scp is secure copy and it allows copying
+files over ssh
+i'll discuss it a bit later
+yum jdk
+you remember i said yum fetches things
+automatically
+so you would expect to do something like
+yum jdk and have the jdk installed
+technically that would work and might
+even work here
+all linux distributions ship with
+openjdk
+which is the open source version of java
+it's pretty similar but not identical to
+the oracle jdk
+that we had to download
+one of the main reasons i did that this
+was support for javafx
+which doesn't exist in the jdk
+we need it
+for
+the css compiler
+and i wanted it to work
+so i'm still using yum instead of rpm
+directly to install a package
+using yum is important as it can update
+its installed database and resolve
+dependencies

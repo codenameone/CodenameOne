@@ -1,0 +1,63 @@
+now that we have a general picture
+of our final destination
+let's figure out how to get there
+the transparent gradient at the bottom
+of the dish view is almost entirely css
+which is pretty cool
+this css generates an image which is
+then overlaid with transparency
+i also chose an italic font for this
+case which might be more appropriate for
+the dish description
+the toolbar
+also uses the gradient tint
+it derives from container to get the
+zero padding and margin
+the map address
+is similar to the dish overview
+description
+with a bit of padding
+the text of the map address
+is a separate component unlike the dish
+overview
+which means these ui ids
+are effectively different
+i set the background of the side menu
+to be white
+besides fitting with the general design
+and separating it from the form color
+this has another important use
+one of the important things to notice
+about the side command
+is that margin is zero except for the
+bottom where we have a one pixel margin
+if you will look at the entries you will
+see a one pixel white line between the
+command entries
+that's the white color of the side
+navigation panel coming through between
+the entries
+it's not a separation line it's
+literally the background
+site commands are styled differently
+in the native themes
+so
+we need to override a lot of behaviors
+such as text decoration which is set to
+3d text in ios
+3d text draws a subtle shadow under
+every letter
+normally there is a status bar component
+on top of the side menu in ios
+so the clock or battery indicators don't
+draw on top of the side menu
+since we have an image here
+this isn't a problem
+and we can set its size to zero
+i thought about using the exact same ui
+id
+as i used for the shopping cart button
+but that button has a bit of a margin to
+push it away from the side of the form
+i probably should have used inheritance
+here but i didn't

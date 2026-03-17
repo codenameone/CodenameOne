@@ -1,0 +1,48 @@
+the more tab is effectively all the
+missing functionality facebook removed
+when it eliminated the side menu ui
+we won't implement most of this stuff
+with the exception of user settings
+which i'll do later
+to keep the code short i added a static
+import of the font image class so i can
+reference material icon names directly
+the code itself is trivial
+we use container again and not infinite
+container which is necessary in this
+case we also have some padding all
+around and activate scrolling which is
+important the me button will lead us
+later to the settings ui
+right now the css api
+doesn't support line borders
+yet
+so code handles that
+every button icon has a different color
+slash icon with roughly the same ui
+so a generic method to create the button
+can solve
+that generic method just generates a
+multi button
+with the proper border color to create
+the circle effect on the icon
+there are quite a few ui ids here but
+most of them aren't custom ui ids they
+are built-in ui ids from multi-button
+multi-line one represents the first line
+of a multi-button
+the avatar of the user we want
+uh
+for for the avatar of the user we want
+more margin
+so the text will be better positioned
+the second line of the multi button is
+gray and noticeably smaller
+the circle icon itself has noticeable
+padding and a large font size for the
+icon
+with this the mock-up of the main ui
+should work and run
+there is one last piece we need to go
+through before going into the server
+code

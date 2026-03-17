@@ -1,0 +1,65 @@
+the restaurant app maker is an
+application that we will build together
+based on the restaurant app i introduced
+earlier
+it will generate a custom application
+for a specific restaurant
+as i mentioned before we are taking a
+depth first strategy where we implement
+a narrow user interface and logic
+all the way to the server code
+so we can test the full process before
+we fill in the pieces across the stack
+so
+we are starting with a relatively simple
+baseline where we only include a part of
+the ui
+due to that i removed almost every
+complex detail form and chose to focus
+only on the very basic features
+i
+chose to copy the data model from the
+restaurant app
+i copied which is the lazy approach
+i think it often makes sense to copy at
+first and if you find yourself copying
+repeatedly
+then spend the time to refactor
+i see developers trying to over
+generalize things that don't need to be
+generic
+and this often ends up taking
+more time than most of us expect
+for code specific for the app i added a
+new app settings class
+this is a class mostly for data related
+to the code generation
+i did the data model now because it was
+already implemented for the most part
+just like i did the ui first for the
+restaurant app as it was already shown
+in the psd
+in this case the data model is a good
+foundation to build on top
+let's try to draw how this will look
+we start with the standard codename one
+form class as the base class
+which i will demonstrate here
+base navigation form derives from form
+to provide common capabilities such as
+the
+the common side menu
+and other common top level form
+abstractions
+it will have several subclasses matching
+the top level forms but right now we'll
+focus on the two common uis
+one of them is
+the dish list
+and the other is the build form
+the dish edit form derives from form
+directly
+as it doesn't include the side menu or
+related logic so the base navigation
+form doesn't fit
+in this case

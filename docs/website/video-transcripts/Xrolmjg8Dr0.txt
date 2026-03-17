@@ -1,0 +1,43 @@
+We are nearing the end and it's time the last two big features: media & push.
+
+Here I'll focus on the former. Media includes all the aspects of the media from acquisition whether from the camera or gallery, to the upload & then viewing said media.
+For the sake of simplicity I'll support only one media file and not the full breadth of ways Facebook allows you to submit/upload and manage media files.
+We'll start with the changes in the server then move through the steps in that sequence.
+
+The changes in the server for media support are minimal. Most of the work is already done we just need to wire and tune a few things. One thing I did need to change was the packet size in the database.
+
+I had to add the argument --max_allowed_packet=256M to mySQL's launch arguments so it would work with large video files.
+
+The most obvious change is to Post & its related DAO/Service classes. We'll start with Post itself.
+
+I've added a relation to media files that lets us reference a specific media object. Notice you can add multiple media files. I won't use that in the code because that makes layout of these files a bit harder and I don't want to get into that. I also added a getter & setter but I won't show them as it's pretty obvious.
+
+The next change in this class is to the DAO method of Post. Notice attachments are represented as a Map of Strings and not as MediaDAO objects, we don't want to expose the full DAO to the client
+
+A map is enough as all we need in the client is the media ID & mime type
+
+This map is now accepted in the PostDAO constructor
+
+This leads me directly to the PostDAO class which has the predictable change within it. This map includes the set of attachments we created in Post
+
+it's reflected in the constructor & in the getters/setters that we won’t detail. This will actually work seamlessly for return values
+
+but for upload we will need an additional set of changes in PostService.
+First we need media access which is the one repository we didn't include in the PostService. We need this so we can translate client request to server side media objects.
+
+The work in the service is done in the post() method, it's a relatively simple change of translating media id's to media objects.
+
+Since we are creating a new Post it's safe to create a set from scratch
+
+We just use findById to set a media object into place. That's a trivial change but with it everything will work seamlessly on the server side as the DAO will handle the new JSON requests and server API doesn't need to change!
+
+There is one tiny change we need to make to media service. It's very nuanced, see if you can spot it… I’ll give you a hint
+
+See it? If you don’t I can give you a bigger hint
+
+Notice it yet? We switched @RequestHeader to @RequestParam so the auth can be passed as an argument.
+This is a security risk, if you share that URL from your app it will essentially hand out the key to your app!
+So why do something like this if there is a risk in it?
+In the client side when I want to show an image I can just submit a URL to the URLImage API. However, if I have a required header the only way to pass it is via global headers which would be a mistake here as it might leak that key to a 3rd party website by mistake. I could have left the API as it was and just written more elaborate code on the client...
+I chose to take this shortcut both because it's simple and also to explain the nuances of security risks. This isn't a vulnerability, but it can become one if we aren't careful. When you are the only person working on the project this isn't a big deal but with more engineers coming on board details like this might be ignored/missed by latecomers.
+With that the changes to support media on the server are done and we can move to the client side.

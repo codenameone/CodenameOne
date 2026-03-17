@@ -1,0 +1,109 @@
+finally we'll discuss the side menu and
+preview functionality
+two relatively big pieces of code
+getting side menu navigation ui to look
+good
+has
+many nuances and pitfalls
+the specific ui includes some small
+details including a different color to
+the selected entry representing the
+current form
+a couple of points i'd like to highlight
+are first
+the large amount of padding
+three millimeters on every side
+that is very important for the feel of
+an application don't be stingy with
+padding the one pixel
+bottom margin creates the effect of a
+thin white line
+separating the side command entries
+and looks like a border between the
+entries
+going over the code we can see the image
+at the top of the side menu is the same
+one
+in the main form
+it wouldn't matter if it was a different
+image
+might actually look better
+i use the logo icon mostly to give the
+ui the right feel
+otherwise the sign menu feels bare
+the same is true for the tagline i use a
+special ui id with some padding to space
+it a bit from the bottom
+without this tag line the side menu
+would look empty and weird
+here is an interesting trick normally
+side menu commands have the side command
+style
+however i wanted the current form
+command to be darker
+so i
+check what's the current form
+and use the uiid attribute of the
+command to determine the ui id
+to
+selected side command which happens to
+look exactly like the side command's
+pressed
+style
+but there is a problem
+since the commands use
+a material design command
+icon it's determined before the ui id
+has time to take effect and the icon
+would have the lighter background color
+the hack
+is to use
+the pressed icon for the icon as it will
+look exactly like the selected side
+command in this case
+the last feature in this module
+is preview
+we can preview the app by pressing the
+play button
+and the trick is that we literally run
+the restaurant app in place
+we only modified it slightly
+by adding an exit button to the side
+menu
+i copied the source of the restaurant
+app
+instead of making it more generic
+it's a lazy solution
+but i am lazy and proud of it
+if the need arises i'll refactor
+everything and build a
+shared code base
+but only when the effort justifies
+itself and not a moment
+sooner
+to get this to work i had to rename the
+theme.res file and the builder app so we
+won't conflict with the theme of the
+restaurant app
+i did copy the sources
+and did a few minor hacks in the code
+but most of that could be generalized in
+the future
+i stepped out purchase.java as the
+native interface portion would have been
+hard to replicate
+and it's not something i'd want in the
+preview
+showing the preview literally means
+creating the main menu form from the
+restaurant app and setting the theme
+from there
+then showing the first form
+exiting means the reverse of that
+with the now renamed builder menu
+there are more efficient ways of doing
+this but this is the most simple and
+consistently reliable way
+i found to accomplish this functionality
+thanks for watching i hope you found
+this informative

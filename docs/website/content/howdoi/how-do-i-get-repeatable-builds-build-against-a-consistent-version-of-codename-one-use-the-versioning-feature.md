@@ -12,27 +12,33 @@ description: Versioning allows us to build against a point release and get stabi
 youtube_id: w7xvlw3rI6Y
 thumbnail: https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-4-1.jpg
 ---
+{{< youtube "w7xvlw3rI6Y" >}}
+Repeatable builds matter when you are trying to stabilize a release, investigate a regression, or keep a production app on a known-good Codename One version instead of automatically moving with the latest server-side changes. Versioned builds are the feature designed for that job.
 
-{{< youtube "w7xvlw3rI6Y" >}} 
+The core idea is simple. Instead of always building against the current Codename One server release, you tell the build system to target a specific Codename One version. That means the native build is performed against the exact server logic and framework state associated with that release. If your application built and ran correctly against that version before, you now have a way to stay there while you validate later updates on your own schedule.
 
-#### Transcript
+This is especially useful when a build suddenly starts failing or when behavior changes unexpectedly after a platform update. If you can rebuild against an older known-good Codename One version and the problem disappears, you have learned something important: the regression is probably tied to the framework or build-server changes rather than to a recent change in your own app. That turns versioned builds into both a stability feature and a debugging tool.
 
-In this short video I will try to explain versioned builds which is Codename One’s approach for repeatable builds. Before we begin, versioned builds are a pro feature that has extended functionality in the enterprise tier. I’ll talk more about that soon but first, what does versioned build actually mean?
+The original video frames this as a Pro feature with longer retention in the Enterprise tier, and that is still the right way to think about availability. The exact retention window depends on the subscription tier, but the practical lesson is the same: if stable historical build targets matter to your team, versioned builds should be part of your release strategy.
 
-With versioned builds we send a build to a specific Codename One point version. For instance, you can send a build to Codename One 3.7 and it will build against the exact version of Codename One that existed when 3.7 was released.
+When you use a versioned build, it is usually a good idea to keep your local simulator environment aligned with that same framework version as well. Otherwise you can end up testing one version locally and shipping another remotely. The older settings UI exposed this through the version selection and client library update flow. In current Maven-based projects, the broader goal is still consistency: keep the project, simulator, and native build path aligned so that local testing reflects what the build server is actually producing.
 
-This allows you to avoid potential regressions due to frequent changes in the build server that might impact compatibility. It’s also useful for testing purposes, if your app suddenly fails you can use versioned build to see if this is due to a change in the Codename One servers.
+This is not something you need for every build during active day-to-day development. It becomes valuable when predictability matters more than immediately consuming the latest changes. Teams that ship production apps, support older releases, or operate in tightly controlled release windows tend to benefit the most from this feature.
 
-As I mentioned before there is a difference between enterprise and pro subscriptions. For enterprise developers we support up to 18 months back. That means an enterprise user can build against a version released in the past 18 months which is typically 4 releases back.
+In practice, the healthiest workflow is to use the current Codename One version during normal development, then pin to a specific version when you need a reproducible release train or when you are isolating a regression. Once the newer version is validated, you can move forward deliberately instead of being surprised by it in the middle of a release.
 
-The pro versions include 5 month support which typically maps to the last one or two releases.
+## Further Reading
 
-You can enable versioned build by selecting the specific version in the Codename One Settings tool under the basics section.  
-This opens the list of versions and you can pick the right one. You can use update client libs to update the simulator to that specific release as well.
+- [Build Server](/build-server/)
+- [Moving To Maven](/blog/moving-to-maven/)
+- [Developer Guide](/developer-guide/)
+- [How Do I Use Offline Build](/how-do-i/how-do-i-use-offline-build/)
 
-Thanks for watching, I hope you found this helpful.
+<!--
+Full transcript retained in docs/website/video-transcripts/w7xvlw3rI6Y.txt for future video recreation.
 
----
+Future video outline: explain why repeatable builds matter, show how to pin a build to a specific Codename One version, compare that with always using the latest build server version, then walk through a regression scenario where versioned builds help isolate whether the breakage came from the app or the framework.
+-->
 
 ## Discussion
 

@@ -1,0 +1,92 @@
+in this module we'll take a psd file and
+convert it into an application mockup
+we will use the css plugin to implement
+most of the ui
+although we will mix it with some
+plain theming
+our goal isn't pixel perfect design
+the goal is a close enough ui experience
+i went a bit overboard with some of the
+design decisions i took
+normal code name one applications don't
+need to be this complex
+to achieve this level of design
+Result
+this is the screenshot
+of the original psd design that we will
+adapt
+there are many things to notice here and
+i'll go over some of them when we
+implement them
+but let's see the final result first
+the screenshot on the right is taken
+from my personal android device
+and shows off
+the mock-up running there
+some differences are instantly apparent
+some are intentional
+and some are not
+notice i chose to use material design
+icons for the shopping cart menu and
+search
+instead of using the icons from the
+design
+i think
+these just look better and they adapt
+better to various resolutions
+this is the second ui element from the
+original design
+on the right you can see the end result
+from my device
+there are many design decisions i had to
+make
+in order to get this right for instance
+i had to make everything a shade darker
+so the title will be visible
+enough on a mobile screen
+here is the mock-up running on my device
+you will notice that it isn't functional
+but can be manipulated
+and the incoming transition for the
+shopping cart ui
+is implemented
+as one would expect
+Top area
+let's zoom a bit to the top area
+which is one of the more challenging
+parts of the application
+i use a layered toolbar in this form
+so the background ui can be deeply
+customized
+the layered toolbar places the toolbar
+area
+above the form itself
+so the form components stretch all the
+way to the top
+the image of the city in the background
+is literally added to the parent form
+as well as all the other elements you
+see here
+the form itself
+is a border layout
+and the whole top portion
+is just placed in the north section
+the toolbar itself floats above
+includes the section
+of the menu and search
+i initially looked at this ui
+and thought it made sense
+as tabs
+after reviewing the functionality it
+became apparent that this is a filter
+and shouldn't replace the entire ui
+so
+i went with a horizontal list
+the separation line on which the
+shopping cart and order are placed
+is really just a layered layout
+that hides the bottom part of an of the
+image with an opaque label
+that has the same color as the form i'll
+discuss this further as we move
+forward

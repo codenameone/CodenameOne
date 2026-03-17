@@ -1,0 +1,206 @@
+with the facebook clone i ended up
+constantly
+contrasting uber and other apps with the
+appearance of the facebook app
+uber chose to use material design in the
+ios version and the app looks great on
+ios and android the flip side is that
+uber is orientation locked and doesn't
+support tablets properly
+in that sense i don't want to make an
+accurate facebook clone i want to make
+something better
+so the goal isn't an exact clone
+but i will draw heavily heavy
+inspiration i will copy the following
+principles from facebook
+native ui look
+i will use native os widget look where
+applicable
+screenflow
+i will keep a similar screenflow to
+facebook
+tablet and orientation i will support
+orientation changes in the app and
+tablet
+mode plain text password i use this
+behavior as facebook does even though i
+don't like it
+with that in mind i'll focus on the
+following big ticket items
+i won't go over each one right now but
+i'll try to implement all of those in
+the clone
+before we proceed let's go over the
+things i won't touch
+the facebook app is huge
+it contains a lot of nuanced hidden
+functionality
+most of that is simple but the breadth
+of data makes it a huge undertaking
+i've tried to address the complex
+features of facebook but i'll skip some
+big ticket items that i won't be able to
+cover
+events are complex they would require a
+lot of time but won't necessarily teach
+a new coding skill
+camera special effects
+this is probably possible but will also
+probably take me an entire week to
+implement
+this is probably outside of the scope of
+what we are trying to do
+additional apps
+the facebook app connects to instagram
+messenger etc
+this shouldn't be hard but i want to
+focus on the app itself
+find friends and complex searches
+this is mostly server-side logic i'll
+implement search but i won't go too deep
+into this as there's a lot of server
+side code
+hashtags and complex posts
+i won't go into all of the nuances of
+post formatting supported by facebook
+i'll include some common templates and
+leave the rest for you to fill slash
+enhance
+i won't cover a lot of things such as
+albums etc
+privacy and visibility
+while we will implement search in some
+aspects of a social network we won't do
+a lot of the important things
+there are a lot of nuances to private
+friends
+friend only public postings that i won't
+cover
+these aren't hard to implement but they
+mostly involve server side juggling
+i prefer focusing on the client side
+pretty much all the details business
+pages ads promotions proper ranking
+complex media detection etc facebook is
+huge we will implement only a small
+subset
+supporting orientation tablets etc
+requires a flexible architecture
+furthermore facebook is filled with data
+to a ridiculous extent there's so much
+information about every attribute
+we can support
+that volume of data with properties
+properties allow us to store data
+transmit data
+and automatically create uis from data
+this is tremendous for a tool such as
+facebook a facebook clone we can
+eliminate a lot of the grind of ui
+database passing overhead by leveraging
+properties
+because of the flexible nature of the
+application i will use an approach of a
+central controller class for the user
+interface to keep things simple
+now that we have a sense of what we are
+trying to do
+we can start with mocking up the initial
+ui
+we first need to start by creating the
+facebook clone project
+i created a standard codename one
+project with the following settings
+project name facebook loan package name
+com dot codename one dot fb clone
+template bare bones and theme native
+i will use css for this project
+the css plugin is getting
+a complete rework right now and would be
+integrated into codename one soon
+check out the css project on github for
+installation activation instruction as
+an instructions as these will probably
+change by the time you see this
+we will need the facebook logo for the
+markup and for that we will use an icon
+font
+icon fonts are fonts
+that map a character glyph to an icon
+that means that icon will have one color
+but we can color it in any way we want
+and size it draw it easily in every
+platform
+that's very convenient and there are
+several providers
+of such fonts
+you can also convert svgs to fonts
+but
+the facebook logo is specifically widely
+available
+we'll make use of fontello which you can
+find at fontello.com to generate a font
+that contains the three facebook logos
+from font awesome and the gender icons
+pontello is a tool that can package
+specific icons from multiple fonts into
+a single file for your convenience
+because of that we'll also use this
+opportunity to bundle into icons
+icon characters for male and female
+gender
+we'll use these during the sign up
+these are icons from the mfg labs font
+we need the gender icons as the material
+design for icons don't have proper
+gender representation
+step one
+type facebook into the search select the
+three font awesome entries
+step two type mail into the search and
+select icons to match genders
+step 3. type facebook into the name
+field and download
+step 4 copy the ttf file into the css
+res directory of the facebook clone
+project
+you will need to create the rest
+directory under the css directory
+step 5
+open demo.html
+in your browser
+step six check the show codes box
+step seven this is the code for each
+icon we'll use
+now that we have all of the pieces in
+place we can create the initial css file
+there are a few important things here so
+let's review it one line at a time
+this is a special css selector for theme
+constants
+you should have this in any theme by
+default to derive the native theme
+even if you don't think you are using
+native theme features you probably are
+this hides the scroll bars by default
+sets the default gap between a label and
+its icon
+it applies to buttons and all label
+subclasses
+these
+should already be transparent
+this is here just to verify
+the default font for the styles might be
+ignored if a specific built-in style
+already defines a font of its own
+we define the ttf of the facebook icon
+font
+we downloaded before
+using this we can draw a large facebook
+logo with the font
+while i'm here i'll define the main form
+to be white
+the app is a bit inconsistent with this
+but white seems to be
+the main background color

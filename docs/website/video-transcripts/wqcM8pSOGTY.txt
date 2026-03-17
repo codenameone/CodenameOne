@@ -1,0 +1,270 @@
+working with the codename one sources
+is not for the faint of heart
+you can learn a lot from going through
+the process
+however if your only goal is to avoid
+the build servers you might find it
+harder to work with
+in fact i personally use the build
+servers when building apps and testing
+them
+i almost never use offline build or the
+sources directly
+instead i hack and test things via the
+include source option
+however
+learning this is still valuable and i'm
+aware of a few people who don't share my
+opinion on this matter
+still
+why would i write a guide for something
+like this
+there are three individuals i think of
+who might benefit from this guide
+if you are the type of person who needs
+to do everything yourself
+then this is pretty much it
+if you want to understand the
+underpinnings of codename one at a
+deeper level than
+more the more abstract descriptions
+then this is a good first step
+if you want to feel secure that you can
+hack codename one manually if our
+service changes or becomes unavailable
+in the future then the mere existence of
+this guide should help calm some of
+those concerns
+to understand how to work with codename
+one code
+we first need to understand what
+codename one does
+for this case i'll remove the build
+servers from the equation and focus on
+the portability aspect codename one
+includes three distinct pieces of four
+portability
+vm
+for some platforms such as android the
+vm is natively included
+however we work on top of rvm in ios
+kvm in windows
+and tvm for javascript
+api represents the actual calls to the
+com.codename1
+classes
+ports are the implementations of the api
+for the various platforms
+this is all pretty trivial the api is
+always the same we change the vm and
+port to support all the platforms so if
+you understand this
+then the simulator is simple too
+in the simulator the vm is just the
+standard java vm
+and the port is just the port of
+codename one to java se
+there is a bit more to that though
+the port javasc includes a lot of
+specialized glue code to show the
+simulator and other features such as the
+network monitor etc
+but let's start with this and move on
+all of the instructions that follow will
+work regardless of whether you have the
+plugin installed
+i will focus on using the command line
+and assume you can translate that to
+your ide of choice
+technically you don't really need the
+plugin if you are working from the
+source code
+however it's convenient to work with
+it means that selecting new project and
+picking codename one just works
+it means that double clicking a resource
+file launches the designer tool
+but technically you don't really need it
+what you do need is jdk8
+notice that newer versions might not
+work
+we generally use the oracle jdk because
+it comes bundled with javafx
+and that makes everything simpler as the
+simulator needs javafx for some features
+specifically media and browser
+if you choose to use openjdk it might
+work if you install
+it with opengfx
+but it's not something we tried
+apache aunt can be downloaded from the
+apache website
+make sure ant is in your system path and
+that the command runs
+note that you will need to define the
+java home environment variable properly
+git is optional you can download the zip
+from github but if you'd like to
+contribute pull requests back
+into the project this can be useful
+for android development we'll use
+android studio 3 which you can download
+from google
+for ios development we will use xcode 9
+point x or 0.2
+from apple
+we need to clone these repositories or
+just download the source zips
+of these repositories and expand them
+these repository repositories should
+reside in the same hierarchy and i will
+rely on that later on when giving out
+instructions you will notice we have
+three repositories to start with
+codename one is the main repo the skins
+make sense as we use them to show the
+phone skins but why have binaries
+the immediate question would be why do
+we need binaries for an open source
+project
+the answer is that they are harder to
+build on their own in some cases and in
+others we need stubs or nate of native
+platforms so we can compile against them
+without downloading the full sdk
+let's go over the files and directories
+and the binaries project and explain
+them one by one
+the svg directory
+is from the open source batik project
+it's unmodified we need it for the
+designer tool for svg support
+the ikvm project is hard to compile
+without windows so we have a
+pre-compiled version here
+these are legacy stubs of the blackberry
+os
+i won't cover blackberry here so these
+aren't really needed
+we need stubs to compile javafx code we
+don't embed this
+this is the jh labs project for javasc
+image filters we use this to implement
+gaussian blur in the simulator
+these are used by the sqlite
+implementation
+in the simulator
+these are part of the open source assemb
+project which we use in powerpower vm
+everything here is stubs which we use to
+compile the android native
+implementation without downloading the
+full android sdk
+we don't run any of this just use it for
+compilation
+these are legacy stubs for j2me which is
+no longer supported
+these are libraries used by the codename
+one designer tool
+there are a lot of swing libraries used
+here
+all of them are open source
+this is an open source library we
+developed to improve javadoc generation
+check out the repos for the project
+this is a pre-compiled binary from the
+cldc directory in the project
+it's here for convenience
+this is technically a set of stubs of
+the java api supported by codename one
+this is a customized version of the
+cldc.jar file that exposes
+classes.getresources
+string which we normally don't want to
+expose
+the entire directory contains binaries
+for the uwp port
+i won't go into that because i won't
+cover the offline building of the uwp
+version here
+before we go into building the project
+let's inspect the separate pieces
+most of the pieces we fetched in the
+codename one repository are netbeans
+projects
+notice that netbeans projects are just
+specific folder structures with an ant
+build xml file
+that means you don't need netbeans in
+order to build or run them
+the codename one folder includes the
+codename one apis
+this is just a standard netbeans and
+project that contains 100 portable code
+notice that at this time this project
+still uses java 5 syntax due to some
+technical constraints
+codename one designer contains the
+designer tool which is a swing
+application built with a swing app
+framework
+it's a standard netbeans project too
+with major pieces written using the
+netbeans matisse gui builder
+the vm directory hosts the power vm
+source code
+it includes two subfolders each of which
+is a standalone netbeans and project
+the batco translator is a java netbeans
+project that reads java bytecode and
+generates c code it includes a couple of
+built-in c files but most of the c code
+is generated
+the portion of the vm that isn't a part
+of the codename one api
+this is a netbeans project that includes
+implementation of all the java packages
+needed by parker vm
+factory is a simple project that
+contains one class
+com.coname1.impo
+dot implementation factory
+that lets us decouple the implementation
+of codename one from the ports
+themes are the native os theme files
+which we load when a theme derives from
+native
+these are embedded into the ports and
+into the skins
+tests contain unit tests for the
+platform
+ports are the various open source os
+native ports of codename one
+and some platform-specific tools
+this is where most of the
+platform-specific code of codename one
+resides
+the android directory obviously includes
+the android port
+the same is true for the ios port
+javasc
+includes both the desktop port and the
+simulator
+uwp includes port to universal windows
+platform
+notice that this also includes our fork
+of ikvm which is the vm implementation
+for that platform
+cldc11
+is not a port but rather a set of
+supported stub apis this isn't an actual
+vm but rather stubs we use when
+compiling codename one apps to make sure
+they don't use unsupported apis
+retro is an adaptation to the
+retroweaver that added support for java
+5 code to run on old blackberry j2me
+devices
+this code is no longer used
+the same is true for the other ports
+within this directory

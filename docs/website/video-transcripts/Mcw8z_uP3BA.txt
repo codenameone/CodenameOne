@@ -1,0 +1,273 @@
+this module covers low level apis and
+some
+ios slash android specific details
+i don't aim to teach objective c or
+some core concepts of android
+development
+you don't necessarily need to know these
+things but they would help
+it's important to notice that the code
+in this module is fresh and complete
+it's here as a porting reference
+since this is pre-alpha level code it
+should be treated as such
+i've discussed low-level native
+interfaces and third-party library
+integrations before
+but i never did it for an api as complex
+as the camera api
+arguably the maps support is harder so
+developers could have used it as a
+reference
+my cheap motivation in doing this module
+is building the cn1 lib itself
+low-level camera access has been a wish
+list of hours since we introduced said
+ordering of components
+as such
+the tutorial is an afterthought
+the first step of implementing a cn1 lib
+is looking for available apis on both
+sides
+and sometimes surveying the work done by
+other cross-platform tools for
+inspiration
+in this case other tools don't offer
+something as comprehensive
+so i don't spend too much time on that
+android's native camera api is a mess
+and at some point google just threw the
+whole thing out and replaced it with
+camera 2.
+if you want to support older devices
+you need to support both apis and
+there's a lot of nuance with permissions
+etc
+i didn't want to use the native android
+api as is
+and started checking for options
+two open source camera apis stood out
+and camera kit android looked like the
+best option
+normally this is the place where i would
+go over the android api and go over the
+ios api and try to find common ground
+instead i chose to skip that
+and just write the android
+implementation
+then think about the ios implementation
+after the fact
+my reasoning was that camera kit already
+spent a lot of time designing an
+abstract api
+it makes sense to follow their lead
+i'm not a camera expert but they already
+dealt with
+user requirements and design issues
+this would make the android
+implementation trivial
+and if something doesn't work on ios or
+elsewhere we can create special cases
+for that
+i didn't build a cn1 lib
+i started with an app that uses
+native interfaces
+apps can i can debug unlike a cn1 lib
+once the app was done i just copied the
+sources into a new cn1 lib project and
+created that
+so without further ado let's dive into
+the portable portion of the code
+as i mentioned before i decided to model
+the api
+based on the android camera kit api
+which is mostly exposed in the camera
+view class
+you can see in the camera view project
+camera view is a big class with a lot of
+ui code so i wanted to distill the api
+calls within
+i searched within the class for public
+methods and isolated them
+i then created a new native interface
+within com.codename1.camera
+the one method that's a special case
+that didn't exist in the original
+is peer component
+get view
+this is a method that returns the
+preview for viewing the camera
+in the native code it's the actual
+camera view class but in our case the
+native interface hides that
+this method returns the camera view
+in the native code
+camera view has a method
+get camera properties which returned an
+object called camera properties
+that object contained two fields
+horizontal and vertical
+viewing angles which i just mapped
+directly
+in retrospect some of these apis like
+toggle facing flash
+is facing back front should have been
+implemented in the java side
+the api already used ins for constants
+so this was pretty easy to translate
+into a native interface
+these two rely on event listener code
+i'll elaborate more on that soon
+these were originally preview and
+capture size
+they returned a size object which was
+just width and height in a class
+as you can see the translation was
+mostly easy and other than a few methods
+that returned objects everything was
+really smooth
+i did gloss over some apis i chose not
+to implement within the native interface
+you will notice all of these methods
+have one thing in common callbacks
+we can't pass a callback into the native
+interface
+so all of these apis can't be
+implemented in the native interface
+we can implement them in the high level
+abstraction though and i'll go into and
+i'll get into that soon
+but before we go there i did mention the
+constants from the native api
+they are implemented in the camera kit
+class in the native project i had to
+implement our own constants which i did
+using an interface
+you'll notice that this is copied from
+the android version and so values
+returned from there should automatically
+work for us on android
+which is pretty cool
+never expose
+a native interface to a user it's a
+recipe for disaster as things might not
+work as expected
+always
+wrap the native interface
+in a regular class as that allows for
+fine grained control
+it lets you change the native api and
+move forward while keeping compatibility
+and simplicity
+so the next order of business was the
+decision of
+how to encapsulate this functionality
+for that i created the camera kit class
+which abstracts this native interface
+we implement the constants interface
+so we'll have easy access to them
+the native interface instance is shared
+between the methods of the class
+this is a singleton
+it's not how the native api works but
+it's much simpler and we don't need
+anything better
+use this list
+to send camera events to the user of the
+api
+i'll discuss that further soon
+ios strips out unused code which can
+cause callbacks to fail
+we need to trick the ios vm into
+thinking that some code will execute
+ios needs a build hint we can just
+inject it into the build hint list if
+the user didn't declare it
+we review the build hints if the ios dot
+ns camera usage description isn't
+declared
+we add it
+notice that this will work only
+on the simulator
+i called this create even though it's
+more like a get instance method
+while the camera kit won't work on the
+simulator i can still bind functionality
+to it
+in this case we do
+two things in the simulator
+we registered the required build hint if
+it isn't there already
+we invoke all the callback methods
+notice that this code will never execute
+but our ios vm can't detect that because
+this is for ios
+is in private
+without these calls
+the ios vm would
+strip out these methods and the c code
+that invokes them
+wouldn't compile
+if the native interface is supported on
+this device
+then we can return the instance of this
+class
+otherwise we return null
+there is a lot to digest here luckily
+this was the hardest part the rest is
+verbose
+but it's far simpler than this
+most of the class looks like this
+we delegate the calls to the native
+interface to keep that code hidden
+nothing interesting
+there are a few interesting methods
+within the class so i'll address them
+here and skip these boring calls
+toggle facing
+is in the native interface but instead
+of implementing it in ios i chose to
+implement it
+in the camera kit and ignore the native
+interface
+the same is true for toggle flash i'm
+sure i could do this for several other
+methods and simplify the native
+interface layer
+the add remove listener code
+just modifies the list of listeners
+notice i trimmed the code a bit so it
+would all fit in one slide
+the fire methods are invoked internally
+to send events to the listeners
+since the native code invokes them
+they might not be on the edt and so they
+recurse via call serially
+to move the context into the edt
+the event dispatch logic is identical
+for all the fire methods
+it's just a loop over the listeners and
+a method invocation
+the rest of the listeners follow the
+same semantic for updating a video
+result or an image result
+so
+who invokes the fire methods
+i deprecated this and the native
+interface so developers won't use them
+by mistake
+this class is for internal usage only
+all three events are handled in the same
+way
+through the fire method
+notice the different types of arguments
+to the constructors
+we'll discuss the complexities of them
+in the ios port
+the final two missing pieces are the
+listener interface
+and event class
+both should be pretty obvious
+so i won't list them here
+you can check out the project source
+code if you are curious

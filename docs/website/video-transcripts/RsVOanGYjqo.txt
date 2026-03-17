@@ -1,0 +1,156 @@
+the ios app is surprisingly easy when
+compared to the android app
+there are some nuances but overall the
+process is pretty simple
+first we need to compile the vm and port
+so we need to go back to the cn1
+directory and execute these commands
+we also need retro lambda which we can
+compile from
+github.com
+orf jackal retro lambda or download the
+binary from
+oss sonotype dot org slash contacts
+groups slash public slash net slash off
+jackal slash retro lambda slash retro
+lambda
+i won't go into the compilation process
+of retro lambda as i just downloaded the
+binary
+i created a new kitchen sync ios folder
+and placed the binary there
+you can run retro lambda with the
+following command
+once this command is complete a version
+of kitchen sync classes targeting jdk 5
+resides under the kitchen sync classes
+directory
+i won't go into details about this
+command as i think you would be better
+served by the documentation in the retro
+lambda project
+the next step is to create and compile
+the step class
+which we will use to launch the
+implementation
+in the kitchen sync ios folder i created
+a step directory i then added
+the kitchensync stub dot java to that
+directory
+the one interesting thing in the stub is
+the fact that the implementation invokes
+the runnable callback when it's ready
+everything else is
+really trivial
+this can be compiled using this command
+notice that i used source
+1.5 level when compiling this is crucial
+as the vm doesn't support java 8
+directly
+we use retro lambda to add support for
+java 8 language features but don't do
+that on the stub
+once we do this we can create the output
+folder
+xcode proj and run the vm translation
+code
+there is a lot to digest in this command
+so i'll break it down to one argument at
+a time
+this should be pretty easy we are
+running the vm translator it's just an
+executable jar
+this represents the vm target os this is
+currently the only supported option
+in the future we might support
+additional targets for the vm
+next we have the path bash understands
+this as multiple commands so we have to
+put the entire path in quotes
+these are the individual elements within
+the first element is
+the in the path is the stubs directory
+where i compiled the kitchen sink stub
+before
+the second element is the classes of the
+vm
+this covers the java core classes
+supported by codename one
+these are the actual classes of the java
+app after they went through the retro
+lambda process
+these are the classes of the ios port
+implementation
+these are the core implementation
+classes of codename one itself
+these are objective c sources that
+implement the native code referenced
+from the ios port
+this is the target output directory we
+created above
+this will include the output project
+this is the name of the stub class we
+created
+this is the package name of the step
+class and the application itself
+these are the title and version numbers
+of the application
+this is the target type ios indicates a
+universal ipad iphone app but you can
+specify iphone or ipad here
+and finally these are the included
+native libraries
+frameworks codename one requires these
+two by default
+now that this is all done we have an
+xcode project under xcode proj
+dist
+we can double click the project to
+launch xcode this instantly opens a
+ready to run file but first we need to
+fix a few things
+the first step is picking the main
+project area
+and select build settings then click
+architectures entry and select standard
+architectures
+the next step is font registration
+we need two fonts
+one is handly which is used in the demo
+the second is the material design font
+which is used for common icons in
+codename one
+to do this we need to select the build
+settings tab
+and in it add the attributes for fonts
+by clicking the small plus button next
+to one of the attributes
+in ios you need to declare ttf files
+included in the project and can't use
+them otherwise the build servers do that
+automatically
+you should be able to type fonts
+provided by application and xcode
+will offer that string to you as you
+type
+once you select that you should have one
+entry called item0 and you should be
+able to add another one
+type in the font file names
+for the project specifically
+materialdesignfont.ttf
+and handleyregular
+dot ttf
+notice that these are case sensitive
+notice that this step is currently
+necessary but it might be unnecessary in
+the future
+we need to update the two sib files in
+the application
+and select the deployment target as 8.
+notice that xcode sometimes fails to
+accept the selection
+and i personally had to restart it twice
+now that all of this is done you should
+be able to press play in xcode and run
+the codename one application

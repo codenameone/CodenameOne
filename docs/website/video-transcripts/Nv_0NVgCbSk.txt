@@ -1,0 +1,139 @@
+next we have the name entry stage in the
+sign up wizard
+the name entry stage in the signup
+wizard
+is pretty trivial there's just one
+interesting aspect here
+the text
+input notice that the text input looks
+different in android when we enter text
+and on ios it looks completely different
+this is part of the magic behind the
+text component class on android we
+animate hint labels in the style of
+material design
+and in ios we show a grouped pair
+let's go right into the create name
+method
+text component
+is a text input component that combines
+the label and text field into one
+component and automatically adapts
+it to the platform
+text mode layout is a layout manager
+designed for text component
+it uses table layout on android and box
+layout on ios
+this will act like adding to a table
+layout when running on android thus
+placing the components side by side
+on ios it would ignore the percentage
+value and stack the components
+vertically using a box layout on the y
+axis
+the text mode layout isn't really a
+layout as much as it is a delegate
+when running in the android mode which
+we refer to as the on top mode
+the layout is almost an exact synonym
+of table layout and in fact delegates to
+an underlying table layout
+in fact there is a public final table
+layout instance within the layout that
+you can refer to directly
+there is one small difference between
+the text mode layout and the underlying
+table layout and that's our choice to
+default or to default to align entries
+to top with this mode
+it's important for error handling which
+i didn't use here
+when working in the non-android
+environment we use a box layout on the
+y-axis
+as the basis
+there is one thing we do have that's
+different from a default box layout and
+that's grouping
+grouping allows the labels to align by
+setting them to the same width
+internally it just invokes component dot
+set same width
+since text components hide the labels
+there is a special group method there
+that can be used
+however this is implicit with the text
+mode layout which is pretty cool
+this listens to the done button
+in the virtual keyboard and
+automatically treats it as a click on
+the next button
+for this form i need to add one change
+to the css
+this is the text that appears on top of
+the android field when we have input
+there
+it's a really small label that uses
+regular font for visibility instead of
+light
+with that we finished the name form and
+it should just work
+birthday is the form i'm currently least
+happy with
+we are in the process of rewriting the
+picker component which would hopefully
+allow a much better looking ui for this
+form
+for now i compromise on this
+when the ui is clicked on the device you
+will see a nice looking date picker ui
+though
+the flip side is that the code is super
+simple
+we set the picker type to date
+20 years ago is a good place to start
+for an age picker by default so that's
+what i did
+that's trivial and includes no changes
+to the css
+the gender form is pretty simple
+we have a couple of ui ids for the
+gender toggle and icons
+before we can go into it i created a
+small helper method to make the two
+gender buttons
+toggle buttons and codename one can be
+radio buttons that means that we can
+pick only one of them
+when we click on female the mail entry
+is deselected
+we create the font icon based on a
+separate ui id because we want it to be
+much bigger than the text on the button
+so we can't use set material icon
+here we create the radio button and set
+the text positioning
+a radio button belongs to a group and
+only one member of the group can be
+selected
+that's mostly simple boilerplate code
+the form code is even simpler
+we use button group to tie two or more
+radio buttons together
+only one of the radio buttons in a group
+can be selected
+grid layout gives both buttons the exact
+same size
+the last piece for this form is the css
+for the ui ids we defined
+the gender icon uses the same icon
+settings as the logo with a different
+color
+we have a special case for the selected
+pressed versions of the ui id to make
+the icon white
+the gender toggle ui id
+uses a round wrecked border with a gray
+line surrounding it once we did all that
+we can run the app and we would be
+halfway through the wizard

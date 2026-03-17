@@ -1,0 +1,121 @@
+when we build an app with the server
+side we still need to think about the
+rest api even if it's strictly for our
+app
+there are still implications such as
+security and future enhancement that we
+need to consider even for in-house apis
+Assumptions
+i first start with
+general assumptions about the api
+it will have several methods to update
+create delete elements in the cloud
+we will then send a build request
+to build the content
+this might sound obvious but originally
+i thought we'd have an api where
+everything is managed locally
+and a build accepts all the data from
+the client in one request
+the main reason i have that design in my
+head
+is because the design makes sense for
+codename one itself
+but it doesn't make sense for this
+specific api
+API Update
+this is the first draft of my plan for
+the api
+update restaurant would allow typical
+crude operations on the restaurant
+object
+the same would be true for dish
+files would let us get a specific file
+from the server it won't include listing
+or anything like that
+we'll use this to push out the result
+do build will perform the actual
+asynchronous build and return
+immediately
+this is
+far from a complete list
+but it's a starting point
+REST Request
+this is the basic implementation of the
+update restaurant rest request
+the post method accepts image uploads
+notice it can accept an icon a logo or a
+background image and can set them into
+the restaurant object
+also notice we use
+secret as an argument to find the right
+restaurant instance
+we return the secret value even though
+it's not necessary
+the main reason for returning the value
+has more to do with spring boot behavior
+than anything needed by the client side
+the second method in the restaurant
+service is the put method that accepts
+the json request containing the
+restaurant data
+this is all pretty straightforward
+if we have an existing secret we just
+update the restaurant otherwise we
+create a new one
+the build service accepts three
+arguments
+the secret
+safeguards this process
+the push key provides us
+the device id to which we can send push
+notification
+and the target type indicates the type
+of build requirement required
+for example android source etc
+in order for the asynchronous call to
+work we need to enable
+asynchronous calls and spring boot which
+we can do by enhancing the main
+application
+the build app method
+is marked as asynchronous and will run
+in a thread queue
+right now i implemented a step that just
+takes the restaurant app
+zip and creates a file with the same
+name
+in a fixed directory in the file system
+File Upload
+for upload to work
+we need to define the right limits for
+file uploads and multipart
+we can do that in the application
+properties by adding these two entries
+to define
+maximum file sizes
+that's important for stability of the
+servers as they shouldn't get overly
+large files
+the files web service just returns a
+file from the given directory
+notice we verify the file name doesn't
+contain any illegal characters
+then verify that the file is within the
+destination directory and has a zip
+extension
+this seems harder
+than just returning a file
+and it is
+the reason for that is that we are
+effectively exposing part of our file
+system here
+and
+this is a security risk
+for example
+someone could include a url like this
+that points to the root directory
+and fetches the password list
+if we don't verify every character in a
+url
+this would be possible

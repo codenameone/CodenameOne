@@ -1,0 +1,77 @@
+it will take a bit of work to implement
+the server and proper abstraction
+however it's a good idea to put things
+in the right place to begin with
+using a server api class will help us
+organize things correctly
+piece by piece
+we can then replace mock-ups with
+implementations and see things working
+almost instantaneously
+currently the server api class
+serves as a mock-up it's a
+static class that hides the server
+connection
+i'm
+blocking api calls within this class as
+they are easier to integrate into the
+infinite container which i'll introduce
+soon the currently logged in user is a
+global state in the application which is
+a pretty standard practice
+i've set up a few images from the
+diverse ui project so we can have fake
+users with avatars in the app
+check out the diverse ui project at
+diverseur.com
+its goal is to feature more diversity in
+app mockups
+we need times in the timeline etc to
+start from a reasonable enough date so i
+can use
+now as the baseline
+we'll set up four user objects
+that we can use soon
+this method returns the current user
+after lazy initializing it
+this is the shorthand builder
+constructor where i set a hard-coded
+user
+i add friends and people i may know
+which are used later in the friends view
+this method fetches the posts in the
+current timeline
+the method accepts time of the last post
+so we can fetch the posts
+since that time
+we add a comment to the comment count
+so the comment count wouldn't be zero
+there is still no comment view though
+the post itself doesn't include much
+either just some html
+for the post content
+when we return null when there is no
+further information that's it we are
+almost ready to implement the news feed
+before i start with the news feed itself
+i'd like a couple of utility methods
+for that i'll add a ui utils class as
+such
+i use these to present time logic more
+efficiently
+these create a gray spacer that's used
+in several places in the facebook ui
+this method formats time as statements
+such as just now 15 minutes ago etc
+then falls back to standard date and
+time values
+we use this when displaying time on
+posts we'll use these in the newsfeed
+container class
+but before we get there
+we have
+the missing css statements for the ui
+ids we used in the listing
+these separators have a gray background
+and right amount of padding to match the
+ui

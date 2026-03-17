@@ -1,0 +1,88 @@
+since the facebook app has many ui
+elements the mock-up stage for this app
+stretches on longer than i would have
+hoped
+the nice thing about this is that the
+logic of the app is relatively simple
+so once the mock-up would be done
+it should be pretty easy to implement
+the basic business logic
+notice that the smart portion in
+facebook
+is the back-end analysis which are
+mostly skip
+it's a subject for a big data course not
+a mobile development course
+i discussed the main ui before so i
+won't go into a recap of the of its
+purpose
+we'll mark up the basics so we can get
+started with implementation and server
+code for now i'll skip camera and video
+as we'll address them later
+the big piece is the main ui which
+includes the four tabs for news feed
+friends notifications and more features
+let's jump right into the main ui
+the main form includes four containers
+that are arranged as tabs you will
+notice that the tabs default to top
+placement on android and bottom
+placement on ios
+this matches how the native facebook app
+behaves
+to support this ui we need container
+classes representing each tab
+we need to add four classes named
+newsfeed container friends container
+notifications container and more
+container
+we'll get to those four containers one
+by one
+but first i'll explain the main form
+itself
+it's important to place the tabs in the
+center
+they never scroll off the screen and
+take up the available
+space
+we add each tab and give it a five
+millimeter icon
+from the material icon set
+the camera and chat icons aren't
+implemented at this time
+search looks like a text field but it's
+a button that leads to the search form
+i'll implement that form later
+this is
+relatively simple
+we also need some css to support that
+this the image includes a few ui ids
+we'll cover a bit later when discussing
+the news feed
+let's look at the css code behind that
+i chose to implement the search ui in
+the ios style with a round pill border
+shape
+we create an opaque white tab and give
+it a small margin and pixels on top and
+bottom
+the tab container below
+the tab is gray
+it lets us form a gray line above and
+below the tab
+the selected tab has a border on some
+native platforms so it's important to
+disable that
+here we just want a different color for
+the selected and pressed styles
+once this is done
+we have the basic tab ui
+we can wire it into the main ui by
+implementing show main ui in ui
+controller
+once this is done pressing login will
+show the main ui form
+now we can proceed to implement the tabs
+but first we need
+something else

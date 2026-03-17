@@ -1,0 +1,40 @@
+there is still one small missing piece
+for search
+what happens when we click one of the
+search results
+when a person is clicked we want to show
+his posts
+when a post is clicked we want to show
+the post itself
+the user form ui is relatively spartan
+when compared to facebook's ui
+i didn't want to go too deep into the
+full title area ui description and
+everything else because those are
+relatively trivial technically yet time
+consuming
+instead i chose to focus on the
+functionality of showing the ui
+this is the user shown in the form which
+we found in the search results
+all this is standard paging boilerplate
+like we had in the other infinite
+container instances
+we request the posts of the specific
+user with his user id
+which we already implemented in the
+server
+this method should be made static
+so we can use it here
+this is trivial to do
+so i won't go into that code
+the infinite container is placed in the
+center and this is pretty much the
+entire functional ui
+the same should be done for the post
+search code but it's much simpler we
+don't even need to save the post
+instance since there isn't much here
+this is pretty simple but it should work
+fine and function correctly
+with that searches fully working

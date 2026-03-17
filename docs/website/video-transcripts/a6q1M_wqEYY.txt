@@ -1,0 +1,171 @@
+after going over the css it's time to go
+into the code changes we made for this
+design
+first we need some common business logic
+to represent a dish
+i use the properties api to represent
+the dish object
+a dish contains a unique id
+price name description and image in two
+sizes thumbnail and four size
+the about form is pretty trivial
+we store the full html hierarchy under
+the html directory which acts as a
+special case and allows us to view html
+with all the bills and whistles on the
+device
+we use enclosed layout to position the
+cart icon on the top right
+this encloses the button in a flow
+layout to position it
+in the right place
+the top area is big enough to contain
+the image
+we see here
+and its size is determined by the size
+of the top bar
+which is
+the top of the main form
+however
+because we use and close right
+the cart button is positioned correctly
+the pickup component is just a
+hard-coded set of values from 1 to 100
+with a special case for 0.
+we use a picker class to represent that
+but the layout of the main widget
+is interesting here
+we have a box layout x
+for the elements which arrange them
+in a row
+it's important not to use flow layout
+for the entire row as it might break a
+line which isn't something we want at
+this point
+however if we use flow layout for a
+single element
+breaking a line isn't an option
+so this won't be a problem
+we wrap the quantity button
+in a flow layout so it will be in the
+middle
+we do the same for the two labels since
+both comprise of one item
+the flakiness that is sometimes
+associated with full layout layout
+isn't applicable
+and
+we can just use it as
+a trick to center align elements
+we don't need to center align the image
+because it is physically larger than the
+other elements
+the labels are arranged as a box layout
+y
+notice they are in the middle because of
+the flow layout surrounding the box y
+the quantity button allows us to edit
+the number of elements
+and also remove an element from the list
+if you look at the removal effect
+looping to the right here
+you will notice that
+this animation has several stages
+first we set the dish to an x position
+outside of the form
+and call animate unlayout
+to show the float floating
+out
+animate unlayout moves a layout from a
+valid laid out state to an invalid state
+and is designed exactly for this use
+case next we physically remove the
+element which is now outside of the form
+and we animate the ui layout
+this creates the scroll layout effect
+the contact us form is relatively simple
+it has a lot of data in it
+but all of that is pretty standard
+first we have the map container class
+which is a part of the codename one
+google maps cn1 lib
+that we installed
+on into the application
+this can be installed via the extensions
+menu
+and allows us to place a native map on
+the form the coordinates of the map are
+all hard-coded at this point
+the address is just a text area that
+isn't editable
+styled to appear in this specific way
+the phone and navigate buttons are just
+standard codename one buttons
+with the shopping cart style
+they map to the appropriate native
+functionality in the display class
+we overlay the text and buttons
+container on top of the map
+using the layered layout since the map
+is a native component there are
+implications to placing an overlay on
+top
+but
+there
+are a bit too much for this discussion
+if you are interested
+in learning more about that check out
+the developer guide section on peer
+component
+the dish view
+is very similar to the map view in
+regard to the bottom description
+and the overlay
+notice
+that i went with image viewer instead of
+using an image
+this allows pinch to zoom that will
+even work with the overlay on top
+and will allow us to look more closely
+at the dishes
+the price label is essentially the same
+your order component that appears
+in the top of the standard forms
+however if we tried to draw it
+cut off
+the round border wouldn't let us
+the layout manager prevents us from
+placing a component off screen as well
+there are other hacks we could do but i
+chose to just paint the component onto
+an image that is too small to hold the
+full size of the component then place
+that image on the screen using a glass
+pane
+a glass pane is drawn as an overlay on
+top of the entire screen
+and as you can
+draw anything there
+there are surprising parallels between
+best practices in almost every
+discipline i ever learned design is no
+different
+you can take a lot of the coordinates of
+programming and apply them to design
+once you understand the basic philosophy
+if you look at the previous ui elements
+it's pretty obvious which ones were
+designed by a designer and which ones
+weren't
+but if we showed them to someone who
+isn't sensitive to design nuance
+it might take some guesses
+so we can get by
+but not much more than that
+when in doubt i take the lazy approach
+i just use images or other elements to
+cover up the lack of design skills
+thanks for watching i hope you found
+this educational please join the
+discussion in the comments section
+and let me know what you think

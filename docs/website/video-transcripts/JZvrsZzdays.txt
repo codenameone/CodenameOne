@@ -1,0 +1,93 @@
+user service is a big class and it makes
+sense to cover it in two parts
+next on the agenda is get avatar it
+returns the avatar picture of the user
+as a byte array
+notice we need an id and not a token to
+get the avatar as anyone who is familiar
+with the user id should be able to see
+the avatar
+if the avatar reference is null we
+return null instantly
+the set avatar method works in a similar
+way
+notice that unlike get avatar with set
+avatar we need a token as this is a set
+operation this prevents other users from
+changing our avatar
+when we map this to the web service we
+need to first create a media entry and
+only then set the avatar value
+the friend request includes a few moving
+parts
+first we need to send a request
+we need an auth token
+as this is a secure operation
+we obviously don't have the auth token
+of the person we are friending
+this is a special case where we modify
+his entry without an auth token that's a
+bit risky
+the notification service should notify
+the user that he got a new friend or
+request
+we'll dig into the notification service
+soon
+but first let's check out the other side
+of the equation
+the accept friend request method
+this time me and him are flipped
+this checks against a potential weakness
+where a hacker could potentially call
+accept friend request for a person that
+didn't request it
+when a request is accepted we need to
+update the friend list on both sides
+i didn't add a remove friend request
+method which i probably should have
+added i think it's trivial to add so i'm
+leaving it as an exercise
+the last method for user service is the
+upload contacts method
+it's invoked when the user uploads the
+contacts from his phone
+if we upload contacts in the past
+it's a good idea to try and merge with
+what we have
+so we can check that by running a
+count query
+for every contact we find we check to
+see if there is a user in the system and
+if so we add that user to the people you
+may know list
+when adding a lot of elements using save
+all is much faster than save
+for simplicity i chose to merge based on
+full name in retrospect it might have
+been wiser to use a device unique id for
+every contact but that might breed
+duplicates too
+i oversimplified a very complex process
+of handling shadow users
+if you take the time to build something
+like this then make sure to analyze data
+more thoroughly and create a more more
+robust social graph
+notice that we still need to declare the
+update people you may know method we
+mentioned before
+we search for the shadow user in the
+table of users using the find him method
+which we'll cover soon
+if a friend was found and isn't already
+a friend or in the people you may know
+list
+then we can add that user to the people
+you may know
+the find him method is simple
+boilerplate that searches based on all
+the metadata in the shadow user we use
+find by email phone etc to find the
+shadow user in our regular user database
+with that we finished the user service
+class which is the largest service class

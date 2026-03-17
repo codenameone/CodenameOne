@@ -1,0 +1,125 @@
+we'll move on to some additional forms
+starting with the billing form
+the billing form like the details form
+is a relatively simple cookie cutter
+form
+today i might have made it with the
+instant ui
+and would have been done with it
+but when i wrote this code we didn't
+have that class yet
+despite the fact that the ui looks
+simple the layout is non-trivial
+first we have a border layout that
+encloses the form
+we use that to keep the green button at
+the bottom of the form regardless of
+size or scrolling
+next we have the content container which
+is a box y container that includes the
+whole user interface except for the
+button
+we mark it as y scrollable
+further down in the code so we can
+scroll through elements within its
+within
+it's important that text fields always
+reside in a y scrollable container
+so the virtual keyboard will have space
+to work with
+and finally we have the table
+the numeric values are too small to give
+them each a line so i packed them in a
+2x2 table
+the entire table is added to the content
+later on
+notice that the table container isn't
+scrollable as nesting scrollable
+scrollables is a
+mobile
+bad idea or bad practice
+we don't have scroll bars so when we
+swipe the implementation needs to guess
+which scrollable we actually mean
+and that might not end well
+as i mentioned before
+this code predated the binding api
+and didn't use it
+so we have some helper code such as the
+adds as double method which
+automatically parses the text value and
+if it's not a double returns the
+existing value
+this allows us to automatically update
+the property
+binding would have made this code
+simpler and shorter
+next we add the elements to the table
+i'm not really sure why i chose to do a
+2x2 table with box layout instead of a
+2x4 layout
+so we can place everything directly into
+the table
+possibly it was force of habit
+both approaches work though
+the separator line allows us to
+differentiate between the brain three
+arguments and the rest of the billing
+details
+i've mentioned this before but it bears
+repeating a separator hair is just a
+component with one pixel padding and a
+grayish color
+normally a label without text is hidden
+by default
+but if we invoke
+set show even if blank
+it will be rendered even if there is no
+text or icon
+there isn't all that much here in the
+final part of the billing form
+it's just the things i've mentioned
+above like the scrollable y of the
+content pane and its placement
+in the center
+now let's look at this at sending this
+data to the server side
+up until now when we sent data it didn't
+include all the information we needed so
+we created a new version of the app
+settings call with the restaurant
+details this allows us to still reuse
+the existing object from the restaurant
+model
+this is a bit of a hack so
+let's get go over what i did here
+in the app settings class i get the
+value of the object as a map object i
+then add all the properties from the
+restaurant object to create one large
+json object
+containing everything i need in the
+server which doesn't have a
+distinction between the two
+then i'll remove the cart and menu
+entries these entries are big and i
+don't need them for the specific api as
+they have their own model
+i also remove the logo
+and title background images as
+they have separate web service
+you might recall from before
+that basic things like
+title tagline etc weren't persisted
+anyway well
+now we have a bind to preferences method
+that just implicitly saves and restores
+from preferences
+that way restaurant data is implicitly
+saved locally in preferences
+it's not sqlite but it works and saves
+some of the effort today after the
+improvements we have in the sql map
+i might have used that
+or i might have used the seamless
+preferences persistence we have built in

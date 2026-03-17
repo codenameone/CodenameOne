@@ -11,29 +11,33 @@ description: Debugging on a device using the Android Studio IDE
 youtube_id: 008AK1GfHA8
 thumbnail: https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-14.jpg
 ---
+{{< youtube "008AK1GfHA8" >}}
 
-{{< youtube "008AK1GfHA8" >}} 
+Debugging on an Android device is the right move when the simulator is no longer telling you enough. If the problem only happens on Android hardware, only appears after a native build, involves Android permissions or activities, or touches native integration code, then you need visibility into the generated Android project and the device runtime.
 
-#### Transcript
+The video shows the older version of this process: enable source inclusion, send an Android build, download the generated sources, create an Android Studio project, copy the generated code into it, and debug from there. The important idea is that when you need to understand what the Android side is doing, the generated native sources are valuable. What has changed is how often you should do this. It is no longer something you should think of as part of normal day-to-day development.
 
-In this short video I’ll try to explain how to debug a Codename One application on an Android device.  
-This video assumes you are familiar with the basics of Codename One and have Android studio installed.
+In a modern Codename One project, the application source in your main project is still the source of truth. Start there first. If the problem reproduces in the simulator, stay in the regular Codename One codebase and debug it there. If the bug only appears on Android, then generate the Android sources with source inclusion enabled and use Android Studio to inspect what the native output is doing.
 
-We start by opening the settings selecting the basic section and checking the "include source" checkbox. Now we can send a build as usual to Android.  
-In the build server results you will see the additional sources file which I will download.
+The useful workflow is to treat the generated Android project as a debugging artifact. Open it in Android Studio, connect a device, run under the debugger, inspect logcat, and place breakpoints in the generated sources or any native bridge code that is relevant to the problem. This is especially useful for permission issues, manifest problems, native interface behavior, packaging problems, and crashes that only occur on device. Once you understand the failure, move the real fix back into your Codename One application, native interface implementation, or build configuration.
 
-Next I’ll launch the Android studio IDE and proceed to create a new project. Within this project I’m pasting in the main class and package names from Codename One. I will leave the rest as the default in this next step and in the final step of the wizard I will select "no activity" as we already have everything.
+That last step is the important one. You should not maintain fixes directly in the generated Android sources because those files are regenerated on the next build. The generated project is there so you can observe and diagnose. The durable fix belongs in the actual project that produced it.
 
-Now that a project is created I’ll unzip the source files. I’ll then copy all the relevant files to the newly created project.  
-I copy the main directory from within the src to the target src & I select to replace all the files. Next I copy the libs directory content to the equivalent directory in the native project. Finally I open the project gradle file as well as the source gradle file. I copy the dependencies from the source gradle to the app gradle dependencies section.
+The video is also a bit out of date in how manual the Android Studio setup is. Today the surrounding toolchain is cleaner and more Maven-centric, but the same principle applies: include sources when you need deeper visibility, inspect the generated Android project only for Android-specific failures, and then carry the solution back to the real codebase. If you approach it that way, Android Studio becomes a precise debugging tool instead of a second development environment you have to keep in sync.
 
-Some additional copying of gradle script snippets might be required based on your app!
+## Further Reading
 
-Next we need to connect our device to the computer and press the debug button. After waiting for a long time the app will appear on the device.
+- [Introduction for Android Developers](/introduction-for-android-developers/)
+- [Build Server](/build-server/)
+- [Build Tools](/build-tools/)
+- [Development Environment](/development-environment/)
+- [Moving To Maven](/blog/moving-to-maven/)
 
-Thanks for watching, please let us know what you think and get help at [codenameone.com](https://www.codenameone.com/).
+<!--
+Full transcript retained in docs/website/video-transcripts/008AK1GfHA8.txt for future video recreation.
 
----
+Future video outline: start with a bug that reproduces only on a real Android device, show how to include sources in the build, open the generated Android project in Android Studio, inspect logs and breakpoints there, and then move the actual fix back into the Codename One project. The main lesson should be when to use Android Studio, not how to turn it into the primary place you work.
+-->
 
 ## Discussion
 

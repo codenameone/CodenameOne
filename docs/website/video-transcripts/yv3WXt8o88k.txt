@@ -1,0 +1,133 @@
+we'll continue with the code for the
+dish list
+the dishless form is the form that
+contains the set of dishes we can select
+from
+the elements within this form are stored
+in a grid layout
+you will notice that the number of rows
+is hard coded
+that is because rows are added
+implicitly
+as we add more elements
+but columns
+won't change by default
+this means that if we only have one or
+two elements
+the rest of the places will remain blank
+and
+the one element we have won't take up
+all the space
+the floating action button at the bottom
+allows us to add a new dish to the set
+of existing dishes
+notice that we instantly add a dish
+and show
+the edit ui forcing the user to delete
+the dish
+if you want to cancel this edition
+that's a common practice on mobile
+we're dealing with the ok cancel process
+is sometimes harder than just doing
+something like this
+the
+add dish method adds a ui element to the
+list of dishes
+that element includes a black gradient
+overlay which makes the white text on
+top
+readable even with a
+white image below
+the entire component is a lead component
+which means all events within the
+container are delegated to the scale
+image button
+that means that the listener on the
+scale image button in the last line will
+receive all of the events in the
+container hierarchy
+we show the dish edit form when editing
+a dish
+since the dish is instantly created and
+edited there is no form for a new dish
+and this form doesn't have
+two modes like you normally would
+or
+for edit or create
+in this app there is only one mode
+edit
+title area of
+dish edit form is
+built of components
+because it is large and relatively
+custom
+i prefer to handle all of the commands
+and functionality and code
+so the title itself
+is a
+text field again just like in the main
+form
+as the digital title can be edited in
+place
+the back and ok buttons are just
+standard buttons with the right ui id
+and the icon
+this is where it gets interesting
+the title component is now really tall
+because of the background image
+so if i had used a standard add material
+command it would have been placed
+somewhere along the middle of the layout
+instead of
+at the top
+so to get around this i created a border
+layout which effectively occupies
+this area
+but again
+if i'd add the components directly
+they will be placed in the middle
+vertically instead of at the top as i
+would like
+so i wrap the two commands with a flow
+layout to push them to the top
+i wrap the text field with a box layout
+though and the reason is a bit more
+complicated
+flow layout doesn't deal well with
+resizable components like text fields
+since it tries to break a line when we
+run out of space
+if the title is too long it will try to
+break a line instead of letting the text
+field overflow which is what i want
+box layout doesn't have that problem
+code right here positions the floating
+action button
+on the border between the title area and
+the body
+notice that this component is positioned
+on top of both and doesn't require a
+special empty region
+like the icon in the previous form
+we bind the floating action button
+directly to the layered layout on top
+on the top right
+which should position it really high in
+the form
+but we then use this code to set the
+margin of the floating action button
+so it will match the toolbar height
+minus half the height of the floating
+back button
+this positions it perfectly
+last but not least we can see the
+component representing the delete button
+at the bottom
+followed by
+stub action handling code for the
+various buttons
+delete is placed in the south so it will
+always appear at the very bottom of the
+form regardless of
+scrolling thanks for watching
+i hope you found this informative

@@ -22,6 +22,8 @@
 *.skin
 *.jar
 *.class
+*.pyc
+**/__pycache__/
 **/private/*
 **/.idea/*
 **/build/*
@@ -91,3 +93,6 @@ dependency-reduced-pom.xml
 /docs/website/.cache/
 /docs/website/.venv/
 /docs/website/.venv-pagefind/
+/docs/website/.venv-video-refresh/
+/docs/website/.youtube-oauth-token.json
+/docs/website/client_secret.json

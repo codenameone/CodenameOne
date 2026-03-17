@@ -1,0 +1,145 @@
+we are now ready for the new post form
+changes
+up until now the changes were simple but
+in this class we have a bit of work to
+do
+let's start with the top level changes
+currently we support one attachment this
+field represents the attachment id
+this is the attachment mime type if
+applicable
+this is the button for sending a post
+we need to disable this button until the
+attachment is uploaded
+the constructor is now private as the
+class is instantiated via factory
+methods
+also notice we don't invoke
+inner ui in the constructor anymore
+the first big change is the init ui
+method which up until now created the
+same ui and was bound in the constructor
+this will no longer work as the ui with
+an attachment will be slightly different
+this code is still there it just moved
+to the factory method
+here
+the post styles code happened at the end
+of the internet ui
+originally but due to logistics we need
+to tear
+this allows the image and video versions
+to avoid the styles bar at the bottom of
+the ui
+notice that those don't exist in the
+native facebook app either
+which brings us back to the init ui
+method
+this is the button for posting from the
+toolbar
+we can later disable this button
+we can find the button
+for toolbar commands
+to get low level control
+this code will behave exactly the same
+as it did before if post styles had a
+value and we'll just add the post to the
+center if it doesn't
+those are somewhat nuanced changes that
+expose components
+we can work with
+let's see how the salau's image uploads
+in the main method
+this is a factory method
+for an image post
+star bar
+in the bottom isn't included
+we set the mime type here but notice we
+don't know the media id yet
+so the attachment value isn't set
+the image will take up half the screen
+height
+this is better than using an api like
+set preferred size because it will still
+work if the device is rotated
+here we upload the media
+to the server and return a slider
+component to track the upload progress
+we place the image
+on the bottom of the form
+and the slider progress on top of it
+further down
+before we go to the logical next step in
+the upload method i'd like to point out
+a big missing piece
+delete
+if we close this post now the image
+would still be in the servers and no one
+would know
+that's a flaw i left in place due to
+time constraints
+there are several potential fixes
+probably the best one would be a
+back-end server process that deletes
+media
+that has no references
+we can also add a delete web service but
+that wouldn't work perfectly for cases
+of app crashes etc
+i'll come back to the video post soon
+for now i'll skip ahead to the upload
+method
+if we're uploading a media file
+the post button should be disabled until
+we are done
+once upload finished
+we enable the post button
+notice we save the attachment value to
+which we will need later
+you can bind a connection request to a
+slider using this utility class built
+into codename one
+every stream and codename one is
+observable which means we can get update
+events on any i o operation seamlessly
+utilities like slider bridge take this
+to the next logical step by binding the
+progress event from network manager to a
+slider with this
+let's go directly to the changes
+in post to support attachments
+this code
+had to move outside of the if statement
+even though it hadn't changed
+if we have an attachment
+we add it to the post object
+after this line the rest of the code is
+identical
+with that
+image posting should work although we
+still need to update the callers to use
+the factory methods instead of the
+constructor
+we have one final change to new post
+form
+the create video post
+most of this looks like the create image
+post method with
+minor changes such as mp4 instead of
+jpeg etc
+we can't
+override the performed size of the video
+component but we can replace it in the
+container where we do override the size
+we need
+we that container anyway so we can place
+a program progress indicator on top of
+that to show the upload progress
+this shows a frame of the video one
+second into playback
+notice i invoke play and only then try
+seeking without doing that the behavior
+is undefined for some features such as
+well seek
+with that the new post form is done
+we just need to wire it in

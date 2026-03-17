@@ -1,0 +1,113 @@
+up until now the app focused on a very
+narrow use case
+and the side menu was just for show
+i won't fill up the entire app as the
+for uber app is very wide and nuanced
+but i would like to add a few essential
+ui elements to show just how easy it is
+and how much work we already did in the
+server to prepare ourselves for this
+the uber signup process prompts the user
+for details which is a nuance we skipped
+early on
+i won't rectify it but i will map the
+menu item for settings to show the
+settings form
+and i'll map a click on the user's
+avatar to the edit account form
+this means we need to add two new forms
+settings form and edit account form
+i didn't take the full ui of the
+settings form and i didn't implement
+everything
+however the basic design is there and it
+should provide a good framework for
+additional forms
+in this application
+the settings form is encapsulated in
+this code
+this is the standard header for forms
+with the black title
+it initializes the ui and adds the
+scroll down collapse effect
+we defined this method before and it
+hasn't changed
+i changed get avatar to return an image
+as a callback
+this can happen if the image wasn't
+downloaded yet from the server
+the rest of the code is mostly ui mockup
+meant to replicate some of the ui
+elements in the uber app
+most of these things aren't challenging
+notice that i have new create entry
+methods
+in common code
+i refactored them from the completion
+container as is
+i added a relatively trivial create
+separator method which i reused later in
+edit account form as well
+for completeness this is the create
+separator method from common code
+there isn't much to discuss about that
+method so let's move on to the next step
+the next step is a review of the changes
+to the get avatar method most of the
+code is the same as it was before
+all of this didn't change at all
+we still need the mask object regardless
+of the outcome as we will need to mask
+an image avatar from the server to in
+order to give it the route effect
+the reason we need to do it
+all of that in the client is
+that only the client knows the size of
+the image it needs
+this will also give give the server
+flexibility in the future to increase
+image resolution slash size
+the fetch avatar method might fetch the
+avatar image from local storage or
+download it from the internet
+when it's done it will invoke the
+callback method with the image object
+the image was fetched from local storage
+the avatar might already be there so we
+don't need to do anything else
+otherwise we can continue with the same
+code we had before in the get avatar
+method
+now let's look at the fetch avatar
+method in user service
+which we used in that code
+i made two variants of the method
+one accepts the id of the user whose
+avatar we are fetching
+and the other one uses our id
+right now i only use the one that
+doesn't take the id however it should be
+trivial to show the image of the driver
+scheduled to pick us up next to his name
+this is a web service i already mapped
+in the server code a while back
+the image is returned for the user with
+the given id
+in the path
+a new user won't have an avatar and we
+will get a
+full response
+which is 100 valid for this case
+without this line
+we would get a default error prompt
+which we don't want
+the built-in method in connection
+requests
+checks if an image already exists in
+storage under the given name
+and if so invokes the callback with that
+name
+otherwise it adds the request to the
+queue downloads the image storage
+file name loads it and invokes the
+callback with that image object

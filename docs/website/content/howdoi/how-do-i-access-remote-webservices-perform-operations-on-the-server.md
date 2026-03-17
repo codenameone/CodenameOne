@@ -11,14 +11,32 @@ description: Invoke server functionality from the client side using the Codename
 youtube_id: sUhpCwd0YJg
 thumbnail: https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-23.jpg
 ---
-
 {{< youtube "sUhpCwd0YJg" >}} 
 
-#### Script
+Client/server work in Codename One usually starts with a simple question: do you want a portable client talking to a server over standard HTTP APIs, or do you want generated RPC-style plumbing that hides some of that protocol detail? The old webservice wizard was designed for the second case. It generated client-side proxies and matching server-side scaffolding so you could define methods and call them almost as if they were local functions.
 
-The webservice wizard is very similar to the GWT RPC functionality if you are familiar with that. We generate a set of simple static functions on the client side and then generate for you a servlet with some helper classes on the server side in order to implement client/server functionality. Lets start by adding a simple webservice to a hello world application. First lets launch the webservice wizard by right clicking and selecting it. This tool allows us to define methods and their arguments. Arguments can be the basic Java types, arrays and Externalizable classes. For simplicities sake I’ll just add a sayHello method with String argument and return value. When we press generate code is generated into the project, notice you migth get prompted if files will be overwritten. We also need to select the source folder of a web server project. I created a standard Java web project and I just selected it here in the tool. The first thing we need to do is open the WebServiceProxy class, its a generated class so its not very important however we need to fix the destination URL to point at the right address including the server context. Now lets look at the server generated code we have the classes in the io package and the proxy.server package which are fixed utility classes. Then we have the CN1WebServiceServlet which is generated to intercept your calls, the only class you need to concern yourself with is the class ending with the word Server which is the one where you should write your source code. Lets fill up the sayHello method with a simple implementation. In the client side lets just add a couple of buttons to the form and demonstrate the difference between a sync call and an async call. In a sync call we just invoke the method directly as if it was a local method. Notice sync calls will throw an IO exception if there was an issue in the server side. The async methods never throw an exception and will communicate success/failure thru a callback mechanism similar to GWT. Success is invoked when the method returns and passes the appropriate response value if relevant. Lets run this code. Notice that when you create a webservice you can’t change the methods after the fact, so if you want to add additional functionality you will need new method names so as not to break applications in production. You can also generate several servlets in several packages and just point to a separate URL. Thanks for watching I hope you found this tutorial educational and helpful.
+That approach is still useful to understand conceptually, but it is no longer the default direction most modern projects should start with. Today, most teams are better served by ordinary REST-style HTTP APIs, `ConnectionRequest`, and the higher-level REST helpers described in the developer guide. Those approaches fit better with current backend tooling, current deployment habits, and Maven-era Codename One projects.
 
----
+What the video still teaches well is the separation of concerns. The client side should know how to invoke a remote capability. The server side should contain the real business logic. Generated proxies can reduce boilerplate, but they do not remove the need to think carefully about API evolution, error handling, and backward compatibility.
+
+One lesson from the older wizard flow is still especially important: remote APIs are contracts. Once an app is in production, you cannot casually change method signatures or response shapes and expect every installed client to keep working. If a service needs to evolve incompatibly, version it or add new endpoints instead of silently mutating the old ones.
+
+The sync-versus-async distinction also matters regardless of whether you use the old wizard or a modern REST API. A synchronous call is simpler to read, but it blocks the current flow and demands careful error handling. An asynchronous call is usually the healthier default in mobile UI work because it keeps the application responsive and makes network latency explicit in the code.
+
+For a current Codename One project, the practical advice is to design a normal server API first, then call it from the client using the networking tools that best match the service. If the service is HTTP-based, prefer the modern REST-oriented client approach. If you are maintaining an older project that already uses the wizard-generated proxies, treat them as an existing contract layer and evolve them carefully rather than rewriting method signatures casually.
+
+## Further Reading
+
+- [Developer Guide](/developer-guide/)
+- [How Do I Use HTTP, Sockets, Webservices And Websockets](/how-do-i/how-do-i-use-http-sockets-webservices-websockets/)
+- [Terse REST API](/blog/terse-rest-api/)
+- [REST API Design](/courses/course-03-build-real-world-full-stack-mobile-apps-java/rest-api-design/)
+
+<!--
+Full transcript retained in docs/website/video-transcripts/sUhpCwd0YJg.txt for future video recreation.
+
+Future video outline: explain the older webservice wizard as one historical approach to client/server integration, then pivot quickly to the modern recommendation of HTTP/REST-based APIs. Show one simple request, discuss sync vs async behavior, and explain why server contracts must be versioned carefully once a mobile app is in production.
+-->
 
 ## Discussion
 

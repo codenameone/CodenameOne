@@ -1,0 +1,106 @@
+the last piece of the server code is the
+web service layer which again is again
+relatively boilerplate driven
+the web services mostly invoke the
+service layer without much imagination
+that's a good thing in engineering terms
+boring is good
+but it doesn't make a thrilling story so
+please bear with me as this will pick up
+pace a bit when we connect to the client
+side
+we have three web service classes user
+web service media web service and post
+web service
+just like the user service this class is
+pretty big
+and also includes some additional
+capabilities from the notification
+service despite that most of the classes
+boilerplate there is still a lot of it
+so i'll try to keep it manageable by
+splitting it down a bit
+the web service is located at the slash
+user base which means the ur any url
+would be below that
+we map two services in this single
+service
+since notifications has just one method
+it made sense bringing it here
+the exception handler grabs one of the
+three exception types that can be thrown
+in one of the methods and in this class
+and convert them to an error response
+object
+notice that the error response is the
+error dao which generates json with the
+error message this is the error da class
+the error dial object is just a simple
+dao that includes the error message and
+an optional error code
+the user login url
+returns the response as json in the body
+and accepts a json request in the body
+of the post
+the exception will be converted to an
+error dial if it's thrown
+the use the slash user slash refresh
+method
+is a get operation
+notice that it doesn't accept an
+argument it uses an http header named
+auth for the
+authorization token
+notice i used the auth header almost
+everywhere
+as it's a standard part of the request
+you will notice the code is very similar
+simple it's declarative code that
+defines how the web service will look
+before delegating to the underlying
+service class
+next we have the operations that map an
+avatar this means the urls user slash
+avatar slash user id would return the
+avatar jpeg directly and would work even
+if the browser with the browser so we
+can share this url
+response entity lets us control the http
+response including the mime type and
+media content
+in this case we send a 404 response when
+the user doesn't have an avatar
+i use the get method to make a change in
+the set avatar request
+this simplifies the code as it already
+requires a separate operation to upload
+the media object
+the friend request methods are trivial
+and nearly identical they both accept
+the same arguments and pass them on to
+the underlying web service call service
+call
+i use a get operation because i don't
+want to add a dial and get into the
+complexities of post for this case
+normally a get operation is a bad idea
+for an operation that triggers a change
+i wouldn't do this on a on the web since
+it can lead to accidental resubmission
+of data
+however since my client here is an app
+the use of get operation simplifies some
+of the syntax
+finally the last piece of the user web
+service code is the notification and
+contacts support
+this method allows us to page through
+the list of notifications fetching a new
+page dynamically as needed
+we can submit a list of contacts for the
+shadow user through this api notice that
+a list from json will implicitly
+translate to the given contact list
+with that we can finish the relatively
+simple
+user web service

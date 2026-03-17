@@ -1,0 +1,56 @@
+in this section we'll discuss the
+address input logic and validation
+one of the things that i missed when i
+wrote the section on the ui elements
+that are missing is the address
+collection ui the reason i missed it
+was that i assumed incorrectly that the
+billing api will do that for me
+it doesn't do that and
+so i needed to add some form of design
+for address collection as you can see in
+the video
+it's relatively bare bones for now
+but it will do
+to collect the address i used this
+business object i also added some simple
+mapping into preferences
+as you can see below
+so the last entered address will be
+cached for future orders
+the rest of the logic is pretty easy
+i just bind each text field to the
+property
+notice that this original code was
+developed before we had property binding
+and instant ui support
+if i had to do it again i'd probably use
+instant ui
+for this feature as it's an ideal use
+case
+a lot of the logic here
+can probably be simplified in the
+current api but for now it works
+this block
+is really a form of validation
+we have a shipping range property that
+can
+be set for restaurant
+and here we use the device gps to make
+sure the device is within
+reasonable range of the restaurant
+here we slide the components of the
+shopping cart out to make room for the
+address fields
+which we add and animate into place here
+this is mostly mostly simple code
+for form input as the binding was done
+before
+the validation code is pretty simple
+i mentioned the shipping range but we
+also have a minimum order value
+which is now enforced
+i also added support for a delivery fee
+that can be levied on top of the total
+cost this is applied in the summary code
+of the form

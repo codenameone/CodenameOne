@@ -1,0 +1,362 @@
+in this section we'll discuss the
+various types of images in codename one
+and their impact on performance
+codename one has a few image types
+loaded rgb built in rgb codename one
+mutable encoded image multi-image font
+image and more
+there are a few others but i won't go
+into every nuance
+all image types are mostly seamless to
+use and will just work with draw image
+and various image related apis for the
+most part with caveats on performance
+performance and memory wise i'll review
+each type and try to explain the
+trade-offs involved with the image type
+you use
+the codename one designer tries to
+conserve memory and be clever by using
+only encoded image
+while these are great for low memory you
+need to understand
+the complexities of image locking and be
+aware that you might pay a penalty if
+you don't
+here are the pros and cons
+and logic behind every image type
+this covers the logic of how it's
+created
+this is the basic image you get when
+loading an image from the jar or network
+using image dot create image string
+or image create image input stream image
+dot create image
+battery intent etc
+the image is stored in ram based on
+device logic and should be reasonably
+efficient in terms of drawing speed
+however it usually takes up a lot of ram
+to calculate the amount of ram taken by
+a loaded image we use the following
+formula
+image width times image height times 4
+equals the size of ram and bytes
+so a 50 by 100 image
+will take up 50 times 100 times 4
+and that's 20 000 bytes of ram
+the logic behind this is simple
+every pixel contains three color
+channels
+and an alpha component
+hence three bytes for color and one for
+alpha
+this isn't the case for all images
+but it's very common and we prefer
+calculate calculating for the worst case
+scenario
+even with jpegs that don't include an
+alpha channel some os's might require
+that additional byte
+there are two types of rgb constructed
+images that are very different from one
+another
+but since
+they are both technically rgb images we
+are bundling them under the same
+subsection
+internal is a close cousin of the loaded
+image
+this image is created using the method
+image dot create image into array int
+and receives the argb data
+to form the image
+it's more efficient than the codename
+one rgb image
+but can't be modified after it's created
+at least not on the pixel level
+the goal of this image type is to
+provide an easy way to render static rgb
+data efficiently at platform native
+speeds
+it's technically a loaded image
+internally
+rgb image is effectively an argb array
+that can be drawn by codename one
+on most platforms this is quite
+inefficient but for some pixel level
+manipulations there is just no other way
+an rgb image is constructed with an end
+array that includes width times height
+elements
+you can then modify the colors and alpha
+channel directly within the array and
+draw the image to any source using
+standard image drawing apis
+this api is very inefficient in terms of
+rendering speed and memory overhead
+only use this technique if there is
+absolutely no other way
+encoded image is the workhorse of
+codename one
+images returned from resource files are
+encoded images
+and many apis expect it
+encoded image can be instantiated via
+the create method in the encoded image
+class
+pretty much any image can be converted
+into an encoded image via the create
+from image boolean method
+encoded image is effectively a loaded
+image that is hidden and extracted as
+needed
+to remove the memory overhead associated
+with loaded image
+when creating an encoded image only the
+png or jpeg
+is loaded into an array and ram
+normally such images are very small
+relatively so they can be kept in memory
+without much overhead
+when image information is needed pixels
+the image is decoded into ram and kept
+in a weak slash soft reference
+this allows the image to be cached for
+performance and allows the garbage
+collector to reclaim it when memory
+becomes scarce
+when drawing an encoded image it checks
+the weak reference cache and if the
+image is cached then it sure is shown
+otherwise the image is loaded and cached
+since the fully decoded image can be big
+width times height times four
+the ability to store just the encoded
+image can save a lot of ram
+so taking our example from before 50 by
+100 image will take up 20 000 bytes of
+ram for a loaded image but an encoded
+image can reduce that to 1 or 2
+kilobytes of ram
+notice that an encoded image might be
+more expensive than a loaded image
+as it will take up both the encoded size
+and the loaded size
+so the cost might be slightly bigger in
+some cases
+its main value is its ability to shrink
+when it isn't used
+encoded image is not final and can be
+derived to produce complex image
+fetching strategies
+for instance the url image class can
+dynamically download its content from
+the web
+naturally loading the image is more
+expensive so we want the images that are
+on the current form to remain in cache
+otherwise the gc will thrash a lot
+that's where lock kicks in
+when lock is active we keep a hard
+reference to the actual native image so
+it won't get gc'd
+this significantly improves performance
+internally
+this is invoked automatically for
+background images icons etc which
+results in a huge performance boost
+this makes sense since these images are
+currently showing
+and they will be in ram anyway
+however
+if you use a complex renderer or custom
+drawing ui you should lock your images
+where possible to verify that locking
+might be a problem you can launch the
+performance monitor tool
+accessible from the simulator menu if
+you get log messages that indicate that
+an unlocked image was drawn you might
+have a problem
+i will discuss the performance monitor
+tool
+later
+multi images don't physically exist as a
+concept within codename one
+api so there is no way to actually
+create them
+and they are in no way distinguishable
+from encoded image
+the only built-in support for
+multi-images is in the resource file
+loading logic where multi-image is
+decoded
+and only the version that matches the
+current dpi is physically loaded
+from that point on user code can treat
+it like any other encoded image
+performance of multi images should be
+identical to encoded image with one
+major caveat
+they increase the size of the resource
+file
+since most apps keep the resource file
+in ram the usage
+later
+for usage later this might impact rams
+hence performance negatively
+workaround a workaround might be to
+split some of the data into separate
+resource files
+that won't be cached
+however in recent years we try to reduce
+the usage of multi images in favor of
+font icons and similar strategies
+mutable images are created via image dot
+create image and end or image dot create
+image and int
+they accept the width
+height of the image and potentially the
+argb background color
+once created a developer can invoke get
+graphics on a mutable image
+and draw to its surface
+the image can then be drawn onto the
+screen like any other image
+in terms of performance mutable images
+are
+the most interesting and most
+problematic
+features
+historically when we started luit and
+codename one mutable images were fast
+in fact we used them to implement common
+optimization technique of the day called
+double buffering
+in double buffering a developer draws
+onto a background image then draws that
+onto the screen resulting in fast
+flicker free rendering
+this is strongly discouraged for modern
+devices as specifically android versions
+newer than 2.3 and ios versions newer
+than full
+since both of these platforms are
+effectively dead you should no longer
+use mutable images for performance
+we even have an api in display to detect
+that
+display dot get instance are mutable
+images fast
+this usually returns false on ios and
+android
+on ios creating a mutable image is even
+slower and might cause noticeable
+rendering delay if we are creating a
+large image
+to understand why we need to understand
+how modern rendering works
+modern devices use hardware acceleration
+aggressively which means every rendering
+operation is sent to the gpu the
+graphics processing unit
+for fast processing
+the more you can throw on the gpu the
+faster your processing will be
+images like this are rendered in
+software and not in the graph by the
+graphics hardware
+so the underlying native os will spend
+expensive cpu time drawing graphics and
+memory
+and then more time copying that memory
+from the cpu ram to the gpu ram to
+actually draw it
+you would also take up memory
+specifically with times heights times 4
+amount and sometimes even more than that
+mutable images are problematic but
+sometimes they are the only way to
+accomplish something for instance if you
+want to create
+and save a new image the only way to do
+it is through mutable image
+however there is also a performance case
+to be made for mutable images
+if you have code that includes a lot of
+rendering operations that repeat
+themselves it might make sense to pay
+the penalty of a mutable image once and
+then draw that
+it's something we do with some special
+effects which would be expensive to
+render repeatedly
+we can just generate a rubber stamp
+once the mutable image is rendered its
+strong performance is as fast as a
+loaded image
+even though it has noticeable ram
+overhead it might still be worthwhile
+for a lot of use cases if you are
+willing to make the trade-off
+one important
+bit of information is that mutable
+images aren't thread safe
+this is a bit problematic but there is
+no way around it
+mutable image access
+must be done on the edt
+some optimizers have tried to use a
+separate thread to render mutable images
+this might work for most platforms but
+it doesn't work for ios which relies on
+a global drawing state
+so this is one performance optimization
+tip you shouldn't
+use
+font image allows using an icon font as
+if it was an image
+you can specify the character color and
+size then treat the font image as if
+it's a regular image
+the huge benefits are that
+the font image can adapt to platform
+conventions in terms of color
+and easily scale to adapt to the dpi
+it also comes bundled with material
+design icons representing common
+functionality
+in terms of performance fonts are
+smaller than pngs and jpegs
+they are much smaller than multi-image
+both in ram and distribution size
+rendering performance is hard to measure
+and depends on a lot on the os
+performance difference shouldn't be
+noticeable in the rendering layer
+as a result if you can use font image
+then you should use font image the image
+type has almost no overhead in terms of
+ram which makes it ideal
+some optimizations in the label
+rendering pipeline might be lost when
+using font image however that is an edge
+case behavior and you should only deal
+with that if profiling highlights this
+as a performance bottleneck
+it's possible to convert a font image to
+image which
+internally uses mutable image
+or encoded image
+there is
+no measurable performance advantage for
+doing that
+the main motivation for doing this is
+apis that might rely on image data
+behaving in a specific way
+font image doesn't implement some common
+apis such as get rgb
+and some low-level apis might rely on
+native image drawing which won't work
+with font image

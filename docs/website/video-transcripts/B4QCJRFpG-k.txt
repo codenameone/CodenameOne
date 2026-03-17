@@ -1,0 +1,126 @@
+we are now ready to implement the news
+feed
+the newsfeed container class is a bit
+big so i'll split down the functionality
+into smaller methods that build the very
+various pieces of the ui
+will use infinite container which lets
+us scroll an infinite list of entries
+and implements paul to refresh
+now that we have a sense of what we are
+building
+let's look at the high level class
+skeleton then fill in the pieces
+we use the last time value
+when invoking fetch timeline posts so
+the latest data arrives
+this method is invoked when the user
+scrolls and needs more data or when pull
+to refresh is used
+it's hard to tell how many components
+will return so we'll use a list and
+convert it to an array when we are done
+if this is the first entry we reset the
+value of lost time before making the
+request
+the top is always the same component
+the post bar
+that's where we can add a new post
+we check with the server if there are
+more posts
+if we reached the end null is returned
+and we return that to
+otherwise we loop over the responses and
+create a news item for each post
+we add it with a space separator
+notice the usage of create news item in
+the code
+we update the last time value to the
+last element so the next request
+continues from the last place
+we convert the list to an array and
+return that data
+we referenced create post bar and create
+news item
+let's look at the former first
+it's a relatively simple method
+there are three buttons here none of
+which look like a button and each one
+should take us to a different form in
+the finished app
+we lay out the entire title area in a
+border layout this allows the right post
+field to grow and occupy the available
+space
+next we have
+the create news title method which is
+very similar in some regards
+we need to format the time as something
+that's more human readable such as three
+minutes ago
+again we place the elements in a border
+layout but this time we wrap them in
+flow layouts within
+so they vertically align properly
+this is subtle and hard to notice in the
+image
+notice that the name jots up just a
+little bit in the unaligned version but
+this can be more obvious when the font
+is smaller or the icon is larger
+also notice the placement of the menu
+button
+next up is create post stats
+it's again a very simple method
+i broke it out just to keep the code
+size smaller so we can review the blocks
+more easily
+the status bar appears above
+the like button
+it's only there if there are likes or
+comments otherwise it shouldn't show
+i could have made this code better so it
+will write one comment and two comments
+etc but i wanted to keep the code simple
+with that we are ready for the final
+method in this class create news item
+this method assembles the post entry
+from the pieces we already built
+the title entry
+the rich text view or
+span label etc
+the three like comment share buttons are
+packaged in a grid so they will have the
+same size and align properly
+everything else is packaged together in
+a
+y asus container with good padding
+we have quite a few uids we didn't cover
+in css yet so let's go into those
+the button looks like a text field when
+we press it
+we go directly to the post editing form
+the gallery button has small font and
+padding so it can fit in the same row as
+the other elements
+the padded container uid
+is often too heavily padded for some ui
+elements this uses 1.5 millimeters
+instead of three millimeters in the
+standard padding
+we'll use this in several places
+as we go on
+here it doesn't matter as much as it
+mostly shows an icon
+the title and subtitle use regular font
+which makes them stand out next to the
+light font used in the rest of the app
+this is literally a round blue circle
+with enough padding to show the thumb
+within the circle
+i just need a label with a font small
+enough to fit
+that's all the css entries we need so we
+can lean back press play in the rd and
+watch the first form element in the
+application come to life

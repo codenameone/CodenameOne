@@ -1,0 +1,151 @@
+so we ran the kitchen sink as a mobile
+app using the simulator
+and that's great
+before going to android and ios let's
+try running the app as a desktop app
+this will be a relatively simple
+exercise that can help us understand the
+more nuanced android and ios processors
+as i mentioned before
+we don't have a real main class we only
+have the bootstrap codename one main
+class
+which we can't run as a standalone app
+so we will need to create a new main
+class
+which i will place under
+a directory called stubs
+the term sub in codename one
+is
+one we use internally to refer to the
+ios bootstrap glue code
+in this case i place the stub under
+stubs slash desktop slash src com
+codename one demos kitchen
+there is a bit of code here in the stub
+so i'm going to go over the various
+lines
+it's basically a swing app that embeds
+codename one so you can enhance the stub
+with everything available under java se
+i included import statements because
+they refer to classes in java sc
+and that might be confusing in the stub
+it makes sense to import the
+implementation code since this code has
+no portability to other platforms so i'm
+importing the javasc port directly
+for simplicity i hard-coded the app
+dimensions but it's pretty easy to
+create more elaborate heuristics and
+window positioning using swing
+if your theme doesn't derive from native
+this doesn't matter however if it does i
+made it use the ios 7 theme which is the
+default ios theme
+this will make the app feel a bit more
+like an ipad app
+the javasc port is used for the
+simulator too
+so things like network monitor and other
+simulator features might still be on if
+this is a developer machine
+so here we disable all of those flags
+this is the location for the storage
+file under the user home directory
+in the simulator this is always.cn1
+but it makes more sense to use your app
+name for real world apps
+the simulator hides the full file system
+and shows a fake one under the dot
+cn1.hierarchy
+this disables that behavior so getroots
+will return the file systems in your
+machine
+the simulator does that by default to
+make it feel more like a real device
+when running on a desktop you would
+prefer showing a tablet ui rather than a
+phone ui
+this means that his tablet and his
+desktop would both return true
+swing is also single threaded
+this invokes the run method
+on the swing thread so we can construct
+the swing ui
+we create a swing jframe and then
+initialize codename one with the content
+pane of that frame
+these are display properties we rely on
+in code
+they aren't essential but it's good
+practice to have them
+the frame size and position is sized and
+positioned
+we bind a window listener for the app
+close event
+we make sure to call stop and destroy on
+the main class before exiting
+notice we invoke these methods on the
+codename one thread
+we go into the codename one thread to
+invoke start and init once those are
+done we call the method again on the
+swing thread and show the frame itself
+i took a bit of a shortcut by reusing
+the same runnable instance for both
+callbacks
+now that this is out of the way
+we are nearly done
+we just need to compile that code and
+link it with the javasc port code since
+we already have an ant build xml file
+this is probably the easiest way to do
+that
+i added a new target to the build.xml
+file that looks like this
+i want to make sure
+that we are working with a clean slate
+when running this build
+there are two important things to notice
+in this statement i don't use the boot
+class path since the app is now a
+standard javasc app
+the classpath points at javasc.jar
+because i'm compiling against an
+implementation
+not an api
+notice that the stubs slash desktop
+directory is added to the compilation
+process so that would get bundled too
+we copy the theme from the codename one
+repo so the native theme will look like
+ios
+the final step is the executable jar
+generation
+for a jar to be executable we need the
+main class in the manifest which i
+define here
+we need three things in the jar
+first we need the concept contents of
+javasc port which is already available
+in the cn1 project notice i exclude the
+skin file from there as we don't need
+the simulator and will just increase the
+jar size
+the next thing we need are the compiled
+sources of the kitchen sink project and
+kitchen sink stub
+and finally we need the resources
+defined within the kitchen sink project
+so i package them directly from the src
+directory making sure to exclude the
+java source files
+after going through all of this i now
+have a desktop app that i can run
+using this
+notice that this is a self-contained fat
+jar
+with no external dependencies which
+means it should work well for tools such
+as java packager etc

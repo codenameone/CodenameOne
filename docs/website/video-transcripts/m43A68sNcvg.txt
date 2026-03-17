@@ -1,0 +1,82 @@
+now that we have maps installed and have
+the keys let's proceed to the hello
+world stage
+the obvious hello world is
+this thing
+we just create map container and show it
+this looks awful
+that is the map component with
+openstreetmap
+it takes a while to load and isn't
+exactly attractive
+so let's add the javascript key to the
+constructor so the fullback will be the
+javascript maps instead of open street
+maps
+this looks more familiar and modern
+now we could use google map provider
+with map component
+which might
+improve the look of the component a bit
+but i don't see a reason to dwell on
+that when we can just use the javascript
+fallback
+in the past before z-order appears that
+made some sense but it no longer does
+now let's configure the build hints for
+the individual os settings
+first the android native map
+api key needs to be specified using this
+exact syntax
+you can copy and paste it from the maps
+github page where all of these keys are
+listed
+don't forget to replace your android api
+key
+with the key generated in the urls i
+mentioned in the previous module
+next we need to do that same thing for
+ios and specify the ios key
+in this build hint
+and last but not least we need the
+javascript key2
+normally this isn't essential since we
+pass the javascript key in the
+constructor
+we need this for the javascript port
+where the key
+needs to be specified in another
+location
+building this to native android produces
+this result on the device
+however
+the ios build fails
+looking at the build error it's clear
+there was a null pointer exception
+when running the application
+but this is an error from the build
+server
+as you might recall ios native
+applications need a splash screen
+the codename one build server solves
+this by running the application several
+times in the servers
+where it generates splash screens for us
+however the build servers don't support
+the web browser component
+the reason for this is simple
+the web browser component will look
+different on the device and so a
+screenshot won't work well
+the solution is to handle a case where a
+web browser isn't supported
+this fix is relatively trivial
+if web browser isn't supported
+it has to be the ios screenshot mode
+and in this case we can just mention
+that we are loading
+a nice graphic might be relevant here
+if we want to refine this further
+and now
+that this was built it looks like this
+in ios

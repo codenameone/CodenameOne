@@ -1,0 +1,95 @@
+next on the agenda is integrating the
+model that we developed with the UI that
+we built
+first I didn't mention the format
+currency call
+initially when I started working on the
+code I used the L10 manager to format
+the code which made sense at a glance
+however currency is something we get
+from the restaurant itself
+and it should handle the currency type
+adding the dishes code
+is code we already have however this
+second block of code is pretty cool
+first I'll bind a listener to the dish
+quantity which allows me to track
+changes to the map of dishes
+to the quantities of each
+that means that every time a dish is
+added or removed in the map of dishes
+regardless of the source of the change
+we can get an event
+and recalculate the amount in the order
+updating the amount is literally as
+trivial as looping over the dishes and
+adding up the amounts when then setting
+it to the label
+notice that we call revalidate at the
+bottom since the label might have a
+longer string as a result and we might
+need to enlarge the space allocated for
+it
+we have a very similar code in the
+checkout form it updates the total value
+based on the dish map
+in this case we don't need listeners
+since the checkout form only provides
+one way to edit the data the dish
+container hasn't changed much so I
+snapped out most of the code
+however the animation portion of the
+removal now needs to update the price
+after the animation completed
+notice we call update price only after
+the animation so the repaint of the
+price won't interfere with the Running
+Animation
+the contact test form is practically the
+same as before and the only major
+difference is that the formerly
+hard-coded data is now entirely from the
+restaurant class
+the main menu form has three interesting
+pieces of code I'd like to focus on
+first the code to create the categories
+list is no longer hard-coded
+the second part is the content container
+which Loops over the dishes in the main
+menu and places them into the UI unlike
+the previous code this now uses the
+restaurant model to show the data
+the final part is the code which adds a
+dish
+or order is the button you see here it
+adds the item to the order total
+notice that we just put the dish into
+the order and update the quantity
+nothing else
+the event handling code updates the
+subtotal of the order seamlessly
+I don't always use the top to bottom
+approach of development
+but I like it more
+when I take that approach I can quickly
+bring non-coders into the circle of
+discussion as the UI aspect is instantly
+communicatable
+and everything else becomes far easier
+there are always exceptions to the rule
+for instance sometimes we build apps for
+companies that have extensive back-ends
+and no front ends in those cases it's
+sometimes easier to just build the
+mapping to the back end and then build a
+user interface around that
+in both cases I'm firmly in the camp of
+running quickly through the design
+you can't debug a design unless you are
+building a mission critical app your
+time might be better spent coding
+than overthinking a design
+thanks for watching I hope you found
+this educational please join the
+discussion in the comments section and
+let me know what you think

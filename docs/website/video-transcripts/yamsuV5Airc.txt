@@ -1,0 +1,227 @@
+now that the server is working we need
+to connect the app mockup to it and get
+all the pieces working in cohort
+since we did most of the work this is
+actually simpler than it sounds
+i completely rewrote the server api
+which was a mock-up beforehand i
+considered building an abstraction
+similar to the one on the server side
+with separate classes for user media and
+post but eventually decided this doesn't
+warrant that
+it might
+as the api grows but right now the api
+is still simple enough the code is
+generally just glue code that doesn't
+contain any real logic
+the code doesn't change up to here
+everything else is different
+we have two new variables the url of the
+server and the token we use for
+authentication
+the get method is a shorthand for rest
+get methods that already inserts the
+right base url token and json headers
+for spring boot
+post works in the same way and saves us
+from a lot of boilerplate code
+we can check if a user is logged in by
+checking the token value this is useful
+as
+a key password scenario
+the rest of the code is mostly mirror of
+the server code
+first we have login and signup which are
+practically identical so their common
+code is encapsulated by one method
+both methods are post operations that
+submit data to the respective url
+a login failure might still invoke the
+success callback method
+this automatically populates the user
+object with the json data from the
+server
+the token is also saved separately for
+convenience
+we save the user object in storage as a
+json file this means we can just read
+that file the next time we launch
+saving as json is very convenient as we
+can literally read the content of the
+file during development and also produce
+test cases using this approach
+notice we save the json data to storage
+not far system storage
+storage is generally private to the app
+and while it's not secure enough for
+your bank account details it should be
+reasonably safe for most apps
+as i mentioned before signup and login
+use the same method with different data
+and url
+refresh is invoked when we need to fetch
+updated user data after making changes
+the operation is synchronous so we can
+just read the data and store it into
+json immediately
+the verification step just sends the
+code using a get request and expects an
+ok response notice this isn't a json
+string just the word
+ok
+update works in a similar way but posts
+the user data
+notice how much simpler this is than the
+signup method
+partially due to the synchronous api
+notice we save the changes into the
+cached local file
+when we use this method we would need to
+already have a media object id
+so set avatar will point at a valid
+image
+most of these are pretty uniform and
+don't bring anything new or interesting
+now to do the next two methods for
+friend request
+a friend request is sent as a get method
+as we only need the user id and not much
+more
+accepting a friend request is
+practically the same operation
+if there were more than two methods it
+would have made sense to
+extract the common logic to one method
+but for this amount of code it's
+probably not worth it
+the next stage is a bit more interesting
+we need an api to upload the user
+contacts
+all the heavy lifting is done in the
+contacts to json method
+this call just posts the data returned
+from that method to the url
+so let's look at the context to json
+method
+we need to translate the codename one
+contact object
+two json strings matching the shadow
+user dao object in the server side
+the first step is looping over all the
+elements to generate the json i chose to
+generate it manually as a string as a
+quick and dirty solution
+we create a map and place the properties
+into it we translate the nuanced
+contacts object into a simplified object
+the logic used here is a bit too
+simplistic but it will do
+the a more realistic approach would
+upload all of the data
+the advantage of using this api rather
+than just writing the json
+is that special characters are escaped
+correctly so this is far simpler
+the two json api only supports
+outputting maps not arrays slash lists
+as we need
+so this portion of the hud is a
+hard-coded string
+that's just a bit verbose and slightly
+hacky but it works
+the next method continues the direction
+of upload with media
+upload api
+for media upload we use the uniform the
+four multipart w3c standard which is
+built into codename one in the multipart
+request class
+upload media submits a multipart request
+which is a special type of post
+operation that encodes binary data as
+base64 for upload
+this is a callback from connection
+request that allows us to read the
+response directly to a string notice
+this method is invoked on the network
+thread
+this callback is invoked on the event
+dispatch thread
+when the connection request finishes
+it's important to call the success
+method on the edt to avoid threading
+issues
+add to queue is asynchronous so the
+media will upload in the background and
+invoke the success callback when ready
+uploading an image is a bit challenging
+but most of the complexity is hidden by
+codename one
+the me method returns the logged in user
+instance if we are logged in we lazily
+initialize the user instance
+we load the json file saved during login
+signup from the storage
+the next step is the list of
+notifications which we fetch
+synchronously page bar page
+you may recall that in the mock-up code
+i used timestamps to define the paging
+process in the infinite container that
+approach works great for some paging
+strategies but for the strategy we
+picked on the server it's not ideal
+in fact the approach on the server is
+even simpler than what we did
+we just need a page and the size of the
+page
+we use synchronous api calls
+since the infinite container api expects
+us to return values
+the json passing always returns a map
+but the server return returns a list in
+this case
+for those cases a map with a single
+entry called root is implicitly created
+we create and populate a notification
+object for every entry in the list
+if there are no entries or if there was
+an error we return null to end the
+listing
+this method is replicated by other
+services that return pageable data
+specifically following the following
+methods deal with posts
+we
+have two lists of post objects this
+method concentrates the common code from
+both of them it's roughly identical to
+the notifications method
+this is pretty much the only difference
+we instantiate post instead of
+notification
+here we list the post for a specific
+user we construct and launch the query
+so map the map response returns to the
+post method
+the newsfeed call is identical with
+different urls and it doesn't
+need the user id
+with that we are nearing the end of the
+server api class the last few methods
+are again pretty simple methods covering
+the actions one can take to submit data
+we submit a post object in the body of
+the web service and return true if the
+post succeeds
+a comment object is submitted in much
+the same way as a post but it sets the
+id of the comment entry added into the
+comment object
+even though a like receives a post
+we only send the post id and use the
+post object to keep this type safe
+with that we mirrored the current server
+changes to the client and can move to
+the integration aspect

@@ -1,0 +1,58 @@
+push is fragile and can be blocked by
+the user
+in order for the app to work properly we
+need to properly handle the situation
+where push isn't available
+and we can do that with a fallback
+implementation
+i have two such implementations i will
+start with the http based implementation
+the async build code
+needs a place where it can deliver the
+message sent back to the client
+the restaurant entity is pretty
+convenient for that
+we can store the result from the build
+process
+in the last result entry within the
+restaurant entity
+you might recall the build app service
+class where we send the build async call
+using a post method
+we can just return the response by using
+a get method to fetch the entity
+database transactions take care of the
+rest
+and all we need to do now is pull from
+the client for this update
+in the client side the build app method
+sends a build to the server
+here we have a polling fallback
+code to see how the connection is
+working
+if we have a push key
+we don't need polling as push will take
+care of this but if we don't have it
+then polling needs to kick in
+the polling code is pretty simple
+let's review what we have here
+first we have a request to to the build
+app url again
+this time however we pass false instead
+of true to the second argument
+that means we are making a get request
+instead of a post request
+we wait for the response and check if
+it's valid
+then schedule a timer that will keep
+polling as long as the value hasn't
+changed
+once that's done we cancel the time
+and return the value with on build
+result this isn't ideal
+and normally we try to avoid http
+polling
+check out a better approach demonstrated
+in the websocket version
+thanks for watching i hope you found
+this informative

@@ -1,0 +1,193 @@
+in this section we'll talk about
+profiling profiling is the process of
+using specialized tools to measure the
+performance bottlenecks of your
+application
+despite the amazing ubiquity of these
+tools many developers just don't use
+them
+Story Time
+fifteen years ago i was contracted by a
+bank to help them solve performance
+problem
+they were having where a huge query was
+taking them seven minutes to perform
+they needed sub sub-second performance
+for that specific query and were lost
+they had a hard time getting profiling
+to work so they wasted quite a bit of my
+time trying to guess the reason
+i wasted a bit of time in a meeting
+where everyone involved raised their own
+theory of why this is happening
+you can probably guess the end
+i spent an afternoon setting up
+profiling which was hard for that huge
+distributed system
+once that ran i had data that showed
+everyone was wrong
+it pointed at a specific set of calls
+that should have taken almost no time
+time at all
+but each was invoked thousands of times
+turns out that two guys sitting at
+adjoining tables had each assumed that
+the other guy was caching the results of
+a query
+so they performed it each time for every
+entry of the table
+that one change brought performance from
+seven minutes to seven seconds
+everyone has stories like these martin
+fowler mentioned how a change
+in how they were getting a default
+constant date in a project reduced
+processing time from more than a day to
+a couple of hours
+profiling is crucial
+Performance Monitor
+the performance monitor is a simple tool
+built into the simulator
+that provides some insight into
+performance issues you might run into
+the performance monitor tool focuses on
+rendering speed and won't help you with
+logical performance issues
+perform the performance monitor monitor
+tool is launched via the simulator
+performance monitor menu option
+in the simulator
+this launches the following ui that can
+help you improve application performance
+the first tab of the performance monitor
+includes a table of the drawn components
+each entry includes the number of times
+it was drawn and the slowest fastest and
+average drawing time this is useful if a
+form is slow you might be able to
+pinpoint it to a specific component
+using this tool
+the log at the bottom of the screen
+includes the bug related information
+for instance it warns about the usage of
+mutable images which might be slow in
+some platforms this also displays
+warnings when an unlocked image is drawn
+etc
+the rendering tree view
+allows us to inspect the hierarchy
+painting
+you can press the refresh button which
+will trigger the painting of the current
+form
+every graphics operation is logged and
+so is the stack to it you can then
+inspect the hierarchy and see what was
+drawn by the various components
+you can click the stack button to see
+the specific stack traces that led to
+that specific specific drawing operation
+this is a remarkably powerful debugging
+tool as you can literally see overdraw
+within this tool
+for instance if you see full wrecked or
+similar apis invoked in the parent and
+then again and again in the children
+this could indicate a problem
+i highly recommend traversing the paint
+hierarchy in this tool and trying to
+explain why every graphic operation
+within this tree occurred i think it
+would help you understand your
+application
+and codename one
+Performance Monitoring
+performance problems are usually
+portable
+the problem is that because one platform
+can be faster than another
+we'd often perceive of them only on the
+slower platform
+however with profilers we can measure
+performance penalties and overhead on
+the desktop
+we can then assume and extrapolate to
+perform optimizations that make sense on
+the device
+there are plenty of performance
+monitoring tools for java sc
+and they all should work just fine with
+the codename one simulator
+in this case i used the netbeans
+built-in performance monitoring tool on
+the kitchen sink demo
+the tool has two applicable modes for
+this case
+cpu and memory
+Performance Monitoring Results
+after running kitchen sync under the
+netbeans performance monitoring tool i
+came up with these results
+this shows the threads of the
+application
+and as we dig into them we can see which
+method takes the line share of cpu time
+the hotspots mode shows the method in
+which the cpu spends the most time
+both are a bit misleading as they give a
+lot of time to methods that use invoke
+and block
+another reason to be wary of this api
+which is why it's always useful to
+isolate the area where the performance
+problem starts and try to measure only
+that section with this tool
+at that point you will be able to
+pinpoint the suspicious methods
+it's important to read the values in the
+table carefully they include both cpu
+time and invocations
+these can expose behaviors weren't
+expecting
+notice that you can click any method in
+the hotspots view and see the stack
+traces to that method
+the memory mode of the profiler is a bit
+more limiting
+as you can see
+we can see the battery
+take up most of all active memory which
+typic effectively means images are
+responsible for the memory of the
+application
+that's not exactly useful as it doesn't
+disclose which image is responsible
+we can still get a lot of useful
+information out of this by
+taking a memory snapshot and then
+another one after performing an
+operation
+we can then check the change in memory
+and determine it acted as we expected
+Back of napkin math
+one of the important things we need to
+do when looking at a profiler is basic
+back of the napkin math
+the numbers we see make sense
+this is true both for both memory and
+cpu profiler
+say your code allocates 30 images that
+are 130 by 130 pixels
+your memory should grow by
+30 times 130 130 times 4
+which means 2 million bytes
+this will mostly show up in the byte
+array growth if the memory grows by a
+bigger margin then you have a problem
+and should try to isolate that
+the same is true for method invocations
+fma method takes a lot of time then look
+at the elements within it
+add them up if a method is invoked too
+many times try to understand why and who
+is invoking that method

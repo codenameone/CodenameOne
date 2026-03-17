@@ -1,0 +1,150 @@
+in this part we will go over the
+remaining big subjects and animations
+we start with style animation which we
+discussed before
+we used that to animate the title bar
+but we can do pretty much anything a
+style can do
+although
+some things work better than others
+for instance animating a color works
+really well
+but animating alignment will not
+as it only has
+three hard states
+most of the other animation types have
+simple methods to implement them
+such as animate layout
+but the style animation is only
+accessible via the animation manager
+class
+the reason for this is that it's a newer
+animation type the older animations
+predated the animation manager and were
+adapted to work with it
+the style animation was created with the
+animation manager and so it relies on it
+this code animates a label uiid to a
+text field uiid
+you will notice we created a generic
+component animation class
+and use animation manager to set it
+these component animations are pretty
+powerful
+you can sequence the and run them in
+parallel
+you can do quite a lot of powerful
+things with them
+the animation manager is a late addition
+to codename one it came after we already
+had layout animations and a lot of
+infrastructure in place so we had to
+upload everything and stick it below
+this created interesting situations and
+made the api awkward at some points
+the main reason we had to do that is
+orchestration
+the animation manager takes care of all
+the animations within the form
+from one point in the code
+before we had this it was really
+difficult to run an animation without
+collision
+so if an animation was running and a
+user triggered a button that removed an
+unrelated component
+the animation would crash
+because the number of components was
+suddenly different
+so the animation manager came along and
+it handles animations but also handles
+serialization of operations
+that means
+that if you try to remove or add a
+component while an animation is in
+progress
+this operation will be postponed until
+the animation completes
+you can also tie together component
+animation objects and effectively create
+elaborate animations
+i would discourage that for most cases
+as it can lead to overly complex
+animations
+that serve
+form instead of function
+and finally i'll cover
+the exact opposite
+of these high-level animations
+the low-level animation infrastructure
+animations ui timers and many other
+features in codename one
+rely on the animate method of component
+which is core to codename one but so few
+people understand it
+when the edt runs a cycle
+we call it a tick
+and the edt aims
+for up to 60 ticks per second
+although the speed varies
+with each tick
+the
+form is tossed with handling animations
+and it invokes the animate method
+if the animate method returns true the
+animation will be painted
+notice that animation in this case
+refers to the animation interface but
+all components implement that so you can
+use the component instead
+now
+this would be very costly if we had to
+go over every component 60 times per
+second
+so only components that use register
+animated will receive the animate call
+the thing is that while there are
+registered animations the edt cannot
+truly sleep
+but that's probably okay
+the real problem is when animate methods
+return true too often or perform long
+complex operations
+this can become a serious battery drain
+that will slowly seep power from the
+device
+so it's very important to deregister
+unnecessary animations
+we try to do it with our components
+but my point here is that this is pretty
+low level stuff
+and you should be very careful when
+dealing with it as the performance
+implications can be significant
+all our components use this feature
+text fields use it to blink their
+cursors url images use animations to
+update the image
+when we receive an up-to-date image from
+the server
+it's pretty powerful
+the clock demo in the kitchen sync uses
+it too let's have a look
+notice we register animated and
+deregister it based on the need
+in the initialize and the initialize
+callbacks
+this triggers a call to animate method
+notice we only refresh the clock once a
+second this is important otherwise
+excessive repaints could drain the
+battery
+and finally we draw the animation in the
+background
+callback
+notice that this is pretty low level
+these types of animations are designed
+for graphics
+not for components
+thanks for watching i hope you found
+this informative

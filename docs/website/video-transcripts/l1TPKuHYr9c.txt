@@ -1,0 +1,76 @@
+now that we have the layer of the land
+let's start building things specifically
+the kitchen sink demo
+first we'll build cldc11 as it's pretty
+trivial
+after that we should have
+this slash cldc11 cldc11.jar
+next we'll build the library itself
+we now have codename one compiled notice
+a pattern here
+it's relatively simple at this stage
+next we want the simulator so we will re
+repeat the same process for the javasc
+port notice i invoked and jar twice this
+isn't a mistake the first time copies a
+skin file into place
+but does that a bit too late a second
+time generates a proper jar
+we should now have codename1.jar
+from the codename1project this directory
+and the javasc jar from the javasc
+project this should allow us to build a
+hello codename one project
+the catch and sync is a simple yet
+comprehensive demo that reviews a wide
+range of the codename one functionality
+it's a good candidate to compile so we
+can start by pulling it from git
+alternatively you can download the
+zipped url from github
+a codename one project is a standard and
+project which we can build and run
+similarly to other and projects
+notice that we are missing the codename
+one build client.jar
+unless we use the codename one ide
+plugin
+this is the jar that effectively
+implements the build server
+functionality in codename one
+if you use the codename one plugin you
+can just copy it from another codename
+one project
+however if you don't intend to use the
+build servers at all you don't really
+need it
+since ant is sensitive to missing
+dependencies you will need to remove the
+codename one ant tasks from the file
+notice that this is only necessary if
+you don't have codename one build
+client.jarrow
+the file is really simple and doesn't
+include many targets most of the targets
+included in the file
+are included in the file nb project
+slash build example.xml
+which netbeans defines
+this is just a bit of guarding against
+compilation issues i included the full
+file in the resources for this module
+finally in order to compile the project
+we need to copy the following files into
+the kitchen sync directory and run and
+after this is done you can now run the
+project in the simulator using either
+and or the manual java command
+you will notice we are running the
+simulator class not the main class
+which in the case of the kitchensync
+project is called com.codnam1
+the simulator loads the class
+dynamically and handles the device skin
+that class and package are defined in
+the codename one settings
+dot properties file

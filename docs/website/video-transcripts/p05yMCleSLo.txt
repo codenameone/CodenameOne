@@ -1,0 +1,139 @@
+in this section we'll discuss the star
+form
+which allows us to determine the style
+of elements within the application
+the style form allows us to view the
+main ui of the application
+and touch various elements
+so we can customize their foreground
+color background color and font
+there are a lot of limitations i imposed
+on this ui to keep things relatively
+simple
+fonts can't be customized on something
+that doesn't actually have a font
+such as an icon
+we only allow a very small selection of
+font options
+the reason for that is
+difficulty of
+getting this right across platform
+where there are so many options
+available
+the color picker is also relatively
+a relatively simple widget
+that just allows us to drag the rgb
+channels or set the hex value of the
+color
+i wanted to keep this ui as trivial as
+possible
+you can reset the changes in two ways
+use the back button on the top left
+without saving or use the restore style
+option
+within the popup dialog
+the style form allows us to define
+that ui
+notice that it derives from form
+but is otherwise a pretty standard class
+we derive from form instead of the base
+form class as we don't want the side
+navigation menu and other thrills that
+come
+with a custom base class
+there is another reason
+we want to apply styling aggressively
+and if we derive from the main form
+we might run into some issues
+the style setting class contains
+information about changes to a specific
+style
+we use this to store the changes defined
+by the user
+and send this data to the user
+i'll
+cover that class soon enough
+the toolbar styling is something we need
+to do in code
+otherwise when we start shifting styles
+around things can get messy
+this is the back command and right below
+we can see the ok command
+with the check next to it
+both do exactly the same thing
+they reload the builder theme
+so we can restore it just like we did in
+the preview code in the preview code
+then show the previous form
+one thing i do want to highlight here is
+the insert or update call
+which loops over the styles and saves
+them
+when we make a change
+as you can see
+the theme for the restaurant tab
+is set when we first launched this form
+so it controls
+most of the ui here
+moving ahead we can see the code that
+deals with applying the styles saved in
+storage
+we load the styles from storage and then
+loop over them
+for each type font foreground or
+background we create a theme entry
+a theme in codename one is a hash table
+that has keys and values
+with the format you see in the code
+for instance
+button dot fg color represents the
+foreground color for the theme
+and so forth
+we can then use add theme props to layer
+this theme on top of the existing theme
+and thus load the style settings from
+the database
+moving on we place the main menu form
+from the restaurant app in the center of
+the user interface
+so we can click on the actual restaurant
+app
+notice we make the toolbar focusable
+we need that so the tapping on the
+toolbar will allow us to customize it
+otherwise some special case logic of the
+form class
+might kick in
+we override the pointer events in the
+form such as pointer dragged pressed etc
+if the event is
+in the content pane
+we discard it
+if not
+we send it on
+this allows events in the toolbar but
+blocks events everywhere
+this works because events in codename
+one propagate through the parent form
+and so if we override the pointer events
+and don't call super it's as if the
+event never happened
+that can be useful if we want to provide
+complete custom functionality
+the pointer released
+override is below the get start setting
+and we'll discuss that more in depth
+soon enough
+but first i want to talk a bit about
+getstar settings method
+this method caches styles from sql and
+loads them lazily you might think why
+would we need that
+the reason is cancel
+we need the ability to cancel the
+changes so we can't persist every star
+change
+we make
+we need to save them in the list and
+only update the database when the ok
+button is pressed

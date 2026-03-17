@@ -13,68 +13,36 @@ description: Determine where components are placed especially when dealing with 
 youtube_id: 4D_KUa2qv2o
 thumbnail: https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-5-1.jpg
 ---
+{{< youtube "4D_KUa2qv2o" >}}
 
-{{< youtube "4D_KUa2qv2o" >}} 
+Layouts are the reason a Codename One UI can survive different screen sizes, orientations, pixel densities, and languages. Components do not live at fixed coordinates. They live inside `Container` objects, and those containers use layout managers to decide how much space each child gets and where it should appear.
 
-#### Details
+The core problem layouts solve is portability. A button position that looks fine on one phone may be wrong on another. A label that fits in English may overflow in German. A design that works in portrait may fall apart in landscape. Absolute positioning looks tempting when a screen is simple, but it stops being practical as soon as the UI has to adapt. Layout managers let you describe intent instead of hard-coding coordinates: this component should stay on the left, this field should take the remaining width, this section should stack vertically, these buttons should all be the same size.
 
-###### Transcript
+That is why the classic “label on the left, field on the right” example is still such a useful starting point. In Codename One you usually express that with a `BorderLayout`, putting the label in `BorderLayout.WEST` and the field in `BorderLayout.CENTER`. The layout then handles the resizing rules for you. The label keeps the width it needs, while the center component expands into the remaining space. Once that pattern clicks, you can start seeing a screen as a composition of small layout problems instead of one big manual positioning job.
 
-In this short video I’ll try to address one of the most challenging basic features of Codename One: Layouts
+The standard layouts each have a natural role. `FlowLayout` is still the simplest layout and is fine for small inline groups of components, but it is easy to outgrow. `BorderLayout` is one of the most useful outer layouts because it gives you strong structure: top, bottom, left, right, and a center area that consumes the remaining space. `BoxLayout.y()` is a great default for stacked content because it reads like the screen itself. `BoxLayout.x()` is good for small horizontal rows. `GridLayout` is useful when you genuinely want equal-sized components, such as button bars or icon grids. `TableLayout` is especially helpful for forms and data entry because it gives you more control over rows, columns, and spanning. `LayeredLayout` is the one to reach for when components need to sit on top of each other, such as floating actions, overlays, or decorative layers.
 
-Before we go into the actual code let’s explain the basics. Codename One Components are arranged within Containers. A Container can contain an arbitrary number of components
+One detail that matters early is constraints. Some layouts need them and some do not. `BorderLayout` depends on explicit positions such as `CENTER` and `WEST`, while `BoxLayout` generally does not need extra constraints at all. Understanding that difference helps make the APIs feel much less arbitrary. A layout manager is not just “where children go”; it also defines what information you need to provide when you add those children.
 
-Since it derives from Component a Container can also Contain other Containers and so forth. By nesting these Containers one into another we can build any type of user interface
+The most effective way to build a real screen is usually to nest a few simple containers rather than hunting for one magical layout that does everything. A form might use `BorderLayout` at the top level, a `BoxLayout.y()` in the content area, and then small `BorderLayout` or `GridLayout` sections inside it. That is normal. Good layout code tends to mirror the visual structure of the screen. If a screen has a header, a scrolling body, and a floating action button, the container hierarchy should make that obvious.
 
-This begs the question: Why? Why not place the components where we want them to be on the screen?
+Inspecting a real screen is often more useful than memorizing layout APIs in the abstract. If you open a working UI in the component inspector and look at the nesting, you quickly see why a `LayeredLayout` was used at the root, why a `BoxLayout.y()` holds a scrolling list, or why a `GridLayout` makes the swipe actions line up evenly. That is how layouts become intuitive.
 
-Devices can have different resolution, pixel density, font sizes and form factors. So a specific position that looks good on one device can look awful in another.
+The modern adjustment is not in the layout system itself so much as in how you split responsibilities. Layout code should mostly define structure and resizing behavior. CSS should do much more of the styling work: spacing, fonts, colors, borders, and visual states. If you find yourself using extra containers only to fake visual styling, that is often a sign that the visual concern belongs in CSS instead.
 
-With device orientation changes, tablets, desktop/web versions of the app etc. You would expect the UI to adapt "automatically". It gets worse with localization for instance languages like German have very long words and you would expect components to resize accordingly
+## Further Reading
 
-Layout managers convey the logic of component placement in a way that Codename One understands and can adapt e.g. Let’s say I want to say put a label on the left and put a text area next to it. I also want to give that text area the rest of the available space
+- [Layout Basics](/layout-basics/)
+- [Developer Guide](/developer-guide/)
+- [Themeing](/themeing/)
+- [Getting Started](/getting-started/)
 
-We can do this in many ways but a common way would be to use a Border Layout. We can place the label in the WEST & the text field in the center
+<!--
+Full transcript retained in docs/website/video-transcripts/4D_KUa2qv2o.txt for future video recreation.
 
-This can be abbreviated using this shorthand syntax so the initial container will have the east component
-
-And can be further abbreviated using this one line of code, this also brings us to one of the more important aspects of layout managers. Constraints.
-
-There are two types of layout managers in Codename One, those that have component constraints and those that don’t. Border layout requires a constraint for every addition (like the center or east constraint we used), layouts like table layout can work without one but add it implicitly. Layouts like Box Layout don’t need a constraint at all.
-
-Let’s go over some of the layout managers at a high level using the kitchen sink demo to show them off
-
-First we have the flow layout which is the default layout manager in Codename One, it arranges components from left to right and gives each component its preferred size.
-
-Flow layout can be aligned to the left, center or right. Vertically it can be aligned to the top middle or the bottom of the available space. It implicitly breaks a line when it reaches the end of the line. This is a bit of a long discussion to get into but if you add complex/large components into flow layout it might fail as Codename One doesn’t reflow for performance reasons. You should be careful when using it for anything non-trivial.
-
-Next we have border layout that we discussed briefly, it can place components in the north (top), south (bottom), east (right), west (left) and center. Components placed in the north & south have their preferred height but are stretched to fill up available width. Likewise components placed in the east & west have their preferred width but stretch to fill up the available height.
-
-The center component is a special case, it’s stretched to fill the available space. There is a special absolute center mode that allows it to be in the actual center based on the preferred size of the component. Border layout doesn’t make sense as a scrollable component since the behavior heavily depends on the fixed size of the available space. Hence it will implicitly disable scrolling when set to a Container or Form. We often use Border Layout for components that need to be sized explicitly such as Map or BrowserComponent as the center location makes sure to give them the available space.
-
-Box layout places components in a row or a column. When we place elements in Box X the row has the same height but the elements are given their preferred width. When we use Box Y elements occupy the available width but have their preferred height. This helps components align property on the given axis as they have the same size on that axis.
-
-Grid layout gives all the components the same size based on their preferred size and places them in rows/columns. This is useful for the icon grid style of user interface and also useful for button bars where you want all the elements to have the exact same size regardless of their text
-
-Table layout is more flexible, it’s very useful for input and forms. Table layout allows spanning columns or rows between table cells. It uses constraints to define behaviors of table elements.
-
-And finally Layered Layout places elements one on top of the other so we can do things like overlays. Here we set a bit of margin on each entry so the difference between the layers are clearer
-
-Now here is a neat trick to learn about components, open the component inspector on a UI and look within the hierarchy to see what we did for that specific hierarchy. You can also look at the code but that isn’t always clear… In the contacts section of the kitchen sink demo we can inspect the various elements and understand which layout was used for what purpose.
-
-We have a layered layout for the root, this allows the floating action button on the bottom.
-
-A bit deeper we can see the Box Layout Y that contains all of the "Swipeable Container" classes,
-
-Swipeable container is a layered layout that we can swipe to show the buttons below
-
-These buttons under the swipeable container use a grid layout so they can occupy the same size
-
-The top component in the swipeable container is the multi button, this button is really just a border layout Container with text in the center and an icon label in the west!
-
-I could talk about layouts for another hour (and I will at a later date) but for now we’ll call this a day. Thanks for watching and I hope it was helpful
-
----
+Future video outline: start with the portability problem, then build one realistic screen from the outside in. Show why nested containers are normal, explain the practical role of `BorderLayout`, `BoxLayout`, `GridLayout`, `TableLayout`, and `LayeredLayout`, and end by showing the component inspector on a finished screen. CSS should be presented as the modern styling layer that sits beside layouts, not as a replacement for them.
+-->
 
 ## Discussion
 

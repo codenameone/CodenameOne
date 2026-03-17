@@ -1,0 +1,130 @@
+in the second part we'll cover some of
+the other big ticket items in security
+we'll start with storage encryption
+which allows us to encrypt the storage
+data
+notice that storage isn't accessible by
+default and is isolated
+however if a hacker gets
+physical access to the device or can get
+through an os exploit
+this might be an important second line
+of defense
+notice that this is about storage
+encryption
+people often confuse file system storage
+and storage
+they are very different things
+file system is low level and pretty
+similar to file systems on desktop os's
+storage can be implemented on top of
+file system
+but it's more of an abstract concept
+because of that we can apply encryption
+seamlessly to the storage class
+but can't do
+that seamlessness
+for the file system or sql
+class
+the bouncy castle cn1 lib
+implements a wide range of encryption
+algorithms
+that you can use for most common
+encryption tasks
+we enhanced it with the ability to
+seamlessly encrypt the storage
+using the encrypted storage class
+once this is applied the constant
+content of storage will be completely
+encrypted
+we use aes
+for the storage encryption
+that's a multi-military grade and
+algorithm that balances performance and
+security
+it should be enough for most purposes
+the main weakness with storage
+encryption
+relates to key storage
+you need to pass the key
+to the encrypted storage class
+this means the key will be accessible to
+a hacker that might use it
+if you need perfect security you have
+the option of encrypting the data with a
+randomly generated key
+and save that key in the file system
+obviously
+this poses the problem of
+where you will need to encrypt the
+randomly
+generated key
+another option
+is to store an encryption key in the
+server that will be provided on login
+this is the most secure option but it
+will block the option of working offline
+another important feature is screenshot
+blocking
+this can prevent potential attack or
+even misuse when a screen containing
+private information can be captured
+you can't block screenshots on ios
+that feature isn't available there
+on android we can block screenshots
+using the build hint to disable
+screenshots
+this also hides the screenshot from the
+android task manager which might impact
+the user experience
+if you have a banking app you might be
+concerned that user will grab a
+screenshot that includes potentially
+private information
+and you might want to block that
+some organizations have a security
+policy that requires this flag
+copy and paste is a common vector of
+attack for spyware
+if you have a malicious app in your
+device one of the first things
+it might do is peek into the clipboard
+to see if you have
+proprietary information there
+that's why copying from
+password fields is always disabled
+but you might want to block some other
+fields that contain proprietary
+information
+you can block copy and paste for the
+entire app which might be a bit much for
+most applications
+alternatively you can block copy and
+paste on a specific field
+using a client property on that field
+jailbroken devices remove important
+layers of security
+they allow apps to be installed outside
+of the app store on ios
+which means a lot of the security
+measures for
+an app are forfeited
+they also allow root access for apps
+which allows more exploits where
+jailbroken devices
+allow
+full-on spyware to run in the background
+the problem is that it's really hard to
+detect a jailbroken device
+as the very idea of jailbreaking is
+hiding this fact
+so the is jailbroken device method
+makes the best effort but can't
+guarantee
+if the method returns true the device is
+probably jailbroken but if it returns
+false
+it might still be a jailbroken device
+that we failed to detect
+thanks for watching i hope you found
+this informative

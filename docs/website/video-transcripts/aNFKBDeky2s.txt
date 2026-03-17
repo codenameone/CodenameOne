@@ -1,0 +1,127 @@
+now that we reviewed the basic design
+elements let's apply this to the code
+we will start with the base form which
+is a base class from which the top level
+forms will derive in the future
+Base Form
+the init method of the base form
+initializes the common pieces including
+the search entry which is currently just
+a search command
+it doesn't do anything right now and is
+there mostly for the icon
+the psd didn't include a design for the
+side menu
+it included only the icon indicating the
+side menu is there
+i added a side menu entry to make the
+icon appear
+but it doesn't have any functionality or
+design
+Filler Label
+i've mentioned the usage of a layered
+toolbar before
+a layered toolbar floats on top which
+would mean the list of filters etc would
+appear underneath it in normal
+circumstances
+to avoid this i added a filler label
+that is as tall as the toolbar area
+and placed it
+in the top portion of the form
+it pushes all the other elements
+downwards so they don't overlap with the
+title
+the background image is a part of the
+style
+and will stay in place behind everything
+Order Entry
+we discussed the your order entry in the
+css
+but i would like to call out the fact
+that i used the localization manager to
+format the currency price here
+that's why the price is listed as ils
+instead of usd
+in this particular case
+this is probably wrong
+as prices should be delivered
+from the server with the currency type
+we discussed the shopping cart style in
+the css 2.
+notice we apply the shopping cart style
+before calling the material icon
+which effectively used the styles from
+the css for the icon
+Label
+this label
+is placed into a grid layout
+with a transparent container
+so the top portion shows the background
+image and this label abstracts it
+creating the effect of a line crossing
+that way it looks like the shopping cart
+is peaking from the bottom of the ui
+this almost works
+Grid Layout
+remember when i mentioned going
+overboard i meant this part
+the label and the grid layout trick
+almost worked
+and this is the workaround to get it to
+work
+a grid layout takes two components and
+give them gives them the exact same size
+to fill up available space
+this works great except for cases where
+the size isn't divisible by two
+in which case one pixel at the bottom
+remains empty
+the workaround was simple
+make sure the size of the order bar is
+always even
+and that way the two components get
+exactly the same size
+otherwise in some weird cases
+we'd have a line of the image
+peaking in the bottom part
+Category List
+the category list
+is just a list
+it's implemented
+in the actual form
+and not within the base form which is
+common to all forms
+so this method might return null as not
+all forms will need that list
+i mentioned the separator line
+in the css section
+but here i'd like to draw your attention
+to set show
+even if blank on the label by default an
+empty label is completely removed in
+codename one
+this helps achieve several design
+aesthetics
+in this case we don't want that behavior
+and we can disable that by using this
+method
+Top Bar
+you might recall the top bar from the
+css
+it includes the title image
+fill style
+again notice that the portion that
+supposedly doesn't have the title image
+showing
+still
+has it
+it's just obscured
+the whole title area is just placed in
+the north section of a border layout
+the content differs from form to form
+so
+this is the content of the main form and
+isn't implemented here
+we are just invoking the method of the
+subclass

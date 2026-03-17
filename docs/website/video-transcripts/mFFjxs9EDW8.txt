@@ -1,0 +1,93 @@
+up until now we focused on the visual
+aspect of the application
+without giving much thought to the
+architecture
+sometimes we start by designing the
+model or underlying logic and sometimes
+we take a more top-down approach
+in mobile i like starting with the ui
+design
+as this is such an important part of the
+product experience
+we'll start by breaking the ui and
+business logic apart
+the first step is understanding the
+pieces that are involved in the backend
+model
+we then need to integrate that model
+data into the ui code and decide on the
+right point of separation between the
+model and the ui
+i don't spend much time in front of a
+whiteboard drawing architectural
+diagrams
+architecture is usually an iterative
+process
+where i can adapt the design to match
+the evolving need
+good architecture starts with necessity
+i needed the dish class to represent the
+data model
+before
+and now it's a great point to begin with
+our ui already communicated some of the
+necessity from the model
+dish is obvious
+but the main ui maps perfectly to a
+restaurant menu
+the checkout ui maps to a specific order
+which we should also represent within
+the model
+we need a global state that contains the
+menu
+current order etc
+this object can be represented by a
+restaurant object
+to which we can push a few other
+variables
+into that object
+the menu object is simple it includes a
+list of dishes and categories there
+isn't much here
+order is also pretty self-explanatory
+notice that the menu object didn't have
+an id
+while the order has an id
+we have one menu for the app so an id
+isn't really necessary but we can have
+multiple orders and might want to keep
+a record of each order
+also notice i used a string
+for an id rather than a numeric id which
+allows more flexibility in id generation
+dishes are stored in a map to quantity
+which might not be the best data model
+but it works
+this necessitates
+an equals and hashcode method
+implementation on dish
+the restaurant object is a singleton
+for simplicity's sake at least at this
+point most of the details i need in the
+app from the name of the restaurant to
+its location
+are all within this object
+this is important as it provides us with
+the necessary flexibility and allows us
+to adapt the app to fit any restaurant
+we want without code changes
+we initialize the restaurant
+properties in the constructor
+i've snipped this a bit to keep it
+narrow
+but generally we set the values from a
+properties file so we can customize this
+easily
+i hard coded the menu and dishes
+at this point so we don't need to deal
+with the complexities related to this
+set of features
+as i mentioned before the restaurant is
+a singleton i load the values for it
+from a properties file
+within the app at this point

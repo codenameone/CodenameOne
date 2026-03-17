@@ -1,0 +1,109 @@
+the next big step is making this into a
+real app by implementing a lot of
+the details such as comments search and
+settings
+each one of these seems like a huge task
+but surprisingly they aren't as hard as
+one would have expected
+for search we need to leap back into the
+server code to implement search
+on the surface search seems like a
+complex problem but thankfully spring
+boot and hibernate magically solve that
+for us
+hibernate is the default jpa
+implementation in spring boot
+one of its features is integration with
+lucine elasticsearch
+which you can read about at the
+hibernate.org
+search url
+springboot makes that even simpler
+we can support search by making a small
+change
+to the palm.xml file
+then we need to configure search in the
+application.properties file as such
+these just mean the search index is
+saved into the file system which is the
+simplest approach for implementing this
+there is a lot of power behind this tool
+and you can learn more about it in their
+website
+users can't search everything that would
+be bad as we don't want the ability to
+search through passwords etc
+we can add search support by marking an
+entity with the at indexed annotation
+then marking each field that should be
+indexed with the at field annotation
+notice that we should use the
+org.hibernate.search.annotations package
+for these annotations as there is
+another indexed class in spring boot
+we only index the name of the user as we
+don't necessarily want to expose private
+data through search
+we'll do a similar change to post which
+contains fields worth indexing
+we only index the text content as other
+content might produce weird results in
+search
+i go further with searching comments etc
+but for simplicity i stopped here
+with that the entities should be
+completely searchable
+we now need to expose the search
+functionality in the service layer
+this warrants a brand new search service
+clause
+the entity manager provides direct
+access to the underlying jpa
+implementation
+normally spring boot hides that but for
+search we need direct access
+this is a small helper method that
+shortens the boilerplate syntax of f to
+ft
+instead of that code
+we first need to build a search
+search database this is a one-time
+operation once the database is built
+hibernate will keep the database up to
+date
+we have two types of searches so i
+combine their common logic into this
+method
+the query builder searches a specific
+entity
+for instance post user etc once we have
+it we can construct a complex search
+query
+the search for keywords is marked as
+fuzzy which means it will find answers
+that don't match complex completely for
+the given text
+we create the query and issue it
+we give it a range of results so we can
+page through the query query results
+like we do with other pageable content
+searching people or posts becomes a
+matter of passing the entity type field
+names and paging numbers
+we then convert the entity result to a
+dow object
+as return types
+post searches are exactly the same same
+only with post objects instead of user
+objects
+that was a bit of code but the premise
+is relatively simple and heavy lifting
+is done by hibernate
+the interesting part is the query
+builder portion
+you can customize the query builder with
+any fields you wish to search and
+complex constraints
+related to the search but for the simple
+implementation we have right now this
+will do just fine

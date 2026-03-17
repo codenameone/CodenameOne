@@ -1,0 +1,152 @@
+in this module we will persist data
+locally
+so we don't have to go to the server to
+fetch data every time
+we'll use sqlite
+not because it's the best storage medium
+but because it's something i want to
+teach
+i'll use the automated properties
+binding api
+to map objects to sqlite
+which makes working with sqlite far
+easier if i didn't have that api i might
+have just skipped over sqlite altogether
+as working with sql
+is unpleasant and error prone
+in order to get the mapping right
+i had to move some properties to getter
+and setters
+as at the time i originally did this
+code
+there was no option to exclude an entry
+from storage
+this is no longer the case and we can
+now mark a property for exclusion
+but changing that would mean changing
+all the following modules and that's not
+necessarily something i want to do right
+now
+i used a local abstraction
+for all the persistence code to make it
+more domain specific
+which is a good practice in general
+app storage abstracts the process of
+saving the objects
+so
+right now it's implemented using sql map
+but in theory we could replace that
+let's review this class
+the class is implemented as a singleton
+and they initialized on first use
+initialization creates the db instance
+that is kept within the application
+we create the sql mapping instance
+to the database
+notice
+that the sqlite api doesn't have
+separate methods for create or open
+and does the former implicitly which is
+pretty convenient
+next we create the tables if they don't
+exist
+we create blank object instances
+for the objects that we need
+then define the primary key field
+i also set the column type for price to
+be double
+this is no longer necessary as newer
+versions of the sql map api detect the
+double property and automatically set
+the right type
+create table
+literally issues a create statement
+notice that we don't support alter at
+this time
+although this might be introduced in the
+future
+insert and update are pretty much direct
+wrappers to the built-in methods that
+handle the exceptions locally instead of
+propagating the i o exception
+from the sqlite api
+the reason for the delete listener
+is that we want the dish list to
+automatically remove the dish
+when it's deleted by the edit form
+this allows us to decouple that code and
+get an event from the underlying data
+model
+we use the event dispatcher class to
+subscribe and fire an event here
+this is a really convenient class when
+you are building an api
+delete serves pretty much the same
+purpose as update and insert with the
+exception that it also fires the
+dispatch event appropriately
+app settings is a special object
+as there is only one of it so when we
+issue a select query
+we should never expect more than one
+entry
+however it's still a select query
+by default when we invoke the select
+method
+if a property value isn't null it's
+added to the where clause
+both name and tagline default to
+non-null values
+and so we need to set them to null
+once that's done
+we can just do the select query as usual
+if there are no entries we just invoke
+insert
+for a new settings object
+fetching the list of dishes is similar
+but more standard as we return the full
+list of dishes
+the main point of interest is the use of
+the name property to indicate the order
+by option
+for the select statement
+some dishes might not have an image
+within them
+as we create them
+and here we force a placeholder image to
+prevent such a case
+i would recommend that you always use
+that strategy and have a good looking
+placeholder image
+now that we have the basic persistence
+object in place
+let's proceed to integration
+but first let's discuss a conceptual
+issue
+why do we need persistence to begin with
+technically
+we shouldn't have a local database as
+all the data is in the server and local
+data is meaningless
+in theory we could enable working
+offline but that's not a current goal
+and would create many complexities i
+want to avoid
+there is only one goal for this code and
+its performance
+users and developers often conflate
+performance with something that has to
+do with bits and bytes
+but it's really about decisions we make
+as developers
+do we go to the server or do we use
+local data do we cache
+in this case it can create
+a conflict between the local and remote
+database
+we need to guard against that obviously
+but once
+data duplication exists
+we open up a risk
+this risk is worth it for this level of
+performance

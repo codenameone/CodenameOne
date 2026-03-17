@@ -1,0 +1,341 @@
+i almost always start apps by building a
+mock-up of the front end first
+we are driven by visual feedback
+the ability to see and interact with the
+app clarifies the problem space and
+motivates you to move forward back-end
+and business logic become easier as you
+can associate them with requirements
+from the gui
+one of the benefits of having markup
+code is that it's easy to experiment
+with the markup
+for example
+we can comment code in out
+and see how it impacts everything move
+your items around to judge impact etc
+before we jump into the implementation
+of the markup
+we first need to understand what we are
+building
+and study the reference
+in this case the reference is the
+facebook app
+so we'll start by deconstructing it
+i'll begin with the login process
+which is the first thing you see when
+you install the facebook app
+there are a few things i'd like to
+discuss about the login process
+deep versus flat also known as shallow
+ui structures
+forms with no functionality
+plain text password used in the ui
+delayed verification process
+device orientation support in facebook
+phone and tablet ui
+and finally the adherence to platform
+conventions in ios versus android
+i'll go all
+over all of these one by one
+but first let's take a brief bird's eye
+view of the sign in ui
+this is the sign-in ui in the native
+facebook app on android
+don't panic i'll go over all the steps
+i will also simplify it a lot because
+this is a mess as you can tell
+this is what i came up with
+as you can see it's much simpler but
+includes a lot of the features we saw
+before
+i'll go over all of this soon but first
+let's get back to our agenda
+there are two approaches we can take for
+user input
+with deep we ask simple questions in
+each form and dig deep through the forms
+until we have all the information
+with flat we show one form with all the
+information we need
+the previous graphic showed a deep
+approach whereas the edit details form
+on the right takes the flat approach
+facebook clearly picked deep for the
+signup process and then did so for
+various other concepts but within the
+app it often picked up the flat approach
+for instance for editing user
+preferences
+why was facebook inconsistent and why
+pick one approach or the next
+there are several reasons to pick a deep
+it's intuitive
+even those who have aversion to
+technology can understand the flow of
+the ui
+it's portable
+more white space on the screen allows
+the ui to resize and adapt a to a wide
+range of display sizes
+it goes through a process as
+humans we are used to this approach
+so
+if deep is so great why doesn't facebook
+use it everywhere
+because it has some limits
+the biggest is expressiveness it's very
+hard to communicate complex data and
+ideas like we see above
+where gender has complex options or a
+person might not want to advertise their
+birthday
+annoyance is also an important limit
+going through a seven step wizard to
+change a single detail
+is annoying to most users
+picking deep or shallow approaches is a
+matter for a ux expert
+as developers are concerned as code
+views
+how do we express two distinct ui
+paradigms and map to the same data model
+since the facebook ui is so darn simple
+i'd like to automate a lot of it and one
+of the core goals is automating this
+logic
+let's go back to the flow graphic
+we looked at before
+the splash screen is shown when we start
+this makes sense for platforms like ios
+but it's there on android 2.
+the logo blinks a bit
+when we move to the login form it lets
+you input the email or phone
+notice a few interesting things about
+this form
+it doesn't use the material design style
+of labels on top of the field
+when elements gain focus
+but it does try to comply with some
+android paradigms for instance the
+buttons use uppercase text
+which is the convention on android
+the create account ui
+is
+one form that literally has no purpose
+when i looked over the ui i was
+perplexed by this
+i'm guessing there is some ux reason for
+this form but i have no idea
+i didn't include anything like that in
+the clone and there is no equivalent of
+this in the ios version version
+of the native facebook app
+before i discuss the name form notice a
+few interesting things about this wizard
+the word next is spelled in the style of
+ios with case sensitive text instead of
+uppercase
+also notice that here the first and last
+name fields use material design
+convention for placement
+and when you select them the hint
+animates above the field unlike the
+first form of the application
+i think this inconsistency is due to
+different teams building different parts
+it contributes to an app that feels
+unrefined in some regards
+this is a long wizard with quite a few
+stages
+and notes
+there are small inconsistencies with the
+ui for birthday and the gender prompt
+doesn't look great
+during verification we can either enter
+either a phone number
+of an
+or an email in the case of the latter we
+can click the sign up with email address
+link at the bottom of the form which
+sends us to the email entry form
+the email entry form is practically
+identical to the phone number form
+and you can toggle back
+the final stage is where interesting
+things happen typing a password on a
+mobile phone is one of my biggest pet
+peeves
+there is literally no reason for doing
+that
+facebook solved that badly by making the
+password visible by default
+their old ui would show a regular
+password field and offer to replace it
+with a plain text field if you got the
+password wrong
+the current approach is problematic and
+shows the lacks approach to security at
+facebook
+i will still clone that approach even
+though i don't like it because it's
+common practice
+while we are on the subject of
+verification facebook doesn't verify
+during sign up
+i could have given a completely fake
+email
+and the process would continue until the
+end
+facebook nags after the fact to make
+sure the email phone
+is correct but you can complete sign up
+with a wrong email or phone
+i'm assuming this relates to the
+challenge of delivery to email or phones
+on a global scale i won't do that though
+although you can probably adapt the code
+to copy that behavior
+facebook supports device orientation
+changes everywhere it often achieves
+this ui by removing content
+surprisingly this isn't consistent for
+other apps from facebook for instance
+instagram is locked to portrait
+orientation
+at first when i looked at how facebook
+implemented landscape support my first
+thought was lazy
+to be fair a lot of apps lock
+orientation change all together for
+instance instagram uber etc
+so landscape support in facebook is
+refreshing
+it still looks bad
+it might be related to the universal
+nature of facebook
+the app should work everywhere and might
+be under constraints we can't imagine
+but i find that hard to believe
+it just looks like something they didn't
+care enough about to invest in
+this makes some sense i doubt most users
+rotate their device during the signup
+process signing up on an ipad is
+radically different to the signup
+process in android
+it's clear that there are distinct
+groups developing the application the
+entire ui is shown within a dialog that
+updates with the progression of the
+wizard
+let's zoom in a bit on the stages
+facebook clearly has two separate themes
+for ios slash android the apps are
+inspired by some common design language
+but take very different approaches for
+some basic ui features
+the android version uses some aspects of
+material design and the ios version
+looks
+somewhat like an ios app but neither one
+stands out as an example of great design
+in the given native platform
+so what's the point
+you will notice that the flow of the
+stages in sign up is different between
+ios and android terms are in the
+beginning instead of the end and there
+are no redundant forms
+notice i magnified the ui so it will be
+more visible as the ipad resolution is
+so big it would make the entire text
+unreadable
+the stages are pretty much the same
+conceptual stages as we saw in the
+android app
+but slightly different
+again the password is plain text
+which shows that this is a clear policy
+decision
+the gender question is probably the most
+telling
+in the ios version it's expressed as a
+toggle button whereas an android that's
+expressed as a radio button the former
+is clearly superior but it's available
+in ios only
+the app itself doesn't use the ipad form
+factor effectively
+for the most part it feels like a
+blown-up phone version of the app
+which is stunning for an app like this
+it does show a search ui on the side
+when running in landscape mode but
+that's pretty much it
+how would this ui adapt better to tablet
+form factor
+the feed is about posts
+right now they are just blown up to the
+size to a size that doesn't help if i
+use an ipad it's not for seeing larger
+posts
+we could fit two or three columns of
+posts in the feed and significantly
+increase information density
+there are some other considerations for
+facebook such as ad placement which
+might be impacted
+this ui choice is also reflected in the
+web version of facebook so i'm guessing
+it's a
+conscious
+choice
+there is a lot to say about the main ui
+of facebook
+let's start by reviewing the android
+version of the ui so we are all roughly
+on the same page
+i trimmed a lot of the hidden nuance and
+details from this chart
+after looking at this i developed
+several insights into the facebook ui
+but one of those was specifically
+interesting
+they removed the hamburger back in the
+day facebook was one of the first apps
+to feature the hamburger side menu
+this is a ui element signified by three
+horizontal lines
+one on top of the other
+hamburger it allows you to open or swipe
+in a drawer with options
+this menu is now a standard in android
+however facebook chose to discard it in
+favor of swipeable tabs at the top of
+android and on the bottom in ios
+on a personal level i'm conflicted about
+this
+it's cool that facebook goes against the
+trend especially
+since it's a trend they helped start
+tabs have
+the user experience advantage of
+visibility
+which is great
+however they have three major
+disadvantages
+first they take up extra stream screen
+space
+second they show only an icon
+new users might be confused about what
+these icon icons mean
+third it's step backwards tab based uis
+were popular in 2009
+despite these reservations i'll copy
+their style in the ui we built a lot of
+demos with side menus so i'll use this
+opportunity to build something different
+i'll come back to this diagram later
+when we go over the implementation

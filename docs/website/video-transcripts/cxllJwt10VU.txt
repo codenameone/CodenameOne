@@ -1,0 +1,141 @@
+In this short video we’ll discuss theming
+in Codename One
+We’ll start with a bare bones native style
+application to keep things simple.
+We’ll start in the designer tool
+In the designer tool we can use the native
+theme option to see how our theme will look
+in iOS and Android.
+We can thus test the native feel of our theme
+We can add a new entry to the theme by pressing
+the add button.
+We can pick a theme entry from the combo box
+or type a custom entry.
+The derive flag indicates if we want to inherit
+the appearance from the native theme.
+We can define many background image and gradient
+types but now we’ll focus on simpler things
+I will create a green button with red foreground
+because my goal is to teach not create something
+“pretty”.
+I can set the color by typing the color hex
+values into the respective entries or by using
+the color picker widget.
+I will also need to set the background to
+opaque which is 255, 0 is transparent
+I can pick the alignment of the text, center
+is pretty common for buttons so I’ll use
+that but I can align to the left & right too
+Padding and margin can be defined in pixels,
+percentage units of the screen size or millimeters.
+We always recommend using millimeters as it
+is consistently portable.
+This allows me to customize the size and spacing
+of the button, don’t be stingy with padding
+as elements need to be big enough for touch
+interaction
+There is a lot of confusion over padding and
+margin so let’s clarify this.
+Margin represents the space outside of the
+component so you use that to push components
+away from one another or bring them closer
+together.
+Padding makes the component larger or smaller,
+it’s the additional space within the component
+beyond what is normally needed to draw the
+component.
+I’ll discuss border & derive soon.
+For now we’ll move directly to font
+Font’s can be pretty complex.
+I recommend only using one of these native
+fonts which will look decent on Android & iOS.
+You should usually size the native font in
+millimeters to avoid platform inconsistency
+This looks great on iOS, lets see how it looks
+on Android…
+Uh oh, that was totally surprising and unexpected.
+This happens because on Android the button
+has a border.
+Lets edit the button entry
+Border always takes precedence over other
+background types so we should derive it and
+use an empty border if we don’t want a border
+That seems to have fixed it but if we click
+the button we see there is still a border
+for the selected style
+We solve this by adding a new selected style
+for the button that derives from the unselected
+button and also overrides the border style
+with an empty option.
+The selected style is effectively the focused
+state of the button
+I use command-c or control-c on windows to
+copy and paste the selected style into the
+pressed style.
+When I click the button the problem is gone
+but I don’t see any effect either
+I can edit the selected style of the button
+and pick a dark green color I then do the
+same for the pressed style of the button.
+Once all that is done pressing the button
+shows the correct highlighting and all is
+good in the world once more
+The code to show this is trivial, just a button
+added to a form
+And this is how it looks on the simulator
+Lets say we want to add a red button to the
+app, we’ll just add a new theme entry and
+call it RedButton.
+We will then derive from Button so we will
+get a similar look
+We will set the background to red and foreground
+to white while leaving everything else in
+the default state
+We’ll copy and paste the red button style
+into the selected state, we’ll leave everything
+as is and only change the background color
+to be a shade darker than the current red
+color by tuning it in the picker
+Now we’ll just paste this into pressed and
+go back to the IDE
+We add the red button entry by creating a
+new button and adding it into the form.
+We use set UIID to set the theme entry ID
+to red button.
+We can also pass this to the button constructor
+as the second argument but I wanted the code
+to be clearer
+As you can see the red button looks and acts
+like the green button
+The cool thing is that you can apply a UIID
+to damn near anything so I can apply the red
+button style to a text field thru set UIID
+and get almost the same effect
+As you can see this is pretty close to the
+button appearance applied to a component that
+has completely different behavior
+The theme can be manipulated directly from
+code in roughly the same way.
+We’ll set the button color to blue by setting
+the background color of the red buttons unselected
+style.
+Notice the pressed/selected behavior for the
+new blue button is missing
+We can fix that by changing the selected & pressed
+styles as well directly from code
+I set them to the same color so we don’t
+see much but you hopefully get my point…
+There is a better way though, by using get
+all styles we can set the property on all
+the styles in one swoop.
+One last subject is theme constants, with
+constants we can manipulate many aspects of
+the theme.
+You can see them in the theme UI and look
+at the help text below each constant to understand
+what they are about.
+I suggest reading in the developer guide about
+the various options in the theme constants
+and theming in general.
+Thanks for watching, I hope you enjoyed this
+tutorial and found it helpful

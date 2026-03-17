@@ -1,0 +1,403 @@
+brace yourselves a bit
+server programming isn't as exciting as
+client-side code
+it includes lots of boilerplate code and
+some complex concepts
+please bear with me
+facebook back and server logic is
+remarkably complex
+what i built took roughly a day of work
+maybe a bit longer with debugging
+i cut a lot of corners to get this
+working especially in the complex data
+driven aspects some features such as
+search will be discussed later
+this seems like a lot to swallow but
+this architecture is remarkably simple
+once you start looking at it
+we have four big pieces
+web services
+these are thin layers that provide a
+standard rest for api
+they encapsulated
+in the rest controller classes that
+expose the json web api
+services provide a generic
+implementation of the underlying logic
+so it isn't mixed with web service
+specific adaptations
+service beans abstract the business
+logic
+and jpa from the web service
+this means
+in the future we can port everything to
+use something like web sockets
+and we use 100 of the code
+within the service class
+dao
+data transfer objects
+are used to move data from the storage
+layer
+all the way to the client
+spring boot can translate a dow object
+to json
+in a response and create a dao from json
+jpa entities
+we use jpa to access the database and
+query slash right into it
+this includes both the entities and the
+crude repositories
+this architecture lets us mix and match
+pieces as we evolve
+i chose to use web services for this app
+but tomorrow we could migrate the code
+to websockets and reuse most of the code
+as all the pieces from the services
+layer onwards wouldn't need to change
+the same is true for the database
+replacing mysql
+should be trivial as jpa can work with
+any sql database
+however you could go even further and
+replace the entire way data is stored
+for instance with a nosql database or
+with direct sql access
+since the data is hidden from the user
+this can be accomplished while leaving
+major portions of the code intact
+to understand how this works let's
+review a small sample of the new user
+creation logic
+request arrives to the server as a web
+service
+it then passes between the layers
+initially the request comes in as a user
+dao object containing the attributes of
+the user
+the response is a new user dao object
+that includes additional attributes
+specifically the user id
+and security token
+Spring Boot
+i'm assuming you have mysql installed
+and ready to use
+so the next step is the new spring boot
+project
+we will need the following features from
+spring boot jpa jersey security web
+services and mysql
+for completeness this is the palm xml
+file dependency section
+notice i'm using spring boot 2.
+we need jpa
+jersey allows us to automatically
+marshal objects to slash from json
+security allows us to hash our passwords
+we obviously need web services support
+we also need the mysql jdbc plugin
+we might as well add two additional
+dependencies this is a simple rest api
+which we'll use to communicate with
+mailgun to send emails
+twilio allows us to send sms messages
+for device activation
+now that all of that is in place let's
+proceed to the code
+my preferred place to start when working
+on server code is the database
+i might start with the web service if i
+have an api in mind but i usually pick
+the database as it's easier to quantify
+but before we go there we need to add
+some boilerplate
+assuming you've created your app with
+the initializer you would have this
+class
+if you don't have it then you need this
+class as it's the entry point for your
+application
+next to it we can place the security
+configuration class
+which handles basic security boilerplate
+as such
+here we disable some security
+protections in spring boot
+these make sense for browser clients but
+not so much for native mobile clients
+where we might need to jump through
+hoops to get things working
+this is the password encoder that we
+will use later to hash the user
+passwords
+as i mentioned before
+the best place to start a server
+implementation
+is the data structure i will skip the
+database schema and instead discuss the
+object entities that we need and how
+they can serve us
+the nice thing about jpa is that it can
+automatically create the schema for us
+which is really useful for fast
+prototyping
+the most obvious object to start with is
+user
+the user class is an entity that handles
+the data of a person using the app
+facebook obviously holds far more data
+over each user but this should be pretty
+simple to extend
+before i go into the code there is one
+concept i'd like to discuss first
+unique ids also known as primary keys
+a very common concept in databases is
+the usage of an auto increment unique id
+this means a database would
+automatically generate a numeric primary
+key for us matching every user
+this is a really cool but also
+problematic notion
+if our ids are numeric and sequential
+that means we can't really use them
+outside of the server
+if we expose them to the outside world
+someone can just scan all our users
+numerically
+a far better approach is a string based
+long random id
+which we can generate with the
+uuid api in java
+the chief value of using this as a
+primary key is performance
+since queries based on primary key are
+practically free
+it makes a lot of sense to expose the
+primary key to the client side
+another advantage is database
+flexibility
+it would be possible to migrate to a
+different database type in the future if
+we use this approach an auto-generating
+strategy can cause a problem as we try
+to move live data from one database to
+another
+User Object
+now that we got that out of the way
+let's go to the code you will notice
+that the user object in the server is
+very similar to the user object in the
+client
+there are some differences but
+essentially they are they correlate to
+one another
+we'll start with the field declarations
+this is a string id as i mentioned
+before notice it lacks the auto-generate
+annotation you might see in jpa entities
+most of the other fields are simple
+persistent fields with the exception of
+email and phone where we demand
+uniqueness from the sql database
+to verify an email or phone we send out
+a code and store it here
+if we had a memory db such as redis or
+memcached we'd use that
+but it's not a big deal to use the
+database for this at first
+a user might change his email or phone
+after the fact so we need to maintain a
+reference to the value
+we verified
+since dates and java are technically
+timestamps we need to explicitly state
+the sql data we need here
+we store media files such as pictures in
+a separate media entity
+we'll discuss that entity soon
+we have three relations to other users
+for friends
+friend requests and people you may know
+the field stores a hashed version of the
+password which is encrypted
+it's never exposed to the user passwords
+in the database are hashed and salted
+this is handled automatically by spring
+as we'll see soon enough
+hashing is a form of encryption that
+only goes one way for instance if my
+password is x y zed
+i can hash it and generate a value that
+looks completely random
+i can't decrypt it ever again
+however if i know the password is xyz
+i can verify it against the hash
+salting means random data is inserted
+into the hash to make it even harder to
+break the hash
+the token is
+a special field that allows us to edit a
+user we expose it only to the logged in
+user and he can use that token to edit
+the
+data we have a unique id for every user
+but we don't use it for write operations
+our id is public knowledge so if a user
+needs to refer to my user object he'd
+use my unique id
+this is efficient and accurate since ids
+never change they are primary keys
+when a user logs in we provide the token
+so only the user can update his own data
+this means the password isn't stored on
+the device and a token can be updated
+slash revoked
+it's also long enough and random enough
+which isn't always the case for
+passwords
+naturally tokens can't be primary keys
+since tokens might need resetting in
+case of a vulnerability and primary keys
+are forever
+if i was super concerned about security
+to
+a paranoid level i'd encrypt the tokens
+in the database in the same way we
+encrypt passwords that would mean we
+would need to give different token a
+different token to every device since
+hashing is a one-way street
+naturally that's a pain to handle so i
+avoided it here
+we initialize the primary key in the
+constructor
+this will be overridden when loading
+from database but makes sure we have a
+unique id when saving a new user
+these methods check the list of friends
+to see if a person with the given id or
+token is in our friend list we'll use it
+later
+codename one on the client side doesn't
+support java 8 streams at this time
+they help writing some complex ideas a
+bit more concisely but we find them hard
+to compile to efficient code for ios
+on the server this isn't a problem
+here we have another case of a stream
+with a for each method
+this is pretty easy to explain with the
+block above
+the stream code is roughly identical to
+the standard java for loop
+this method handles conversion of lists
+of users to list of user dao
+this is a common practice as we get a
+lot of those
+we'll use the full name a lot in the
+code so it makes sense to have this as a
+helper method
+the birthday can be null so we need to
+check before converting to a long value
+here we create a dao object matching
+this user i'll discuss the dao in more
+detail soon
+but as you recall from before
+we use it to transfer data to the client
+notice that no private information is
+passed when the dial is created not even
+the friend list no password token etc
+we pass the
+auth token here but not the password
+this method is invoked when a user logs
+in and returns
+to the user his own data
+looking over the rest of the code you
+will notice
+that the rest is just a lot of
+boilerplate setters and getters
+there is nothing interesting here
+but we need this for jpa to function
+properly
+these getters and setters are made
+through id refactorings so i didn't
+write them
+DAO
+before we move to the methods i'd like
+to discuss the concept of a dao
+a dao stands for data access object this
+is a conceptual idea there is no dow api
+or requirement
+you can skip it entirely
+however it's a
+very common best practice
+when working with back-end systems for
+instance in our application we have
+three layers
+web services the user-facing code
+services the back-end logic
+entities jpa the database
+the roles are clearly separate
+that's important as it means we can
+replace or change one layer
+significantly without impacting the
+others
+for instance we can move to websockets
+replacing the web services layer
+or we can move to nosqldb and throw away
+the entity layer
+so how do we transfer data between the
+layers while keeping them logically
+separate
+enter the dow objects they aren't
+entities entities are too close to the
+data and are hard to modify those are in
+place simply to pass along the data
+the cool part about daos is that
+springboot can automatically convert
+them to json when sending a response
+from the web service and automatically
+create a new instance from json when
+receiving a call
+we could just pass the entity itself but
+that would break the separation of
+layers and might inadvertently expose
+private data to the client side
+so for the user object we have a similar
+user dial equivalent
+the fields are almost identical to the
+fields of the user object
+you will notice that even the relations
+are dao objects
+notice that the class includes private
+data such as password and oauth
+as you might recall from the user object
+we never pass password into the dial and
+it's hashed anyway so why do we need the
+password in the dial
+when the user is created or updated the
+password value can be set the dow is
+sent from the client side too
+and that value may come from there
+the token is returned in the dao once
+after login or create
+the dao must include a no arg construct
+constructor so it can be instantiated by
+spring boot
+we also have a convenience constructor
+for our use
+the rest of the code is all
+automatically generated getters and
+setters
+the one last missing piece for the user
+object is the user repository interface
+which allows us to query the user
+objects
+the implementation of these queries is
+generated automatically by spring boot
+based on the names of the jpa fields
+ignore case is a special case keyword
+for spring which works exactly as one
+would think
+with that we have the first entity and
+the data area
+and the basic spring boot server

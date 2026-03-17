@@ -1,0 +1,128 @@
+in this part we'll cover the server side
+of the push
+you might recall the async class from a
+previous review of a server code
+here it is more fleshed out and we'll
+also send out a push when the build is
+true
+Variables
+we'll start by reviewing these variables
+we have two IRS certificate URLs and
+passwords for these two URLs we also
+have a flag indicating whether this is a
+production or debug push when we send a
+push to iOS we need a special
+certificate to authenticate us to Apple
+it's not the signing certificate it's a
+special Cloud certificate
+Apple has two separate server
+deployments
+one you use while developing and one
+during production they don't mix
+each has its own certificate
+an annoying bit is that if you use a
+phone during development it will
+sometimes take up for a day for it to
+start working for the production
+deployment
+notice that the production deployment
+will only work once you install through
+the App Store and doesn't work with
+debug builds
+Push Token
+the push token is taken from the
+codename One account settings in the
+build server and is used to authenticate
+with the codename one server
+the GCM server key is the other value
+from the initial Android registration
+process we need it for the Android push
+Rest Builder
+we initialized these fields from a file
+in the user home directory called rest
+Builder the reason for this is both easy
+maintenance but mostly convenience so I
+won't have to include my keys and the
+source code and constantly remember to
+remove them I can just set the values in
+a properties file and forget about this
+Build App
+I'll take a short detour through the
+build app method you might recall where
+a lot of customization is now happening
+on the general generated application you
+will notice we generate the right
+package name and Main class we also set
+the right restaurant ID
+Etc so the generated app will work as
+expected
+CSS
+a bit lower we can see the CSS generated
+by the style objects we configured in
+the client this will allow customizing
+the look of the final restaurant app
+Android Target
+further down the source Target hasn't
+changed much but you will notice the
+Android Target is now implemented
+it sets the automated flag to True which
+allows sending a blocking build which
+returns a result synchronously
+this is an Enterprise feature and it's
+useful for continuous integration or
+cases such as this where you want the
+build servers to do a build for you and
+return a result
+I execute the r and command using the
+process Builder and wait for it to
+complete
+scrolling a bit down we can see the loop
+over the result zip from the synchronous
+ant build
+where we look for the result APK and
+extract it to send the result to the
+client
+but that's not what I'm looking at
+Push Notification
+if we have an error we invoke the method
+send push notification with the push key
+if we have it
+Send Push Notification
+going further down we can see
+push being sent and here are the
+arguments are far clearer for the
+success
+the app build completed successfully
+string is pretty clear but we also have
+a semicolon followed by a URL and number
+three
+if you recall that means a Type 3 push
+with a string message and a result URL
+so it's effectively two separate
+messages the first visible the second
+hidden
+send push notification is actually
+really simple
+since we do it from the server we need
+to post to the codename one per servers
+at
+https push dot codename1.com slash push
+slash push
+with a post method
+we need to provide all the arguments in
+the post body from token to the device
+key and certificates
+the push server returns a response which
+we should should log for our records in
+case of failure but we should normally
+keep track of in case of key a key that
+expires
+in this particular case this isn't
+likely since the key is sent with the
+request so it should always be 100 valid
+there are some additional details but
+the basic gist of sending a push message
+response for this case should be
+reasonably clear with this code
+thanks for watching
+I hope you found this informative

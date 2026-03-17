@@ -11,50 +11,37 @@ description: Getting started guide for IntelliJ developers
 youtube_id: oR3KHYf5OrY
 thumbnail: https://www.codenameone.com/wp-content/uploads/2020/09/hqdefault-1-1.jpg
 ---
+{{< youtube "oR3KHYf5OrY" >}}
 
-{{< youtube "oR3KHYf5OrY" >}} 
+The easiest way to get started in IntelliJ is to open a Maven-based Codename One project and keep the first version of the app very small. [Create the project with the initializr](/initializr/), import it into IntelliJ, and aim for something that starts in the simulator without surprises and does one obvious thing when you press a button. The video demonstrates the same first milestone, but it gets there through the old IDE plugin flow, which is no longer the recommended setup. That small app is enough to prove that the environment is working and to give you a solid base for the next step.
 
-#### Transcript
+The first decision worth making carefully is the package name. In Codename One it eventually shows up in builds, signing, store metadata, and native packaging, so it is worth choosing a stable reverse-domain package from the beginning. Renaming a package later is possible, but once a project has started to accumulate build configuration and native artifacts it becomes much more annoying than it looks.
 
-For details please check out the [download section](/download/).
+Once the project is open, the generated application class is the most important thing to understand. Codename One applications still revolve around `init()`, `start()`, `stop()`, and `destroy()`. `init()` is where one-time application setup belongs. `start()` is where you create or show the first screen. `stop()` is called when the app is backgrounded, and `destroy()` is reserved for final cleanup when the application is really shutting down. If you understand those four methods early, the rest of the framework becomes much easier to reason about.
 
-In this short video we’ll walk you thru the very basics of Codename One.
+For a first app, create a single form and add one interactive component to it. A button that opens a dialog is enough. That tiny exercise proves several important things at once: the app started successfully, the form was shown from `start()`, components were added correctly, and events are firing as expected. In practice that is much more valuable than jumping immediately into themes, navigation frameworks, or platform integration.
 
-Codename One allows Java developers to write native mobile apps for all devices easily. It’s open source, free and works with all IDE’s.
+The simulator is still the fastest place to do this first pass. Run the app, press the button, switch simulator skins if you want to see how the screen behaves on different devices, and make sure the application survives stop-and-start cycles. You do not need to solve device-specific issues before you even know that the application works locally. Once the simulator loop is stable, send a native build. Android is usually the easiest first target. iOS still requires signing and provisioning, so it is normal to validate Android first and then handle Apple certificates afterwards.
 
-We can install Codename One by going to the plugin update center, typing in "Codename" and following the installation wizard.  
-We can now create a new project, we need to select Codename One and once we do so we are faced with the "New Project Dialog".
+One part of the video is clearly dated. It moves from the generated app into the older theme designer and resource-editor workflow. For a new project, the better path is to style with CSS and handle localization with l10n property bundles. The designer and resource editor still work, but they are awkward enough that they should not be the default recommendation for new development.
 
-In this dialog we must first define the package name, you must pick a correct package name as changing this later is challenging.  
-Next we can pick one of the builtin themes. If you want something very bare bones go with native, I will use red for this demo.  
-Last but not least we need to pick the app type, I recommend checking out the getting started app. However, for simplicity’s sake I’m picking the "Bare Bones" hand coded application as it contains the least amount of code.
+So the practical workflow is straightforward: start with a Maven project, understand the lifecycle, build one small interactive form, validate it in the simulator, and then send a device build. After that, keep the app logic in code, move styling into CSS, and use property bundles when you add localization.
 
-When we press the finish button the new app is created in the IDE. You will notice two major files, the theme resource file and the main source file. Let’s look at the generated code.  
-In the main file we have four life cycle methods: init, start, stop and destroy.
+## Further Reading
 
-Init is called once per application launch to setup things such as themes. You should use this instead of using the constructor.  
-Start is invoked when the app is started or restored from minimized state. You use it to show the UI.  
-Stop is invoked when the app is minimized & destroy might be invoked for a complete exit.
+- [Getting Started](/getting-started/)
+- [Development Environment](/development-environment/)
+- [Hello World](/hello-world/)
+- [Build Server](/build-server/)
+- [Themeing](/themeing/)
+- [Create an iOS Provisioning Profile](/create-an-ios-provisioning-profile/)
+- [Moving To Maven](/blog/moving-to-maven/)
 
-Let’s add a button to the new app: the code is rather trivial. We just add a button object to the parent form. We then bind an action listener to the button and show a dialog within that action logic.  
-We can now run the simulator in the IDE by pressing the play button, you can manipulate the simulator using the simulate menu. You can switch devices using the skins menu as such.
+<!--
+Full transcript retained in docs/website/video-transcripts/oR3KHYf5OrY.txt for future video recreation.
 
-Next we’ll open the designer by double clicking the theme file. The theme allows us to customize the appearance of the application. We can double click any entry or add new entries to customize their look. E.g. we set the button foreground to yellow and we can now rerun the simulator with this result.
-
-Next we’ll open the designer by double clicking the theme file. The theme allows us to customize the appearance of the application. We can double click any entry or add new entries to customize their look. E.g. we set the button foreground to yellow and we can now rerun the simulator with this result.
-
-The designer tool is also used for countless other features, such as: resolution independent images, localization and more!
-
-The most important thing is running the resulting app on my devices, to do that we right click the project and select send Android build. You will notice there are many other build targets e.g. iOS. etc.).  
-Once a build is made navigate to the [build server at codenameone.com](/build-server/) and select your build entry. You can then either email the link to yourself using the dedicated button or just scan the QR code in the page. This will allow you to download and install the app to your device.
-
-Here is actual device footage for the app we just built!
-
-iOS. apps are slightly more challenging, we need certificates from Apple in order to build a native app. For those you need an Apple developer account, once you have that in order just use the certificate wizard to generate all of the required certificates and you can then follow the exact same procedure used for Android.
-
-Thanks for watching, please let us know what you think and get help at [codenameone.com](https://www.codenameone.com/).
-
----
+Future video outline: create or open a Maven-based project in IntelliJ, explain the lifecycle methods in the generated application class, add one button and one action to a form, validate the app in the simulator, then send a native Android build. Explicitly note that the older designer-centered styling and localization workflow has been replaced in most new projects by CSS and l10n property bundles.
+-->
 
 ## Discussion
 

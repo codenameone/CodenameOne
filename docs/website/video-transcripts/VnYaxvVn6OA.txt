@@ -1,0 +1,49 @@
+a server is incomplete without the
+client
+let's go back to the client side and see
+how to proceed from there
+the builder class allows us to build a
+new restaurant app
+but the first thing we need is to obtain
+a secret matching this device
+in order to do that we have an api
+called create restaurant if necessary
+if we already have the secret it will
+just return the secret and we can move
+on
+if we are already in the process of
+requesting the secret it will wait for
+that and if not it will actually connect
+to the web service
+to get a new secret
+the connection to the web service code
+is pretty standard
+put operation which works asynchronously
+without interrupting the user
+notice the response is invoked in post
+response to keep things on the edt
+we use create restaurant if necessary
+like this
+which
+effectively uses the closure code to get
+the reference to the secret
+it isn't as convenient as synchronous
+code
+but it still allows us to send a
+connection request call
+i've designed the client api and the ui
+so
+they don't get in the way
+we send a request and trust it to work
+if it fails we'll undo the change
+after or retry
+but the idea is to
+not bother the user with details of
+network reliability or
+synchronicity
+the api on the client and the server is
+designed to use the network manager
+queue
+effectively
+thanks for watching
+i hope you found this informative

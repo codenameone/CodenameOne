@@ -1,0 +1,114 @@
+the one last form we'll work on in the
+markup stage is the new post form
+right now i'll only support simple
+variations of the new post i'll deal
+with image and video posting later
+we will discuss some built-in styles and
+use html to display formatted posts
+this could allow for logic that
+implements things such as hashtags etc
+in a future implementation
+unlock the tabs we had until now the new
+post is a separate form
+the new post form includes styles that
+can be applied to the editing such as
+colors background images etc
+the form itself uses a border layout to
+position title area
+on the top and the rest of the ui over
+the entire screen
+we save the current form before showing
+so we can go back to it
+the avatar of the user
+goes on the left side of the title area
+followed by a button that should let us
+pick the right visibility mode for the
+post
+the text of the post is just a standard
+text area with 3 rows and 80 columns
+they are just hints for the preferred
+size of the component
+if we input more than 3 rows the ui
+shouldn't grow
+it might go on top of the post style
+container and it would be hard to
+differentiate a tap
+there from
+text edit gesture
+this method creates the bar at the
+bottom of the screen
+when we click an entry in the bar
+the look changes and the post gets a new
+style
+the bar on the bottom of the form is an
+x-axis box layout
+that's scrollable on the x-axis
+every icon is eight millimeters in size
+we loop over the style types the first
+style is label
+which means an unstyled regular post
+we create a radio toggle button for
+every style and set the style to the
+button
+for the rounded corners we use the round
+rect border class and apply it manually
+as the style is designed for the entire
+entry
+the first entry is a special case
+because text fields are sometimes
+transparent and so are labels
+this implements the selected line border
+around an entry
+notice stroke color can be black when
+surrounding the white label
+entry when the user clicks on one of
+these radio buttons we invoke the change
+style method
+this brings us directly to the change
+style method
+we need a special case for the first
+entry again as the behavior is slightly
+different
+separate ui ids are needed for the text
+area and the foreground
+before we go into the css we need one
+more thing to get this working
+we need the following line in the
+newsfeed container class
+in the create
+post bar method
+there is quite a bit of css listed here
+let's start with the simple stuff the
+friend combo
+this is the gray round wrecked border
+that's applied to the visibility button
+this button determines if something is
+seen only by friends or is
+public this is the base ui id for every
+one of the uids listed in the array it
+isn't mentioned in the code but it's
+used in the css itself
+next we have the css definitions of the
+text styles
+for this code we'll need
+hearts.jpg and hands.jpg that represent
+two of the designs
+notice that all the styles here derive
+from post style bass
+i fill the hearts pattern into place
+even though
+it might make sense to tile it in some
+cases
+i scale to fit the hands entry i'm not
+sure if it's the best way as even in the
+native app the hands disappear in some
+cases
+the rest of the styles are pretty
+trivial and should be easy to understand
+this is the style of the foreground text
+when another style is applied to the
+background
+with that we are done
+you should have a working mock-up with a
+sign-up wizard and core functionality
+the core functionality we will work on

@@ -1,0 +1,102 @@
+in this section we'll focus on the
+native dependencies before reviewing the
+implementation
+most native code requires that we link
+against specific libraries and this is
+often the most challenging part of
+implementing the actual native interface
+if we review the braintree setup guide
+for android we'll see that the
+instructions include a gradle dependency
+change
+this is a common tool for integrating
+third-party libraries to android native
+apps
+and it usually follows syntax like the
+one we see above
+normally this is pretty easy to
+integrate
+the build hint android gradle depth
+should solve the problem in no time
+but if we try to build the app we'll get
+this build error which is not just
+unreadable it's also snipped because it
+overflows the screen
+so let's zoom in a bit but this doesn't
+tell us more one of the mistakes people
+make when looking at the gradle errors
+is
+the focus on the gradle exceptions which
+are confusing and verbus
+the error is usually printed above
+that
+and here it is in bold
+the minus decay version is the actual
+error we are experiencing the problem is
+that the suggestion entry is wrong
+we can just fix our men sdk version and
+codename one
+instead
+we have a build hint for setting the
+android men sdk version to 16
+which will align it with the min sdk
+version required by braintree
+the problem is that even after that
+change
+i still got a compilation error which
+was just about the most unclear error
+message possible
+i googled this
+which is pretty much the best way to
+solve issues like this
+and i found a stack overflow entry that
+explained
+that this is caused by the wrong sdk
+version setting in
+android
+at this time codename one defaults to
+sdk 23.
+notice we update that value occasionally
+so this might be incorrect when you see
+this
+however
+in this particular case the fix was
+simple
+set the sdk version to 25.
+once this was set build went through as
+expected and we were able to get a
+working project for android
+on the ios side things were also a bit
+tricky
+ios has a tool called cocoapods
+which allows us to define dependencies
+since we already use maps in the contact
+us form we already have a dependency on
+that
+we can just add a brain tree drop-in
+dependency as explained in the
+integration guide in the braintree site
+and this should work
+however
+it seems that drop-in requires ios 9 or
+newer
+as highlighted in their site
+so we can define the build hint
+pods platform
+to force the minimal
+platform
+but this creates a conflict with the
+google maps cn1 lib
+which defined the pods platform to 7.0
+this is something that should be
+resolved by now
+but if you happen to run into something
+like this and need to fix it
+at this exact moment
+then what i did is simple
+i edited the required properties in the
+cn1 lib file
+and just removed the offending line
+notice that the cn1 lib is just a zip
+file so i was able to just edit the
+properties file

@@ -1,0 +1,103 @@
+Facebook has a splash screen which takes
+a short time to load the login UI I'm
+assuming Facebook tries to figure out as
+much as possible about the device and
+its owner before showing the login UI
+since we don't have such capabilities
+which I personally find disturbing we
+might not need a splash screen at all
+we can go directly to the login UI
+however this isn't ideal and we should
+show a splash screen the first time the
+app is launched
+iOS applications take a while to load
+they feel much faster because they show
+a splash screen when they first load
+this means the image of the UI appears
+almost instantly and is replaced by the
+actual UI once the loading finished
+to the use of this seems seamless in a
+well-crafted app
+codename 1 runs the application on the
+Mac Cloud servers 16 times as of this
+writing to produce 16 separate
+screenshots matching the various device
+configurations
+some device configurations include both
+landscape and portrait mode for instance
+iPads high resolution phones
+Etc
+as a result the numbers add up to 16
+separate screenshots
+notice that this is subject to change as
+we are moving toward an automatically
+generated native splash screen in iOS
+but since that isn't there yet at this
+time this is still relevant
+for a typical application that doesn't
+require login this isn't a problem it
+can show the UI of the first form
+for instance in the case of Facebook we
+show the feed without any data
+this would give a sense of loading data
+which would pop in once loading finishes
+unfortunately Facebook's login UI looks
+very different from its feed UI
+so the first activation would seem odd
+if the feed UI was replaced with the
+login UI
+in that case we'd rather have a splash
+screen a pair for the screenshot process
+since the splash screen is pretty much
+identical in the native iOS slash
+Android implementation
+there isn't much we need to do in terms
+of design
+first we need to add a new UI controller
+class that will handle the UI navigation
+and hide the underlying forms
+here we can implement the splash screen
+and later the navigation to additional
+forms
+this can be static as it happens once
+and we can control it
+using absolute Center the logo will be
+in the middle of the screen for all
+devices slash resolutions
+we defined this UI ID earlier it uses
+the Facebook icon font that means that
+the f308 character will render as the
+Facebook logo
+this is important for the morph
+transition we use that to animate to the
+first form
+when departing this form we will move
+the component named logo in this form
+to assume the position slash appearance
+of the logo component in the destination
+form
+the duration of the transition is 1200
+milliseconds
+this animation controls an effect where
+the logo appears translucent and
+gradually becomes opaque
+every 20 milliseconds we update the
+opacity of the logo until we finish
+which should take 1 000 milliseconds
+this will create an effect where the
+logo fades in and then moves from the
+center of the screen to the top or side
+in landscape mode
+when we are done we show the login form
+which I currently implemented as a stub
+or we now need
+is one additional CSS entry to support
+this
+we set the background color to the blue
+of the splash screen
+we now need to bind this to the main UI
+so we need one change to the main class
+Facebook clone I replace the default
+High World form with this call
+pressing play should result in a splash
+screen fading in

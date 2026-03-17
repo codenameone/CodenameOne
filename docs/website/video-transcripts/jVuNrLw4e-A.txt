@@ -1,0 +1,199 @@
+as i built this app
+i took the code i used within it
+and created a cn1 lib
+that implements the native interface
+described here
+so a better way to implement braintree
+support would be to use the official
+braintree cn1 lib
+however this is still useful
+as an educational tool explaining both
+braintree and how to map a native
+interface
+braintree is a pretty simple api on the
+client side
+as most of the
+charging process is handled on the
+server side of the api
+the reason for this is that the client
+side is far more hackable
+even in a native app
+in order to work with the api we start
+with a token
+which we can get from the server code
+and then perform the charge process
+which is handled most mostly seamlessly
+by the library api
+if you go to the braintree online docs
+and look at the integration instructions
+for native android code you will find
+this code
+this is native android code for making a
+request
+the token is something we need to get
+from the server although conveniently
+the braintree site provides a helpful
+debugging token we can work with
+this can fit right into our native
+interface
+but first i want to review the native
+api to decide what sort of native calls
+we would need
+notice that even though a view object is
+passed
+it isn't really used and that a token
+value is needed even though it isn't
+passed
+moving to the ios side the objective c
+code isn't as readable for java
+developers
+so let's review this in pieces
+this is a method declaration that
+accepts
+one string argument
+technically in objective c
+these are messages not methods but i
+won't go into subtle language
+differences
+here we allocate a request
+notice that this is the equivalent of a
+new call in java
+the init entry is a method invocation of
+init
+methods are invoked using a square
+bracket syntax
+init is a special case method in
+objective c
+and is usually used as a constructor
+this is really an interesting block
+so i'll split the block itself into
+several
+pieces that's simple it's just code that
+allocates the drop-in controller not
+much to it
+this is like java's new however you will
+notice that the brackets aren't closed
+because the init method
+or the constructor
+should be invoked
+the init method here is special
+it accepts the token as an argument
+as well as the request
+notice two interesting things
+the client token is just passed
+but request is written twice
+in objective c arguments are named that
+means that you need to type the name of
+every argument
+to a method
+and you can have two methods with the
+same name but different argument names
+to make matters more confusing the first
+argument is a special case that doesn't
+need a name
+so
+we have one argument
+followed by the other arguments each
+containing the name of the argument
+and then the value
+so the request argument name and value
+make sense
+but the last argument might seem odd
+handler is an argument that accepts a
+lambda expression with a callback
+that callback
+accepts several argument types
+and will be invoked asynchronously
+when a purchase
+produces a result
+the lambda expression itself
+checks if the arguments represent an
+error cancellation
+or success
+this code should be pretty familiar to
+java programmers
+the one weird thing is that objective c
+strings start with the at character
+which i won't go into here
+the final piece of code is the present
+view controller
+which
+should be
+which shows the ui
+notice it happens before the lambda
+expression is invoked
+as that is a callback
+also notice we use the objective-c
+keyword
+self
+which is the objective-c equivalent
+of java's this keyword
+in this particular case self is assumed
+to be a view controller
+so now that we've reviewed everything in
+the method
+it's pretty clear that the big thing
+that's needed from the java side of the
+api
+is the token and not much else
+this is something we can represent with
+this simple method
+once we implement that in the java side
+we can use generate native stubs to
+generate stub code for the various
+native platforms and fill up that stub
+code
+one important piece that's missing from
+the native interface is the callback
+code
+we need to monitor callback events so we
+can know if a purchase succeeded
+or failed
+a more common approach would be to pass
+the callback object instance
+to the call
+but here i use static callback code
+the reason for that is simple
+native interfaces have a lot of
+restrictions on them and one of those is
+that we can't pass arbitrary object
+types
+the reason for those restrictions is
+simplicity and portability how would you
+represent an object instance and the
+objective c mapping
+to implement callbacks
+we use static methods
+and some platform-specific code
+calling the native interface directly is
+often a bad practice
+native interfaces are often fragile and
+should be wrapped in an abstraction that
+hides potential platform issues for
+instance
+if the ios and android native interfaces
+have different features we might be able
+to hide or abstract it in the java side
+which is normally much easier to do
+than implementing native code
+in this code
+we even have an attempt at fallback code
+based on the javascript port of
+braintree
+it doesn't work all that well but that's
+mostly because i didn't pay that much
+attention to it
+this class is mostly trivial sense the
+native interface is trivial too
+notice the code at the bottom that
+invokes the static callbacks
+this is a special case for ios
+where the vm strips away unused code
+by writing this com
+this the compiler can't tell that the
+code will never be invoked and will keep
+it in place
+notice that even making a seemingly
+small change like making flag into a
+private variable
+might break this

@@ -1,0 +1,283 @@
+security is a huge topic
+that we can probably talk about for ages
+for now i'll try to limit myself to the
+basics
+in this first part we'll discuss the
+basics of security and certificate
+pinning
+Security Basics
+before we begin i'd like to make a short
+disclaimer
+security slows stuff down and sometimes
+makes your app more cumbersome the
+question of why we didn't solve security
+is a question of usability
+a lot of core concepts and programming
+would become harder and less efficient
+this would also impact usability to the
+user who often is the biggest
+vulnerability there is
+throwing permission prompts at users is
+problematic
+it triggers permission fatigue and users
+tend to ignore these prompts at some
+point
+for programmers things as basic as
+mutable state
+can often cause vulnerability and code
+removing security weaknesses
+is pretty difficult
+if you are still with me
+let's start with the basics and common
+terms
+a term you should all be familiar with
+is vulnerability
+we hear that term a lot when discussing
+security but it's a bit confusing
+sometimes
+a vulnerability is a security bug
+but that doesn't mean anything all
+software has vulnerabilities because
+it's so hard to avoid for instance if
+you have a method that returns a java
+array
+your code is probably vulnerable
+a caller can change the element in the
+returned array and impact internal state
+working around this vulnerability by
+creating a new copy of the array will be
+expensive
+most of us are willing to risk security
+for extra ram and cpu power an exploit
+converts a vulnerability or a few
+different vulnerabilities into a hack
+so if you offer a banking sdk and return
+internal state in an array i can then
+change that internal state and hack the
+sdk
+that's an exploit
+there are different grades of exploit
+and
+sometimes you will need to chain them
+the worst kind of exploit is a remote
+root exploit
+a remote root exploit is a vulnerability
+you can use for full control of a system
+without physical access to the machine
+that's the worst kind of exploit and
+it's pretty rare
+usually security works in layers with
+penetration of one layer
+isn't enough you would still face
+another layer below it
+so let's take the example of returning
+internal state data
+and continue with that
+let's say one of the objects in the
+array has an os native method
+let's say that method
+has a vulnerability that allows us to
+step outside of the virtual machine
+the os
+should have restrictions too
+so even if we can step outside of the vm
+we still be in a sandbox
+let's say the os has a user escalation
+vulnerability where the attacker can
+elevate his privileges to root
+so something small like returning an
+array can become the missing piece in a
+big attack
+this isn't common as such
+vulnerabilities are usually fixed by
+vendors
+our chief concern as developers is the
+safety of our app data
+and access
+more than device root exploits
+codename one tries to be as secure as it
+can be by default
+some of our design choices make codename
+one more secure by default
+even when compared to native coding and
+especially when compared to other
+approaches
+the first is obfuscation by default
+codename one obfuscates its code
+this isn't a complete
+roadblock to a hacker a diligent hacker
+can get around obfuscation
+still it makes reverse engineering
+an application
+harder
+obfuscation is especially hard to deal
+with in codename one
+even compared to native code
+both android and ios
+store ui data in readable formats
+reverse engineering tools can decode
+these uis by default
+a hacker can point at a button and find
+the code that binds to that button
+this undermines obfuscation and native
+applications
+in codename one even if you use the gui
+builder the ui compiles to bytecode
+and thus to native
+so the ui gets obfuscated with the rest
+of the business logic code
+this means you will have more code
+but no readable layout files
+reverse engineering tools will have
+nothing to go on with codename one
+even when tools adapt to codename one
+this is unlikely to change due to code
+obfuscation
+in that sense codename one is even more
+secure than a typical native app
+think about the way a typical hacker
+will crack your application
+let's say you have a login button
+and the hacker wants to grab the
+username and password
+the hacker can upload a hacked version
+of your app to the store and grab the
+credentials from a fake app
+users of the fake app will be oblivious
+to the steel
+as the app will look and behave the same
+way
+the first step to hacking an app this
+way
+is to find the button and fields code
+in a native app this would be doable
+as both would be in the xml
+so
+the hacker's job is trivial
+for a codename one app this would be a
+tedious process of digging through
+obfuscated code
+finally release builds
+add a few layers of default security for
+instance blocking remote debugging etc
+this is especially true for android
+Certificate Pinning
+as i mentioned before we try to be
+secure by default however some potential
+vulnerabilities
+would impact usability too much the
+first protection system i'd like to
+discuss is certificate pinning
+certificate pinning thwarts a man and
+middle attack on ssl
+to understand this
+we need to understand
+ssl and man in the middle attacks
+when we connect
+to a server
+there are many servers along the way
+for instance if your user is in an
+internet cafe
+and a hacker hacked the wi-fi server
+when he connects to your server the hack
+can spy
+and even change all of the communication
+we use ssl or https to encrypt all the
+data
+and this works by sending an encryption
+key from the server to the client
+what if the hacker sends his own
+encryption key
+that's why we have a certificate
+authority
+you can create a certificate for
+yourself
+you need an authority to verify your
+identity
+for instance i can buy a certificate
+from very sign who will verify my
+identity
+that way the client knows the
+certificate can be trusted
+the problem is that certificate
+authorities got hacked in the past
+so it's possible a hacker would get a
+valid trusted certificate
+in that case he can execute a
+man-in-the-middle attack
+this scenario is pretty challenging
+a hacker would need to get in the middle
+he would also also need a valid fake
+certificate
+this is a ca a case that would be
+possible in the age of government
+sponsored hacking
+if you are building an app for the
+government
+or financial institutions
+you should be aware of this
+in those cases you should use
+certificate pinning as an extra layer of
+security on top
+certificate pinning verifies a
+certificate signature of the server
+we can thus verify that the certificate
+we are communicating with is a specific
+one
+the downside for this is updates if we
+update the certificate on the server we
+need to update the installed
+applications they might stop working or
+start warning users
+in valid server update situations
+Connection Request
+the connection request class contains a
+check ssl certificates method
+that accepts an array of the
+certificates supported by a secure
+connection
+you can verify that a signature of a
+server
+matches a specific signature
+that you expect
+and that way prevent a potential exploit
+you can loop over the array of
+certificates and verify that a proper
+certificate is in place
+the certificate
+unique key you get in the simulator
+should match the one you have in
+production
+the drawback of the security layer
+is in flexibility
+normally we can just replace the server
+and set up a new certificate
+as long as the certificate is valid this
+is pretty seamless
+but with pinning we need to jump through
+a few hoops
+that might mean that if you update the
+server apps
+that are installed on a user device will
+stop working
+another important bit
+is the algorithm used
+most servers support multiple signing
+algorithms for maximum compatibility
+however
+algorithms such as
+sha-1 are already long in the tooth
+sha-1
+can be defeated with modern hardware
+and it might be better to pin a stronger
+signature
+such as sha 256 etc
+every certificate has an algorithm
+associated with it
+and you should pick the best option
+notice that you shouldn't depend on the
+number of certificates
+or their offsets
+as this will block the flexibility of
+the server team
+to make changes

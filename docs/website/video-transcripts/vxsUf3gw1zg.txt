@@ -1,0 +1,151 @@
+let's dive right into the code starting
+with base navigation form
+the main class for the top level forms
+is the base navigation form
+here we have the material commands in
+the side menu that allow us to navigate
+to the other top level forms
+the title of the forms
+is really a text field
+as it's editable in a place
+the trick in making a text field feel
+like title is to style it as such
+which is why we created navigation title
+uiid
+and that style has zero margin
+one millimeter of padding
+with five millimeter white font that's
+aligned to the left
+that looks and feels like a title
+one important thing to notice is the
+left align
+which doesn't match the ios convention
+center aligned text fields are flaky
+across platforms so we don't support
+them properly
+that's why we use left alignment here
+the tagline is similarly a text field
+with the right styling
+technically the styling derives
+navigation title
+so
+we can be in sync
+with changes to the title style
+it just uses a smaller three millimeter
+font
+Edit Background UI
+in case this wasn't clear
+these ui ids map to the title and
+subtitle of the form right
+here moving on
+the edit background ui on the bottom
+right portion of the form maps to this
+button
+which allows us to edit the background
+image in the title area
+you will notice we use the constructor
+that accepts the button label and ui id
+the edit background ui id is styled to
+match the navigation title but it also
+adds padding to the bottom
+so the text doesn't appear within the
+white area
+i'll talk about that more in the next
+section
+besides that the other interesting thing
+about this ui id is the right alignment
+which we use to make it sure it appears
+to the right of the icon
+the background image is just a scaled
+image label that stretches all across
+we added a four millimeter margin to the
+bottom of this background image
+and that allows the icon to peak exactly
+four millimeters outside of the bottom
+portion
+this looks decent enough and works well
+for all resolutions
+since the size is in millimeters and the
+icon is also scaled in millimeters
+the logo image
+uses a special rounded scaled logo
+getter
+which adapts the logo's look to the
+design of the ui
+let's go see how that method works
+Rounded Logo
+the rounded scaled logo is
+just an image with no setter
+so
+where is this initialized
+when we set the property for the logo we
+automatically generate this image too
+by drawing the image in the right place
+let's go over these steps
+we have two important sizes here
+millimeter
+or mm is the size of the arc
+in the corner
+and size is the size of the entire icon
+i got these numbers through trial and
+error until i got something that looked
+satisfactory and the various device
+densities
+a general path is a shape object we can
+fill stroke or clip based on a shape
+notice that shape operations can
+sometimes be expensive in terms of
+graphics processing power so while they
+are very powerful
+you need to be very aware of what you
+are trying to do
+a general path allows us to define an
+arbitrary shape we can then use in the
+drawing primitives
+this raises the question of why not use
+the built-in round rect methods within
+graphics those don't allow the same
+level of customizability and power as
+the shape api
+they aren't as consistent across
+platforms either
+building the shape is
+essential
+uh essentially about moving a virtual
+pen around and drawing lines arcs or
+curves along the path
+this is mostly straightforward
+here we create a mask from the shape
+a mask for the image
+we create a solid black image
+and we fill the shape area with a white
+color
+then we create a mask
+a mask can be applied to an image to
+remove the black pieces
+and leave the white pieces
+this begs the question why not use shape
+clipping that i mentioned earlier
+masking supports anti-aliasing which
+renders the elements in the corners with
+a slight alpha channel to make the
+corner seem smooth
+a clip is a binary operation where a
+pixel can either be in the clip or it's
+outside of the clip
+so there is no room for interpretation
+using shape clipping won't look as good
+furthermore shape clipping isn't as
+portable as masking which is
+100 portable to all supported
+codename one platforms
+last line of this code
+we do two separate things
+the fill method scales the image but it
+does that while cropping redundant areas
+so
+if we have an image that isn't a square
+the area outside will be clipped
+and the center will remain
+we then apply the mask to the clipped
+image to create that round effect
