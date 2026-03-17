@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 we finally have a client server
 application that works
 but we don't have any real functionality

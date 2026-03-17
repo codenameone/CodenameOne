@@ -32,9 +32,3 @@ For modern projects, this lesson pairs well with the general advice to keep styl
 - [Themeing](/themeing/)
 - [How Do I Fetch An Image From The Resource File, Add A Multiimage](/how-do-i/how-do-i-fetch-an-image-from-the-resource-file-add-a-multiimage/)
 - [What is Performance? Breaking Down the Problem](/courses/course-02-deep-dive-mobile-development-with-codename-one/038-what-is-performance-breaking-down-the-problem/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/DWifLQZyPDE.txt for future video recreation.
-
-Future video outline: compare the main Codename One image representations, estimate their memory costs, explain the trade-offs around encoded-image locking, and tie the lesson back to practical UI choices like icon fonts and multi-images.
--->

@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 the last two big ticket items are
 billing and social login
 i won't implement them with adherence to

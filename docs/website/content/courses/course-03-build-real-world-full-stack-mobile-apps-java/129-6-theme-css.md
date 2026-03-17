@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 now that we looked at the first ui form
 let's take a short detour via the css
 for the app

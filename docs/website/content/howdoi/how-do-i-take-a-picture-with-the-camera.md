@@ -30,12 +30,6 @@ The modern advice here is mostly about restraint. Capture the image you need, no
 - [How Do I Improve Application Performance Or Track Down Performance Issues](/how-do-i/how-do-i-improve-application-performance-or-track-down-performance-issues/)
 - [How Do I Use Storage, File System And SQL](/how-do-i/how-do-i-use-storage-file-system-sql/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/nF4eqzVcsic.txt for future video recreation.
-
-Future video outline: show a simple camera capture flow, compare the direct and callback-based capture methods, explain why resizing during capture is usually the right default, and finish by updating the UI with the captured image on a real device.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

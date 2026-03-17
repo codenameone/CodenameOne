@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 with that out of the way search should
 work
 but how does it display the result

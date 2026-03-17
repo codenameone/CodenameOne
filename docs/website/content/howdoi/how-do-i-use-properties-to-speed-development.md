@@ -32,12 +32,6 @@ So the best way to think about properties is as a productivity tool for model-dr
 - [Properties Are Amazing](/blog/properties-are-amazing/)
 - [How Do I Use Storage, File System And SQL](/how-do-i/how-do-i-use-storage-file-system-sql/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/77N2t2n8rbQ.txt for future video recreation.
-
-Future video outline: start with a POJO and a property-based equivalent, then show how the property index enables parsing, serialization, UI binding, CRUD helpers, and simple generated UI. End by explaining when properties are worth the extra structure and when a plain object is enough.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

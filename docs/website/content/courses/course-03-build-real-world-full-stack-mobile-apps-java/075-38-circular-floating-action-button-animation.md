@@ -33,9 +33,3 @@ This lesson sits in a good middle ground between high-level animation APIs and f
 - [Layout Animations](/courses/course-03-build-real-world-full-stack-mobile-apps-java/036-layout-animations/)
 - [Animation Manager, Style Animations and Low Level Animations](/courses/course-03-build-real-world-full-stack-mobile-apps-java/037-animation-manager-style-animations-and-low-level-animations/)
 - [Enter Password Form](/courses/course-03-build-real-world-full-stack-mobile-apps-java/072-35-google-login-process/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/YE7OQFQE0yA.txt for future video recreation.
-
-Future video outline: motivate a product-specific progress indicator, animate the floating action button border with a UI timer, explain why UI state must be restored cleanly, and show how this lightweight effect replaces a more generic loading treatment in the password flow.
--->

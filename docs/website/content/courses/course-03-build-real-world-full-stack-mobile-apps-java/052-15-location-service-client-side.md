@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 next we'll bind the websocket logic and
 map UI to bring this all together
 we can get started with a location

@@ -33,9 +33,3 @@ The final touch is small but important: putting the editable search field direct
 - [34. Search Results UI - UserForm and PostForm](/courses/course-03-build-real-world-full-stack-mobile-apps-java/111-34-search-results-ui-userform-and-postform/)
 - [12. The Newsfeed Container](/courses/course-03-build-real-world-full-stack-mobile-apps-java/089-12-the-newsfeed-container/)
 - [Threading and the EDT](/courses/course-01-java-for-mobile-devices/011-threading-and-the-edt/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/sxCADu-SjpQ.txt for future video recreation.
-
-Future video outline: put an editable search field in the title area, debounce user typing with a UI timer, switch between people and post search modes, and load paged results through InfiniteContainer so the search UI feels fast without hammering the backend.
--->

@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 we'll jump into the client functionality
 from the server connectivity class
 I won't start with the UI and build

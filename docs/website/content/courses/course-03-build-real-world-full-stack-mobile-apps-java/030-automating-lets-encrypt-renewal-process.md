@@ -31,9 +31,3 @@ The main thing to preserve from this lesson is the deployment mindset. Security-
 - [Setting up the VPS Server](/courses/course-03-build-real-world-full-stack-mobile-apps-java/026-setting-up-the-vps-server/)
 - [Security Basics and Certificate Pinning](/courses/course-02-deep-dive-mobile-development-with-codename-one/024-security-basics-and-certificate-pinning/)
 - [Corporate Server](/corporate-server/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/0l4R049tSOY.txt for future video recreation.
-
-Future video outline: explain the 90-day renewal model, build a simple renewal script, schedule it with cron, discuss the temporary downtime tradeoff, and show how to verify that the automation will keep the server certificate current.
--->

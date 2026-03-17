@@ -32,9 +32,3 @@ So the broader lesson is this: fleshing out the UI is not only about drawing mor
 - [Scope and Basic UI Design](/courses/course-03-build-real-world-full-stack-mobile-apps-java/002-scope-and-basic-ui-design/)
 - [Architecture of Mockup](/courses/course-03-build-real-world-full-stack-mobile-apps-java/004-architecture-of-mockup/)
 - [How Do I Use Properties To Speed Development](/how-do-i/how-do-i-use-properties-to-speed-development/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/IxVUX0s2Nms.txt for future video recreation.
-
-Future video outline: review the key supporting forms the app maker needs, distinguish essential flows from postponed features, explain in-context customization, and close with why a depth-first implementation plan is the right fit for this product.
--->

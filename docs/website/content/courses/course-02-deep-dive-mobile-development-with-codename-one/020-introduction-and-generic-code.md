@@ -30,9 +30,3 @@ One modern point worth stating explicitly: if there is already a maintained Code
 - [Developer Guide](/developer-guide/)
 - [How Do I Access Native Device Functionality, Invoke Native Interfaces](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
 - [How Do I Take A Picture With The Camera](/how-do-i/how-do-i-take-a-picture-with-the-camera/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/Mcw8z_uP3BA.txt for future video recreation.
-
-Future video outline: explain why camera APIs are difficult to abstract, define a narrow portable API first, wrap the raw native interface in a safer Java class, and show how simulator behavior and build hints fit into that higher-level wrapper.
--->

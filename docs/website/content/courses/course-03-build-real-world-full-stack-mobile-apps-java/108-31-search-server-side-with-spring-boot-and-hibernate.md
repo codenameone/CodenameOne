@@ -33,9 +33,3 @@ The one-time index build is also a useful operational reminder. Search is not ju
 - [33. Search: Client Side UI - SearchForm](/courses/course-03-build-real-world-full-stack-mobile-apps-java/110-33-search-client-side-ui-searchform/)
 - [17. Spring Boot Server Architecture and the User Entity](/courses/course-03-build-real-world-full-stack-mobile-apps-java/094-17-spring-boot-server-architecture-and-the-user-entity/)
 - [Search Results UI - UserForm and PostForm](/courses/course-03-build-real-world-full-stack-mobile-apps-java/111-34-search-results-ui-userform-and-postform/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/tWMVUDScyfQ.txt for future video recreation.
-
-Future video outline: explain why search is mostly an indexing problem, enable Hibernate Search in the backend, choose only the fields that should be searchable, and build pageable query methods that the client can later use without knowing anything about the indexing internals.
--->

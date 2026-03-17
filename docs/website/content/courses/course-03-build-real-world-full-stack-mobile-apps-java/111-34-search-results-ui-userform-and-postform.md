@@ -31,9 +31,3 @@ This is a good example of prioritizing functional completeness over ornamental c
 - [29. Newsfeed and Posts From Server](/courses/course-03-build-real-world-full-stack-mobile-apps-java/106-29-newsfeed-and-posts-from-server/)
 - [12. The Newsfeed Container](/courses/course-03-build-real-world-full-stack-mobile-apps-java/089-12-the-newsfeed-container/)
 - [31. Search: Server Side with Spring Boot and Hibernate](/courses/course-03-build-real-world-full-stack-mobile-apps-java/108-31-search-server-side-with-spring-boot-and-hibernate/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/Rt68rA2c6A8.txt for future video recreation.
-
-Future video outline: explain why search results need real destinations, build a minimal user screen that loads that person’s posts from the backend, create a lightweight post-result destination, and emphasize end-to-end usability over ornamental UI completeness.
--->

@@ -31,9 +31,3 @@ The lesson also highlights a very practical detail: sometimes the app has raw by
 - [39. ImagePicker - Video and Custom Support](/courses/course-03-build-real-world-full-stack-mobile-apps-java/116-39-imagepicker-video-and-custom-support/)
 - [16. The 'New Post' Form](/courses/course-03-build-real-world-full-stack-mobile-apps-java/093-16-the-new-post-form/)
 - [18. Media Entity](/courses/course-03-build-real-world-full-stack-mobile-apps-java/095-18-media-entity/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/H7WW4GwXK8o.txt for future video recreation.
-
-Future video outline: add attachment metadata to the client-side post model, change the upload API so the UI can observe progress, explain why file paths and byte arrays both need support, and position attachment upload as a first-class step in the posting flow rather than an invisible helper.
--->

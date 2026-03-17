@@ -30,9 +30,3 @@ So this lesson is really about matching the editing surface to the structure of 
 - [Style Customization 1 - Introduction and Basics](/Users/shai/dev/cn1/docs/website/content/courses/course-03-build-real-world-full-stack-mobile-apps-java/016-style-customization-1-introduction-and-basics.md)
 - [Style Customization 3 - Font and Color Pickers](/Users/shai/dev/cn1/docs/website/content/courses/course-03-build-real-world-full-stack-mobile-apps-java/018-style-customization-3-font-and-color-pickers.md)
 - [Developer Guide](/Users/shai/dev/cn1/docs/website/content/developer-guide.md)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/uYCCbE70kE0.txt for future video recreation.
-
-Future video outline: show the contextual popup workflow, explain why customization should trigger on release events, and demonstrate how the editor filters style options so users only see the changes that make sense for the selected element.
--->

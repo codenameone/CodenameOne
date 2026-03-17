@@ -31,9 +31,3 @@ The confirm/delete controls then finish the pattern. The screen is not just deco
 - [39. Settings Form and Fetching the Avatar Image](/courses/course-03-build-real-world-full-stack-mobile-apps-java/076-39-settings-form-and-fetching-the-avatar-image/)
 - [Client Side UserService](/courses/course-03-build-real-world-full-stack-mobile-apps-java/050-13-client-side-userservice/)
 - [How Do I Create a List of Items the Easy Way](/how-do-i/how-do-i-create-a-list-of-items-the-easy-way/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/LZ_ydua__gY.txt for future video recreation.
-
-Future video outline: explain why this screen does not need InfiniteContainer, split the UI into friend requests and suggestions, render square avatars and clear actions, and use pull-to-refresh to keep the screen dynamic without overcomplicating the data flow.
--->

@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 we can now move forward to the last two
 pieces of the search service class
 if the last request is this request

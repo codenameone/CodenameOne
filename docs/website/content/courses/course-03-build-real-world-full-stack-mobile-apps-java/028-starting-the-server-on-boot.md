@@ -31,9 +31,3 @@ The lesson also includes supporting pieces such as copying environment-specific 
 - [Let’s Encrypt, HTTPS Certificate Support](/courses/course-03-build-real-world-full-stack-mobile-apps-java/029-let-s-encrypt-https-certificate-support/)
 - [Introduction to Spring Boot](/courses/course-02-deep-dive-mobile-development-with-codename-one/002-introduction-to-spring-boot/)
 - [Connecting to a Web Service](/courses/course-02-deep-dive-mobile-development-with-codename-one/003-connecting-to-a-web-service/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/mqNtfN2C3fM.txt for future video recreation.
-
-Future video outline: copy the backend and configuration to the VPS, explain the packaged-service behavior of the Spring Boot artifact, wire it into system startup, and verify logs and database initialization after reboot.
--->

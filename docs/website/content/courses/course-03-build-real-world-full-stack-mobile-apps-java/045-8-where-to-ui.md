@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 when you tap the where to button on the
 map form you see something that might
 look like a new form but it isn't really

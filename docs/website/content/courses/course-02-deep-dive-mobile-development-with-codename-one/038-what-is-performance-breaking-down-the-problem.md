@@ -32,9 +32,3 @@ So the best way to start performance work is to classify the problem. Is it rend
 - [Developer Guide](/developer-guide/)
 - [Threading and the EDT](/courses/course-01-java-for-mobile-devices/011-threading-and-the-edt/)
 - [How Do I Improve Application Performance Or Track Down Performance Issues](/how-do-i/how-do-i-improve-application-performance-or-track-down-performance-issues/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/x-mUTz23Cd4.txt for future video recreation.
-
-Future video outline: define the major categories of performance problems, contrast real performance issues with UI misuse bugs, explain why perceived performance matters, and end with a strong warning against optimizing before measurement.
--->

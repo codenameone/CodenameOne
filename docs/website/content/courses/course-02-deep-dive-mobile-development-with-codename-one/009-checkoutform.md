@@ -31,9 +31,3 @@ So the checkout form is valuable not only because it looks good, but because it 
 - [CSS](/courses/course-02-deep-dive-mobile-development-with-codename-one/006-css/)
 - [Transitions](/transitions/)
 - [How Do I Create Gorgeous SideMenu](/how-do-i/how-do-i-create-gorgeous-sidemenu/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/ts-Q1zBGXco.txt for future video recreation.
-
-Future video outline: begin by explaining why this UI should be a form instead of a dialog, build the blurred/tinted backdrop effect, layer the receipt content on top, and show how ordinary form transitions create the polished overlay experience.
--->

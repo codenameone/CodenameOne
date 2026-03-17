@@ -33,9 +33,3 @@ So the right takeaway here is not that every app needs exactly this abstraction 
 - [The UIAbstraction Class](/courses/course-03-build-real-world-full-stack-mobile-apps-java/032-the-uiabstraction-class/)
 - [The TabletUI Class](/courses/course-03-build-real-world-full-stack-mobile-apps-java/033-the-tabletui-class/)
 - [Adapting a UI Design](/courses/course-01-java-for-mobile-devices/009-adapting-a-ui-design/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/AMlnslUn1bA.txt for future video recreation.
-
-Future video outline: apply the abstraction to real forms, show how little application logic actually changes, use the address form as a concrete example, and close with a discussion of why this lives well as app architecture even if it should not yet be a framework-level API.
--->

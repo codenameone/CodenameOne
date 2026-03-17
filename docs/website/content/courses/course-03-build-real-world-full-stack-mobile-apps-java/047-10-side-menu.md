@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 we are nearing the end of the mock-up
 code
 the next thing on the agenda is the side

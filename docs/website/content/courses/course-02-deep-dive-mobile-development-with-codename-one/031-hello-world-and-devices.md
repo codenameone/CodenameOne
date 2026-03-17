@@ -30,9 +30,3 @@ So the real goal here is not just to get a map on screen. It is to make sure the
 - [Introduction and Installation](/courses/course-02-deep-dive-mobile-development-with-codename-one/030-introduction-and-installation/)
 - [Developer Guide](/developer-guide/)
 - [Markers, Lightweight Overlays and Map Layout](/courses/course-02-deep-dive-mobile-development-with-codename-one/032-markers-lightweight-overlays-and-map-layout/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/m43A68sNcvg.txt for future video recreation.
-
-Future video outline: put the simplest possible map on screen, compare native and fallback behavior across targets, and show how to handle environments where heavyweight or browser-backed map support is not fully available.
--->

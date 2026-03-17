@@ -32,9 +32,3 @@ So the key lesson is that checkout forms are not just a place to gather input. T
 - [Developer Guide](/developer-guide/)
 - [How Do I Use Properties To Speed Development](/how-do-i/how-do-i-use-properties-to-speed-development/)
 - [How Do I Access Native Device Functionality, Invoke Native Interfaces](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/vOcKbbW9HBM.txt for future video recreation.
-
-Future video outline: add a delivery-address form, persist the last used address, apply modern property-binding guidance, and then enforce shipping range, minimum order, and delivery fee rules in a way the user can understand.
--->

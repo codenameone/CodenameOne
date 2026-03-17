@@ -32,9 +32,3 @@ This lesson is really a collection of reminders that performance is often about 
 - [What is Performance? Breaking Down the Problem](/courses/course-02-deep-dive-mobile-development-with-codename-one/038-what-is-performance-breaking-down-the-problem/)
 - [How Do I Create A List Of Items The Easy Way](/how-do-i/how-do-i-create-a-list-of-items-the-easy-way/)
 - [How Do I Fetch An Image From The Resource File, Add A Multiimage](/how-do-i/how-do-i-fetch-an-image-from-the-resource-file-add-a-multiimage/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/ZEe_hb1Lz6Y.txt for future video recreation.
-
-Future video outline: explain why some list use cases are structurally wrong for mobile, show how overdraw and EDT parsing hurt responsiveness, then walk through a practical approach to identifying oversized resources and cleaning them up.
--->

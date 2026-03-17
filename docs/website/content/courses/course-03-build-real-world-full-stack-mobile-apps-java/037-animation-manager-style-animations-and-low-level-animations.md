@@ -35,9 +35,3 @@ So the real lesson here is not “here is one more animation trick.” It is tha
 - [Layout Animations](/courses/course-03-build-real-world-full-stack-mobile-apps-java/036-layout-animations/)
 - [Threading and the EDT](/courses/course-01-java-for-mobile-devices/011-threading-and-the-edt/)
 - [What Is Performance? Breaking Down the Problem](/courses/course-02-deep-dive-mobile-development-with-codename-one/037-what-is-performance-breaking-down-the-problem/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/qUJ4FwZMEQY.txt for future video recreation.
-
-Future video outline: explain why style animation needs central orchestration, show a small style animation example, introduce the animation manager’s serialization role, and then move into the low-level animate/registerAnimated lifecycle with explicit performance guidance.
--->

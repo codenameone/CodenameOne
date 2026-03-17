@@ -32,9 +32,3 @@ So the first server lesson is really about responsibility boundaries. The mobile
 - [Introduction to Spring Boot](/courses/course-02-deep-dive-mobile-development-with-codename-one/002-introduction-to-spring-boot/)
 - [Connecting to a Web Service](/courses/course-02-deep-dive-mobile-development-with-codename-one/003-connecting-to-a-web-service/)
 - [Security Basics and Certificate Pinning](/courses/course-02-deep-dive-mobile-development-with-codename-one/028-security-basics-and-certificate-pinning/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/exL7bS0StP4.txt for future video recreation.
-
-Future video outline: reintroduce the server as the authoritative half of the app, show where pricing and security logic belong, contrast entities with transport objects, and explain why a boring, predictable backend is exactly what a mobile product needs.
--->

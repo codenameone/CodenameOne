@@ -32,9 +32,3 @@ So if a checkout UI feels elegant but does not let the user edit the order natur
 - [Developer Guide](/developer-guide/)
 - [How Do I Create A List Of Items The Easy Way](/how-do-i/how-do-i-create-a-list-of-items-the-easy-way/)
 - [Threading and the EDT](/courses/course-01-java-for-mobile-devices/011-threading-and-the-edt/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/CvbcWC4hLYk.txt for future video recreation.
-
-Future video outline: begin with the flawed checkout interaction, compare swipe, edit mode, and always-visible controls, then implement a quantity editor that fits the existing UI while making correction obvious and easy.
--->

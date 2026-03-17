@@ -35,9 +35,3 @@ The video uses the older designer workflow to define bundles and RTL markers. Th
 - [Themeing](/themeing/)
 - [Layout Basics](/layout-basics/)
 - [Properties Are Amazing](/blog/properties-are-amazing/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/32mkZymqa6E.txt for future video recreation.
-
-Future video outline: explain the difference between internationalization and localization, show how to move user-facing strings into l10n property bundles, test an alternate locale in the simulator, format dates and numbers with the localization APIs, then switch to an RTL language and review the layout, icons, and bidi edge cases that need explicit attention.
--->

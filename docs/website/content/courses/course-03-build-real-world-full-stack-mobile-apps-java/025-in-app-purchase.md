@@ -37,9 +37,3 @@ The exact screens shown in the video are dated now, but the overall store workfl
 - [Billing and Global Server](/courses/course-03-build-real-world-full-stack-mobile-apps-java/013-billing-and-global-server/)
 - [In-App Purchase](/in-app-purchase/)
 - [What Is Codename One](/courses/course-01-java-for-mobile-devices/004-what-is-codename-one/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/uvQKs_PdB64.txt for future video recreation.
-
-Future video outline: explain when store billing is required, define the role of SKUs, wire the purchase callback into the main app class, resume the pending build flow after purchase success, and then walk through the current store-console setup at a high level.
--->

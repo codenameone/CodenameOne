@@ -33,12 +33,6 @@ The video is also a bit out of date in how manual the Android Studio setup is. T
 - [Development Environment](/development-environment/)
 - [Moving To Maven](/blog/moving-to-maven/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/008AK1GfHA8.txt for future video recreation.
-
-Future video outline: start with a bug that reproduces only on a real Android device, show how to include sources in the build, open the generated Android project in Android Studio, inspect logs and breakpoints there, and then move the actual fix back into the Codename One project. The main lesson should be when to use Android Studio, not how to turn it into the primary place you work.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

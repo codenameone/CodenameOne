@@ -33,9 +33,3 @@ So the modern version of this advice is: prototype in the native IDE when needed
 - [How Do I Access Native Device Functionality, Invoke Native Interfaces](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
 - [How Do I Use The Include Sources Feature To Debug The Native Code On iOS/Android](/how-do-i/how-do-i-use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc/)
 - [Threading and the EDT](/courses/course-01-java-for-mobile-devices/011-threading-and-the-edt/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/swgT_aDsv3U.txt for future video recreation.
-
-Future video outline: start with generated native stubs, implement the Android and iOS sides in their native environments, explain the thread boundary between Codename One and the platform UI thread, and show how to return a clean callback into the portable layer.
--->

@@ -31,9 +31,3 @@ So this module is really about design judgment in a programmer's context. You al
 - [Adapting a UI Design](/courses/course-01-java-for-mobile-devices/009-adapting-a-ui-design/)
 - [How Do I Create Gorgeous SideMenu](/how-do-i/how-do-i-create-gorgeous-sidemenu/)
 - [Themeing](/themeing/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/aZ2Y74xPj_0.txt for future video recreation.
-
-Future video outline: frame the challenge of extending an incomplete design, identify the reusable visual language from the existing screens, build one or two missing forms, and explain how consistency and purposeful motion matter more than decorative effects.
--->

@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 in this lesson we'll go over the basic
 server architecture and project lombok
 which we use in the server

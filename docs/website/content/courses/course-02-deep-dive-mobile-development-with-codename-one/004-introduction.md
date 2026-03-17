@@ -31,9 +31,3 @@ In the lessons that follow, the design gets broken down into manageable parts: a
 - [Themeing](/themeing/)
 - [Layout Basics](/layout-basics/)
 - [How Do I Create A 9 Piece Image Border](/how-do-i/how-do-i-create-a-9-piece-image-border/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/BXwh2T7wvfc.txt for future video recreation.
-
-Future video outline: introduce a real design mockup, explain how to separate interactive structure from decorative assets, set expectations about not chasing pixel perfection too early, and frame the upcoming lessons on image extraction, layout, and CSS styling.
--->

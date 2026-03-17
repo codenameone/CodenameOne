@@ -36,9 +36,3 @@ The broader lesson is that mobile work rewards adaptability. You do not control 
 - [How Do I Fetch An Image From The Resource File, Add A Multiimage](/how-do-i/how-do-i-fetch-an-image-from-the-resource-file-add-a-multiimage/)
 - [How Do I Create A 9 Piece Image Border](/how-do-i/how-do-i-create-a-9-piece-image-border/)
 - [How Do I Create An iOS Provisioning Profile](/how-do-i/how-do-i-create-an-ios-provisioning-profile/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/hwsWdhJHl8Q.txt for future video recreation.
-
-Future video outline: explain why mobile constraints differ from desktop development, walk through density versus resolution with concrete device examples, compare bitmap assets to icon fonts and multi-images, then demystify signing and provisioning so new developers understand why mobile builds have more ceremony than desktop builds.
--->

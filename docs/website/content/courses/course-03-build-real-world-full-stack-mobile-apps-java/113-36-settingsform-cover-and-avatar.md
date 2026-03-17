@@ -31,9 +31,3 @@ This is one of the better examples in the course of progressive feature design. 
 - [39. ImagePicker - Video and Custom Support](/courses/course-03-build-real-world-full-stack-mobile-apps-java/116-39-imagepicker-video-and-custom-support/)
 - [40. Edit User - UI Binding and Multipart Image Upload](/courses/course-03-build-real-world-full-stack-mobile-apps-java/077-40-edit-user-ui-binding-and-multipart-image-upload/)
 - [18. Media Entity](/courses/course-03-build-real-world-full-stack-mobile-apps-java/095-18-media-entity/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/_JCsyyIH02E.txt for future video recreation.
-
-Future video outline: isolate image picking into a reusable helper, compose the settings/profile header with layered layouts, update avatar and cover images through the media/upload path, and prepare the screen for generic profile editing in the next lesson.
--->

@@ -32,9 +32,3 @@ So the Android side is not just "translate methods one by one." It is "translate
 - [Developer Guide](/developer-guide/)
 - [How Do I Access Native Device Functionality, Invoke Native Interfaces](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
 - [How Do I Use The Include Sources Feature To Debug The Native Code On iOS/Android](/how-do-i/how-do-i-use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/16-Vkgcx2kg.txt for future video recreation.
-
-Future video outline: implement the Android preview bridge in the native IDE, explain which calls must run on the Android UI thread, wire the result back into the portable camera wrapper, and finish with the native dependency and build-hint configuration needed to make the integration compile.
--->

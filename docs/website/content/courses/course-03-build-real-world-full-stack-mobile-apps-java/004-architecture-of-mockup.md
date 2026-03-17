@@ -30,9 +30,3 @@ So the architectural lesson here is not complicated, but it is important. Establ
 - [Base Navigation Form and Shape Effects](/courses/course-03-build-real-world-full-stack-mobile-apps-java/005-base-navigation-form-and-shape-effects/)
 - [Developer Guide](/developer-guide/)
 - [Layout Basics](/layout-basics/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/vxsUf3gw1zg.txt for future video recreation.
-
-Future video outline: define the form hierarchy for the app maker, explain why some screens share a navigation shell while others should stand alone, and tie that structure back to the earlier product-scope decisions.
--->

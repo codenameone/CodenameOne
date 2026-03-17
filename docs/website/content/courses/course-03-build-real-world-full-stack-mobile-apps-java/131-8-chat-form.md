@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 the next step is the actual chat form
 the chat form is a form like the main
 form we discussed earlier

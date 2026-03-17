@@ -33,9 +33,3 @@ Another good pattern from the lesson is restoring the previous transition after 
 - [Animation Manager, Style Animations and Low Level Animations](/courses/course-03-build-real-world-full-stack-mobile-apps-java/037-animation-manager-style-animations-and-low-level-animations/)
 - [Morph Transition: Animating Elements Between Forms](/courses/course-03-build-real-world-full-stack-mobile-apps-java/038-circular-floating-action-button-animation/)
 - [Bubble Border](/courses/course-03-build-real-world-full-stack-mobile-apps-java/007-bubble-border/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/aVkeOIx-Is8.txt for future video recreation.
-
-Future video outline: start with the principle that animation should explain rather than decorate, compare the most useful transition types, show a morph from list thumbnail to detail view, and demonstrate how to scope a custom transition so it does not leak into unrelated navigation.
--->

@@ -33,9 +33,3 @@ Even though the implementation here is intentionally simplified, the lesson is u
 - [21. Service Layer and UserService](/courses/course-03-build-real-world-full-stack-mobile-apps-java/098-21-service-layer-and-userservice/)
 - [22. UserService Part II](/courses/course-03-build-real-world-full-stack-mobile-apps-java/099-22-userservice-part-ii/)
 - [13. Friends Container](/courses/course-03-build-real-world-full-stack-mobile-apps-java/090-13-friends-container/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/Otujb_KyofA.txt for future video recreation.
-
-Future video outline: finish the client-mirroring notification entity, justify treating the newsfeed as its own ranked server dataset, introduce the shadow-user concept behind friend suggestions, and connect those server-only models back to the user-facing feed and friends screens.
--->

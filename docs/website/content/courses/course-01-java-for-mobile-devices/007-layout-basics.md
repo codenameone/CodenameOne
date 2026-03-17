@@ -35,9 +35,3 @@ The modern adjustment is not in the layout system itself so much as in how you s
 - [Developer Guide](/developer-guide/)
 - [Themeing](/themeing/)
 - [Getting Started](/getting-started/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/4D_KUa2qv2o.txt for future video recreation.
-
-Future video outline: start with the portability problem, then build one realistic screen from the outside in. Show why nested containers are normal, explain the practical role of `BorderLayout`, `BoxLayout`, `GridLayout`, `TableLayout`, and `LayeredLayout`, and end by showing the component inspector on a finished screen.
--->

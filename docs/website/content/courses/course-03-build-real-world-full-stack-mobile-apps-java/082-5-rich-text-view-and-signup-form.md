@@ -31,9 +31,3 @@ This is the kind of reusable UI infrastructure that is worth writing. It is clos
 - [Working with CSS](/courses/course-02-deep-dive-mobile-development-with-codename-one/001-working-with-css/)
 - [Layout Basics](/courses/course-01-java-for-mobile-devices/007-layout-basics/)
 - [How Do I Handle Events/Navigation in the GUI Builder & Populate the Form from Code](/how-do-i/how-do-i-handle-eventsnavigation-in-the-gui-builder-populate-the-form-from-code/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/UhLFHJj8qnM.txt for future video recreation.
-
-Future video outline: explain why a browser component would be the wrong tool here, build a small rich-text renderer for controlled markup, introduce the shared signup form shell, and show how that shell will make the later wizard stages much more consistent.
--->

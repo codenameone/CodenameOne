@@ -33,9 +33,3 @@ So the right takeaway is not “copy these HTTP verbs literally.” It is “kee
 - [21. Service Layer and UserService](/courses/course-03-build-real-world-full-stack-mobile-apps-java/098-21-service-layer-and-userservice/)
 - [22. UserService Part II](/courses/course-03-build-real-world-full-stack-mobile-apps-java/099-22-userservice-part-ii/)
 - [Connecting to a Web Service](/courses/course-02-deep-dive-mobile-development-with-codename-one/003-connecting-to-a-web-service/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/rjIQqfrFvbI.txt for future video recreation.
-
-Future video outline: explain why the controller layer should stay thin, map service exceptions into a stable error DAO, expose login/refresh/avatar/friend APIs over HTTP, and discuss where the lesson’s pragmatic mobile-focused verb choices are useful versus where stricter REST semantics would be better.
--->

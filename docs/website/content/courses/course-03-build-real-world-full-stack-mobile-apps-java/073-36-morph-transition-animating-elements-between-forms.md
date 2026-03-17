@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 i kept most of the default transitions
 and did a few animations along the way
 but i didn't spend too much time on

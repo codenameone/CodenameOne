@@ -37,9 +37,3 @@ Finally, log the push response on the server. Even in a small project, delivery 
 - [Push 2 - Client Side Code](/courses/course-03-build-real-world-full-stack-mobile-apps-java/021-push-2-client-side-code/)
 - [Push Notifications](/push-notifications/)
 - [In-App Purchase](/courses/course-03-build-real-world-full-stack-mobile-apps-java/025-in-app-purchase/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/qaYExTzcCVY.txt for future video recreation.
-
-Future video outline: start from the completed build result, explain which credentials the server needs and why they should live outside source control, show the synchronous build path, and then send a visible-plus-payload push that the client can consume immediately.
--->

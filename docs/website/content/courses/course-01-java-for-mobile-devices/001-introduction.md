@@ -30,9 +30,3 @@ The best way to use this course is to keep a project open while you read. Run th
 - [Initializr](/initializr/)
 - [Developer Guide](/developer-guide/)
 - [Hello World](/hello-world/)
-
-<!--
-This lesson does not currently have a transcript-backed video in the content source.
-
-Future video outline: introduce the course goals, explain the current Maven-based setup, frame the difference between old and new tooling, and set expectations for how to use the written lessons as the up-to-date guide while still benefiting from the older course videos where the concepts remain valid.
--->

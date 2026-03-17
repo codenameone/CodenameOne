@@ -30,9 +30,3 @@ So the key takeaway here is not a specific request helper. It is the product sta
 - [Connecting to a Web Service](/courses/course-02-deep-dive-mobile-development-with-codename-one/003-connecting-to-a-web-service/)
 - [REST API Design](/courses/course-03-build-real-world-full-stack-mobile-apps-java/008-rest-api-design/)
 - [Communicating with the Server](/courses/course-02-deep-dive-mobile-development-with-codename-one/025-communicating-with-the-server/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/VnYaxvVn6OA.txt for future video recreation.
-
-Future video outline: show the client establishing its secret automatically, keep the UI responsive while asynchronous requests run, and explain why good builder products avoid making network coordination feel like a separate task the user has to manage.
--->

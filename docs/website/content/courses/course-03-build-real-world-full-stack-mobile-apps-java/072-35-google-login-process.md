@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 the last piece is the google login
 support which we almost finished as the
 code we did for facebook is nearly

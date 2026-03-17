@@ -33,9 +33,3 @@ The last change to the UI controller is small but important: startup now depends
 - [21. Service Layer and UserService](/courses/course-03-build-real-world-full-stack-mobile-apps-java/098-21-service-layer-and-userservice/)
 - [22. UserService Part II](/courses/course-03-build-real-world-full-stack-mobile-apps-java/099-22-userservice-part-ii/)
 - [4. Login Form](/courses/course-03-build-real-world-full-stack-mobile-apps-java/081-4-login-form/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/8WER-8R0WqA.txt for future video recreation.
-
-Future video outline: wire the login screen to the real ServerAPI, carry the bound user object across the signup wizard, complete server-backed account creation plus verification, and update startup navigation so existing sessions go straight into the main UI.
--->

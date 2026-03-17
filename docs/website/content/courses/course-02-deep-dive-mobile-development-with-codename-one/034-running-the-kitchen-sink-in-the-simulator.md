@@ -28,9 +28,3 @@ This is another reason direct-source work should be treated as an advanced mode.
 - [Introduction and Setup](/courses/course-02-deep-dive-mobile-development-with-codename-one/033-introduction-and-setup/)
 - [Developer Guide](/developer-guide/)
 - [Hello World](/hello-world/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/l1TPKuHYr9c.txt for future video recreation.
-
-Future video outline: compile the minimum source-built pieces, explain why Kitchen Sink is a useful verification target, run it in the simulator, and clarify what this proves and what it does not yet prove about the rest of the platform.
--->

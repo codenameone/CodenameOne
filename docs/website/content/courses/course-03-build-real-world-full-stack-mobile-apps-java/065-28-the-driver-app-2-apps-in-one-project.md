@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 when i started on this road i didn't
 want to create a driver app
 and wanted to focus only on the client

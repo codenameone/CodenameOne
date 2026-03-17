@@ -33,9 +33,3 @@ This lesson also quietly reinforces a pattern that matters across the whole back
 - [20. Notification, Newsfeed and ShadowUser Entities](/courses/course-03-build-real-world-full-stack-mobile-apps-java/097-20-notification-newsfeed-and-shadowuser-entities/)
 - [23. NotificationService and MediaService](/courses/course-03-build-real-world-full-stack-mobile-apps-java/100-23-notificationservice-and-mediaservice/)
 - [13. Friends Container](/courses/course-03-build-real-world-full-stack-mobile-apps-java/090-13-friends-container/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/JZvrsZzdays.txt for future video recreation.
-
-Future video outline: add public/avatar retrieval and authenticated avatar updates, implement friend-request and friend-accept flows with proper validation, then use uploaded contacts and shadow-user matching to grow the suggestion graph behind the friends screen.
--->

@@ -31,9 +31,3 @@ This lesson also demonstrates that not every feed-style screen needs a long chai
 - [23. NotificationService and MediaService](/courses/course-03-build-real-world-full-stack-mobile-apps-java/100-23-notificationservice-and-mediaservice/)
 - [39. Settings Form and Fetching the Avatar Image](/courses/course-03-build-real-world-full-stack-mobile-apps-java/076-39-settings-form-and-fetching-the-avatar-image/)
 - [Push Notifications](/push-notifications/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/FczBAgUIb1c.txt for future video recreation.
-
-Future video outline: define the notification model, load notifications incrementally like a lightweight feed, overlay reaction markers on top of avatars, and explain how this UI prepares the app for real notification delivery later.
--->

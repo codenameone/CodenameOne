@@ -33,9 +33,3 @@ This is exactly the right stage to introduce a server boundary. The app is compl
 - [12. The Newsfeed Container](/courses/course-03-build-real-world-full-stack-mobile-apps-java/089-12-the-newsfeed-container/)
 - [17. Spring Boot Server Architecture and the User Entity](/courses/course-03-build-real-world-full-stack-mobile-apps-java/094-17-spring-boot-server-architecture-and-the-user-entity/)
 - [Connecting to a Web Service](/courses/course-02-deep-dive-mobile-development-with-codename-one/003-connecting-to-a-web-service/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/PERdJq3I-As.txt for future video recreation.
-
-Future video outline: justify introducing a server boundary before the backend exists, build a mock ServerAPI with realistic sample data, add a small UI utility layer for time formatting and separators, and explain how this lets the UI progress without being tightly coupled to temporary fake objects.
--->

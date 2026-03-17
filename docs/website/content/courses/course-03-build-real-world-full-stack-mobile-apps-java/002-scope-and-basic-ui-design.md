@@ -32,9 +32,3 @@ So the real takeaway here is not just one UI sketch over another. It is the idea
 - [Fleshing Out the UI Design](/courses/course-03-build-real-world-full-stack-mobile-apps-java/003-fleshing-out-the-ui-design/)
 - [Adapting a UI Design](/courses/course-01-java-for-mobile-devices/009-adapting-a-ui-design/)
 - [Themeing](/themeing/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/tiY5ofnJop8.txt for future video recreation.
-
-Future video outline: define the product scope of the app maker, show why the first tab-heavy concept failed, move to a preview-first design, and explain why defaults and first impression matter so much in builder-style products.
--->

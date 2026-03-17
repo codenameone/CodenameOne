@@ -39,9 +39,3 @@ By the time you have a form on screen, a button responding to taps, and a simula
 - [Build Server](/build-server/)
 - [Themeing](/themeing/)
 - [Moving To Maven](/blog/moving-to-maven/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/73d65cvyQv4.txt for future video recreation.
-
-Future video outline: keep the beginner-friendly pace, start from a Maven project instead of the old IDE plugin wizard, explain the lifecycle, build one very small interactive form, run that app in the simulator, send a first Android build, and close by showing that modern projects now style with CSS and localize with l10n property bundles rather than relying on the designer as the main workflow.
--->

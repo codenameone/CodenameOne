@@ -33,9 +33,3 @@ The warning about Java trust stores is also still relevant in spirit. When certi
 - [Security Basics and Certificate Pinning](/courses/course-02-deep-dive-mobile-development-with-codename-one/024-security-basics-and-certificate-pinning/)
 - [Introduction to Spring Boot](/courses/course-02-deep-dive-mobile-development-with-codename-one/002-introduction-to-spring-boot/)
 - [Communicating from the Client](/courses/course-03-build-real-world-full-stack-mobile-apps-java/009-communicating-from-the-client/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/sH5GY816sRc.txt for future video recreation.
-
-Future video outline: explain why HTTPS is mandatory, connect DNS to certificate issuance, fetch a Let's Encrypt certificate, convert it into a Java-usable keystore, and wire the backend to serve secure traffic with that keystore.
--->

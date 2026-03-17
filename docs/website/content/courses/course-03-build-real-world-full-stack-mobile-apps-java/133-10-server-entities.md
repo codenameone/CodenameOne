@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 we are finally back to the spring boot
 server we set up initially
 the code here is pretty simple as well

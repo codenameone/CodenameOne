@@ -33,9 +33,3 @@ This lesson also reinforces something developers often underweight: taste is par
 - [Themeing](/themeing/)
 - [Adapting a UI Design](/courses/course-01-java-for-mobile-devices/009-adapting-a-ui-design/)
 - [How Do I Create Gorgeous SideMenu](/how-do-i/how-do-i-create-gorgeous-sidemenu/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/bH7cS5ENNlw.txt for future video recreation.
-
-Future video outline: start from the existing design language, add a dish detail screen, about page, contact screen, and side menu, and explain how each one reuses the original visual hierarchy instead of inventing a new style from scratch.
--->

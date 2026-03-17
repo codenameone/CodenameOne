@@ -31,9 +31,3 @@ The DAO stays intentionally simple, which is also a good sign. Media transport s
 - [23. NotificationService and MediaService](/courses/course-03-build-real-world-full-stack-mobile-apps-java/100-23-notificationservice-and-mediaservice/)
 - [39. Settings Form and Fetching the Avatar Image](/courses/course-03-build-real-world-full-stack-mobile-apps-java/076-39-settings-form-and-fetching-the-avatar-image/)
 - [40. Edit User - UI Binding and Multipart Image Upload](/courses/course-03-build-real-world-full-stack-mobile-apps-java/077-40-edit-user-ui-binding-and-multipart-image-upload/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/W_1S2Rzgff8.txt for future video recreation.
-
-Future video outline: explain why media deserves its own entity, compare database storage with external object storage at a high level, define the role/visibility/owner fields, and show how this prepares the app for avatars and post attachments alike.
--->

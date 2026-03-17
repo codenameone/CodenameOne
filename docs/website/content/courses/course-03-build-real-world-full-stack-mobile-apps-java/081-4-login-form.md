@@ -33,9 +33,3 @@ The CSS work in this lesson is more than ornament. It defines which buttons shou
 - [5. Rich Text View and Signup Form](/courses/course-03-build-real-world-full-stack-mobile-apps-java/082-5-rich-text-view-and-signup-form/)
 - [Working with CSS](/courses/course-02-deep-dive-mobile-development-with-codename-one/001-working-with-css/)
 - [Adapting a UI Design](/courses/course-01-java-for-mobile-devices/009-adapting-a-ui-design/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/vdFr815Dhpg.txt for future video recreation.
-
-Future video outline: compare the native Facebook login flows, justify where the clone intentionally diverges, use ComponentGroup to get native-feeling grouped fields on iOS, adapt the layout for landscape and tablets, and finish by wiring the splash-to-login morph transition.
--->

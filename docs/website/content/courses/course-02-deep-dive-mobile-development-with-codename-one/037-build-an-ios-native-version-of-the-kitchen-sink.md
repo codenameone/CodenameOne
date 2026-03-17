@@ -28,9 +28,3 @@ So the lesson here is the same as the Android one, but even more visible. Workin
 - [Developer Guide](/developer-guide/)
 - [Introduction and Setup](/courses/course-02-deep-dive-mobile-development-with-codename-one/033-introduction-and-setup/)
 - [How Do I Use The Include Sources Feature To Debug The Native Code On iOS/Android](/how-do-i/how-do-i-use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/RsVOanGYjqo.txt for future video recreation.
-
-Future video outline: explain the translation/bootstrap path for iOS source builds, show how the generated native project fits into Xcode, and keep the focus on architecture and responsibility boundaries rather than on command memorization.
--->

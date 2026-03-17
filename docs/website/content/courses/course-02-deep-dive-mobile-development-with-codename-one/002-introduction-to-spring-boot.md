@@ -32,9 +32,3 @@ The key outcome of this lesson is not "install Spring Boot." It is understanding
 - [Developer Guide](/developer-guide/)
 - [How Do I Access Remote Webservices, Perform Operations On The Server](/how-do-i/how-do-i-access-remote-webservices-perform-operations-on-the-server/)
 - [Connecting to a Web Service](/courses/course-02-deep-dive-mobile-development-with-codename-one/003-connecting-to-a-web-service/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/tugJ_7xMdzs.txt for future video recreation.
-
-Future video outline: explain why a mobile app needs a backend, create a small Spring Boot project with a current Maven-based setup, add web and persistence dependencies, and show how this backend will become the API target for the Codename One client.
--->

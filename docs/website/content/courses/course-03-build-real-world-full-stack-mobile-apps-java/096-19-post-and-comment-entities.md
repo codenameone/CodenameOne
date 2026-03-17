@@ -33,9 +33,3 @@ The repository discussion is also useful because this is where paging starts to 
 - [21. Service Layer and UserService](/courses/course-03-build-real-world-full-stack-mobile-apps-java/098-21-service-layer-and-userservice/)
 - [10. Client Data Model - User, Post and Comment](/courses/course-03-build-real-world-full-stack-mobile-apps-java/087-10-client-data-model-user-post-and-comment/)
 - [12. The Newsfeed Container](/courses/course-03-build-real-world-full-stack-mobile-apps-java/089-12-the-newsfeed-container/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/tjgyigzxo5U.txt for future video recreation.
-
-Future video outline: map the client-side post and comment concepts into real server entities, justify storing individual likes and nested-comment references, add pageable repository queries, and connect the model decisions back to the feed UI already built on the client.
--->

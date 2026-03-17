@@ -31,9 +31,3 @@ That is a strong finish to this feature arc. Gallery selection, media upload, fe
 - [41. Post Image and Video from NewPostForm](/courses/course-03-build-real-world-full-stack-mobile-apps-java/118-41-post-image-and-video-from-newpostform/)
 - [42. Images, Videos and Styled Posts in the Newsfeed](/courses/course-03-build-real-world-full-stack-mobile-apps-java/119-42-images-videos-and-styled-posts-in-the-newsfeed/)
 - [How Do I Take a Picture with the Camera](/how-do-i/how-do-i-take-a-picture-with-the-camera/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/cZiHmpw2FVI.txt for future video recreation.
-
-Future video outline: introduce camera capture with a graceful fallback path, keep the custom camera UI intentionally minimal, route the captured media back into the existing picker/composer/upload flow, and emphasize reuse of the same posting pipeline regardless of media source.
--->

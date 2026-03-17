@@ -36,12 +36,6 @@ That leaves a straightforward modern workflow: generate a Maven project, choose 
 - [Themeing](/themeing/)
 - [Moving To Maven](/blog/moving-to-maven/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/fmNpMFLwABA.txt for future video recreation.
-
-Future video outline: start from the initializr and Eclipse Maven import instead of the old plugin flow, explain the lifecycle methods in the generated app, build one tiny interactive form, run it in the simulator, then send an Android build and briefly explain the extra iOS signing steps. Close by noting that new projects should usually use CSS for styling and l10n property bundles for localization.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

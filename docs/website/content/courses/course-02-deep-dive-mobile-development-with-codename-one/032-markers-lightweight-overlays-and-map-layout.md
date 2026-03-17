@@ -30,9 +30,3 @@ So the lesson here is that built-in markers are fine when they are enough, but d
 - [Developer Guide](/developer-guide/)
 - [Introduction and Installation](/courses/course-02-deep-dive-mobile-development-with-codename-one/030-introduction-and-installation/)
 - [Hello World and Devices](/courses/course-02-deep-dive-mobile-development-with-codename-one/031-hello-world-and-devices/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/sed5OPQSfe0.txt for future video recreation.
-
-Future video outline: start with default markers, explain their limitations, build a lightweight overlay container tied to map coordinates, and show how real UI components can live above the map and respond as the map moves.
--->

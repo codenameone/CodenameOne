@@ -30,9 +30,3 @@ The broader lesson is that performance work should move from general to specific
 - [Profiling on the Desktop, Using the Performance Monitor Tool](/courses/course-02-deep-dive-mobile-development-with-codename-one/042-profiling-on-the-desktop-using-the-performance-monitor-tool/)
 - [What is Performance? Breaking Down the Problem](/courses/course-02-deep-dive-mobile-development-with-codename-one/038-what-is-performance-breaking-down-the-problem/)
 - [How Do I Improve Application Performance Or Track Down Performance Issues](/how-do-i/how-do-i-improve-application-performance-or-track-down-performance-issues/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/YwkwqXkHGwg.txt for future video recreation.
-
-Future video outline: explain when simulator evidence stops being enough, show Android and iOS device profiling at a practical level, include GPU overdraw visualization on Android, and connect the device tools back to the earlier desktop profiling workflow.
--->

@@ -31,9 +31,3 @@ The more durable takeaway is that media delivery often forces you to choose betw
 - [23. NotificationService and MediaService](/courses/course-03-build-real-world-full-stack-mobile-apps-java/100-23-notificationservice-and-mediaservice/)
 - [40. Post Media Attachments - Client Side Business Logic](/courses/course-03-build-real-world-full-stack-mobile-apps-java/117-40-post-media-attachments-client-side-business-logic/)
 - [42. Images, Videos and Styled Posts in the Newsfeed](/courses/course-03-build-real-world-full-stack-mobile-apps-java/119-42-images-videos-and-styled-posts-in-the-newsfeed/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/Xrolmjg8Dr0.txt for future video recreation.
-
-Future video outline: connect posts to media records on the server, explain why the client only needs lightweight attachment metadata, then discuss the auth-query-parameter shortcut honestly as a convenience with real security implications.
--->

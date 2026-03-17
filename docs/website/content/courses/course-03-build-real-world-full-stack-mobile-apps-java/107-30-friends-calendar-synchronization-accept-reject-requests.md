@@ -33,9 +33,3 @@ The lesson’s mention of notifications is important too. Once friendship action
 - [22. UserService Part II](/courses/course-03-build-real-world-full-stack-mobile-apps-java/099-22-userservice-part-ii/)
 - [14. Notifications Container](/courses/course-03-build-real-world-full-stack-mobile-apps-java/091-14-notifications-container/)
 - [How Do I Use Push Notification / Send Server Push Messages](/how-do-i/how-do-i-use-push-notification-send-server-push-messages/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/-aTpqxDa1Ag.txt for future video recreation.
-
-Future video outline: explain the tab-container implications of adding a floating action button, upload contacts from the device into the server-backed social graph, wire accept/remove actions to the backend, and animate the friends UI so accepted or dismissed suggestions disappear cleanly.
--->

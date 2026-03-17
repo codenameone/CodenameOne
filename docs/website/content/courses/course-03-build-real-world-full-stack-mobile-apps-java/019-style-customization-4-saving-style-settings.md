@@ -30,9 +30,3 @@ So the final lesson in this style-customization block is straightforward but imp
 - [Style Customization 1 - Introduction and Basics](/Users/shai/dev/cn1/docs/website/content/courses/course-03-build-real-world-full-stack-mobile-apps-java/016-style-customization-1-introduction-and-basics.md)
 - [SQLite Abstraction with Object Relational Mapping](/Users/shai/dev/cn1/docs/website/content/courses/course-03-build-real-world-full-stack-mobile-apps-java/010-sqlite-abstraction-with-object-relational-mapping.md)
 - [Billing and Global Server](/Users/shai/dev/cn1/docs/website/content/courses/course-03-build-real-world-full-stack-mobile-apps-java/013-billing-and-global-server.md)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/Wiy2goFwfQA.txt for future video recreation.
-
-Future video outline: show how style settings become structured domain data, save and reload them through the builder’s persistence layer, and connect the customization UX back to the broader product model rather than treating it as a temporary theme hack.
--->

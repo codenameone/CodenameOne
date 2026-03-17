@@ -37,9 +37,3 @@ The hard part of native interfaces is often not the code itself but the configur
 - [Build Hints](/build-hints/)
 - [Build Server](/build-server/)
 - [How Do I Access Native Device Functionality? Invoke Native Interfaces?](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/2xKvvv7XoVQ.txt for future video recreation.
-
-Future video outline: define what "native" means in Codename One, build one small native interface, implement it on Android and iOS, show how `isSupported()` and `NativeLookup` are used, then explain the real-world issues around build hints, native library dependencies, manifest/plist changes, and include-sources debugging.
--->

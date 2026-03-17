@@ -35,9 +35,3 @@ Once you adopt that model, threading stops being an abstract theory lesson and b
 - [How Do I Access Remote Webservices, Perform Operations On The Server](/how-do-i/how-do-i-access-remote-webservices-perform-operations-on-the-server/)
 - [How Do I Improve Application Performance Or Track Down Performance Issues](/how-do-i/how-do-i-improve-application-performance-or-track-down-performance-issues/)
 - [How Do I Find Problems In My Application Using The Codename One Tools And The Standard IDE Tools](/how-do-i/how-do-i-find-problems-in-my-application-using-the-codename-one-tools-and-the-standard-ide-tools/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/p6UFNw0nGik.txt for future video recreation.
-
-Future video outline: explain the EDT as the UI-owning thread, show what it feels like when the UI is blocked, move a slow task off the EDT, return to the EDT for UI updates, and close with practical rules for keeping concurrency simple and portable.
--->

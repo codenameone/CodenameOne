@@ -35,9 +35,3 @@ The video correctly presents polling as a fallback rather than the ideal design.
 - [Push WebSockets Fallback](/courses/course-03-build-real-world-full-stack-mobile-apps-java/024-push-websockets-fallback/)
 - [Connecting to a Web Service](/courses/course-02-deep-dive-mobile-development-with-codename-one/003-connecting-to-a-web-service/)
 - [How Do I Use HTTP, Sockets, Webservices & WebSockets](/how-do-i/how-do-i-use-http-sockets-webservices-websockets/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/VDyltmk_Hu8.txt for future video recreation.
-
-Future video outline: explain why push cannot be the only delivery path, persist the build result on the server, add the client polling loop, and compare the reliability and cost of polling with the WebSocket approach in the next lesson.
--->

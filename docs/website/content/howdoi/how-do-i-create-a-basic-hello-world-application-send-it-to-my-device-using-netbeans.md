@@ -37,12 +37,6 @@ So the modern NetBeans version of this lesson is straightforward: start from the
 - [Themeing](/themeing/)
 - [Moving To Maven](/blog/moving-to-maven/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/73d65cvyQv4.txt for future video recreation.
-
-Future video outline: start from the initializr and NetBeans Maven import, explain the lifecycle methods in the generated application class, build a one-button hello world form, validate it in the simulator, then send an Android build and note the extra certificate work needed for iOS. Close by showing that CSS and l10n property bundles are now the preferred styling and localization workflow.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

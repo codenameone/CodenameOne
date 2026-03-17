@@ -30,9 +30,3 @@ So the key lesson is that preview should be treated as a product feature, not as
 - [Scope and Basic UI Design](/courses/course-03-build-real-world-full-stack-mobile-apps-java/002-scope-and-basic-ui-design/)
 - [Themeing](/themeing/)
 - [How Do I Create Gorgeous SideMenu](/how-do-i/how-do-i-create-gorgeous-sidemenu/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/jhPep9vHv_U.txt for future video recreation.
-
-Future video outline: polish the builder side menu, explain the selected-entry styling details, and then show how a real preview can be produced by reusing the restaurant app path instead of simulating it with a separate mock representation.
--->

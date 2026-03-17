@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 let's continue with the other entities
 i'll skip media as it's just a copy and
 paste of the facebook media class and

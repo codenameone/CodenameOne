@@ -34,12 +34,6 @@ The main reason to choose offline build is policy, not convenience. It is usuall
 - [How Do I Use The Include Sources Feature To Debug The Native Code On iOS/Android Etc.](/how-do-i/how-do-i-use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc/)
 - [How Do I Get Repeatable Builds?](/how-do-i/how-do-i-get-repeatable-builds-build-against-a-consistent-version-of-codename-one-use-the-versioning-feature/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/IqsUSCgSVTo.txt for future video recreation.
-
-Future video outline: explain when offline build is actually justified, show the required local toolchain at a high level, download/select an offline builder snapshot, generate Android and iOS offline builds, open the Android project in Android Studio and the iOS xcworkspace in Xcode, and close with the tradeoffs compared to the cloud build server.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

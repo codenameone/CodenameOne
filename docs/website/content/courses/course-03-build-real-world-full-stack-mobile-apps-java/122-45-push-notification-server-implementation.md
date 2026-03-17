@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 the changes to the notification service
 are significant and in effect that's the
 class that implements push notification

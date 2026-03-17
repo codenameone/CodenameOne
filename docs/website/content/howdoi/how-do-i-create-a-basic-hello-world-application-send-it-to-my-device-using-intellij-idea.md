@@ -37,12 +37,6 @@ So the practical workflow is straightforward: start with a Maven project, unders
 - [Create an iOS Provisioning Profile](/create-an-ios-provisioning-profile/)
 - [Moving To Maven](/blog/moving-to-maven/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/oR3KHYf5OrY.txt for future video recreation.
-
-Future video outline: create or open a Maven-based project in IntelliJ, explain the lifecycle methods in the generated application class, add one button and one action to a form, validate the app in the simulator, then send a native Android build. Explicitly note that the older designer-centered styling and localization workflow has been replaced in most new projects by CSS and l10n property bundles.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

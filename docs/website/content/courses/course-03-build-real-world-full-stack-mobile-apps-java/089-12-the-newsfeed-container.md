@@ -31,9 +31,3 @@ The feed item assembly code also shows good layout judgment. Buttons that should
 - [11. ServerAPI Abstraction Mockup](/courses/course-03-build-real-world-full-stack-mobile-apps-java/088-11-serverapi-abstraction-mockup/)
 - [13. Friends Container](/courses/course-03-build-real-world-full-stack-mobile-apps-java/090-13-friends-container/)
 - [How Do I Create a List of Items the Easy Way](/how-do-i/how-do-i-create-a-list-of-items-the-easy-way/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/B4QCJRFpG-k.txt for future video recreation.
-
-Future video outline: introduce InfiniteContainer for the feed, split the rendering into reusable post-bar/title/stats/item helpers, connect the feed to the mock ServerAPI, and explain how pull-to-refresh and infinite scrolling fit naturally into a social timeline.
--->

@@ -32,12 +32,6 @@ For a current Codename One project, the practical advice is to design a normal s
 - [Terse REST API](/blog/terse-rest-api/)
 - [REST API Design](/courses/course-03-build-real-world-full-stack-mobile-apps-java/rest-api-design/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/sUhpCwd0YJg.txt for future video recreation.
-
-Future video outline: explain the older webservice wizard as one historical approach to client/server integration, then pivot quickly to the modern recommendation of HTTP/REST-based APIs. Show one simple request, discuss sync vs async behavior, and explain why server contracts must be versioned carefully once a mobile app is in production.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

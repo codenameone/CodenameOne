@@ -33,12 +33,6 @@ The video is useful as a picture of the overall flow, but the modern thing to re
 - [Hello World](/hello-world/)
 - [Developer Guide](/developer-guide/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/OWHizrNyizQ.txt for future video recreation.
-
-Future video outline: explain the relationship between app identifiers, devices, certificates, and provisioning profiles, then walk through creating development and distribution profiles and wiring the exported credentials into a Codename One project for iOS builds.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

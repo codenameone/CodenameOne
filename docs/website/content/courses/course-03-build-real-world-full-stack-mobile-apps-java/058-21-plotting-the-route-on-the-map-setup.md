@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 next we'll bring these changes into the
 map form class which handles the actual
 heavy lifting of search

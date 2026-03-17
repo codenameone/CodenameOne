@@ -33,9 +33,3 @@ This lesson also highlights a broader truth about mobile networking: the app is 
 - [How Do I Access Remote Webservices, Perform Operations On The Server](/how-do-i/how-do-i-access-remote-webservices-perform-operations-on-the-server/)
 - [How Do I Use HTTP, Sockets, Webservices & Websockets](/how-do-i/how-do-i-use-http-sockets-webservices-websockets/)
 - [Threading and the EDT](/courses/course-01-java-for-mobile-devices/011-threading-and-the-edt/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/3B7C0ZbV8Bc.txt for future video recreation.
-
-Future video outline: build one small JSON endpoint, implement a client-side service class around ConnectionRequest, contrast synchronous and asynchronous flows, and finish by showing how the UI layer stays cleaner when networking concerns are kept out of the form code.
--->

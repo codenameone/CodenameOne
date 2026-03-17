@@ -31,9 +31,3 @@ What matters most is that the app now has a place for user-adjacent functions su
 - [9. The Main Form](/courses/course-03-build-real-world-full-stack-mobile-apps-java/086-9-the-main-form/)
 - [How Do I Create Gorgeous SideMenu](/how-do-i/how-do-i-create-gorgeous-sidemenu/)
 - [Working with CSS](/courses/course-02-deep-dive-mobile-development-with-codename-one/001-working-with-css/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/kfKsVAx659s.txt for future video recreation.
-
-Future video outline: explain the role of the “more” tab in a large social app, build reusable MultiButton-style entries with icon circles, handle the remaining styling gaps pragmatically, and connect the screen to future settings/profile destinations.
--->

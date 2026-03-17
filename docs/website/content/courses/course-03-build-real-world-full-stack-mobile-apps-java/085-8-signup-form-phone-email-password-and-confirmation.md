@@ -31,9 +31,3 @@ The final wiring into the UI controller is also important. A wizard is not compl
 - [9. The Main Form](/courses/course-03-build-real-world-full-stack-mobile-apps-java/086-9-the-main-form/)
 - [Threading and the EDT](/courses/course-01-java-for-mobile-devices/011-threading-and-the-edt/)
 - [Creating a Hello World App](/courses/course-01-java-for-mobile-devices/002-creating-a-hello-world-app/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/v-kJ_nIYq3I.txt for future video recreation.
-
-Future video outline: build the parallel phone and email stages without over-generalizing them, finish the password and confirmation flow, and wire the entire signup wizard into the app controller so it becomes a real navigation path.
--->

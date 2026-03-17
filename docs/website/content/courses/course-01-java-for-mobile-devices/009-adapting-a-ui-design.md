@@ -38,9 +38,3 @@ The best way to adapt a design in Codename One today is to treat the mockup as a
 - [Layout Basics](/layout-basics/)
 - [How Do I Create A 9 Piece Image Border](/how-do-i/how-do-i-create-a-9-piece-image-border/)
 - [How Do I Create Gorgeous SideMenu](/how-do-i/how-do-i-create-gorgeous-sidemenu/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/WT4cFceBWRA.txt for future video recreation.
-
-Future video outline: begin with a design mockup, separate structural UI from asset extraction, build the screen with layouts first, then style it with CSS and add only the assets that truly need to exist as images. Include one example of a floating action button and one example of a reusable border or accent treatment.
--->

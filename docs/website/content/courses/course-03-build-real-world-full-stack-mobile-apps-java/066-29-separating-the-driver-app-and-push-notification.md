@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 before we go into the big ui changes
 let's go over some of the networking
 level level changes in the code

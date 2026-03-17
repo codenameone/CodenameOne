@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 in the third part we'll dive right into
 the model objects representing the
 server and ultimately the front end code

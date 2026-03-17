@@ -31,9 +31,3 @@ The styled-post fixes are just as important. Earlier in the module, style choice
 - [12. The Newsfeed Container](/courses/course-03-build-real-world-full-stack-mobile-apps-java/089-12-the-newsfeed-container/)
 - [16. The 'New Post' Form](/courses/course-03-build-real-world-full-stack-mobile-apps-java/093-16-the-new-post-form/)
 - [18. Media Entity](/courses/course-03-build-real-world-full-stack-mobile-apps-java/095-18-media-entity/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/M518p4_Horg.txt for future video recreation.
-
-Future video outline: extend the feed renderer to display images and videos, explain the simplified nature of the current media-delivery pipeline, then fix styled-text post rendering so the visual choices made in the composer carry through into the timeline.
--->

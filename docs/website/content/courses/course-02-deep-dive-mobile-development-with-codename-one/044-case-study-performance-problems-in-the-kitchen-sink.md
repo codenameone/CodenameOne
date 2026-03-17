@@ -30,9 +30,3 @@ So the real lesson from the case study is methodological. Do not assume. Measure
 - [What is Performance? Breaking Down the Problem](/courses/course-02-deep-dive-mobile-development-with-codename-one/038-what-is-performance-breaking-down-the-problem/)
 - [EDT, Threading, Caching and Soft References](/courses/course-02-deep-dive-mobile-development-with-codename-one/039-edt-threading-caching-and-soft-references/)
 - [Profiling on the Desktop, Using the Performance Monitor Tool](/courses/course-02-deep-dive-mobile-development-with-codename-one/042-profiling-on-the-desktop-using-the-performance-monitor-tool/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/qGJaVaQ_MNY.txt for future video recreation.
-
-Future video outline: walk through the Kitchen Sink case study, expose the repeated resource-loading mistake, then show why moving work off the EDT was not sufficient until the timing of background image loading was tied to user interaction and idle time.
--->

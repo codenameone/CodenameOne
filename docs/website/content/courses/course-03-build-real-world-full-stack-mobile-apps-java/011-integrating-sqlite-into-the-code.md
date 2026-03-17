@@ -30,9 +30,3 @@ So the integration lesson is really about coupling and user experience at the sa
 - [SQLite Abstraction with Object Relational Mapping](/courses/course-03-build-real-world-full-stack-mobile-apps-java/010-sqlite-abstraction-with-object-relational-mapping/)
 - [How Do I Use Properties To Speed Development](/how-do-i/how-do-i-use-properties-to-speed-development/)
 - [How Do I Use Storage, File System, SQL](/how-do-i/how-do-i-use-storage-file-system-sql/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/vAiTW4Y8QuA.txt for future video recreation.
-
-Future video outline: wire the storage abstraction into the editor flow, use listeners to keep the UI synchronized with local state, and show how delete-plus-undo works cleanly when the data model is the thing driving updates.
--->

@@ -31,9 +31,3 @@ Taken together, these screens show a good principle for signup flows: keep the s
 - [Properties Are Amazing](/blog/properties-are-amazing/)
 - [Layout Basics](/courses/course-01-java-for-mobile-devices/007-layout-basics/)
 - [How Do I Position Components Using Layout Managers](/how-do-i/how-do-i-positioning-components-using-layout-managers/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/Nv_0NVgCbSk.txt for future video recreation.
-
-Future video outline: use TextComponent and TextModeLayout for the name stage, explain why native date picking is the right choice for birthday, build the gender selector with grouped toggle-style buttons, and connect all three stages back to the shared signup wizard structure.
--->

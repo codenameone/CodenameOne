@@ -31,9 +31,3 @@ This is one of those lessons where the code is not flashy, but the payoff is lar
 - [7. Signup Form - Name, Birthday and Gender](/courses/course-03-build-real-world-full-stack-mobile-apps-java/084-7-signup-form-name-birthday-and-gender/)
 - [Working with CSS](/courses/course-02-deep-dive-mobile-development-with-codename-one/001-working-with-css/)
 - [CSS Changes](/courses/course-02-deep-dive-mobile-development-with-codename-one/013-css-changes/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/xLa5yeeVsE8.txt for future video recreation.
-
-Future video outline: build the first signup stage on top of the shared shell, render the legal copy with the custom rich-text view, establish the common toolbar and action styling, and explain how these CSS decisions will carry the rest of the wizard.
--->

@@ -31,9 +31,3 @@ The wider lesson here is that good architecture does not need to arrive all at o
 - [Overview and Basic Model](/courses/course-02-deep-dive-mobile-development-with-codename-one/015-overview-and-basic-model/)
 - [How Do I Use Properties To Speed Development](/how-do-i/how-do-i-use-properties-to-speed-development/)
 - [How Do I Localize/Translate My Application, Apply i18n/l10n to My App](/how-do-i/how-do-i-localizetranslate-my-application-apply-i18nl10n-internationalizationlocalization-to-my-app/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/Ke8bjFdD1bc.txt for future video recreation.
-
-Future video outline: connect the model to the forms, replace hard-coded UI data with restaurant and order state, use listeners to drive totals and updates, and close by showing how architecture can emerge incrementally from a once purely visual prototype.
--->

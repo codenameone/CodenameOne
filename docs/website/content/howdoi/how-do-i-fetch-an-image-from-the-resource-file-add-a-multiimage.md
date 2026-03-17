@@ -32,12 +32,6 @@ The older page talks about fetching images from the resource file through the re
 - [How Do I Create A 9 Piece Image Border](/how-do-i/how-do-i-create-a-9-piece-image-border/)
 - [How Do I Improve Application Performance Or Track Down Performance Issues](/how-do-i/how-do-i-improve-application-performance-or-track-down-performance-issues/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/sK-u1TBWFX8.txt for future video recreation.
-
-Future video outline: explain density vs resolution, compare vector and raster assets, show when multi-images are still worth using, and end with a modern recommendation that new projects should prefer vector icons and CSS where possible while keeping raster assets density-aware.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

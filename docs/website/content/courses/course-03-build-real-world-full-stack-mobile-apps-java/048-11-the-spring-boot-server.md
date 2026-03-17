@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 now that we got the mock-up running
 let's jump to the other side of the
 fence and set up the server

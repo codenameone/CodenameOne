@@ -31,9 +31,3 @@ The friend-list refresh change follows the same pattern. Once user state is cach
 - [16. The 'New Post' Form](/courses/course-03-build-real-world-full-stack-mobile-apps-java/093-16-the-new-post-form/)
 - [24. PostService](/courses/course-03-build-real-world-full-stack-mobile-apps-java/101-24-postservice/)
 - [27. Client Side ServerAPI](/courses/course-03-build-real-world-full-stack-mobile-apps-java/104-27-client-side-serverapi/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/AIsD5MXEK-c.txt for future video recreation.
-
-Future video outline: replace mock feed loading with real paged server calls, wire the composer to create actual posts on the backend, discuss why manual refresh is still necessary at this stage, and refresh cached user state so server-side friendship changes appear in the UI.
--->

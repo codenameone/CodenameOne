@@ -32,9 +32,3 @@ The result of this first architecture pass is not a grand framework. It is a cle
 - [Developer Guide](/developer-guide/)
 - [How Do I Use Properties To Speed Development](/how-do-i/how-do-i-use-properties-to-speed-development/)
 - [Connecting to a Web Service](/courses/course-02-deep-dive-mobile-development-with-codename-one/003-connecting-to-a-web-service/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/mFFjxs9EDW8.txt for future video recreation.
-
-Future video outline: explain why the project now needs a real model, extract dishes, orders, menus, and restaurant state from the UI assumptions, and show how a lightweight shared application model makes the next stage of development much easier.
--->

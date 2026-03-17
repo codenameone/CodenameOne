@@ -33,9 +33,3 @@ The simplifications are also sensible. There is no full reactions model yet, and
 - [23. NotificationService and MediaService](/courses/course-03-build-real-world-full-stack-mobile-apps-java/100-23-notificationservice-and-mediaservice/)
 - [29. Newsfeed and Posts From Server](/courses/course-03-build-real-world-full-stack-mobile-apps-java/106-29-newsfeed-and-posts-from-server/)
 - [12. The Newsfeed Container](/courses/course-03-build-real-world-full-stack-mobile-apps-java/089-12-the-newsfeed-container/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/UxATbrfWveU.txt for future video recreation.
-
-Future video outline: explain why profile posts and the newsfeed are different concepts, implement the posting flow that writes into feed records, add comments and likes with permission checks, and connect those operations to notification side effects.
--->

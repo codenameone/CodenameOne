@@ -33,9 +33,3 @@ So the summary of this lesson is that extending a UI from mockup to working app 
 - [How Do I Access Native Device Functionality, Invoke Native Interfaces](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
 - [How Do I Use Properties To Speed Development](/how-do-i/how-do-i-use-properties-to-speed-development/)
 - [How Do I Take A Picture With The Camera](/how-do-i/how-do-i-take-a-picture-with-the-camera/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/a6q1M_wqEYY.txt for future video recreation.
-
-Future video outline: connect the new forms back to model objects, implement the quantity editor and related animations, add map and HTML-backed screens, and finish by showing how the once-static mockup now behaves like a real application.
--->

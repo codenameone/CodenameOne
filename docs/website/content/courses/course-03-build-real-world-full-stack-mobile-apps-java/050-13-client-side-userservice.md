@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 now that we have a server and a mock
 client we need to connect them together
 so we have a working prototype

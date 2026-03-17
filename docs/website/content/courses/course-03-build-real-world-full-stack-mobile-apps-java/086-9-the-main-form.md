@@ -31,9 +31,3 @@ At this stage, the individual containers behind the tabs are still mostly placeh
 - [12. The Newsfeed Container](/courses/course-03-build-real-world-full-stack-mobile-apps-java/089-12-the-newsfeed-container/)
 - [Friends Container](/courses/course-03-build-real-world-full-stack-mobile-apps-java/090-13-friends-container/)
 - [How Do I Create Gorgeous SideMenu](/how-do-i/how-do-i-create-gorgeous-sidemenu/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/q4YjUClRHBk.txt for future video recreation.
-
-Future video outline: define the main tabbed shell, explain why platform-specific tab placement matters, style the search affordance and tab area, and stub the four major sections that the rest of the module will fill in.
--->

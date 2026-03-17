@@ -31,9 +31,3 @@ The note about generic erasure is also useful context here. Java generics feel e
 - [33. Search: Client Side UI - SearchForm](/courses/course-03-build-real-world-full-stack-mobile-apps-java/110-33-search-client-side-ui-searchform/)
 - [27. Client Side ServerAPI](/courses/course-03-build-real-world-full-stack-mobile-apps-java/104-27-client-side-serverapi/)
 - [11. ServerAPI Abstraction Mockup](/courses/course-03-build-real-world-full-stack-mobile-apps-java/088-11-serverapi-abstraction-mockup/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/_WKRuO0Izxg.txt for future video recreation.
-
-Future video outline: expose the search service over HTTP, explain the one-time index rebuild path as operational setup rather than app logic, add generic paged search methods to the client ServerAPI, and discuss why runtime type hints are still needed even when the API looks generic in Java code.
--->

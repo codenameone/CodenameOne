@@ -35,9 +35,3 @@ The lesson is also right to be cautious about the more recursive hierarchy-wide 
 - [Animation Manager, Style Animations and Low Level Animations](/courses/course-03-build-real-world-full-stack-mobile-apps-java/037-animation-manager-style-animations-and-low-level-animations/)
 - [Dish List and Edit](/courses/course-03-build-real-world-full-stack-mobile-apps-java/006-dish-list-and-edit/)
 - [Base Navigation Form and Shape Effects](/courses/course-03-build-real-world-full-stack-mobile-apps-java/005-base-navigation-form-and-shape-effects/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/anfVMvBXXX0.txt for future video recreation.
-
-Future video outline: explain explicit reflow, show the difference between animating into a valid layout and animating out of it, walk through the dish removal example line by line, and close with guidance on when to avoid hierarchy-wide animation helpers.
--->

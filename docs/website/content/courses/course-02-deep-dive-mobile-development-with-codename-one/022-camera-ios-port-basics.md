@@ -32,9 +32,3 @@ So the lesson here is not about becoming an iOS media expert overnight. It is ab
 - [Developer Guide](/developer-guide/)
 - [How Do I Access Native Device Functionality, Invoke Native Interfaces](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
 - [How Do I Use The Include Sources Feature To Debug The Native Code On iOS/Android](/how-do-i/how-do-i-use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/17ISIksjcPM.txt for future video recreation.
-
-Future video outline: explain the iOS camera bridge in terms of permission, session lifecycle, and preview hosting, show how the native view is exposed back to Codename One, and keep the Objective-C details anchored to that higher-level mental model.
--->

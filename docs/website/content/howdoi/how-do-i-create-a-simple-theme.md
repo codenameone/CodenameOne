@@ -39,12 +39,6 @@ Theme constants and other lower-level theme settings still matter, especially wh
 - [Designer](/designer/)
 - [Hello World](/hello-world/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/cxllJwt10VU.txt for future video recreation.
-
-Future video outline: begin with the modern recommendation that styling should usually start in CSS, then use a single custom button style to explain UIIDs, padding, margin, state-specific styling, border precedence, and inheritance. Show how those same concepts map to the underlying theme system without presenting the old designer workflow as the main path for new apps.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

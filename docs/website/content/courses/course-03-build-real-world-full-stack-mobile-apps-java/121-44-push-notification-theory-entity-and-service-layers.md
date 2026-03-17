@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 this is probably the easiest section in
 terms of materials but since push is
 always such a hassle it could possibly

@@ -32,9 +32,3 @@ The practical takeaway is that mobile security should be layered. Protect transp
 - [Developer Guide](/developer-guide/)
 - [Storage Encryption and Misc Security Features](/courses/course-02-deep-dive-mobile-development-with-codename-one/029-storage-encryption-and-misc-security-features/)
 - [How Do I Access Remote Webservices, Perform Operations On The Server](/how-do-i/how-do-i-access-remote-webservices-perform-operations-on-the-server/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/kjUFJro0yUQ.txt for future video recreation.
-
-Future video outline: define the basic security vocabulary, explain layered defense in the context of mobile apps, then introduce certificate pinning as a powerful but operationally expensive protection that should be tied to a real threat model.
--->

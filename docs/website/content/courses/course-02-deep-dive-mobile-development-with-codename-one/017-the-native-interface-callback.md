@@ -32,9 +32,3 @@ So the real takeaway from this lesson is not "copy this payment bridge." It is "
 - [Developer Guide](/developer-guide/)
 - [How Do I Access Native Device Functionality, Invoke Native Interfaces](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
 - [How Do I Use The Include Sources Feature To Debug The Native Code On iOS/Android](/how-do-i/how-do-i-use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/jVuNrLw4e-A.txt for future video recreation.
-
-Future video outline: start from a real native SDK, identify the smallest portable API the app needs, show how callback results are bridged back into Java, and emphasize wrapping the native interface in a clean abstraction rather than exposing it directly to the rest of the app.
--->

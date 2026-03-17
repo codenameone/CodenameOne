@@ -37,12 +37,6 @@ Testing needs a layered approach. First make sure registration succeeds and the 
 - [Build Server](/build-server/)
 - [How Do I Use Crash Protection? Get Device Logs?](/how-do-i/how-do-i-use-crash-protection-get-device-logs/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/8wzBpEp81Kc.txt for future video recreation.
-
-Future video outline: start with the conceptual role of push as a user-notification channel, configure the provider credentials at a high level, implement `PushCallback` in the main class, capture and upload the push token to a backend, send a push from the server, inspect the response, and finish by comparing visible, hidden, and payload-bearing push behavior across platforms.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

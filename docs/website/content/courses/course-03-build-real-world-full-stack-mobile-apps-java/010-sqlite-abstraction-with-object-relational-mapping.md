@@ -30,9 +30,3 @@ So the main lesson here is to persist locally on purpose, behind a small abstrac
 - [Communicating with the Server](/courses/course-02-deep-dive-mobile-development-with-codename-one/025-communicating-with-the-server/)
 - [Integrating SQLite into the Code](/courses/course-03-build-real-world-full-stack-mobile-apps-java/011-integrating-sqlite-into-the-code/)
 - [How Do I Use Storage, File System, SQL](/how-do-i/how-do-i-use-storage-file-system-sql/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/Qw7moLv-dE4.txt for future video recreation.
-
-Future video outline: explain why local persistence improves the app maker, introduce a domain-specific storage abstraction over SQLite, and frame ORM-style mapping as a practical way to reduce boilerplate without making local state the source of truth.
--->

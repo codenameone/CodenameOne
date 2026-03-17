@@ -40,12 +40,6 @@ For deeper debugging, the include-sources workflow is still useful. When native 
 - [Introduction for Android Developers](/introduction-for-android-developers/)
 - [How Do I Use The Include Sources Feature To Debug The Native Code On iOS/Android Etc.](/how-do-i/how-do-i-use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/2xKvvv7XoVQ.txt for future video recreation.
-
-Future video outline: define what "native" means in Codename One, build one small native interface, implement it on Android and iOS, show how `isSupported()` and `NativeLookup` are used, then explain the real-world issues around build hints, native library dependencies, manifest/plist changes, and include-sources debugging.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

@@ -33,9 +33,3 @@ This is one of those small service-layer improvements that pays off all over the
 - [Client Side UserService](/courses/course-03-build-real-world-full-stack-mobile-apps-java/050-13-client-side-userservice/)
 - [Storage, Filesystem and SQL](/courses/course-01-java-for-mobile-devices/010-storage-filesystem-and-sql/)
 - [How Do I Fetch an Image from the Resource File / Add a MultiImage](/how-do-i/how-do-i-fetch-an-image-from-the-resource-file-add-a-multiimage/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/tBBtpdz-JJg.txt for future video recreation.
-
-Future video outline: turn the side menu into real settings navigation, load the avatar asynchronously, explain why sizing and masking belong on the client, and centralize local caching so profile images can be reused across the app.
--->

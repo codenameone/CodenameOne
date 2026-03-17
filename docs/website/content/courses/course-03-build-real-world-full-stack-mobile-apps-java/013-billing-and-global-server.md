@@ -30,9 +30,3 @@ So this section is less about billing forms in isolation and more about how buil
 - [Introduction, Architecture and Authorization](/courses/course-03-build-real-world-full-stack-mobile-apps-java/007-introduction-architecture-and-authorization/)
 - [REST API Design](/courses/course-03-build-real-world-full-stack-mobile-apps-java/008-rest-api-design/)
 - [How Do I Use Properties To Speed Development](/how-do-i/how-do-i-use-properties-to-speed-development/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/Q0fkApAGMZA.txt for future video recreation.
-
-Future video outline: build the billing editor UI, show how its data is mapped into the broader server-facing settings payload, and explain why client editing models and backend contracts often need an explicit translation layer.
--->

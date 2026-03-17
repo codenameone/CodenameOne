@@ -33,12 +33,6 @@ The modern caveat is that new Codename One projects are usually less GUI-builder
 - [How Do I Create A Gorgeous Sidemenu](/how-do-i/how-do-i-create-gorgeous-sidemenu/)
 - [How Do I Create A List Of Items](/how-do-i/how-do-i-create-a-list-of-items-the-easy-way/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/3IC2qZ3wUO4.txt for future video recreation.
-
-Future video outline: explain how the GUI builder generates forms and handlers, show the easiest path for declarative form navigation, add one custom action handler, then populate a generated component from code in the appropriate form lifecycle hook.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

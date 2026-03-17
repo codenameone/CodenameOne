@@ -30,9 +30,3 @@ The important product lesson here is that finishing the app does not mean ignori
 - [How Do I Create A List Of Items The Easy Way](/how-do-i/how-do-i-create-a-list-of-items-the-easy-way/)
 - [Developer Guide](/developer-guide/)
 - [Communicating with the Server](/courses/course-02-deep-dive-mobile-development-with-codename-one/025-communicating-with-the-server/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/GEG_S-dyxaM.txt for future video recreation.
-
-Future video outline: add category-based filtering, wire in a searchable toolbar state, contrast manual search implementation with higher-level framework support, and show how both features improve the usability of a growing menu.
--->

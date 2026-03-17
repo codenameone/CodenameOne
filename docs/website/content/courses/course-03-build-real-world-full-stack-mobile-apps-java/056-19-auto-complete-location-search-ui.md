@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 now that the basic infrastructure is out
 of the way
 we'll start wiring it into the ui

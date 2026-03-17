@@ -34,9 +34,3 @@ The modern recommendation is mostly about choosing the simplest layer that fits 
 - [Developer Guide](/developer-guide/)
 - [How Do I Use Properties To Speed Development](/how-do-i/how-do-i-use-properties-to-speed-development/)
 - [How Do I Improve Application Performance Or Track Down Performance Issues](/how-do-i/how-do-i-improve-application-performance-or-track-down-performance-issues/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/_EXEN52wQvs.txt for future video recreation.
-
-Future video outline: compare `Preferences`, `Storage`, filesystem APIs, and SQLite by use case, then show one small example of each and finish with a decision guide for choosing the simplest persistence layer that actually fits the problem.
--->

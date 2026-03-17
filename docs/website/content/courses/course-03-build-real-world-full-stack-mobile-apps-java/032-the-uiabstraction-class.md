@@ -35,9 +35,3 @@ This kind of abstraction can become overengineered very quickly, so the best thi
 - [The TabletUI Class](/courses/course-03-build-real-world-full-stack-mobile-apps-java/033-the-tabletui-class/)
 - [Putting it all Together](/courses/course-03-build-real-world-full-stack-mobile-apps-java/034-putting-it-all-together/)
 - [Base Navigation Form and Shape Effects](/courses/course-03-build-real-world-full-stack-mobile-apps-java/005-base-navigation-form-and-shape-effects/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/bU6pZPs3uto.txt for future video recreation.
-
-Future video outline: define the responsibilities of UIAbstraction, show how it delegates differently in phone and tablet mode, explain wrapper and decorated containers, and demonstrate how validation and navigation remain stable for the screens built on top of it.
--->

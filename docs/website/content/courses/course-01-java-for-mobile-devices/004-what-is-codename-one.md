@@ -35,9 +35,3 @@ If you are trying to decide whether Codename One is "just Java for mobile", the 
 - [Getting Started](/getting-started/)
 - [Build Server](/build-server/)
 - [Moving To Maven](/blog/moving-to-maven/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/XSztvFzQAr0.txt for future video recreation.
-
-Future video outline: define Codename One in practical terms, separate the API layer from the porting and build layers, explain why lightweight UI matters, update the tooling discussion to Maven and Initializr, and finish with the advantages of versioned application builds.
--->

@@ -30,9 +30,3 @@ So the navigation form in this lesson is important for two reasons. It gives the
 - [Themeing](/themeing/)
 - [Working With CSS](/courses/course-02-deep-dive-mobile-development-with-codename-one/001-working-with-css/)
 - [Architecture of Mockup](/courses/course-03-build-real-world-full-stack-mobile-apps-java/004-architecture-of-mockup/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/xzwq4P9ogoU.txt for future video recreation.
-
-Future video outline: build the reusable navigation shell, show how editable preview text is styled to feel natural, implement the rounded-logo treatment carefully, and explain where CSS should handle most of the styling versus where image masking is still appropriate.
--->

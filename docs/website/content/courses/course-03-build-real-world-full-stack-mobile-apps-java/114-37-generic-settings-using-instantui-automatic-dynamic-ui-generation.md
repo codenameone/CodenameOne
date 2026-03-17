@@ -31,9 +31,3 @@ The unbind-on-exit behavior is another good reminder that generated forms still 
 - [Properties Are Amazing](/blog/properties-are-amazing/)
 - [21. Service Layer and UserService](/courses/course-03-build-real-world-full-stack-mobile-apps-java/098-21-service-layer-and-userservice/)
 - [40. Edit User - UI Binding and Multipart Image Upload](/courses/course-03-build-real-world-full-stack-mobile-apps-java/077-40-edit-user-ui-binding-and-multipart-image-upload/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/hys6Rpkru50.txt for future video recreation.
-
-Future video outline: motivate why profile settings forms become a maintenance problem, use property metadata and InstantUI to generate most of the editor automatically, handle awkward fields like birthdays and constrained choices explicitly, and save the updated model while unbinding cleanly on exit.
--->

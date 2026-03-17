@@ -37,12 +37,6 @@ The modern takeaway is simple: use include-sources when the normal simulator or 
 - [How Do I Debug On An Android Device](/how-do-i/how-do-i-debug-on-an-android-device/)
 - [How Do I Access Native Device Functionality? Invoke Native Interfaces?](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/6oTy-LcTm0s.txt for future video recreation.
-
-Future video outline: explain what include-sources is for, generate a build with source output, open the iOS xcworkspace and the Android Studio project, set one breakpoint in generated framework code on each platform, inspect the native-side stack, and end by showing how the real fix belongs back in the Codename One project or native interface implementation.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

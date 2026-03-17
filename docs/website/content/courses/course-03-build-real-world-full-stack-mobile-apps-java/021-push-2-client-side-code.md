@@ -39,9 +39,3 @@ The lesson also touches on registration failures, and that part is worth updatin
 - [Push 3 - The Server Side and Build Logic](/courses/course-03-build-real-world-full-stack-mobile-apps-java/022-push-3-the-server-side-and-build-logic/)
 - [Push WebSockets Fallback](/courses/course-03-build-real-world-full-stack-mobile-apps-java/024-push-websockets-fallback/)
 - [Push Notifications](/push-notifications/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/BwWhFcHc6LM.txt for future video recreation.
-
-Future video outline: register for push in the main app class, explain the difference between device IDs and push keys, show how mixed user-visible and machine-readable payloads are handled, and end by routing push and fallback transports through the same result-processing code.
--->

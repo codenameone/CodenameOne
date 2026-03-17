@@ -33,9 +33,3 @@ So the practical lesson is simple: if several screens share the same top bar, ba
 - [Layout Basics](/layout-basics/)
 - [Adapting a UI Design](/courses/course-01-java-for-mobile-devices/009-adapting-a-ui-design/)
 - [CSS](/courses/course-02-deep-dive-mobile-development-with-codename-one/006-css/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/aNFKBDeky2s.txt for future video recreation.
-
-Future video outline: explain why a family of screens benefits from a shared base form, build the common top section once, show how layered and filler elements keep content aligned, and then let a subclass inject its own content so the reuse pattern is obvious.
--->

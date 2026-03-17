@@ -34,12 +34,6 @@ The main thing that changed since the video is not the underlying idea but the b
 - [How Do I Positioning Components Using Layout Managers](/how-do-i/how-do-i-positioning-components-using-layout-managers/)
 - [How Do I Improve Application Performance Or Track Down Performance Issues](/how-do-i/how-do-i-improve-application-performance-or-track-down-performance-issues/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/0m7Bay4g93k.txt for future video recreation.
-
-Future video outline: build a small scrollable list with `BoxLayout.y()`, then evolve it into a lazy-loading list with `InfiniteContainer`, placeholders for expensive row content, and a simple search filter that refreshes the visible data set.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

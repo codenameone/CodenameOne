@@ -30,9 +30,3 @@ So this lesson is best read as an anatomy-of-the-platform walkthrough for advanc
 - [Developer Guide](/developer-guide/)
 - [How Do I Get Repeatable Builds, Build Against A Consistent Version Of Codename One & Use The Versioning Feature](/how-do-i/how-do-i-get-repeatable-builds-build-against-a-consistent-version-of-codename-one-use-the-versioning-feature/)
 - [How Do I Use Offline Build](/how-do-i/how-do-i-use-offline-build/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/wqcM8pSOGTY.txt for future video recreation.
-
-Future video outline: frame source builds as an advanced workflow, explain the main platform pieces and repositories, and clarify when direct source work is appropriate versus when the standard build flow remains the better choice.
--->

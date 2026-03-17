@@ -39,9 +39,3 @@ The video also shows WebSocket support being installed through the old settings 
 - [How Do I Use HTTP, Sockets, Webservices & WebSockets](/how-do-i/how-do-i-use-http-sockets-webservices-websockets/)
 - [Connecting to a Web Service](/courses/course-02-deep-dive-mobile-development-with-codename-one/003-connecting-to-a-web-service/)
 - [Push Notifications](/push-notifications/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/FSek5IOQ0IE.txt for future video recreation.
-
-Future video outline: compare polling and WebSockets, show the client connection lifecycle with a proper on-open handshake, bind the connection to the restaurant secret on the server, and publish build completion messages through the socket instead of relying on mobile push delivery.
--->

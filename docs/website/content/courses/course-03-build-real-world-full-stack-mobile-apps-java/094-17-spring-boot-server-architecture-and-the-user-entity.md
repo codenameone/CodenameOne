@@ -33,9 +33,3 @@ The client and server user models are deliberately similar, and that is good. Th
 - [10. Client Data Model - User, Post and Comment](/courses/course-03-build-real-world-full-stack-mobile-apps-java/087-10-client-data-model-user-post-and-comment/)
 - [Introduction to Spring Boot](/courses/course-02-deep-dive-mobile-development-with-codename-one/002-introduction-to-spring-boot/)
 - [Connecting to a Web Service](/courses/course-02-deep-dive-mobile-development-with-codename-one/003-connecting-to-a-web-service/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/iCY64ThCleI.txt for future video recreation.
-
-Future video outline: explain the backend layer split, justify why the server work starts with data modeling, implement the User entity and repository, and discuss why UUID-style public identifiers are a better fit than exposing sequential numeric IDs.
--->

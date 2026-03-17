@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 now that we implemented the model code
 and the lifecycle code we are almost
 finished we are down to ui code and css

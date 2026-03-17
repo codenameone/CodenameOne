@@ -31,9 +31,3 @@ The morph from the splash logo into the next screen’s logo is also a good exam
 - [Transitions](/courses/course-03-build-real-world-full-stack-mobile-apps-java/035-transitions/)
 - [Animation Manager, Style Animations and Low Level Animations](/courses/course-03-build-real-world-full-stack-mobile-apps-java/037-animation-manager-style-animations-and-low-level-animations/)
 - [Creating a Hello World App](/courses/course-01-java-for-mobile-devices/002-creating-a-hello-world-app/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/Rat-FDqDCTU.txt for future video recreation.
-
-Future video outline: justify when a splash screen is actually useful, introduce a UI controller that owns startup navigation, build the splash screen with the project’s logo styling, and finish with a morph into the first real login screen.
--->

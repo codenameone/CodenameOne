@@ -33,9 +33,3 @@ That combination of service hardening and port mapping is the difference between
 - [Starting the Server on Boot](/courses/course-03-build-real-world-full-stack-mobile-apps-java/028-starting-the-server-on-boot/)
 - [Introduction to Spring Boot](/courses/course-02-deep-dive-mobile-development-with-codename-one/002-introduction-to-spring-boot/)
 - [Security Basics and Certificate Pinning](/courses/course-02-deep-dive-mobile-development-with-codename-one/024-security-basics-and-certificate-pinning/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/4jIqplr19HA.txt for future video recreation.
-
-Future video outline: install the required packages, explain why a headless server may still need a virtual framebuffer, harden the database, and map the app to standard web ports without running the Java process as root.
--->

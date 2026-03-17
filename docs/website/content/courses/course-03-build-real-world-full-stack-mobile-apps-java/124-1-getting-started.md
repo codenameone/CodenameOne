@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 in this module we'll build a rudimentary
 whatsapp clone
 i'll take a very different path when

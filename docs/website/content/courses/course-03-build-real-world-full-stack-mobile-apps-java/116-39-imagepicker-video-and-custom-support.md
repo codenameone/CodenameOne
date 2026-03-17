@@ -31,9 +31,3 @@ This is one of those small infrastructure lessons that pays off disproportionall
 - [41. Post Image and Video from NewPostForm](/courses/course-03-build-real-world-full-stack-mobile-apps-java/118-41-post-image-and-video-from-newpostform/)
 - [43. Low Level Camera Integration](/courses/course-03-build-real-world-full-stack-mobile-apps-java/120-43-low-level-camera-integration/)
 - [How Do I Take a Picture with the Camera](/how-do-i/how-do-i-take-a-picture-with-the-camera/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/wp6gqYLD-XM.txt for future video recreation.
-
-Future video outline: refactor the picker into a generic media selector, distinguish the handling of images and videos, add factory paths for pre-captured media, and show how this keeps later gallery and camera features from branching all over the app.
--->

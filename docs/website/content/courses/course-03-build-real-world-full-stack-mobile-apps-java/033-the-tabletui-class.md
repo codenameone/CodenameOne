@@ -33,9 +33,3 @@ The video also shows some duplication between phone-specific and tablet-specific
 - [The UIAbstraction Class](/courses/course-03-build-real-world-full-stack-mobile-apps-java/032-the-uiabstraction-class/)
 - [Putting it all Together](/courses/course-03-build-real-world-full-stack-mobile-apps-java/034-putting-it-all-together/)
 - [How Do I Create Gorgeous SideMenu](/how-do-i/how-do-i-create-gorgeous-sidemenu/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/DyzEgAGyRcA.txt for future video recreation.
-
-Future video outline: build the tablet shell, keep the side menu permanently visible, implement grouped navigation entries, and demonstrate how replacing the center content changes the feel of the whole app.
--->

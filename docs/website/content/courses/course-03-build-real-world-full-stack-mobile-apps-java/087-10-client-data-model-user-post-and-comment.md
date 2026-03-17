@@ -33,9 +33,3 @@ The nested-comment support hinted at in the `Comment` model is also a good sign 
 - [12. The Newsfeed Container](/courses/course-03-build-real-world-full-stack-mobile-apps-java/089-12-the-newsfeed-container/)
 - [Properties Are Amazing](/blog/properties-are-amazing/)
 - [Overview and Basic Model](/courses/course-02-deep-dive-mobile-development-with-codename-one/015-overview-and-basic-model/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/PHb5YO77OQk.txt for future video recreation.
-
-Future video outline: explain why the clone now needs a real client data model, define the User/Post/Comment objects with properties, show how avatar fetching and shaping belongs naturally on the client, and prepare the models for the feed and later server integration.
--->

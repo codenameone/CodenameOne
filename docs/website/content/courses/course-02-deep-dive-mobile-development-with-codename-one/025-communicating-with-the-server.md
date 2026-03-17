@@ -32,9 +32,3 @@ So the practical outcome here is a network layer with sane caching, timestamp-ba
 - [Connecting to a Web Service](/courses/course-02-deep-dive-mobile-development-with-codename-one/003-connecting-to-a-web-service/)
 - [Threading and the EDT](/courses/course-01-java-for-mobile-devices/011-threading-and-the-edt/)
 - [How Do I Access Remote Webservices, Perform Operations On The Server](/how-do-i/how-do-i-access-remote-webservices-perform-operations-on-the-server/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/LUHb5fuWzJE.txt for future video recreation.
-
-Future video outline: define the finish-line mindset for the app, implement a cache-first dish service, add timestamp-based refresh, and show how the UI updates cleanly when the server returns newer data.
--->

@@ -30,9 +30,3 @@ This lesson also reinforces a broader design rule: REST is not about worshipping
 - [Introduction, Architecture and Authorization](/courses/course-03-build-real-world-full-stack-mobile-apps-java/007-introduction-architecture-and-authorization/)
 - [Connecting to a Web Service](/courses/course-02-deep-dive-mobile-development-with-codename-one/003-connecting-to-a-web-service/)
 - [Communicating from the Client](/courses/course-03-build-real-world-full-stack-mobile-apps-java/009-communicating-from-the-client/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/L7ulPCUxIsw.txt for future video recreation.
-
-Future video outline: design the app-maker API around real editing and build workflows, separate file upload from structured updates, explain why build requests should be asynchronous, and use the file-download endpoint to illustrate why path validation matters even for internal-feeling APIs.
--->

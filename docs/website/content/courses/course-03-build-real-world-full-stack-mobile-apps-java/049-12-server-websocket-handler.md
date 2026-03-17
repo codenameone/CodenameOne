@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 continuing the server side code will now
 delve into the location logic
 which maps to the websocket support in

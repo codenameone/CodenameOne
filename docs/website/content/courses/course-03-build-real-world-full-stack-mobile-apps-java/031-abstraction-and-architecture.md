@@ -33,9 +33,3 @@ This is the real benefit of the module. It is not just about making one screen w
 - [The TabletUI Class](/courses/course-03-build-real-world-full-stack-mobile-apps-java/033-the-tabletui-class/)
 - [Putting it all Together](/courses/course-03-build-real-world-full-stack-mobile-apps-java/034-putting-it-all-together/)
 - [Adapting a UI Design](/courses/course-01-java-for-mobile-devices/009-adapting-a-ui-design/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/Dh1bYqiKBQo.txt for future video recreation.
-
-Future video outline: show why a tablet UI cannot just be a scaled phone UI, introduce the single-shell navigation idea, extract the common abstraction away from Form, and use OK/cancel behavior to demonstrate why the abstraction pays off immediately.
--->

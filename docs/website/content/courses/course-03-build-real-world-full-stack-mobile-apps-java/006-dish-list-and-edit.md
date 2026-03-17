@@ -32,9 +32,3 @@ So this lesson is really the first end-to-end content-management interaction in 
 - [Base Navigation Form and Shape Effects](/courses/course-03-build-real-world-full-stack-mobile-apps-java/005-base-navigation-form-and-shape-effects/)
 - [How Do I Create A List Of Items The Easy Way](/how-do-i/how-do-i-create-a-list-of-items-the-easy-way/)
 - [Layout Basics](/layout-basics/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/yv3WXt8o88k.txt for future video recreation.
-
-Future video outline: build the dish grid, explain why create-and-edit is faster than a heavier modal flow, show how the edit screen keeps the image and title central, and tie the control placement back to the preview-first product philosophy.
--->

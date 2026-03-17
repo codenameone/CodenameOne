@@ -31,9 +31,3 @@ The lesson also calls out the orphan-media problem when a user abandons the form
 - [42. Images, Videos and Styled Posts in the Newsfeed](/courses/course-03-build-real-world-full-stack-mobile-apps-java/119-42-images-videos-and-styled-posts-in-the-newsfeed/)
 - [39. ImagePicker - Video and Custom Support](/courses/course-03-build-real-world-full-stack-mobile-apps-java/116-39-imagepicker-video-and-custom-support/)
 - [16. The 'New Post' Form](/courses/course-03-build-real-world-full-stack-mobile-apps-java/093-16-the-new-post-form/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/U0Ms65vcVr4.txt for future video recreation.
-
-Future video outline: split the composer into clearer factory paths for media-aware modes, keep track of attachment IDs and MIME types, disable posting until upload completes, surface upload progress in the UI, and discuss orphaned uploads as a real cleanup concern.
--->

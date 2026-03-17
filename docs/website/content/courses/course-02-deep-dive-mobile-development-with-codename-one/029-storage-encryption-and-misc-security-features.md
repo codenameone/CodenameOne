@@ -30,9 +30,3 @@ So the practical rule for these features is simple: use them when they protect s
 - [Developer Guide](/developer-guide/)
 - [Security Basics and Certificate Pinning](/courses/course-02-deep-dive-mobile-development-with-codename-one/028-security-basics-and-certificate-pinning/)
 - [How Do I Use Crash Protection, Get Device Logs](/how-do-i/how-do-i-use-crash-protection-get-device-logs/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/GMnWMB_JfaQ.txt for future video recreation.
-
-Future video outline: explain local-data threats, show where storage encryption helps and where key management becomes the harder problem, then review screenshot blocking, clipboard controls, and compromised-device detection as additional but limited defensive layers.
--->

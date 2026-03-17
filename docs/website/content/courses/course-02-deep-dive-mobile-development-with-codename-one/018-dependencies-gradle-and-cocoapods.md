@@ -30,9 +30,3 @@ Native dependency management is not glamorous, but it is part of the cost of cro
 - [Developer Guide](/developer-guide/)
 - [How Do I Access Native Device Functionality, Invoke Native Interfaces](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
 - [How Do I Get Repeatable Builds, Build Against A Consistent Version Of Codename One & Use The Versioning Feature](/how-do-i/how-do-i-get-repeatable-builds-build-against-a-consistent-version-of-codename-one-use-the-versioning-feature/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/d1T25sbFUKE.txt for future video recreation.
-
-Future video outline: explain how Android and iOS native SDK dependencies enter a Codename One project, walk through one realistic build failure, show how to find the real version mismatch, and finish with guidance on documenting build hints and avoiding ad hoc artifact patching where possible.
--->

@@ -28,9 +28,3 @@ This is one more reason the normal hosted or standard build flow remains the rig
 - [Developer Guide](/developer-guide/)
 - [Introduction and Setup](/courses/course-02-deep-dive-mobile-development-with-codename-one/033-introduction-and-setup/)
 - [How Do I Use Offline Build](/how-do-i/how-do-i-use-offline-build/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/5eMvwRcDcug.txt for future video recreation.
-
-Future video outline: explain what the Android source-built path is assembling, map Codename One lifecycle expectations onto Android activity setup, and clarify why this workflow is mainly for framework-level understanding rather than normal app development.
--->

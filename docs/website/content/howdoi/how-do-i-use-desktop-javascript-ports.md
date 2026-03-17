@@ -32,12 +32,6 @@ The best way to choose between these ports is not to ask which one is more power
 - [Introduction For Android Developers](/introduction-for-android-developers/)
 - [Hello World](/hello-world/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/hCjmHoktlrU.txt for future video recreation.
-
-Future video outline: explain what the desktop port and JavaScript port each produce, compare packaging, deployment, networking limits, and native-extension options, then close with a simple decision framework for choosing the right target.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

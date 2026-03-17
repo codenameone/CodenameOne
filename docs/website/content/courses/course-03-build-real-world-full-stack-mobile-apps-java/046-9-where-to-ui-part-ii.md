@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 the where2 ui is a pretty big piece of
 the puzzle and it also includes the
 navigation ui

@@ -40,9 +40,3 @@ Once you approach the topic that way, the rest falls into place. Layouts define 
 - [Developer Guide](/developer-guide/)
 - [Layout Basics](/layout-basics/)
 - [Moving To Maven](/blog/moving-to-maven/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/UxZ1HeheGwU.txt for future video recreation.
-
-Future video outline: present CSS as the normal styling workflow from the start, show a simple component styled through CSS, explain how UIIDs and theme layering still work underneath, and then connect that to a realistic modern project where layouts define structure, CSS defines appearance, and localization lives in l10n property bundles instead of the older designer-centered flow.
--->

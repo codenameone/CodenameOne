@@ -34,9 +34,3 @@ So the practical takeaway is this: keep the EDT lean, use threads deliberately, 
 - [Threading and the EDT](/courses/course-01-java-for-mobile-devices/011-threading-and-the-edt/)
 - [What is Performance? Breaking Down the Problem](/courses/course-02-deep-dive-mobile-development-with-codename-one/038-what-is-performance-breaking-down-the-problem/)
 - [How Do I Improve Application Performance Or Track Down Performance Issues](/how-do-i/how-do-i-improve-application-performance-or-track-down-performance-issues/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/85MyytvMS9I.txt for future video recreation.
-
-Future video outline: explain why the EDT must stay responsive, contrast helpful versus harmful background work, show where caching helps and where it creates memory pressure, and use a few real examples to explain form reuse and reclaimable caches.
--->

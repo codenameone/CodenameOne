@@ -34,12 +34,6 @@ The right workflow is to measure first, then optimize. Use the performance tools
 - [How Do I Find Problems In My Application, Using The Codename One Tools And The Standard IDE Tools](/how-do-i/how-do-i-find-problems-in-my-application-using-the-codename-one-tools-and-the-standard-ide-tools/)
 - [In A Pinch](/blog/in-a-pinch/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/set12jVQl_A.txt for future video recreation.
-
-Future video outline: explain how to think about performance in terms of measurable costs, then cover list models, list renderers, text measurement, image scaling, gradients, and memory pressure with concrete examples of what to avoid and what to do instead.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

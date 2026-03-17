@@ -33,12 +33,6 @@ The key point is that crash reporting works best when it is part of a broader lo
 - [How Do I Find Problems In My Application, Using The Codename One Tools And The Standard IDE Tools](/how-do-i/how-do-i-find-problems-in-my-application-using-the-codename-one-tools-and-the-standard-ide-tools/)
 - [How Do I Debug On An Android Device](/how-do-i/how-do-i-debug-on-an-android-device/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/C3PLjAWQ-XA.txt for future video recreation.
-
-Future video outline: explain the role of portable logging, show `Log.p()` and `Log.e()`, bind crash protection during startup, send a manual log for a detected error condition, and compare the development-time and production-time handling of EDT exceptions and user-visible error dialogs.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

@@ -37,9 +37,3 @@ At this stage, the goal is not to send a notification yet. The goal is to leave 
 - [Push 3 - The Server Side and Build Logic](/courses/course-03-build-real-world-full-stack-mobile-apps-java/022-push-3-the-server-side-and-build-logic/)
 - [Push Notifications](/push-notifications/)
 - [Build Hints](/build-hints/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/SBqYZSdIdec.txt for future video recreation.
-
-Future video outline: explain push registration from first principles, show the current Android sender/Firebase setup, walk carefully through iOS push certificates and provisioning, and finish by identifying which values the server-side push lesson will need later.
--->

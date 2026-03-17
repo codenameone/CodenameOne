@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 for this final part we'll cover the ui
 of the client which is relatively simple
 we don't have that many forms but to be

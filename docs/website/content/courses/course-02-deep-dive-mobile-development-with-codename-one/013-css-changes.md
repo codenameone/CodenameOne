@@ -33,9 +33,3 @@ So the right way to think about these CSS changes is not "decorate the new scree
 - [Working With CSS](/courses/course-02-deep-dive-mobile-development-with-codename-one/001-working-with-css/)
 - [CSS](/courses/course-02-deep-dive-mobile-development-with-codename-one/006-css/)
 - [How Do I Create A Simple Theme](/how-do-i/how-do-i-create-a-simple-theme/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/MLbOdCt67Rw.txt for future video recreation.
-
-Future video outline: revisit the existing CSS, extend it for the new forms and side menu, explain the styling overrides needed to tame native defaults, and show how shared style ideas keep the expanded app visually coherent.
--->

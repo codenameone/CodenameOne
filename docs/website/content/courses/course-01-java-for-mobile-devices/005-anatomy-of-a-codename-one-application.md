@@ -36,9 +36,3 @@ So the real anatomy of a Codename One application is simpler than it first appea
 - [Build Server](/build-server/)
 - [Hello World](/hello-world/)
 - [How Do I Get Repeatable Builds, Build Against A Consistent Version Of Codename One & Use The Versioning Feature](/how-do-i/how-do-i-get-repeatable-builds-build-against-a-consistent-version-of-codename-one-use-the-versioning-feature/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/8fxZVc1hw6Q.txt for future video recreation.
-
-Future video outline: start with a current Maven project, identify the application class, configuration files, assets, and generated output, explain what still maps conceptually from the old Ant-based structure, and finish with a short troubleshooting segment on inspecting packaged artifacts and settings.
--->

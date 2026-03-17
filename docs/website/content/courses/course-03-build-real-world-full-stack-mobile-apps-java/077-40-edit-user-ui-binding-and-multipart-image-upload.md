@@ -33,9 +33,3 @@ The warning about unbinding is also important. Once bindings are attached to a g
 - [Properties Are Amazing](/blog/properties-are-amazing/)
 - [Storage, Filesystem and SQL](/courses/course-01-java-for-mobile-devices/010-storage-filesystem-and-sql/)
 - [How Do I Take a Picture with the Camera](/how-do-i/how-do-i-take-a-picture-with-the-camera/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/S1SHZLXQxSI.txt for future video recreation.
-
-Future video outline: bind the edit-account form directly to the user model, save only when leaving the form, explain why bindings must be released, then resize and upload a new avatar with multipart form data while updating the local UI immediately.
--->

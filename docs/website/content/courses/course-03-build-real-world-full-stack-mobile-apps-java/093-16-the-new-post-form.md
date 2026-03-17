@@ -31,9 +31,3 @@ This lesson also shows a useful boundary between content and presentation. The p
 - [10. Client Data Model - User, Post and Comment](/courses/course-03-build-real-world-full-stack-mobile-apps-java/087-10-client-data-model-user-post-and-comment/)
 - [Working with CSS](/courses/course-02-deep-dive-mobile-development-with-codename-one/001-working-with-css/)
 - [Style Customization 1 - Introduction and Basics](/courses/course-03-build-real-world-full-stack-mobile-apps-java/016-style-customization-1-introduction-and-basics/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/0a6mPI412C4.txt for future video recreation.
-
-Future video outline: build the first dedicated post-composer form, explain why it is still text-first at this stage, add a bottom bar of mutually exclusive style choices, and show how style selection changes presentation without changing the underlying post content.
--->

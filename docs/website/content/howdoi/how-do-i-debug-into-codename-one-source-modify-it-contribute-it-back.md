@@ -35,12 +35,6 @@ The real educational value here is that the framework source is not off-limits. 
 - [How Do I Debug On An Android Device](/how-do-i/how-do-i-debug-on-an-android-device/)
 - [How Do I Use The Include Sources Feature To Debug The Native Code On iOS/Android Etc.](/how-do-i/how-do-i-use-the-include-sources-feature-to-debug-the-native-code-on-iosandroid-etc/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/2nD75pODPWk.txt for future video recreation.
-
-Future video outline: check out the relevant Codename One source repositories, wire an application to depend on the source projects instead of jars, step into framework code with the debugger, make one small framework change, verify it locally, then show the fork/push/pull-request flow with a short section on contribution etiquette and ownership.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

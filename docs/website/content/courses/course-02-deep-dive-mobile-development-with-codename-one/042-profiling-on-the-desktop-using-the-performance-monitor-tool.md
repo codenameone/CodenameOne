@@ -32,9 +32,3 @@ The most practical habit from this lesson is the back-of-the-envelope check. If 
 - [What is Performance? Breaking Down the Problem](/courses/course-02-deep-dive-mobile-development-with-codename-one/038-what-is-performance-breaking-down-the-problem/)
 - [How Do I Improve Application Performance Or Track Down Performance Issues](/how-do-i/how-do-i-improve-application-performance-or-track-down-performance-issues/)
 - [Profiling on Devices iOS and Android](/courses/course-02-deep-dive-mobile-development-with-codename-one/043-profiling-on-devices-ios-and-android/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/BY1lMQz873g.txt for future video recreation.
-
-Future video outline: show why profiler data beats intuition, walk through the simulator performance monitor, inspect drawing hierarchy and overdraw, then connect that to desktop CPU and memory profiling with a few simple sanity checks.
--->

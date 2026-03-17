@@ -32,9 +32,3 @@ So the purpose of the style form is not just to expose colors and fonts. It is t
 - [Themeing](/Users/shai/dev/cn1/docs/website/content/themeing.md)
 - [Working With CSS](/Users/shai/dev/cn1/docs/website/content/courses/course-02-deep-dive-mobile-development-with-codename-one/001-working-with-css.md)
 - [Style Customization 2 - The Customization Popup](/Users/shai/dev/cn1/docs/website/content/courses/course-03-build-real-world-full-stack-mobile-apps-java/017-style-customization-2-the-customization-popup.md)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/p05yMCleSLo.txt for future video recreation.
-
-Future video outline: introduce the style editor as a constrained in-context customization tool, explain why unlimited styling freedom is a bad builder experience, and show how temporary edits differ from committed style changes.
--->

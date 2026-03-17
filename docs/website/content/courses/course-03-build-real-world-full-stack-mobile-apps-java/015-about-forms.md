@@ -32,9 +32,3 @@ So the real lesson here is not “how to show HTML.” It is how to give both th
 - [Sidemenu and Preview](/Users/shai/dev/cn1/docs/website/content/courses/course-03-build-real-world-full-stack-mobile-apps-java/014-sidemenu-and-preview.md)
 - [Details, Categories and Validation](/Users/shai/dev/cn1/docs/website/content/courses/course-03-build-real-world-full-stack-mobile-apps-java/012-details-categories-and-validation.md)
 - [Developer Guide](/Users/shai/dev/cn1/docs/website/content/developer-guide.md)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/a7MF3oSCASE.txt for future video recreation.
-
-Future video outline: distinguish the builder's own about page from the generated app's about destination, explain when HTML is acceptable, justify the URL-based approach for the generated app, and show lightweight validation for the configured destination.
--->

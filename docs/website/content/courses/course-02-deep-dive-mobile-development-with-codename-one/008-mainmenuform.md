@@ -33,9 +33,3 @@ By the end of this lesson, the main screen should no longer feel like a set of d
 - [CSS](/courses/course-02-deep-dive-mobile-development-with-codename-one/006-css/)
 - [How Do I Create A List Of Items The Easy Way](/how-do-i/how-do-i-create-a-list-of-items-the-easy-way/)
 - [How Do I Create Gorgeous SideMenu](/how-do-i/how-do-i-create-gorgeous-sidemenu/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/WYlM2utu4Ps.txt for future video recreation.
-
-Future video outline: take the shared base form, add the filter strip and dish cards, explain why the top selector behaves more like a filter than tabs, and show how reusable component-building code keeps the main screen coherent.
--->

@@ -31,9 +31,3 @@ This is another good example of the course finding the right level of product re
 - [19. Post and Comment Entities](/courses/course-03-build-real-world-full-stack-mobile-apps-java/096-19-post-and-comment-entities/)
 - [29. Newsfeed and Posts From Server](/courses/course-03-build-real-world-full-stack-mobile-apps-java/106-29-newsfeed-and-posts-from-server/)
 - [Layout Animations](/courses/course-03-build-real-world-full-stack-mobile-apps-java/036-layout-animations/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/OnZIaGXDZSo.txt for future video recreation.
-
-Future video outline: justify limiting nested replies for usability, build the comments form with fixed input at the bottom, post replies against a parent comment ID, and animate the comment list so new replies slot naturally into the visible thread.
--->

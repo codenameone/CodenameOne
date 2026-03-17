@@ -34,12 +34,6 @@ The broader lesson is that visual styling should be deliberate. Use the right bo
 - [How Do I Create A Simple Theme](/how-do-i/how-do-i-create-a-simple-theme/)
 - [Work With Multi Images And Device Densities](/how-do-i/how-do-i-fetch-an-image-from-the-resource-file-add-a-multiimage/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/ACsZ8qiwR8Q.txt for future video recreation.
-
-Future video outline: explain rendering precedence for borders and backgrounds, show when 9-piece borders are still useful, demonstrate how to cut a good border image, then contrast that workflow with the simpler modern cases where CSS or built-in border types are the better choice.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

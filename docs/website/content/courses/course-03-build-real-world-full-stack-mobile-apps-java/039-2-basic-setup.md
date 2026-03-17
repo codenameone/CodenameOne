@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 let's jump into the code and styling
 with a mock-up of the final application
 but before we begin i'd like to start by

@@ -31,9 +31,3 @@ The main thing to notice about this lesson is how uneventful it feels. That is e
 - [24. PostService](/courses/course-03-build-real-world-full-stack-mobile-apps-java/101-24-postservice/)
 - [23. NotificationService and MediaService](/courses/course-03-build-real-world-full-stack-mobile-apps-java/100-23-notificationservice-and-mediaservice/)
 - [18. Media Entity](/courses/course-03-build-real-world-full-stack-mobile-apps-java/095-18-media-entity/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/h-I62aFYBNA.txt for future video recreation.
-
-Future video outline: map the post and feed operations into straightforward HTTP endpoints, show the multipart upload path for media, explain where MIME-type and binary-response concerns belong, and finish the server transport layer now that the service layer is already stable.
--->

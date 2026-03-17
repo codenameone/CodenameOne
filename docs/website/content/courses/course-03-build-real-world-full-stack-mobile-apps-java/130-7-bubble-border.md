@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 while we are on the subject of theming
 there is one missing piece we neglected
 in the theme css

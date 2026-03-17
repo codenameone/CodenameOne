@@ -35,9 +35,3 @@ Theme constants and other lower-level theme settings still matter, especially wh
 - [Developer Guide](/developer-guide/)
 - [How Do I Create A Simple Theme](/how-do-i/how-do-i-create-a-simple-theme/)
 - [Work With Multi Images And Device Densities](/how-do-i/how-do-i-fetch-an-image-from-the-resource-file-add-a-multiimage/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/cxllJwt10VU.txt for future video recreation.
-
-Future video outline: begin with the modern recommendation that styling should usually start in CSS, then use a single custom button style to explain UIIDs, padding, margin, state-specific styling, border precedence, and inheritance.
--->

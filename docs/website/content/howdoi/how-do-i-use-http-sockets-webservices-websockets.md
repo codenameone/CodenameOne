@@ -36,12 +36,6 @@ The modern decision tree is fairly simple. If you are calling a normal backend A
 - [How Do I Access Remote Webservices? Perform Operations On The Server?](/how-do-i/how-do-i-access-remote-webservices-perform-operations-on-the-server/)
 - [Performance Network Monitors](/performance-network-monitors/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/-M957AAi-vk.txt for future video recreation.
-
-Future video outline: explain mobile networking constraints first, then compare `ConnectionRequest`, lower-level URL APIs, sockets, and WebSockets by use case. Show one HTTP/REST request, one response-handling pattern, and one real-time WebSocket example so the tradeoffs feel concrete.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

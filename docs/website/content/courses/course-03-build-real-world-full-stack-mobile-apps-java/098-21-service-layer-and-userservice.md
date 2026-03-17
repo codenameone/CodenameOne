@@ -33,9 +33,3 @@ The sections on Twilio and Mailgun are partly about tooling, but the more durabl
 - [17. Spring Boot Server Architecture and the User Entity](/courses/course-03-build-real-world-full-stack-mobile-apps-java/094-17-spring-boot-server-architecture-and-the-user-entity/)
 - [20. Notification, Newsfeed and ShadowUser Entities](/courses/course-03-build-real-world-full-stack-mobile-apps-java/097-20-notification-newsfeed-and-shadowuser-entities/)
 - [Push 3 - The Server Side and Build Logic](/courses/course-03-build-real-world-full-stack-mobile-apps-java/022-push-3-the-server-side-and-build-logic/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/QY7josfVbdg.txt for future video recreation.
-
-Future video outline: explain why services are where application intelligence belongs, implement login and signup in UserService, separate safe field copying from security-sensitive state changes, and show how activation-code delivery integrates with external providers through configuration rather than hard-coded secrets.
--->

@@ -33,12 +33,6 @@ The main modern caution is not to over-invest in ornament if the menu is no long
 - [Layout Basics](/layout-basics/)
 - [How Do I Create A Simple Theme](/how-do-i/how-do-i-create-a-simple-theme/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/99DAeP9LG6c.txt for future video recreation.
-
-Future video outline: build a small toolbar side menu with a few commands, add a custom header area, then style the panel, commands, spacing, and selected state using CSS rather than the older designer-centric theme workflow.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

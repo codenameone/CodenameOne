@@ -27,12 +27,6 @@ So while the original Cloud Connect workflow is mostly historical now, the reaso
 - [Themeing](/themeing/)
 - [Hello World](/hello-world/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/NVPIXnkoxv0.txt for future video recreation.
-
-Future video outline: frame Cloud Connect historically as an early rapid-preview workflow, then pivot to the broader lesson of keeping a fast real-device feedback loop while building modern Codename One UIs with code and CSS.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

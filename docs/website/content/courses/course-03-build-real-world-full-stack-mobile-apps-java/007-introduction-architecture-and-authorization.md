@@ -32,9 +32,3 @@ So the broader takeaway is that once the app maker becomes real, the server is n
 - [Server](/courses/course-03-build-real-world-full-stack-mobile-apps-java/001-server/)
 - [REST API Design](/courses/course-03-build-real-world-full-stack-mobile-apps-java/008-rest-api-design/)
 - [Security Basics and Certificate Pinning](/courses/course-02-deep-dive-mobile-development-with-codename-one/028-security-basics-and-certificate-pinning/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/FcHVK9ObONg.txt for future video recreation.
-
-Future video outline: connect the app maker to the existing server, explain the editing trust boundary, introduce the secret-key write model, and frame build requests as asynchronous work rather than ordinary CRUD traffic.
--->

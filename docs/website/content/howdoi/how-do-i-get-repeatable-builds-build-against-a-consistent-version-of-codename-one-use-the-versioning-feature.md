@@ -34,12 +34,6 @@ In practice, the healthiest workflow is to use the current Codename One version 
 - [Developer Guide](/developer-guide/)
 - [How Do I Use Offline Build](/how-do-i/how-do-i-use-offline-build/)
 
-<!--
-Full transcript retained in docs/website/video-transcripts/w7xvlw3rI6Y.txt for future video recreation.
-
-Future video outline: explain why repeatable builds matter, show how to pin a build to a specific Codename One version, compare that with always using the latest build server version, then walk through a regression scenario where versioned builds help isolate whether the breakage came from the app or the framework.
--->
-
 ## Discussion
 
 _Join the conversation via GitHub Discussions._

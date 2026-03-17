@@ -33,9 +33,3 @@ So while the tooling in the video is older and Photoshop-specific, the principle
 - [How Do I Create A 9 Piece Image Border](/how-do-i/how-do-i-create-a-9-piece-image-border/)
 - [How Do I Fetch An Image From The Resource File, Add A Multiimage](/how-do-i/how-do-i-fetch-an-image-from-the-resource-file-add-a-multiimage/)
 - [Adapting a UI Design](/courses/course-01-java-for-mobile-devices/009-adapting-a-ui-design/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/exQ8xXAxtoU.txt for future video recreation.
-
-Future video outline: start from a design file, identify which visual elements should stay as assets, export representative JPEG and PNG examples, explain when a nine-piece border is a better fit, and reinforce the rule that text and interactive structure should stay live in the UI whenever possible.
--->

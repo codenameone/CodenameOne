@@ -33,9 +33,3 @@ The little permission and visibility helpers in this lesson may feel unremarkabl
 - [18. Media Entity](/courses/course-03-build-real-world-full-stack-mobile-apps-java/095-18-media-entity/)
 - [19. Post and Comment Entities](/courses/course-03-build-real-world-full-stack-mobile-apps-java/096-19-post-and-comment-entities/)
 - [Push 3 - The Server Side and Build Logic](/courses/course-03-build-real-world-full-stack-mobile-apps-java/022-push-3-the-server-side-and-build-logic/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/zJ7L5fi60H8.txt for future video recreation.
-
-Future video outline: justify why notifications and media each deserve their own service, persist and page notifications for the client, position the notification service as the future home of push delivery, and enforce authenticated creation plus visibility-aware retrieval in the media service.
--->

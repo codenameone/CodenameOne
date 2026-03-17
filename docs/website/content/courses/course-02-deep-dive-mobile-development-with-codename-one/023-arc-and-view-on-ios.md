@@ -32,9 +32,3 @@ So the point of this lesson is not really ARC trivia for its own sake. It is und
 - [Developer Guide](/developer-guide/)
 - [How Do I Access Native Device Functionality, Invoke Native Interfaces](/how-do-i/how-do-i-access-native-device-functionality-invoke-native-interfaces/)
 - [Camera iOS Port Basics](/courses/course-02-deep-dive-mobile-development-with-codename-one/022-camera-ios-port-basics/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/7G4OkjgTWIQ.txt for future video recreation.
-
-Future video outline: show how the preview UIView and camera layer stay aligned, explain why iOS memory management matters at the bridge boundary, and walk through one reconfiguration example such as changing focus or camera direction.
--->

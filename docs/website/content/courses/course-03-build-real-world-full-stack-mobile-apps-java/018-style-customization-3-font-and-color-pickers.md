@@ -30,9 +30,3 @@ So the real product lesson here is that builder controls should be expressive en
 - [Style Customization 2 - The Customization Popup](/Users/shai/dev/cn1/docs/website/content/courses/course-03-build-real-world-full-stack-mobile-apps-java/017-style-customization-2-the-customization-popup.md)
 - [Themeing](/Users/shai/dev/cn1/docs/website/content/themeing.md)
 - [Working With CSS](/Users/shai/dev/cn1/docs/website/content/courses/course-02-deep-dive-mobile-development-with-codename-one/001-working-with-css.md)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/ZzSCPcnFkxs.txt for future video recreation.
-
-Future video outline: build the constrained color and font pickers, explain why a builder should prioritize reliability over endless option depth, and show how immediate preview keeps the customization process understandable.
--->

@@ -30,9 +30,3 @@ So the common thread in this lesson is simplification through structure. Remove 
 - [Fleshing Out the UI Design](/courses/course-03-build-real-world-full-stack-mobile-apps-java/003-fleshing-out-the-ui-design/)
 - [Billing and Global Server](/courses/course-03-build-real-world-full-stack-mobile-apps-java/013-billing-and-global-server/)
 - [How Do I Use Properties To Speed Development](/how-do-i/how-do-i-use-properties-to-speed-development/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/VCNFKMeud-w.txt for future video recreation.
-
-Future video outline: simplify category handling through autocomplete and implicit creation, add focused validation rules where users edit data, and explain why dedicated detail screens are often clearer than one overloaded settings form.
--->

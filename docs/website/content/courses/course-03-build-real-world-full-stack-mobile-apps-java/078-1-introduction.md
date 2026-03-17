@@ -33,9 +33,3 @@ The architectural hint near the end is also important: a social app carries a hu
 - [Overview and Basic Model](/courses/course-02-deep-dive-mobile-development-with-codename-one/015-overview-and-basic-model/)
 - [Properties Are Amazing](/blog/properties-are-amazing/)
 - [Adapting a UI Design](/courses/course-01-java-for-mobile-devices/009-adapting-a-ui-design/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/S5pAGkV4h4w.txt for future video recreation.
-
-Future video outline: analyze the native Facebook app, compare deep and flat UI flows, explain what the clone will and will not attempt, and connect the product scope to the property-heavy architecture the module will use later.
--->

@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 Uber is a big influence on the mobile
 market
 and a lot of us try to replicate their

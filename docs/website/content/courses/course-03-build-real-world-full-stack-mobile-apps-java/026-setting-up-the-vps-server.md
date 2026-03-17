@@ -35,9 +35,3 @@ This setup step is intentionally unglamorous, but it matters. A backend deployme
 - [Starting the Server on Boot](/courses/course-03-build-real-world-full-stack-mobile-apps-java/028-starting-the-server-on-boot/)
 - [Introduction to Spring Boot](/courses/course-02-deep-dive-mobile-development-with-codename-one/002-introduction-to-spring-boot/)
 - [Corporate Server](/corporate-server/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/PRk7EhXQRqs.txt for future video recreation.
-
-Future video outline: explain why a small VPS is a sensible starting point, provision a Linux server, create a non-root deployment user, install Java cleanly, and set up the machine so the backend can later run like a normal service.
--->

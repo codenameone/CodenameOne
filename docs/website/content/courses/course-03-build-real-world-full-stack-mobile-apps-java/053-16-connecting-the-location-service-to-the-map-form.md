@@ -18,8 +18,6 @@ description: "Watch the lesson and follow the accompanying resources."
 
 ## Transcript
 
-_Transcript source: fetched-manual._
-
 we discussed the location service class
 now let's see how this maps into the ui
 back in the map form we can change the

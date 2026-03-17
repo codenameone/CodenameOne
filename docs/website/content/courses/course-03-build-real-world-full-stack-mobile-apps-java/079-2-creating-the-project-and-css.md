@@ -31,9 +31,3 @@ The CSS details in the lesson are the beginning of a theme system, not just a fe
 - [Working with CSS](/courses/course-02-deep-dive-mobile-development-with-codename-one/001-working-with-css/)
 - [CSS](/courses/course-02-deep-dive-mobile-development-with-codename-one/006-css/)
 - [CSS Changes](/courses/course-02-deep-dive-mobile-development-with-codename-one/013-css-changes/)
-
-<!--
-Full transcript retained in docs/website/video-transcripts/3rLf9A9RYPY.txt for future video recreation.
-
-Future video outline: define what the clone is trying to emulate, create the project, explain why CSS is the right modern styling system for this app, import a focused icon font set, and establish the initial theme rules that later screens will inherit.
--->
