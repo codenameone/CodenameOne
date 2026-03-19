@@ -14,7 +14,7 @@ This effectively means bringing that old "Write Once Run Anywhere" (WORA) Java m
 The things that make Codename One stand out from other tools in this field are:
 
 * Write Once Run Anywhere support with no special hardware requirements and 100% code reuse (((Reuse)))
-* Compiles Java/Kotlin into native code for iOS, UWP (Universal Windows Platform), Android and even JavaScript/PWA
+* Compiles Java/Kotlin into native code for iOS, Android and even JavaScript/PWA
 * Open Source and Free with commercial backing/support
 * Easy to use with 100% portable Drag and Drop GUI builder
 * Full access to underlying native OS capabilities using the native OS programming language (e.g. Objective-C) without compromising portability
@@ -59,7 +59,7 @@ On iOS, Codename One built and open sourced ParparVM, which is a very conservati
 
 NOTE: Codename One translates the bytecode to C which is faster than Swift/Objective-C. The port code that invokes iOS API's is hand coded in Objective-C
 
-For Windows 10 desktop and Mobile support, Codename One uses iKVM to target UWP (Universal Windows Platform) and has open sourced the changes to the original iKVM code.
+Codename One previously offered a UWP (Universal Windows Platform) target based on iKVM. That target was discontinued in release 7.0.229 and is preserved only as historical context in older documentation and blog posts.
 
 JavaScript build targets use TeaVM to do the translation statically. TeaVM provides support for threading using JavaScript by breaking the app down in a rather elaborate way. To support the complex UI Codename One uses the HTML5 Canvas API which allows absolute flexibility for building applications.
 
@@ -94,15 +94,11 @@ The key advantages of ParparVM over other approaches are:
 
 - *Simple and Extensible* -- to work with ParparVM you need a basic understanding of C. This is crucial for the fast moving world of mobile development, as Apple changes things left and right we need a more agile VM.
 
-===== Windows Phone/UWP
+===== Historical Windows Ports
 
-In the past Codename One had 2 major Windows VM port rewrites and 3 or 4 rendering pipelines within those ports (depends on how you would define a "rewrite").
+Codename One experimented with multiple Windows ports over the years, including the legacy Windows Phone target and a later UWP (Universal Windows Platform) target based on iKVM.
 
-NOTE: The old Windows Phone port was deprecated and is no longer supported, the UWP port is the only supported Windows mobile target
-
-Codename One now targets UWP by leveraging a https://github.com/shannah/cn1-ikvm-uwp[modified version of iKVM] to build native Windows Universal Applications.
-
-iKVM uses a bytecode to CLR translation process that effectively converts Java bytecode directly to the .net equivalent. This is paired with a port of the Codename One API's that was built for the UWP environment. The UWP port generates native Windows 10 applications that can support ARM Windows devices natively as well as desktops etc. These binaries can be uploaded directly to Microsofts online store without special processing.
+NOTE: The UWP target was discontinued in release 7.0.229 and is no longer part of the supported build targets. Older references to it in historical material are retained only for archival context.
 
 ===== JavaScript Port
 

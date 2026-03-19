@@ -288,17 +288,6 @@
         </profile>
         <profile>
             <!--
-                For sending Windows UWP builds use:
-                mvn cn:build -P uwp
-            -->
-            <id>uwp</id>
-            <properties>
-                <codename1.targetType>windows</codename1.targetType>
-                <codename1.targetPlatform>win</codename1.targetPlatform>
-            </properties>
-        </profile>
-        <profile>
-            <!--
                 For sending Windows desktop builds use:
                 mvn cn:build -P windows
             -->

@@ -26,8 +26,6 @@ ios::
 . `ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.m`
 android::
 `android/src/main/java/com/mycompany/myapp/MyNativeImpl.java`
-windows (uwp)::
-`win/src/main/csharp/com/mycompany/myapp/MyNativeImpl.cs`
 javascript::
 `javascript/src/main/javascript/com_mycompany_myapp_MyNativeImpl.js`
 

@@ -533,51 +533,6 @@
             </MavenSettings>
             <method v="2" />
         </configuration>
-        <configuration name="Windows Device Build (UWP)" type="MavenRunConfiguration" factoryName="Maven" folderName="Build Server">
-            <MavenSettings>
-                <option name="myGeneralSettings" />
-                <option name="myRunnerSettings">
-                    <MavenRunnerSettings>
-                        <option name="delegateBuildToMaven" value="true" />
-                        <option name="environmentProperties">
-                            <map />
-                        </option>
-                        <option name="jreName" value="#USE_PROJECT_JDK" />
-                        <option name="mavenProperties">
-                            <map>
-                                <entry key="codename1.buildTarget" value="windows-device" />
-                                <entry key="codename1.platform" value="win" />
-                            </map>
-                        </option>
-                        <option name="passParentEnv" value="true" />
-                        <option name="runMavenInBackground" value="true" />
-                        <option name="skipTests" value="true" />
-                        <option name="vmOptions" value="" />
-                    </MavenRunnerSettings>
-                </option>
-                <option name="myRunnerParameters">
-                    <MavenRunnerParameters>
-                        <option name="profiles">
-                            <set />
-                        </option>
-                        <option name="goals">
-                            <list>
-                                <option value="package" />
-                                <option value="-U" />
-                                <option value="-e" />
-                            </list>
-                        </option>
-                        <option name="pomFileName" />
-                        <option name="profilesMap">
-                            <map />
-                        </option>
-                        <option name="resolveToWorkspace" value="false" />
-                        <option name="workingDirPath" value="$PROJECT_DIR$" />
-                    </MavenRunnerParameters>
-                </option>
-            </MavenSettings>
-            <method v="2" />
-        </configuration>
         <configuration name="Xcode iOS Project" type="MavenRunConfiguration" factoryName="Maven" folderName="Local Builds">
             <MavenSettings>
                 <option name="myGeneralSettings" />
@@ -745,7 +700,6 @@
             <item itemvalue="Maven.Javascript Build" />
             <item itemvalue="Maven.Mac Desktop Build" />
             <item itemvalue="Maven.Windows Desktop Build" />
-            <item itemvalue="Maven.Windows Device Build (UWP)" />
             <item itemvalue="Maven.Cross-platform (JavaSE) Desktop App" />
             <item itemvalue="Maven.Xcode iOS Project" />
             <item itemvalue="Maven.Gradle Android Project" />

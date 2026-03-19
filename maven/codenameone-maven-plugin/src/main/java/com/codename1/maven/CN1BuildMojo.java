@@ -49,7 +49,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     /**
      * The build target, corresponding to ANT build targets in build-template.xml.  E.g. javascript,
-     * mac-os-x-desktop, windows-desktop, windows-device, ios-device, ios-device-release, android-device, war
+     * mac-os-x-desktop, windows-desktop, ios-device, ios-device-release, android-device, war
      */
     @Parameter(property = "codename1.buildTarget", required = true, defaultValue = "${codename1.defaultBuildTarget}")
     private String buildTarget;

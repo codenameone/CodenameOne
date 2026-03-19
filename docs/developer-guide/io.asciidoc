@@ -263,7 +263,7 @@ In general SQL seems overly complex for most embedded device programming tasks.
 
 .Portability Of SQLite
 ****
-SQLite is supported on iOS, Android, JavaScript, Desktop/Simulator, and UWP
+SQLite is supported on iOS, Android, JavaScript, and Desktop/Simulator
 builds.  The JavaScript port relies on the browser's WebSQL implementation, so
 it may be unavailable in environments that have already removed that feature.
 

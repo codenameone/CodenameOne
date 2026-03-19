@@ -11,6 +11,8 @@ author: Shai Almog
 
 ![Header Image](/blog/windows-phone-8-1-uwp-support/universal-windows-apps_thumb.jpg)
 
+> **Historical note:** Codename One's UWP target was discontinued in release **7.0.229**. This post is preserved for historical context only, and its build/setup instructions no longer apply to current Codename One projects.
+
 [Fabricio](https://twitter.com/ravnos_kun) just  
 [submitted a pull request](https://github.com/codenameone/CodenameOne/pull/1757) that Steve  
 merged to provide support for Windows Phone 8.1 in our new UWP (Universal Windows Platform) port of Codename One.

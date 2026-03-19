@@ -12,15 +12,6 @@ function windows_desktop() {
     call(MVNW, "package", "-DskipTests", "-Dcodename1.platform=javase", "-Dcodename1.buildTarget=windows-desktop");
 }
 
-function windows_device() {
-    global MVNW;
-    call(MVNW, "package", "-DskipTests", "-Dcodename1.platform=win", "-Dcodename1.buildTarget=windows-device");
-}
-
-function uwp() {
-    global MVNW;
-    windows_device();
-}
 
 function javascript() {
     global MVNW;
@@ -95,8 +86,6 @@ function help() {
     println("  windows_desktop");
     println("    Builds Windows desktop app.");
     println("    *Windows Desktop builds are a Pro user feature.");
-    println("  windows_device");
-    println("    Builds UWP Windows app.");
     println("  javascript");
     println("    Builds as a web app.");
     println("    *Javascript builds are an Enterprise user feature");

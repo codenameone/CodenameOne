@@ -480,7 +480,7 @@ rim.nativeBrowser	true/false defaults to false. Enables the native blackberry br
 |The JVM that should be bundled in the Windows desktop build.  Windows desktop builds only. Supported values: zulu8, zuluFx8, zulu8-32bit, zuluFx8-32bit, zulu11, zuluFx11, zulu11-32bit, zuluFx11-32bit
 
 |windows.extensions
-|Content to be embedded into the `<Extensions>` section of the Package.appxmanifest file for windows (UWP) builds.
+|Historical build hint for the discontinued UWP target. It is retained here only for legacy reference and is not used by current supported build targets.
 
 |win.vm32bit
 |true/false (defaults to false). Forces windows desktop builds to use the Win32 JVM instead of the 64 bit VM making them compatible with older Windows Machines. This is off by default at the moment because of a bug in JDK 8 update 112 that might cause this to fail for some cases

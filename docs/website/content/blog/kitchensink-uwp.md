@@ -11,6 +11,8 @@ author: Shai Almog
 
 ![Header Image](/blog/kitchensink-uwp/kitchensink-sidemenu.png)
 
+> **Historical note:** Codename One's UWP target was discontinued in release **7.0.229**. This post is preserved for historical context only, and its build/setup instructions no longer apply to current Codename One projects.
+
 The latest plugin update includes a new kitchen sink version that includes quite a few bug fixes, enhancements  
 and a new side menu design that looks much better. We also got the demo published on the Windows Store  
 thru the UWP port which isn’t so much a testament to the maturity of the port as much as it is to the limited  

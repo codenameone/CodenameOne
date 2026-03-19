@@ -65,7 +65,7 @@ Let's take minute to go over the three callbacks in our application.
 
 ==== Registration
 
-When your application first opens, it needs to register with the platform's central cloud messaging infrastructure.  On Android this involves a call to their GCM/FCM server; on iOS, the call will be to the APNS server, on Windows (UWP) the call will be to the WNS server.  And so on.  That server will return a unique device ID that can be used to send push notifications to the device.  This device ID will then be passed to your `registeredForPush()` method as the `deviceId` parameter so that you can save it somewhere.  Typically you would send this value to your own web service so that you can use it to send notifications to the device later on.  The device ID will generally not change unless you uninstall and reinstall the app, but you will receive the callback every time the app starts.
+When your application first opens, it needs to register with the platform's central cloud messaging infrastructure.  On Android this involves a call to their GCM/FCM server; on iOS, the call will be to the APNS server. And so on.  That server will return a unique device ID that can be used to send push notifications to the device.  This device ID will then be passed to your `registeredForPush()` method as the `deviceId` parameter so that you can save it somewhere.  Typically you would send this value to your own web service so that you can use it to send notifications to the device later on.  The device ID will generally not change unless you uninstall and reinstall the app, but you will receive the callback every time the app starts.
 
 IMPORTANT: The `deviceId` parameter cannot be used directly when sending push messages via the Codename One push service.  It needs to be prefixed with a platform identifier so the that push server knows which messaging service to route the message through.  You can obtain the complete device ID, including the platform prefix, by calling `Push.getPushKey()`
 
@@ -318,7 +318,7 @@ Rich push notifications refer to push notifications that include functionality a
 
 ==== Image Attachment Support
 
-When you attach an image to a push notification, it will appear as a large image in the push notification on the user's device if that device supports it.  iOS supports image attachments in iOS 10, Android supports them in API 26.  The Javascript port, and Windows (UWP) port do not currently support image attachments.  If a platform that doesn't support image attachments receives a push notification with an image attachment, it will just ignore it.
+When you attach an image to a push notification, it will appear as a large image in the push notification on the user's device if that device supports it.  iOS supports image attachments in iOS 10, Android supports them in API 26.  The Javascript port does not currently support image attachments.  If a platform that doesn't support image attachments receives a push notification with an image attachment, it will just ignore it.
 
 Push type "99" is used to send rich push notifications.  It is sort of a "meta" push type, or a "container", as it can be used to send any of the other push types, but to attach additional content, such as image attachments.
 
@@ -590,53 +590,9 @@ You can read more about the certificate wizard in the https://www.codenameone.co
 You can read more about the certificate wizard in the <<signing-section-top-heading,signing section>>
 ////
 
-[[push-bureaucracy-uwp-section]]
-==== The Push Bureaucracy - UWP (Windows 10)
+==== Historical Note About UWP Push
 
-Push on UWP requires only that you register your app in the Windows Store Dashboard.  You will then be provided with credentials (Package Security Identifier (SID) and a secret key) that you can use to send push notifications to your app.  To begin this process, go to the https://developer.microsoft.com/en-us/windows[Windows Dev Center] and select "Dashboard".
-
-// HTML_ONLY_START
-You can read more about the registering your app in the Windows store https://www.codenameone.com/manual/appendix-uwp.html#building-for-the-windows-store[here].
-// HTML_ONLY_END
-////
-//PDF_ONLY
-You can read more about the registering your app in the Windows store <<building-for-the-windows-store,here>>
-////
-
-Once you have registered your app in the Windows Store, and completed the corresponding setup in Codename One settings (e.g. generated a certificate), you should proceed to configure your app for push notifications.
-
-Navigate to the App overview page for your app inside the Windows store dashboard.  Under the "Services" menu (left side), select "Push notifications".
-
-.Push notifications menu item in Windows Store dashboard
-image::img/windows-store-push-notications-menu.png[Push notifications menu item in Windows Store dashboard,scaledwidth=10%]
-
-Then, select the "WNS/MPNS" option that appears in the left menu under "Push notifications"
-
-.WNS menu item in Windows Store dashboard
-image::img/windows-store-wns-menu-item.png[WNS menu item in Windows Store dashboard,scaledwidth=10%]
-
-This will bring you to a page with information about WNS push notifications.  You'll be interested in the paragraph shown here:
-
-.Live services link
-image::img/wns-live-services-link.png[Live services link,scaledwidth=20%]
-
-Click on the "Live Services Site" link.
-
-You'll be prompted to log in using your Windows Store account.  Then you'll be taken to a page that contains the push credentials that you can use for sending push messages to your app.  You'll be interested in two values:
-
-Package SID.  (It will be of the form "ms-app://XXXXXXXXXXX...")
-
-.WNS Package SID
-image::img/wns-package-id.png[WNS Package SID,scaledwidth=20%]
-
-Client Secret.  This will be listed in a section called "Application Secrets"
-
-.WNS Client secret
-image::img/wns-client-secret.png[WNS Client secret,scaledwidth=20%]
-
-You will use these two values for sending push notifications to your app.
-
-Microsoft provides full instructions on setting up WNS notifications https://msdn.microsoft.com/library/windows/apps/hh465407[here] but much of this is not relevant for Codename One apps.  For Codename One apps, one need only obtain Package Security ID and client secret values for the app.
+The Codename One UWP target was discontinued in release 7.0.229. Older references to WNS setup, Package SID values, and client secrets are preserved only in archived material for teams maintaining legacy code outside the current supported build flow.
 
 [[push-bureaucracy-javascript-section]]
 ==== The Push Bureaucracy - Javascript
@@ -686,13 +642,8 @@ The instructions for extracting the API key for Google are <<push-bureaucracy-an
 private static final String FCM_SERVER_API_KEY = "******************-********************";
 -----
 
-The instructions for extracting the SID and Client Secret for Windows are <<push-bureaucracy-uwp-section,listed above>>.
+Historical UWP push credentials (SID/client secret) were used only by the discontinued UWP target, which was removed in release 7.0.229.
 
-[source,java]
------
-private static final String WNS_SID = "ms-app://**************************************";
-private static final String WNS_CLIENT_SECRET = "*************************";
------
 
 When sending push to iOS devices we have two modes:
 - Production
@@ -775,8 +726,6 @@ We can send a push message as an HTTP `POST` request to https://push.codenameone
 - *production* - `true`/`false` whether to push to production or sandbox environment in iOS - `ITUNES_PRODUCTION_PUSH`
 - *certPassword* - password for the push certificate in iOS push - `ITUNES_DEVELOPMENT_PUSH_CERT_PASSWORD` or `ITUNES_PRODUCTION_PUSH_CERT_PASSWORD`
 - *cert* - http or https URL containing the push certificate for an iOS push - `ITUNES_DEVELOPMENT_PUSH_CERT` or `ITUNES_PRODUCTION_PUSH_CERT`
-- *sid* - The package security ID (SID) for UWP apps.
-- *client_secret* - The client secret for UWP apps.
 
 We can thus send a push from Java EE using code like this:
 

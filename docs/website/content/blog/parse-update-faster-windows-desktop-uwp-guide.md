@@ -11,6 +11,8 @@ author: Shai Almog
 
 ![Header Image](/blog/parse-update-faster-windows-desktop-uwp-guide/universal-windows-apps_thumb.jpg)
 
+> **Historical note:** Codename One's UWP target was discontinued in release **7.0.229**. This post is preserved for historical context only, and its build/setup instructions no longer apply to current Codename One projects.
+
 [Chidiebere Okwudire](https://github.com/sidiabale) of [SMash ICT Solutions](https://www.smash-ict.com/) just  
 released [version 3.0 of the parse4cn1 library](https://github.com/sidiabale/parse4cn1/releases/tag/parse4cn1-3.0).  
 The biggest feature of which is support for the open source Parse server which should work with some of the  

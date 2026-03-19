@@ -171,7 +171,7 @@ paths and curves and caching the shape drawn in the GPU.
 === Device Support
 
 Shapes and transforms ship with all of Codename One's actively maintained ports
-(Android, iOS, JavaScript, desktop/Simulator, and UWP).  Older platforms that
+(Android, iOS, JavaScript, and desktop/Simulator). Older platforms that
 have reached end of life may lack these APIs, so keep the guard code shown below
 if you still target them with legacy builds.
 
@@ -373,7 +373,6 @@ you need a fallback path.
 | JavaScript
 | Yes
 
-| UWP
 | Yes
 |===
 

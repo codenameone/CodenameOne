@@ -109,7 +109,6 @@ if (cnst.isSizeSupported()) {
 | iOS | Limited | Yes | Yes |  No
 | Android | No*  | Yes | Yes | Yes  
 | Simulator/JavaSE | No | No | No |  No
-| UWP | No* | Yes | Yes |  No
 | Javascript (Desktop) | Yes | Yes | Yes |  No
 | Javascript (Android) | Yes | Yes | Yes |  No 
 | Javascript (iOS) | Yes | Yes | Yes |  No

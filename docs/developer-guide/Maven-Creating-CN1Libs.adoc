@@ -223,14 +223,6 @@ If we do a file listing on the project directory, it shows the following:
 ----
 Steves-Mac-Pro:MyFirstLibrary shannah$ find .
 .
-./win
-./win/pom.xml
-./win/src
-./win/src/main
-./win/src/main/csharp
-./win/src/main/csharp/com
-./win/src/main/csharp/com/example
-./win/src/main/csharp/com/example/myfirstlib
 ./tests
 ./tests/pom.xml
 ./tests/javase

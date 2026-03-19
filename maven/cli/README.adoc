@@ -103,11 +103,6 @@ Builds app for Windows.  Uses Codename One build server.
 Windows Desktop builds are a Pro user feature.  https://www.codenameone.com/pricing.html[See pricing].  You can the `jar` command to build your app as a cross-platform desktop app (executable jar).
 ====
 
-windows_device::
-Builds app for Windows devices (.appx i.e. UWP).
-
-uwp::
-Alias of `windows_device`
 
 javascript::
 Builds app as Javascript app (for Web).  Uses Codeame One build server.

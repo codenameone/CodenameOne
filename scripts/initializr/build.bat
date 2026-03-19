@@ -21,16 +21,6 @@ goto :EOF
 !MVNW! package -DskipTests -Dcodename1.platform^=javase -Dcodename1.buildTarget^=windows-desktop -U -e
 
 goto :EOF
-:windows_device
-!MVNW! package -DskipTests -Dcodename1.platform^=win -Dcodename1.buildTarget^=windows-device -U -e
-
-goto :EOF
-:uwp
-set /a _0_%~2=^(1 + %~2^)
-call :windows_device _1_%~2 !_0_%~2!
-echo | set /p ^=!_1_%~2!
-
-goto :EOF
 :javascript
 !MVNW! package -DskipTests -Dcodename1.platform^=javascript -Dcodename1.buildTarget^=javascript -U -e
 
@@ -97,8 +87,6 @@ echo     *Mac OS Desktop builds are a Pro user feature.
 echo   windows_desktop
 echo     Builds Windows desktop app.
 echo     *Windows Desktop builds are a Pro user feature.
-echo   windows_device
-echo     Builds UWP Windows app.
 echo   javascript
 echo     Builds as a web app.
 echo     *Javascript builds are an Enterprise user feature

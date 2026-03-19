@@ -10,14 +10,6 @@ function windows_desktop {
   
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javase" "-Dcodename1.buildTarget=windows-desktop" "-U" "-e"
 }
-function windows_device {
-  
-  "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=win" "-Dcodename1.buildTarget=windows-device" "-U" "-e"
-}
-function uwp {
-  
-  "windows_device" 
-}
 function javascript {
   
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=javascript" "-U" "-e"
@@ -81,8 +73,6 @@ function help {
   "echo" "-e" "  windows_desktop"
   "echo" "-e" "    Builds Windows desktop app."
   "echo" "-e" "    *Windows Desktop builds are a Pro user feature."
-  "echo" "-e" "  windows_device"
-  "echo" "-e" "    Builds UWP Windows app."
   "echo" "-e" "  javascript"
   "echo" "-e" "    Builds as a web app."
   "echo" "-e" "    *Javascript builds are an Enterprise user feature"

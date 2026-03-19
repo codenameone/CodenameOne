@@ -184,26 +184,4 @@ This the Ant build script used by the CN1BuildMojo for sending to the build serv
     </target>
 
 
-
-
-    <target name="windows-device" depends="">
-        <codeNameOne
-                jarFile="${dist.jar}"
-                displayName="${codename1.displayName}"
-                packageName = "${codename1.packageName}"
-                mainClassName = "${codename1.mainName}"
-                version="${codename1.version}"
-                icon="${codename1.icon}"
-                vendor="${codename1.vendor}"
-                subtitle="${codename1.secondaryTitle}"
-
-                certificate="${codename1.windows.certificate}"
-                certPassword="${codename1.windows.certificatePassword}"
-
-                targetType="windows"
-                automated="${automated}"
-        />
-    </target>
-
-
 </project>
