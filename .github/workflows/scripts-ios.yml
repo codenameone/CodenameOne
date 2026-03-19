@@ -1,4 +1,4 @@
-name: Test iOS build scripts
+name: Test iOS UI build scripts
 
 on:
   pull_request:
@@ -131,7 +131,7 @@ jobs:
 
       - name: Build iOS port
         run: ./scripts/build-ios-port.sh -q -DskipTests
-        timeout-minutes: 25
+        timeout-minutes: 40
 
       - name: Build sample iOS app and compile workspace (UIScene on)
         id: build-ios-app-scene
@@ -178,17 +178,6 @@ jobs:
             "" \
             "${{ steps.build-ios-app.outputs.scheme }}"
         timeout-minutes: 30
-
-      - name: Run native iOS notification tests (XCTest)
-        env:
-          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts
-        run: |
-          set -euo pipefail
-          mkdir -p "${ARTIFACTS_DIR}"
-          ./scripts/run-ios-native-tests.sh \
-            "${{ steps.build-ios-app.outputs.workspace }}" \
-            "${{ steps.build-ios-app.outputs.scheme }}"
-        timeout-minutes: 20
 
       - name: Upload iOS artifacts
         if: always()

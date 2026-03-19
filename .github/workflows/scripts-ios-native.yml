@@ -1,55 +1,67 @@
-name: Test iOS packaging
+name: Test iOS native test scripts
 
 on:
   pull_request:
     paths:
-      - '.github/workflows/ios-packaging.yml'
-      - 'maven/codenameone-maven-plugin/**'
-      - 'vm/ByteCodeTranslator/**'
+      - '.github/workflows/scripts-ios-native.yml'
+      - 'scripts/setup-workspace.sh'
+      - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
-      - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
-      - 'scripts/ios/**'
+      - 'scripts/ios/create-shared-scheme.py'
+      - 'scripts/ios/notification-tests/native-tests/**'
+      - 'scripts/ios/notification-tests/install-native-notification-tests.sh'
+      - 'scripts/ios/notification-tests/**'
       - 'scripts/hellocodenameone/**'
+      - 'scripts/templates/**'
+      - '!scripts/templates/**/*.md'
+      - 'CodenameOne/src/**'
+      - '!CodenameOne/src/**/*.md'
+      - 'Ports/iOSPort/**'
+      - '!Ports/iOSPort/**/*.md'
+      - 'vm/**'
+      - '!vm/**/*.md'
+      - 'tests/**'
+      - '!tests/**/*.md'
       - '!docs/**'
+      - 'maven/**'
+      - '!maven/core-unittests/**'
   push:
     branches: [ master ]
     paths:
-      - '.github/workflows/ios-packaging.yml'
-      - 'maven/codenameone-maven-plugin/**'
-      - 'vm/ByteCodeTranslator/**'
+      - '.github/workflows/scripts-ios-native.yml'
+      - 'scripts/setup-workspace.sh'
+      - 'scripts/build-ios-port.sh'
       - 'scripts/build-ios-app.sh'
-      - 'scripts/run-ios-ui-tests.sh'
       - 'scripts/run-ios-native-tests.sh'
-      - 'scripts/ios/**'
+      - 'scripts/ios/create-shared-scheme.py'
+      - 'scripts/ios/notification-tests/native-tests/**'
+      - 'scripts/ios/notification-tests/install-native-notification-tests.sh'
+      - 'scripts/ios/notification-tests/**'
       - 'scripts/hellocodenameone/**'
+      - 'scripts/templates/**'
+      - '!scripts/templates/**/*.md'
+      - 'CodenameOne/src/**'
+      - '!CodenameOne/src/**/*.md'
+      - 'Ports/iOSPort/**'
+      - '!Ports/iOSPort/**/*.md'
+      - 'vm/**'
+      - '!vm/**/*.md'
+      - 'tests/**'
+      - '!tests/**/*.md'
       - '!docs/**'
+      - 'maven/**'
+      - '!maven/core-unittests/**'
 
 jobs:
-  packaging-matrix:
+  native-ios:
     permissions:
       contents: read
     runs-on: macos-15
-    timeout-minutes: 75
-    strategy:
-      fail-fast: false
-      matrix:
-        packaging:
-          - name: pods-only
-            args: >-
-              -Dcodename1.arg.ios.dependencyManager=cocoapods
-              -Dcodename1.arg.ios.pods=AFNetworking
-          - name: spm-only
-            args: >-
-              -Dcodename1.arg.ios.dependencyManager=spm
-              -Dcodename1.arg.ios.spm.packages=swift-collections|https://github.com/apple/swift-collections.git|from:1.1.0
-              -Dcodename1.arg.ios.spm.products.swift-collections=Collections
-          - name: both
-            args: >-
-              -Dcodename1.arg.ios.dependencyManager=both
-              -Dcodename1.arg.ios.pods=AFNetworking
-              -Dcodename1.arg.ios.spm.packages=swift-collections|https://github.com/apple/swift-collections.git|from:1.1.0
-              -Dcodename1.arg.ios.spm.products.swift-collections=Collections
+    timeout-minutes: 65
+    concurrency:
+      group: mac-ci-${{ github.workflow }}-${{ github.ref_name }}
+      cancel-in-progress: true
 
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +71,9 @@ jobs:
           mkdir -p ~/.codenameone
           cp maven/UpdateCodenameOne.jar ~/.codenameone/
           set -euo pipefail
+          if ! command -v ruby >/dev/null; then
+            echo "ruby not found"; exit 1
+          fi
           GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
           export PATH="$GEM_USER_DIR/bin:$PATH"
           gem install cocoapods xcodeproj --no-document --user-install
@@ -100,39 +115,26 @@ jobs:
       - name: Build sample iOS app
         id: build_ios_app
         env:
-          IOS_DEPENDENCY_ARGS: ${{ matrix.packaging.args }}
+          IOS_UISCENE: "false"
         run: ./scripts/build-ios-app.sh -q -DskipTests
         timeout-minutes: 30
 
-      - name: Run iOS UI smoke
+      - name: Run native iOS notification tests (XCTest)
         env:
-          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/${{ matrix.packaging.name }}
-        run: |
-          set -euo pipefail
-          mkdir -p "${ARTIFACTS_DIR}"
-          ./scripts/run-ios-ui-tests.sh \
-            "${{ steps.build_ios_app.outputs.workspace }}" \
-            "" \
-            "${{ steps.build_ios_app.outputs.scheme }}"
-        timeout-minutes: 30
-
-      - name: Run native iOS notification tests
-        if: matrix.packaging.name == 'both'
-        env:
-          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/${{ matrix.packaging.name }}-native
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/native-ios-tests
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
           ./scripts/run-ios-native-tests.sh \
             "${{ steps.build_ios_app.outputs.workspace }}" \
             "${{ steps.build_ios_app.outputs.scheme }}"
-        timeout-minutes: 20
+        timeout-minutes: 25
 
-      - name: Upload packaging artifacts
+      - name: Upload native iOS artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-packaging-${{ matrix.packaging.name }}
+          name: ios-native-tests
           path: artifacts
           if-no-files-found: warn
           retention-days: 14
