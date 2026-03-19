@@ -96,17 +96,22 @@ bia_log "Running HelloCodenameOne Maven build with JAVA_HOME=$JAVA17_HOME"
   export JAVA_HOME="$JAVA17_HOME"
   export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$BASE_PATH"
   MVN_IOS_LOG="$ARTIFACTS_DIR/hellocn1-ios-build.log"
+  MVN_CMD=(
+    ./mvnw package
+    -DskipTests
+    -Dcodename1.platform=ios
+    -Dcodename1.buildTarget=ios-source
+    -Dmaven.compiler.fork=true
+    -Dmaven.compiler.executable="$JAVA17_HOME/bin/javac"
+    -Dcodename1.arg.ios.uiscene="${IOS_UISCENE}"
+    -Dopen=false
+  )
+  if [ ${#EXTRA_IOS_ARGS[@]} -gt 0 ]; then
+    MVN_CMD+=("${EXTRA_IOS_ARGS[@]}")
+  fi
+  MVN_CMD+=(-U -e -X)
   set +e
-  ./mvnw package \
-    -DskipTests \
-    -Dcodename1.platform=ios \
-    -Dcodename1.buildTarget=ios-source \
-    -Dmaven.compiler.fork=true \
-    -Dmaven.compiler.executable="$JAVA17_HOME/bin/javac" \
-    -Dcodename1.arg.ios.uiscene="${IOS_UISCENE}" \
-    -Dopen=false \
-    "${EXTRA_IOS_ARGS[@]}" \
-    -U -e -X > "$MVN_IOS_LOG" 2>&1
+  "${MVN_CMD[@]}" > "$MVN_IOS_LOG" 2>&1
   RC=$?
   set -e
   if [ $RC -ne 0 ]; then
@@ -176,6 +181,24 @@ if [ -f "$PROJECT_DIR/Podfile" ]; then
   echo "CocoaPods Install (Script) : ${POD_TIME}000 ms" >> "$ARTIFACTS_DIR/iphone-builder-stats.txt"
 else
   bia_log "Podfile not found in generated project; skipping pod install"
+fi
+
+WORKSPACE_XML='<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:HelloCodenameOne.xcodeproj">
+   </FileRef>
+</Workspace>'
+if [ ! -d "$PROJECT_DIR/HelloCodenameOne.xcworkspace" ] && [ -d "$PROJECT_DIR/HelloCodenameOne.xcodeproj" ]; then
+  bia_log "Creating fallback xcworkspace for generated Xcode project"
+  mkdir -p "$PROJECT_DIR/HelloCodenameOne.xcworkspace"
+  printf '%s\n' "$WORKSPACE_XML" > "$PROJECT_DIR/HelloCodenameOne.xcworkspace/contents.xcworkspacedata"
+fi
+
+if [ -d "$PROJECT_DIR/HelloCodenameOne.xcodeproj" ]; then
+  bia_log "Ensuring shared Xcode scheme exists"
+  "$REPO_ROOT/scripts/ios/create-shared-scheme.py" "$PROJECT_DIR" HelloCodenameOne
 fi
 
 # Locate workspace or project for the next step

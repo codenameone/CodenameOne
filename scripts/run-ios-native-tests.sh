@@ -47,11 +47,13 @@ PROJECT_DIR="$(cd "$(dirname "$WORKSPACE_PATH")" && pwd)"
 
 ri_log "Injecting native notification tests into project at $PROJECT_DIR"
 "$REPO_ROOT/scripts/ios/notification-tests/install-native-notification-tests.sh" "$PROJECT_DIR"
+"$REPO_ROOT/scripts/ios/create-shared-scheme.py" "$PROJECT_DIR" "$APP_SCHEME"
+"$REPO_ROOT/scripts/ios/create-shared-scheme.py" "$PROJECT_DIR" "$TEST_SCHEME"
 
 ri_log "Discovering simulator destination for test scheme $TEST_SCHEME"
 DESTINATION="$(xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$TEST_SCHEME" -showdestinations 2>/dev/null \
   | sed -n 's/.*{ platform:iOS Simulator,.*id:\([^,}]*\).*/\1/p' \
-  | rg -v "placeholder" \
+  | grep -v "placeholder" \
   | head -n 1 \
   | sed 's#^#platform=iOS Simulator,id=#' || true)"
 if [ -z "$DESTINATION" ]; then

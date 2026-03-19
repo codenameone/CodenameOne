@@ -91,7 +91,7 @@ jobs:
 
       - name: Setup workspace
         run: ./scripts/setup-workspace.sh -q -DskipTests
-        timeout-minutes: 25
+        timeout-minutes: 40
 
       - name: Build iOS port
         run: ./scripts/build-ios-port.sh -q -DskipTests

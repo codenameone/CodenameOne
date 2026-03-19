@@ -370,6 +370,7 @@ fallback_sim_destination() {
 
 
 SIM_DESTINATION="${IOS_SIM_DESTINATION:-}"
+USE_GENERIC_BUILD_DESTINATION="false"
 if [ -z "$SIM_DESTINATION" ]; then
   SELECTED_DESTINATION="$(auto_select_destination || true)"
   if [ -n "${SELECTED_DESTINATION:-}" ]; then
@@ -400,14 +401,20 @@ if [ -z "$SIM_DESTINATION" ]; then
   FALLBACK_DESTINATION="$(fallback_sim_destination || true)"
   if [ -n "${FALLBACK_DESTINATION:-}" ]; then
     SIM_DESTINATION="$FALLBACK_DESTINATION"
+    USE_GENERIC_BUILD_DESTINATION="true"
     ri_log "Using fallback simulator destination '$SIM_DESTINATION'"
   else
     SIM_DESTINATION="platform=iOS Simulator,name=iPhone 16"
+    USE_GENERIC_BUILD_DESTINATION="true"
     ri_log "Falling back to default simulator destination '$SIM_DESTINATION'"
   fi
 fi
 
 SIM_DESTINATION="$(normalize_destination "$SIM_DESTINATION")"
+BUILD_DESTINATION="$SIM_DESTINATION"
+if [ "$USE_GENERIC_BUILD_DESTINATION" = "true" ]; then
+  BUILD_DESTINATION="generic/platform=iOS Simulator"
+fi
 
 # Extract UDID and prefer id-only destination to avoid OS/SDK mismatches
 SIM_UDID="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*id=\([^,]*\).*/\1/p' | tr -d '\r[:space:]')"
@@ -420,7 +427,18 @@ if [ -n "$SIM_UDID" ]; then
   echo "Simulator Boot : $(( (BOOT_END - BOOT_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
   SIM_DESTINATION="id=$SIM_UDID"
 fi
+if [ "$USE_GENERIC_BUILD_DESTINATION" = "true" ]; then
+  ri_log "Building with generic simulator destination '$BUILD_DESTINATION' and running on '$SIM_DESTINATION'"
+else
+  BUILD_DESTINATION="$SIM_DESTINATION"
+fi
 ri_log "Running DeviceRunner on destination '$SIM_DESTINATION'"
+
+HOST_ARCH="$(uname -m 2>/dev/null || echo arm64)"
+case "$HOST_ARCH" in
+  arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+  *) BUILD_ARCH="arm64" ;;
+esac
 
 DERIVED_DATA_DIR="$SCREENSHOT_TMP_DIR/derived"
 rm -rf "$DERIVED_DATA_DIR"
@@ -428,15 +446,26 @@ BUILD_LOG="$ARTIFACTS_DIR/xcodebuild-build.log"
 
 ri_log "Building simulator app with xcodebuild"
 COMPILE_START=$(date +%s)
-if ! xcodebuild \
-  "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" \
-  -scheme "$SCHEME" \
-  -sdk iphonesimulator \
-  -configuration Debug \
-  -destination "$SIM_DESTINATION" \
-  -destination-timeout 120 \
-  -derivedDataPath "$DERIVED_DATA_DIR" \
-  build | tee "$BUILD_LOG"; then
+XCODE_BUILD_CMD=(
+  xcodebuild
+  "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH"
+  -scheme "$SCHEME"
+  -sdk iphonesimulator
+  -configuration Debug
+  -destination "$BUILD_DESTINATION"
+  -destination-timeout 120
+  -derivedDataPath "$DERIVED_DATA_DIR"
+)
+if [ "$USE_GENERIC_BUILD_DESTINATION" = "true" ]; then
+  ri_log "Forcing simulator ARCHS=$BUILD_ARCH for generic build destination"
+  XCODE_BUILD_CMD+=(
+    "ARCHS=$BUILD_ARCH"
+    "ONLY_ACTIVE_ARCH=YES"
+    "EXCLUDED_ARCHS=armv7 armv7s"
+  )
+fi
+XCODE_BUILD_CMD+=(build)
+if ! "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
   ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
   exit 10
 fi

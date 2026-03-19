@@ -1634,9 +1634,11 @@ public class IPhoneBuilder extends Executor {
                     // that the change will work for all builds.  I made it "only" for the cocoapods version
                     // to prevent inadvertent breaking of versioned builds etc...
                     if (runPods) {
-                        replaceAllInFile(pbx, "ARCHS = [^;]+;", "ARCHS = \"\\$(ARCHS_STANDARD_INCLUDING_64_BIT)\";");
+                        replaceAllInFile(pbx, "ARCHS = [^;]+;", "ARCHS = \"\\$(ARCHS_STANDARD)\";");
+                        replaceAllInFile(pbx, "VALID_ARCHS = [^;]+;", "VALID_ARCHS = \"\\$(ARCHS_STANDARD)\";");
                     } else {
-                        replaceInFile(pbx, "ARCHS = armv7;", "ARCHS = \"armv7 arm64\";");
+                        replaceInFile(pbx, "ARCHS = armv7;", "ARCHS = \"\\$(ARCHS_STANDARD)\";");
+                        replaceAllInFile(pbx, "VALID_ARCHS = [^;]+;", "VALID_ARCHS = \"\\$(ARCHS_STANDARD)\";");
                     }
                 }
 
