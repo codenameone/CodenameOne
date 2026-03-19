@@ -11,6 +11,8 @@ author: Steve Hannah
 
 ![Header Image](/blog/cocoapods/cocoapods.png)
 
+_Editor note: CocoaPods remains supported, but current iOS dependency guidance now also covers Swift Package Manager (SPM) and mixed CocoaPods/SPM setups. See the current "Working with iOS" section in the developer guide._
+
 [CocoaPods](https://cocoapods.org/) is a dependency manager for Swift and Objective-C Cocoa projects.  
 It has over eighteen thousand libraries and can help you scale your projects elegantly. Cocoapods can be  
 used in your Codename One project to include native iOS libraries without having to go through the hassle  

@@ -19,8 +19,13 @@ APP_SCHEME="${2:-}"
 TEST_SCHEME="${3:-}"
 
 if [ ! -d "$WORKSPACE_PATH" ]; then
-  ri_log "Workspace not found at $WORKSPACE_PATH" >&2
+  ri_log "Xcode workspace/project not found at $WORKSPACE_PATH" >&2
   exit 3
+fi
+
+XCODE_CONTAINER_FLAG="-workspace"
+if [[ "$WORKSPACE_PATH" == *.xcodeproj ]]; then
+  XCODE_CONTAINER_FLAG="-project"
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,7 +33,11 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 if [ -z "$APP_SCHEME" ]; then
-  APP_SCHEME="$(basename "$WORKSPACE_PATH" .xcworkspace)"
+  if [[ "$WORKSPACE_PATH" == *.xcworkspace ]]; then
+    APP_SCHEME="$(basename "$WORKSPACE_PATH" .xcworkspace)"
+  else
+    APP_SCHEME="$(basename "$WORKSPACE_PATH" .xcodeproj)"
+  fi
 fi
 if [ -z "$TEST_SCHEME" ]; then
   TEST_SCHEME="${APP_SCHEME}Tests"
@@ -40,7 +49,7 @@ ri_log "Injecting native notification tests into project at $PROJECT_DIR"
 "$REPO_ROOT/scripts/ios/notification-tests/install-native-notification-tests.sh" "$PROJECT_DIR"
 
 ri_log "Discovering simulator destination for test scheme $TEST_SCHEME"
-DESTINATION="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$TEST_SCHEME" -showdestinations 2>/dev/null \
+DESTINATION="$(xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$TEST_SCHEME" -showdestinations 2>/dev/null \
   | sed -n 's/.*{ platform:iOS Simulator,.*id:\([^,}]*\).*/\1/p' \
   | rg -v "placeholder" \
   | head -n 1 \
@@ -50,7 +59,7 @@ if [ -z "$DESTINATION" ]; then
 fi
 
 SIMULATOR_ID="$(printf "%s" "$DESTINATION" | sed -n 's/.*id=\([^,]*\).*/\1/p')"
-BUNDLE_ID="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$APP_SCHEME" -showBuildSettings 2>/dev/null \
+BUNDLE_ID="$(xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$APP_SCHEME" -showBuildSettings 2>/dev/null \
   | sed -n 's/^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER = //p' \
   | head -n 1 || true)"
 
@@ -71,7 +80,7 @@ TEST_LOG="$ARTIFACTS_DIR/xcode-native-tests.log"
 ri_log "Running xcodebuild test (scheme=$TEST_SCHEME, destination=$DESTINATION)"
 set +e
 xcodebuild \
-  -workspace "$WORKSPACE_PATH" \
+  "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" \
   -scheme "$TEST_SCHEME" \
   -destination "$DESTINATION" \
   test | tee "$TEST_LOG"

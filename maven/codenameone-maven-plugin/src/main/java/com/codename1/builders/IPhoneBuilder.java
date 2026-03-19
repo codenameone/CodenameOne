@@ -70,6 +70,7 @@ public class IPhoneBuilder extends Executor {
     private boolean detectJailbreak;
 
     private boolean runPods=false;
+    private boolean runSpm=false;
     private boolean photoLibraryUsage;
     private String buildVersion;
     private boolean usesLocalNotifications;
@@ -123,6 +124,38 @@ public class IPhoneBuilder extends Executor {
             }
         }
         return 0;
+    }
+
+    private void ensurePodsInstalled() throws BuildException {
+        if(!new File(pod).exists()) {
+            pod = "/usr/bin/pod";
+            if(!new File(pod).exists()) {
+                pod = "/opt/homebrew/bin/pod";
+                if(!new File(pod).exists()) {
+                    log("You need to install cocoapods to proceed, to install cocoapods on your mac issue this command in the terminal: sudo gem install cocoapods --pre\n"
+                            + "followed by: sudo gem install xcodeproj");
+                    throw new BuildException("Please install Cocoapods in order to use ios.dependencyManager=cocoapods or ios.pods");
+                }
+            }
+        }
+        try {
+            log("Pods version: " + execString(new File("."), pod, "--version"));
+        } catch (Exception ex) {
+            error("Please install Cocoapods in order to build iOS projects with CocoaPods.  E.g. 'sudo gem install cocoapods'.  See https://cocoapods.org/", ex);
+            throw new BuildException("Please install Cocoapods in order to build iOS projects with CocoaPods.  E.g. 'sudo gem install cocoapods'.  See https://cocoapods.org/");
+        }
+    }
+
+    private void ensureXcodeprojInstalled() throws BuildException {
+        try {
+            execString(new File("."), "ruby", "-e", "require 'xcodeproj'; puts Xcodeproj::VERSION");
+        } catch (Exception ex) {
+            throw new BuildException("Please install the xcodeproj Ruby gem to configure iOS Swift packages. E.g. 'sudo gem install xcodeproj'", ex);
+        }
+    }
+
+    private static String escapeRuby(String input) {
+        return input.replace("\\", "\\\\").replace("'", "\\'");
     }
     
     @Override
@@ -220,12 +253,6 @@ public class IPhoneBuilder extends Executor {
         defaultEnvironment.put("LANG", "en_US.UTF-8");
         tmpFile = tmpDir = getBuildDirectory();
         useMetal = "true".equals(request.getArg("ios.metal", "false"));
-        try {
-            log("Pods version: " + execString(new File("."), pod, "--version"));
-        } catch (Exception ex) {
-            error("Please install Cocoapods in order to generate Xcode projects.  E.g. 'sudo gem install cocoapods'.  See https://cocoapods.org/", ex);
-            throw new BuildException("Please install Cocoapods in order to generate Xcode projects.  E.g. 'sudo gem install cocoapods'.  See https://cocoapods.org/");
-        }
         log("Request Args: ");
         log("-----------------");
         for (String arg : request.getArgs()) {
@@ -291,30 +318,15 @@ public class IPhoneBuilder extends Executor {
         }
 
         String facebookAppId = request.getArg("facebook.appId", null);
-        if(!new File(pod).exists()) {
-            pod = "/usr/bin/pod";
-            if(!new File(pod).exists()) {
-                pod = "/opt/homebrew/bin/pod";
-                if(!new File(pod).exists()) {
-                    log("You need to install cocoapods to proceed, to install cocoapods on your mac issue this command in the terminal: sudo gem install cocoapods --pre\n"
-                            + "followed by: sudo gem install xcodeproj");
-                    return false;
-                }
-            }
-        }
-        
         boolean usePodsForFacebook = !request.getArg("ios.facebook.usePods", "true").equals("false") && facebookAppId != null && facebookAppId.length() > 0;
         if (usePodsForFacebook) {
             String fbPodsVersion = request.getArg("ios.facebook.version", "~>5.6.0");
             addMinDeploymentTarget("10.0");
             iosPods += (((iosPods.length() > 0) ? ",":"") + "FBSDKCoreKit "+fbPodsVersion+",FBSDKLoginKit "+fbPodsVersion+",FBSDKShareKit "+fbPodsVersion);
         }
-        
-        runPods = true;
-        
-        
+
         String googleAdUnitId = request.getArg("ios.googleAdUnitId", request.getArg("google.adUnitId", null));
-        boolean usePodsForGoogleAds = runPods && googleAdUnitId != null && googleAdUnitId.length() > 0;
+        boolean usePodsForGoogleAds = googleAdUnitId != null && googleAdUnitId.length() > 0;
         if (usePodsForGoogleAds) {
             iosPods += (((iosPods.length() > 0) ? ",":"") + "Firebase/Core,Firebase/AdMob");
             addMinDeploymentTarget("7.0");
@@ -324,6 +336,17 @@ public class IPhoneBuilder extends Executor {
         }
         if (enableWKWebView) {
             addMinDeploymentTarget("8.0");
+        }
+
+        IOSDependencyConfig dependencyConfig = IOSDependencyManager.resolve(request, iosPods);
+        iosPods = dependencyConfig.iosPods;
+        runPods = dependencyConfig.usesCocoaPods();
+        runSpm = dependencyConfig.usesSwiftPackages();
+        if (runPods) {
+            ensurePodsInstalled();
+        }
+        if (runSpm) {
+            ensureXcodeprojInstalled();
         }
 
         debug("Xcode version is "+xcodeVersion);
@@ -1980,6 +2003,14 @@ public class IPhoneBuilder extends Executor {
                 stopwatch.split("CocoaPods");
             }
 
+            if (runSpm) {
+                configureSwiftPackages(request, dependencyConfig);
+                if (!runPods) {
+                    ensureTopLevelWorkspace(request);
+                }
+                stopwatch.split("SwiftPM");
+            }
+
             try {
 
 
@@ -2040,6 +2071,111 @@ public class IPhoneBuilder extends Executor {
 
     public File getXcodeProjectDir() {
         return xcodeProjectDir;
+    }
+
+    private void configureSwiftPackages(BuildRequest request, IOSDependencyConfig dependencyConfig) throws BuildException {
+        if (!dependencyConfig.usesSwiftPackages()) {
+            return;
+        }
+        File hooksDir = new File(tmpFile, "hooks");
+        hooksDir.mkdir();
+        File configFile = new File(hooksDir, "configure_swift_packages.rb");
+        StringBuilder script = new StringBuilder();
+        script.append("#!/usr/bin/env ruby\n")
+                .append("require 'xcodeproj'\n")
+                .append("project_file = '").append(escapeRuby(new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj").getAbsolutePath())).append("'\n")
+                .append("xcproj = Xcodeproj::Project.open(project_file)\n")
+                .append("target = xcproj.targets.find { |t| t.name == '").append(escapeRuby(request.getMainClass())).append("' }\n")
+                .append("abort('Unable to find app target ").append(escapeRuby(request.getMainClass())).append("') unless target\n");
+        for (SwiftPackageSpec spec : dependencyConfig.swiftPackages) {
+            script.append("package_ref = xcproj.root_object.package_references.find { |pkg| pkg.respond_to?(:repositoryURL) && pkg.repositoryURL == '")
+                    .append(escapeRuby(spec.url)).append("' }\n")
+                    .append("if package_ref.nil?\n")
+                    .append("  package_ref = xcproj.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)\n")
+                    .append("  package_ref.repositoryURL = '").append(escapeRuby(spec.url)).append("'\n")
+                    .append("  package_ref.requirement = ").append(toRubyRequirement(spec.requirement)).append("\n")
+                    .append("  xcproj.root_object.package_references << package_ref\n")
+                    .append("end\n");
+            for (String product : spec.products) {
+                script.append("product_dep = target.package_product_dependencies.find { |dep| dep.product_name == '")
+                        .append(escapeRuby(product)).append("' }\n")
+                        .append("if product_dep.nil?\n")
+                        .append("  product_dep = xcproj.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)\n")
+                        .append("  product_dep.package = package_ref\n")
+                        .append("  product_dep.product_name = '").append(escapeRuby(product)).append("'\n")
+                        .append("  target.package_product_dependencies << product_dep\n")
+                        .append("end\n")
+                        .append("unless target.frameworks_build_phase.files_references.any? { |ref| ref.respond_to?(:display_name) && ref.display_name == '")
+                        .append(escapeRuby(product)).append("' }\n")
+                        .append("  build_file = xcproj.new(Xcodeproj::Project::Object::PBXBuildFile)\n")
+                        .append("  build_file.product_ref = product_dep\n")
+                        .append("  target.frameworks_build_phase.files << build_file\n")
+                        .append("end\n");
+            }
+        }
+        script.append("xcproj.save\n");
+        try {
+            createFile(configFile, script.toString().getBytes(StandardCharsets.UTF_8));
+            exec(hooksDir, "chmod", "0755", configFile.getAbsolutePath());
+            if (!exec(hooksDir, configFile.getAbsolutePath())) {
+                throw new BuildException("Failed to configure Swift Package Manager dependencies for generated Xcode project");
+            }
+        } catch (BuildException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BuildException("Failed to configure Swift Package Manager dependencies for generated Xcode project", ex);
+        }
+    }
+
+    private String toRubyRequirement(String requirement) throws BuildException {
+        if (requirement.startsWith("from:")) {
+            String min = requirement.substring("from:".length()).trim();
+            return "{ 'kind' => 'upToNextMajorVersion', 'minimumVersion' => '" + escapeRuby(min) + "' }";
+        }
+        if (requirement.startsWith("exact:")) {
+            String version = requirement.substring("exact:".length()).trim();
+            return "{ 'kind' => 'exactVersion', 'version' => '" + escapeRuby(version) + "' }";
+        }
+        if (requirement.startsWith("branch:")) {
+            String branch = requirement.substring("branch:".length()).trim();
+            return "{ 'kind' => 'branch', 'branch' => '" + escapeRuby(branch) + "' }";
+        }
+        if (requirement.startsWith("revision:")) {
+            String revision = requirement.substring("revision:".length()).trim();
+            return "{ 'kind' => 'revision', 'revision' => '" + escapeRuby(revision) + "' }";
+        }
+        if (requirement.startsWith("range:")) {
+            String[] bounds = requirement.substring("range:".length()).trim().split("\\.\\.<");
+            if (bounds.length != 2) {
+                throw new BuildException("Invalid SPM range requirement '" + requirement + "'");
+            }
+            return "{ 'kind' => 'versionRange', 'minimumVersion' => '" + escapeRuby(bounds[0].trim()) + "', 'maximumVersion' => '" + escapeRuby(bounds[1].trim()) + "' }";
+        }
+        throw new BuildException("Unsupported SPM requirement '" + requirement + "'");
+    }
+
+    private void ensureTopLevelWorkspace(BuildRequest request) throws BuildException {
+        File distDir = new File(tmpFile, "dist");
+        File workspaceDir = new File(distDir, request.getMainClass() + ".xcworkspace");
+        if (workspaceDir.exists()) {
+            return;
+        }
+        if (!workspaceDir.mkdirs() && !workspaceDir.isDirectory()) {
+            throw new BuildException("Failed to create workspace directory " + workspaceDir.getAbsolutePath());
+        }
+        File workspaceData = new File(workspaceDir, "contents.xcworkspacedata");
+        String contents = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                "<Workspace\n" +
+                "   version = \"1.0\">\n" +
+                "   <FileRef\n" +
+                "      location = \"group:" + request.getMainClass() + ".xcodeproj\">\n" +
+                "   </FileRef>\n" +
+                "</Workspace>\n";
+        try {
+            createFile(workspaceData, contents.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException ex) {
+            throw new BuildException("Failed to create workspace metadata at " + workspaceData.getAbsolutePath(), ex);
+        }
     }
 
     private void appendFilesToXcodeProjGroup(StringBuilder sb, File dir, String serviceGroupVarName, String serviceTargetVarName, File baseDir) {

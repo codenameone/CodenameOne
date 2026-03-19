@@ -28,7 +28,7 @@ These are unresolved questions, but we are poised to find out their answers, as 
 
 ### iOS Builds
 
-The Local iOS build target generates an Xcode project that you can open and build directly in Xcode. This target necessarily requires a Mac with Xcode and cocoapods installed. See [Building for iOS](https://shannah.github.io/cn1-maven-archetypes/cn1app-archetype-tutorial/getting-started.html#ios) from [this tutorial](https://shannah.github.io/cn1-maven-archetypes/cn1app-archetype-tutorial/getting-started.html) for more information.
+The Local iOS build target generates an Xcode project that you can open and build directly in Xcode. This target requires a Mac with Xcode installed. CocoaPods is only required for CocoaPods-based builds; projects that use Swift Package Manager use the normal Apple toolchain instead. See the current "Working with iOS" section in the developer guide and [Building for iOS](https://shannah.github.io/cn1-maven-archetypes/cn1app-archetype-tutorial/getting-started.html#ios) for more information.
 
 ![intellij-build-ios-project](https://www.codenameone.com/wp-content/uploads/2021/04/intellij-build-ios-project.png)
 

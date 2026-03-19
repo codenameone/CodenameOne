@@ -11,6 +11,8 @@ author: Shai Almog
 
 ![Header Image](/blog/tip-use-ios-cocoapods-dependencies-native-code/tip.jpg)
 
+_Editor note: This post is still valid for CocoaPods, but current iOS dependency setup also supports Swift Package Manager (SPM). See the current "Working with iOS" section in the developer guide._
+
 Last week I talked about [using gradle dependencies](/blog/tip-use-android-gradle-dependencies-native-code.html) to build native code, this week I’ll talk about the iOS equivalent: CocoaPods. We’ve [discussed CocoaPods before](/blog/cocoapods.html) but this bares repeating especially in the context of a specific cn1lib like [intercom](/blog/intercom-support.html).
 
 CocoaPods allow us to add a native library dependency to iOS far more easily than Gradle. However, I did run into a caveat with target OS versioning. By default we target iOS 7.0 or newer which is supported by Intercom only for older versions of the library. Annoyingly CocoaPods seemed to work, to solve this we had to explicitly define the build hint `ios.pods.platform=8.0` to force iOS 8 or newer.

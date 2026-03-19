@@ -919,6 +919,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         return new File(xcprojectRoot, props.getProperty("codename1.mainName")+".xcworkspace");
     }
 
+    private File getXcodeProject(Properties props, File xcprojectRoot) {
+        return new File(xcprojectRoot, props.getProperty("codename1.mainName")+".xcodeproj");
+    }
+
+    private File getWorkspaceOrProject(Properties props, File xcprojectRoot) {
+        File workspace = getWorkspace(props, xcprojectRoot);
+        if (workspace.exists()) {
+            return workspace;
+        }
+        return getXcodeProject(props, xcprojectRoot);
+    }
+
     private void openWorkspace(File workspace) throws MojoExecutionException {
         try {
             ProcessBuilder pb = new ProcessBuilder("open", workspace.getAbsolutePath());
@@ -944,8 +956,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     if (getSourcesModificationTime() <= lastModifiedRecursive(generatedProject)) {
                         getLog().info("Sources have not changed.  Skipping Xcode project generation");
                         if (open) {
-                            getLog().info("Opening workspace project "+getWorkspace(props, generatedProject));
-                            openWorkspace(getWorkspace(props, generatedProject));
+                            File projectToOpen = getWorkspaceOrProject(props, generatedProject);
+                            getLog().info("Opening Xcode project "+projectToOpen);
+                            openWorkspace(projectToOpen);
                         }
                         return;
 
@@ -1035,8 +1048,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 }
                 if (open) {
 
-                    getLog().info("Opening workspace project "+getWorkspace(props, output));
-                    openWorkspace(getWorkspace(props, output));
+                    File projectToOpen = getWorkspaceOrProject(props, output);
+                    getLog().info("Opening Xcode project "+projectToOpen);
+                    openWorkspace(projectToOpen);
 
                 }
             }

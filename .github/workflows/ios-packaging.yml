@@ -1,0 +1,138 @@
+name: Test iOS packaging
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ios-packaging.yml'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'vm/ByteCodeTranslator/**'
+      - 'scripts/build-ios-app.sh'
+      - 'scripts/run-ios-ui-tests.sh'
+      - 'scripts/run-ios-native-tests.sh'
+      - 'scripts/ios/**'
+      - 'scripts/hellocodenameone/**'
+      - '!docs/**'
+  push:
+    branches: [ master ]
+    paths:
+      - '.github/workflows/ios-packaging.yml'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'vm/ByteCodeTranslator/**'
+      - 'scripts/build-ios-app.sh'
+      - 'scripts/run-ios-ui-tests.sh'
+      - 'scripts/run-ios-native-tests.sh'
+      - 'scripts/ios/**'
+      - 'scripts/hellocodenameone/**'
+      - '!docs/**'
+
+jobs:
+  packaging-matrix:
+    permissions:
+      contents: read
+    runs-on: macos-15
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        packaging:
+          - name: pods-only
+            args: >-
+              -Dcodename1.arg.ios.dependencyManager=cocoapods
+              -Dcodename1.arg.ios.pods=AFNetworking
+          - name: spm-only
+            args: >-
+              -Dcodename1.arg.ios.dependencyManager=spm
+              -Dcodename1.arg.ios.spm.packages=swift-collections|https://github.com/apple/swift-collections.git|from:1.1.0
+              -Dcodename1.arg.ios.spm.products.swift-collections=Collections
+          - name: both
+            args: >-
+              -Dcodename1.arg.ios.dependencyManager=both
+              -Dcodename1.arg.ios.pods=AFNetworking
+              -Dcodename1.arg.ios.spm.packages=swift-collections|https://github.com/apple/swift-collections.git|from:1.1.0
+              -Dcodename1.arg.ios.spm.products.swift-collections=Collections
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure CocoaPods tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          gem install cocoapods xcodeproj --no-document --user-install
+          pod --version
+
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: |
+          set -euo pipefail
+          echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v4
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
+      - name: Setup workspace
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+        timeout-minutes: 25
+
+      - name: Build iOS port
+        run: ./scripts/build-ios-port.sh -q -DskipTests
+        timeout-minutes: 25
+
+      - name: Build sample iOS app
+        id: build_ios_app
+        env:
+          IOS_DEPENDENCY_ARGS: ${{ matrix.packaging.args }}
+        run: ./scripts/build-ios-app.sh -q -DskipTests
+        timeout-minutes: 30
+
+      - name: Run iOS UI smoke
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/${{ matrix.packaging.name }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+          ./scripts/run-ios-ui-tests.sh \
+            "${{ steps.build_ios_app.outputs.workspace }}" \
+            "" \
+            "${{ steps.build_ios_app.outputs.scheme }}"
+        timeout-minutes: 30
+
+      - name: Run native iOS notification tests
+        if: matrix.packaging.name == 'both'
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/${{ matrix.packaging.name }}-native
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+          ./scripts/run-ios-native-tests.sh \
+            "${{ steps.build_ios_app.outputs.workspace }}" \
+            "${{ steps.build_ios_app.outputs.scheme }}"
+        timeout-minutes: 20
+
+      - name: Upload packaging artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-packaging-${{ matrix.packaging.name }}
+          path: artifacts
+          if-no-files-found: warn
+          retention-days: 14

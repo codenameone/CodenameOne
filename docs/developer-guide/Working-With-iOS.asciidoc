@@ -192,6 +192,8 @@ However, it seems that Apple will reject your app if you just include that and d
 
 === Using Cocoapods
 
+NOTE: CocoaPods remains fully supported, but it is no longer the only supported iOS dependency path. Swift Package Manager (SPM) is also supported. The current guidance is documented in this section.
+
 https://cocoapods.org/[CocoaPods] is a dependency manager for Swift and Objective-C Cocoa projects. It has over eighteen thousand libraries and can help you scale your projects elegantly.  Cocoapods can be used in your Codename One project to include native iOS libraries without having to go through the hassle of bundling the actual library into your project.  Rather than bundling .h and .a files in your ios/native directory, you can specify which "pods" your app uses via the `ios.pods` build hint.  (There are other build hints also if you need more advanced features).
 
 **Examples**
@@ -251,6 +253,22 @@ ios.pods=GoogleMaps
 ----
 
 (Note that the `ios.pods.sources` directive is optional).
+
+=== Using Swift Package Manager
+
+Swift Package Manager can be used as an alternative to CocoaPods for remote Swift package dependencies on iOS.  Select the dependency path with `ios.dependencyManager`.  Supported values are `auto`, `cocoapods`, `spm`, and `both`.
+
+For an SPM-only configuration, declare the packages in `ios.spm.packages` using the format `<identity>|<url>|<requirement>` and then declare the products to link using `ios.spm.products.<identity>`.
+
+----
+ios.dependencyManager=spm
+ios.spm.packages=swift-collections|https://github.com/apple/swift-collections.git|from:1.1.0
+ios.spm.products.swift-collections=Collections
+----
+
+Supported requirement formats are `from:`, `exact:`, `branch:`, `revision:`, and `range:`.
+
+`ios.dependencyManager=auto` preserves backward compatibility.  Existing projects with only `ios.pods` continue to use CocoaPods.  Projects with only `ios.spm.*` use SPM.  If both hint families are present, both are applied.
 
 === Including Dynamic Frameworks
 

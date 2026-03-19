@@ -645,7 +645,7 @@ Codename One supports debugging applications on devices by using the natively ge
 
 In iOS this is usually strait forward, just open the project with xcode and run it optionally disabling bitcode. Unzip the .bz2 file and open the `.xcworkspace` file if it's available otherwise open the `.xcodeproj` file inside the `dist` directory.
 
-IMPORTANT: Only the `.xcworkspace` if it is there, it is activated by the CocoaPods build pipeline so it won't always be there
+IMPORTANT: The `.xcworkspace` is no longer exclusive to CocoaPods-based builds.  Use it whenever it is generated, whether the project uses CocoaPods, Swift Package Manager, or both.
 
 With Android Studio this is sometimes as very easy task as it is possible to actually open the gradle project in Android Studio and just run it. However, due to the fragile nature of the gradle project this stopped working for some builds and has been "flaky".
 
