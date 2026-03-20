@@ -3,6 +3,9 @@
 #include <ctype.h>
 #include <assert.h>
 #include <errno.h>
+#include <time.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifndef MAX
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
@@ -1627,6 +1630,236 @@ JAVA_OBJECT java_util_Locale_getOSLanguage___R_java_lang_String(CODENAME_ONE_THR
     return language;
 #else
     return newStringFromCString(threadStateData, "en");
+#endif
+}
+
+#if !defined(__APPLE__) || !defined(__OBJC__)
+static char* cn1_strdup(const char* value) {
+    if (value == NULL) {
+        return NULL;
+    }
+    size_t len = strlen(value);
+    char* out = (char*)malloc(len + 1);
+    if (out != NULL) {
+        memcpy(out, value, len + 1);
+    }
+    return out;
+}
+
+static void cn1_with_timezone(const char* zoneId, void (*func)(void*), void* ctx) {
+    char* original = cn1_strdup(getenv("TZ"));
+    if (zoneId != NULL && strlen(zoneId) > 0) {
+        setenv("TZ", zoneId, 1);
+    } else {
+        unsetenv("TZ");
+    }
+    tzset();
+    func(ctx);
+    if (original != NULL) {
+        setenv("TZ", original, 1);
+        free(original);
+    } else {
+        unsetenv("TZ");
+    }
+    tzset();
+}
+
+typedef struct {
+    int year;
+    int month;
+    int day;
+    int millis;
+    int result;
+} cn1_timezone_offset_ctx;
+
+static void cn1_compute_timezone_offset(void* data) {
+    cn1_timezone_offset_ctx* ctx = (cn1_timezone_offset_ctx*)data;
+    struct tm tmv;
+    memset(&tmv, 0, sizeof(tmv));
+    tmv.tm_year = ctx->year - 1900;
+    tmv.tm_mon = ctx->month - 1;
+    tmv.tm_mday = ctx->day;
+    tmv.tm_hour = ctx->millis / 3600000;
+    tmv.tm_min = (ctx->millis / 60000) % 60;
+    tmv.tm_sec = (ctx->millis / 1000) % 60;
+    tmv.tm_isdst = -1;
+    time_t epoch = mktime(&tmv);
+    struct tm resolved;
+    localtime_r(&epoch, &resolved);
+#ifdef __USE_MISC
+    ctx->result = (int)resolved.tm_gmtoff * 1000;
+#else
+    ctx->result = 0;
+#endif
+}
+
+typedef struct {
+    long long millis;
+    int result;
+} cn1_timezone_dst_ctx;
+
+static void cn1_compute_timezone_dst(void* data) {
+    cn1_timezone_dst_ctx* ctx = (cn1_timezone_dst_ctx*)data;
+    time_t epoch = (time_t)(ctx->millis / 1000LL);
+    struct tm resolved;
+    localtime_r(&epoch, &resolved);
+    ctx->result = resolved.tm_isdst > 0 ? JAVA_TRUE : JAVA_FALSE;
+}
+
+typedef struct {
+    int januaryOffset;
+    int julyOffset;
+} cn1_timezone_raw_ctx;
+
+static void cn1_compute_timezone_raw(void* data) {
+    cn1_timezone_raw_ctx* ctx = (cn1_timezone_raw_ctx*)data;
+    time_t now = time(NULL);
+    struct tm sample;
+    localtime_r(&now, &sample);
+    sample.tm_year = 124;
+    sample.tm_mon = 0;
+    sample.tm_mday = 1;
+    sample.tm_hour = 12;
+    sample.tm_min = 0;
+    sample.tm_sec = 0;
+    sample.tm_isdst = -1;
+    time_t january = mktime(&sample);
+    localtime_r(&january, &sample);
+#ifdef __USE_MISC
+    ctx->januaryOffset = (int)sample.tm_gmtoff * 1000;
+#else
+    ctx->januaryOffset = 0;
+#endif
+    sample.tm_year = 124;
+    sample.tm_mon = 6;
+    sample.tm_mday = 1;
+    sample.tm_hour = 12;
+    sample.tm_min = 0;
+    sample.tm_sec = 0;
+    sample.tm_isdst = -1;
+    time_t july = mktime(&sample);
+    localtime_r(&july, &sample);
+#ifdef __USE_MISC
+    ctx->julyOffset = (int)sample.tm_gmtoff * 1000;
+#else
+    ctx->julyOffset = 0;
+#endif
+}
+#endif
+
+JAVA_OBJECT java_util_TimeZone_getTimezoneId___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
+#if defined(__APPLE__) && defined(__OBJC__)
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* name = [[NSTimeZone defaultTimeZone] name];
+    JAVA_OBJECT out = fromNSString(threadStateData, name);
+    [pool release];
+    return out;
+#else
+    time_t now = time(NULL);
+    struct tm localTm;
+    localtime_r(&now, &localTm);
+#ifdef __USE_MISC
+    if (localTm.tm_zone != NULL) {
+        return newStringFromCString(threadStateData, localTm.tm_zone);
+    }
+#endif
+    const char* tz = getenv("TZ");
+    return newStringFromCString(threadStateData, tz == NULL ? "GMT" : tz);
+#endif
+}
+
+JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name, JAVA_INT year, JAVA_INT month, JAVA_INT day, JAVA_INT timeOfDayMillis) {
+#if defined(__APPLE__) && defined(__OBJC__)
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* n = toNSString(threadStateData, name);
+    NSTimeZone* tzone = [NSTimeZone timeZoneWithName:n];
+    NSCalendar* cal = [[[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian] autorelease];
+    [cal setTimeZone:tzone];
+    NSDateComponents* comps = [[[NSDateComponents alloc] init] autorelease];
+    [comps setYear:year];
+    [comps setMonth:month];
+    [comps setDay:day];
+    [comps setHour:timeOfDayMillis / 3600000];
+    [comps setMinute:(timeOfDayMillis / 60000) % 60];
+    [comps setSecond:(timeOfDayMillis / 1000) % 60];
+    NSDate* date = [cal dateFromComponents:comps];
+    JAVA_INT out = (JAVA_INT)([tzone secondsFromGMTForDate:date] * 1000);
+    [pool release];
+    return out;
+#else
+    JAVA_ARRAY_CHAR chars = ((JAVA_ARRAY_CHAR)((struct obj__java_lang_String*)name)->java_lang_String_value)->data;
+    int len = ((struct obj__java_lang_String*)name)->java_lang_String_count;
+    char buffer[256];
+    int copyLen = len < 255 ? len : 255;
+    int i;
+    for (i = 0; i < copyLen; i++) {
+        buffer[i] = (char)chars[i];
+    }
+    buffer[copyLen] = 0;
+    cn1_timezone_offset_ctx ctx;
+    ctx.year = year;
+    ctx.month = month;
+    ctx.day = day;
+    ctx.millis = timeOfDayMillis;
+    ctx.result = 0;
+    cn1_with_timezone(buffer, cn1_compute_timezone_offset, &ctx);
+    return ctx.result;
+#endif
+}
+
+JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name) {
+#if defined(__APPLE__) && defined(__OBJC__)
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* n = toNSString(threadStateData, name);
+    NSTimeZone* tzone = [NSTimeZone timeZoneWithName:n];
+    JAVA_INT result = (JAVA_INT)([tzone secondsFromGMT] * 1000);
+    if ([tzone isDaylightSavingTime]) {
+        result -= (JAVA_INT)([tzone daylightSavingTimeOffset] * 1000);
+    }
+    [pool release];
+    return result;
+#else
+    JAVA_ARRAY_CHAR chars = ((JAVA_ARRAY_CHAR)((struct obj__java_lang_String*)name)->java_lang_String_value)->data;
+    int len = ((struct obj__java_lang_String*)name)->java_lang_String_count;
+    char buffer[256];
+    int copyLen = len < 255 ? len : 255;
+    int i;
+    for (i = 0; i < copyLen; i++) {
+        buffer[i] = (char)chars[i];
+    }
+    buffer[copyLen] = 0;
+    cn1_timezone_raw_ctx ctx;
+    ctx.januaryOffset = 0;
+    ctx.julyOffset = 0;
+    cn1_with_timezone(buffer, cn1_compute_timezone_raw, &ctx);
+    return abs(ctx.januaryOffset) <= abs(ctx.julyOffset) ? ctx.januaryOffset : ctx.julyOffset;
+#endif
+}
+
+JAVA_BOOLEAN java_util_TimeZone_isTimezoneDST___java_lang_String_long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name, JAVA_LONG millis) {
+#if defined(__APPLE__) && defined(__OBJC__)
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* n = toNSString(threadStateData, name);
+    NSTimeZone* tzone = [NSTimeZone timeZoneWithName:n];
+    NSDate* date = [NSDate dateWithTimeIntervalSince1970:(millis / 1000)];
+    JAVA_BOOLEAN out = [tzone isDaylightSavingTimeForDate:date] ? JAVA_TRUE : JAVA_FALSE;
+    [pool release];
+    return out;
+#else
+    JAVA_ARRAY_CHAR chars = ((JAVA_ARRAY_CHAR)((struct obj__java_lang_String*)name)->java_lang_String_value)->data;
+    int len = ((struct obj__java_lang_String*)name)->java_lang_String_count;
+    char buffer[256];
+    int copyLen = len < 255 ? len : 255;
+    int i;
+    for (i = 0; i < copyLen; i++) {
+        buffer[i] = (char)chars[i];
+    }
+    buffer[copyLen] = 0;
+    cn1_timezone_dst_ctx ctx;
+    ctx.millis = millis;
+    ctx.result = JAVA_FALSE;
+    cn1_with_timezone(buffer, cn1_compute_timezone_dst, &ctx);
+    return ctx.result;
 #endif
 }
 

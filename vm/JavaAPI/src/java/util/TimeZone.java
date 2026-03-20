@@ -128,6 +128,10 @@ public abstract class TimeZone{
         }
         return defaultTimeZone;
     }
+
+    public static void setDefault(TimeZone timezone) {
+        defaultTimeZone = timezone;
+    }
     
     
 

@@ -50,6 +50,9 @@ public abstract class TimeZone{
         return null; //TODO codavaj!!
     }
 
+    public static void setDefault(TimeZone timezone) {
+    }
+
     /**
      * Gets the ID of this time zone.
      */
