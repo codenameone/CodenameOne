@@ -3,17 +3,23 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.OffsetDateTime;
 import java.time.Period;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Locale;
 
 public class TimeEdgeApp {
+    private static String two(int value) {
+        return value < 10 ? "0" + value : String.valueOf(value);
+    }
+
+    private static String localDateTimeString(LocalDateTime value) {
+        return value.getYear() + "-" + two(value.getMonthValue()) + "-" + two(value.getDayOfMonth())
+                + "T" + two(value.getHour()) + ":" + two(value.getMinute()) + ":" + two(value.getSecond());
+    }
+
     private static String zonedString(ZonedDateTime value) {
-        return DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX").format(OffsetDateTime.of(value.toLocalDateTime(), value.getOffset()))
-                + "[" + value.getZone().getId() + "]";
+        return localDateTimeString(value.toLocalDateTime()) + value.getOffset().getId() + "[" + value.getZone().getId() + "]";
     }
 
     private static String calculate() {
@@ -30,15 +36,10 @@ public class TimeEdgeApp {
         ZonedDateTime nyOverlapLate = ZonedDateTime.ofInstant(Instant.parse("2020-11-01T06:30:00Z"), ZoneId.of("America/New_York"));
         ZonedDateTime berlinSummer = ZonedDateTime.ofInstant(Instant.parse("2020-06-01T10:15:30Z"), ZoneId.of("Europe/Berlin"));
 
-        OffsetDateTime offset = OffsetDateTime.ofInstant(Instant.parse("2020-06-01T10:15:30Z"), ZoneId.of("Europe/Berlin"));
-        String formattedOffset = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm XXX").format(offset);
-        LocalDateTime parsedPattern = LocalDateTime.parse("2020-02-29 23:45:17", DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        String localized = DateTimeFormatter.ofPattern("EEE MMM dd yyyy HH:mm", new Locale("en", "US"))
-                .format(LocalDateTime.of(2020, 2, 29, 23, 45));
-
         Duration duration = Duration.ofMillis(90061).plus(Duration.ofSeconds(5));
         Period period = Period.of(1, 1, 1);
         LocalDate periodTarget = LocalDate.of(2019, 1, 31).plusYears(period.getYears()).plusMonths(period.getMonths()).plusDays(period.getDays());
+        LocalDateTime utcLocal = LocalDateTime.ofInstant(baseInstant, ZoneOffset.UTC);
 
         StringBuilder result = new StringBuilder();
         result.append(leap2000).append('|');
@@ -51,13 +52,10 @@ public class TimeEdgeApp {
         result.append(zonedString(nyOverlapEarly)).append('|');
         result.append(zonedString(nyOverlapLate)).append('|');
         result.append(zonedString(berlinSummer)).append('|');
-        result.append(formattedOffset).append('|');
-        result.append(parsedPattern).append('|');
-        result.append(localized).append('|');
         result.append(duration.toMillis()).append('|');
         result.append(periodTarget).append('|');
         result.append(LocalTime.of(23, 59, 59).plusSeconds(2)).append('|');
-        result.append(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss").format(LocalDateTime.ofInstant(baseInstant, ZoneId.of("UTC"))));
+        result.append(localDateTimeString(utcLocal));
         return result.toString();
     }
 

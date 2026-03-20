@@ -202,7 +202,9 @@ public class ByteCodeTranslator {
     private static void handleCleanOutput(ByteCodeTranslator b, File[] sources, File dest, String appName) throws Exception {
         File root = new File(dest, "dist");
         root.mkdirs();
-        System.out.println("Root is: " + root.getAbsolutePath());
+        if(verbose) {
+            System.out.println("Root is: " + root.getAbsolutePath());
+        }
         File srcRoot = new File(root, appName + "-src");
         srcRoot.mkdirs();
 
@@ -251,12 +253,16 @@ public class ByteCodeTranslator {
     private static void handleIosOutput(ByteCodeTranslator b, File[] sources, File dest, String appName, String appPackageName, String appDisplayName, String appVersion, String appType, String addFrameworks) throws Exception {
         File root = new File(dest, "dist");
         root.mkdirs();
-         System.out.println("Root is: " + root.getAbsolutePath());
+         if(verbose) {
+             System.out.println("Root is: " + root.getAbsolutePath());
+         }
         File srcRoot = new File(root, appName + "-src");
         srcRoot.mkdirs();
         //cleanDir(srcRoot);
 
-        System.out.println("srcRoot is: " + srcRoot.getAbsolutePath() );
+        if(verbose) {
+            System.out.println("srcRoot is: " + srcRoot.getAbsolutePath() );
+        }
 
         File imagesXcassets = new File(srcRoot, "Images.xcassets");
         imagesXcassets.mkdirs();
@@ -631,7 +637,9 @@ public class ByteCodeTranslator {
         //
         // don't start the output file until all the processing is done
         //
-        System.out.println("Rewrite " + sourceFile + " with " + totchanges + " changes");
+        if(verbose) {
+            System.out.println("Rewrite " + sourceFile + " with " + totchanges + " changes");
+        }
         try(Writer fios = new OutputStreamWriter(Files.newOutputStream(sourceFile.toPath()), StandardCharsets.UTF_8)) {
             fios.write(str.toString());
         }

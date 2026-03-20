@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "cn1_globals.h"
 #include <stdint.h>
 #include <ctype.h>
@@ -1646,7 +1650,10 @@ static char* cn1_strdup(const char* value) {
     return out;
 }
 
+static pthread_mutex_t cn1_timezone_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 static void cn1_with_timezone(const char* zoneId, void (*func)(void*), void* ctx) {
+    pthread_mutex_lock(&cn1_timezone_mutex);
     char* original = cn1_strdup(getenv("TZ"));
     if (zoneId != NULL && strlen(zoneId) > 0) {
         setenv("TZ", zoneId, 1);
@@ -1662,6 +1669,7 @@ static void cn1_with_timezone(const char* zoneId, void (*func)(void*), void* ctx
         unsetenv("TZ");
     }
     tzset();
+    pthread_mutex_unlock(&cn1_timezone_mutex);
 }
 
 typedef struct {
@@ -1674,19 +1682,19 @@ typedef struct {
 
 static void cn1_compute_timezone_offset(void* data) {
     cn1_timezone_offset_ctx* ctx = (cn1_timezone_offset_ctx*)data;
-    struct tm tmv;
-    memset(&tmv, 0, sizeof(tmv));
-    tmv.tm_year = ctx->year - 1900;
-    tmv.tm_mon = ctx->month - 1;
-    tmv.tm_mday = ctx->day;
-    tmv.tm_hour = ctx->millis / 3600000;
-    tmv.tm_min = (ctx->millis / 60000) % 60;
-    tmv.tm_sec = (ctx->millis / 1000) % 60;
-    tmv.tm_isdst = -1;
-    time_t epoch = mktime(&tmv);
+    struct tm utc;
+    memset(&utc, 0, sizeof(utc));
+    utc.tm_year = ctx->year - 1900;
+    utc.tm_mon = ctx->month - 1;
+    utc.tm_mday = ctx->day;
+    utc.tm_hour = ctx->millis / 3600000;
+    utc.tm_min = (ctx->millis / 60000) % 60;
+    utc.tm_sec = (ctx->millis / 1000) % 60;
+    utc.tm_isdst = 0;
+    time_t epoch = timegm(&utc);
     struct tm resolved;
     localtime_r(&epoch, &resolved);
-#ifdef __USE_MISC
+#if defined(__APPLE__) || defined(__USE_MISC)
     ctx->result = (int)resolved.tm_gmtoff * 1000;
 #else
     ctx->result = 0;
@@ -1725,7 +1733,7 @@ static void cn1_compute_timezone_raw(void* data) {
     sample.tm_isdst = -1;
     time_t january = mktime(&sample);
     localtime_r(&january, &sample);
-#ifdef __USE_MISC
+#if defined(__APPLE__) || defined(__USE_MISC)
     ctx->januaryOffset = (int)sample.tm_gmtoff * 1000;
 #else
     ctx->januaryOffset = 0;
@@ -1739,7 +1747,7 @@ static void cn1_compute_timezone_raw(void* data) {
     sample.tm_isdst = -1;
     time_t july = mktime(&sample);
     localtime_r(&july, &sample);
-#ifdef __USE_MISC
+#if defined(__APPLE__) || defined(__USE_MISC)
     ctx->julyOffset = (int)sample.tm_gmtoff * 1000;
 #else
     ctx->julyOffset = 0;
@@ -1752,7 +1760,7 @@ JAVA_OBJECT java_util_TimeZone_getTimezoneId___R_java_lang_String(CODENAME_ONE_T
     time_t now = time(NULL);
     struct tm localTm;
     localtime_r(&now, &localTm);
-#ifdef __USE_MISC
+#if defined(__APPLE__) || defined(__USE_MISC)
     if (localTm.tm_zone != NULL) {
         return newStringFromCString(threadStateData, localTm.tm_zone);
     }
@@ -1762,15 +1770,7 @@ JAVA_OBJECT java_util_TimeZone_getTimezoneId___R_java_lang_String(CODENAME_ONE_T
 }
 
 JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name, JAVA_INT year, JAVA_INT month, JAVA_INT day, JAVA_INT timeOfDayMillis) {
-    JAVA_ARRAY_CHAR chars = ((JAVA_ARRAY_CHAR)((struct obj__java_lang_String*)name)->java_lang_String_value)->data;
-    int len = ((struct obj__java_lang_String*)name)->java_lang_String_count;
-    char buffer[256];
-    int copyLen = len < 255 ? len : 255;
-    int i;
-    for (i = 0; i < copyLen; i++) {
-        buffer[i] = (char)chars[i];
-    }
-    buffer[copyLen] = 0;
+    const char* buffer = stringToUTF8(threadStateData, name);
     cn1_timezone_offset_ctx ctx;
     ctx.year = year;
     ctx.month = month;
@@ -1782,15 +1782,7 @@ JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int
 }
 
 JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name) {
-    JAVA_ARRAY_CHAR chars = ((JAVA_ARRAY_CHAR)((struct obj__java_lang_String*)name)->java_lang_String_value)->data;
-    int len = ((struct obj__java_lang_String*)name)->java_lang_String_count;
-    char buffer[256];
-    int copyLen = len < 255 ? len : 255;
-    int i;
-    for (i = 0; i < copyLen; i++) {
-        buffer[i] = (char)chars[i];
-    }
-    buffer[copyLen] = 0;
+    const char* buffer = stringToUTF8(threadStateData, name);
     cn1_timezone_raw_ctx ctx;
     ctx.januaryOffset = 0;
     ctx.julyOffset = 0;
@@ -1799,15 +1791,7 @@ JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String_R_int(CODENA
 }
 
 JAVA_BOOLEAN java_util_TimeZone_isTimezoneDST___java_lang_String_long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name, JAVA_LONG millis) {
-    JAVA_ARRAY_CHAR chars = ((JAVA_ARRAY_CHAR)((struct obj__java_lang_String*)name)->java_lang_String_value)->data;
-    int len = ((struct obj__java_lang_String*)name)->java_lang_String_count;
-    char buffer[256];
-    int copyLen = len < 255 ? len : 255;
-    int i;
-    for (i = 0; i < copyLen; i++) {
-        buffer[i] = (char)chars[i];
-    }
-    buffer[copyLen] = 0;
+    const char* buffer = stringToUTF8(threadStateData, name);
     cn1_timezone_dst_ctx ctx;
     ctx.millis = millis;
     ctx.result = JAVA_FALSE;

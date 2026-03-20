@@ -89,11 +89,10 @@ class TimeApiIntegrationTest {
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
         Path executable = buildDir.resolve("TimeEdgeApp");
-        String parparOutput = CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), buildDir);
-        String parparResult = extractResultLine(parparOutput);
-        assertTrue(parparResult.startsWith("RESULT="), "ParparVM execution should produce a RESULT line. Output: " + parparOutput);
-
-        assertEquals(javaResult, parparResult, "JavaSE and ParparVM should emit identical result lines for time edge cases");
+        assertTrue(Files.exists(executable), "ParparVM build should produce a runnable executable");
+        String vmOutput = CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), buildDir);
+        String vmResult = extractResultLine(vmOutput);
+        assertEquals(javaResult, vmResult, "ParparVM output should match JavaSE");
     }
 
     private String loadAppSource() throws Exception {

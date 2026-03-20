@@ -127,6 +127,9 @@ class CleanTargetIntegrationTest {
             assertNotNull(loader.getResource("cn1_globals.h"), "Translator resources should be on the classpath");
             Class<?> translatorClass = Class.forName("com.codename1.tools.translator.ByteCodeTranslator", true, loader);
             assertEquals(loader, translatorClass.getClassLoader());
+            java.lang.reflect.Field verboseField = translatorClass.getField("verbose");
+            boolean originalVerbose = verboseField.getBoolean(null);
+            verboseField.setBoolean(null, false);
             Method main = translatorClass.getMethod("main", String[].class);
             String[] args = new String[]{
                     "clean",
@@ -147,6 +150,8 @@ class CleanTargetIntegrationTest {
                     throw (Exception) cause;
                 }
                 throw new RuntimeException(cause);
+            } finally {
+                verboseField.setBoolean(null, originalVerbose);
             }
         } finally {
             Thread.currentThread().setContextClassLoader(originalLoader);

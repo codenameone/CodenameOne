@@ -147,16 +147,13 @@ public final class DateTimeSupport {
     }
 
     public static LocalDateTime localDateTimeFromInstant(Instant instant, ZoneId zone) {
-        Calendar cal = newCalendar(zone.toTimeZone());
-        cal.setTime(new Date(instant.toEpochMilli()));
-        return LocalDateTime.of(
-                cal.get(Calendar.YEAR),
-                cal.get(Calendar.MONTH) + 1,
-                cal.get(Calendar.DAY_OF_MONTH),
-                cal.get(Calendar.HOUR_OF_DAY),
-                cal.get(Calendar.MINUTE),
-                cal.get(Calendar.SECOND),
-                cal.get(Calendar.MILLISECOND) * 1000000);
+        ZoneOffset offset = offsetFromInstant(instant, zone);
+        long localSecond = instant.getEpochSecond() + offset.getTotalSeconds();
+        long epochDay = floorDiv(localSecond, SECONDS_PER_DAY);
+        int secondOfDay = (int) floorMod(localSecond, SECONDS_PER_DAY);
+        LocalDate date = LocalDate.ofEpochDay(epochDay);
+        LocalTime time = LocalTime.ofNanoOfDay(secondOfDay * NANOS_PER_SECOND + instant.getNano());
+        return LocalDateTime.of(date, time);
     }
 
     public static ZoneOffset offsetFromInstant(Instant instant, ZoneId zone) {

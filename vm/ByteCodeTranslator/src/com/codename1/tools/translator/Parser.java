@@ -365,7 +365,9 @@ public class Parser extends ClassVisitor {
     }
     
     public static void writeOutput(File outputDirectory) throws Exception {
-        System.out.println("outputDirectory is: " + outputDirectory.getAbsolutePath() );
+        if(ByteCodeTranslator.verbose) {
+            System.out.println("outputDirectory is: " + outputDirectory.getAbsolutePath() );
+        }
         if(ByteCodeClass.getMainClass()==null){
 			System.out.println("Error main class is not defined. The main class name is expected to have a public static void main(String[]) method and it is assumed to reside in the com.package.name directory");
 			System.exit(1);
@@ -423,12 +425,16 @@ public class Parser extends ClassVisitor {
 
             // loop over methods and start eliminating the body of unused methods
             if (BytecodeMethod.optimizerOn) {
-                System.out.println("Optimizer On: Removing unused methods and classes...");
+                if(ByteCodeTranslator.verbose) {
+                    System.out.println("Optimizer On: Removing unused methods and classes...");
+                }
                 Date now = new Date();
                 neliminated += eliminateUnusedMethods();
                 Date later = new Date();
                 long dif = later.getTime()-now.getTime();
-                System.out.println("unused Method cull removed "+neliminated+" methods in "+(dif/1000)+" seconds");
+                if(ByteCodeTranslator.verbose) {
+                    System.out.println("unused Method cull removed "+neliminated+" methods in "+(dif/1000)+" seconds");
+                }
             }
 
             generateClassAndMethodIndexHeader(outputDirectory);
@@ -459,7 +465,9 @@ public class Parser extends ClassVisitor {
         }
         nativeSources = new String[mFiles.length];
         int size = 0;
-        System.out.println(mFiles.length + " native files");
+        if(ByteCodeTranslator.verbose) {
+            System.out.println(mFiles.length + " native files");
+        }
         for(int iter = 0 ; iter < mFiles.length ; iter++) { 
         	FileInputStream fi = new FileInputStream(mFiles[iter]);
             DataInputStream di = new DataInputStream(fi);
@@ -470,7 +478,9 @@ public class Parser extends ClassVisitor {
             fi.close();
             nativeSources[iter] = new String(dat, StandardCharsets.UTF_8);
         }
-        System.out.println("Native files total "+(size/1024)+"K");
+        if(ByteCodeTranslator.verbose) {
+            System.out.println("Native files total "+(size/1024)+"K");
+        }
     }
     
     private static int eliminateUnusedMethods() {
@@ -493,8 +503,10 @@ public class Parser extends ClassVisitor {
             for(BytecodeMethod mtd : bc.getMethods()) {
                 if(mtd.isEliminated() || mtd.isMain() || mtd.getMethodName().equals("__CLINIT__") || mtd.getMethodName().equals("finalize") || mtd.isNative()) {
                     if (!mtd.isEliminated() && mtd.getMethodName().contains("yield")) {
-                        System.out.println("Not eliminating method ");
-                        System.out.println("main="+mtd.isMain()+", isNative="+mtd.isNative());
+                        if(ByteCodeTranslator.verbose) {
+                            System.out.println("Not eliminating method ");
+                            System.out.println("main="+mtd.isMain()+", isNative="+mtd.isNative());
+                        }
                     }
                     continue;
                 }
@@ -557,7 +569,9 @@ public class Parser extends ClassVisitor {
     }
 
     private static int cullClasses(boolean found, int depth) {
-        System.out.println("cullClasses()");
+        if(ByteCodeTranslator.verbose) {
+            System.out.println("cullClasses()");
+        }
         if(found && depth < 4) {
             for(ByteCodeClass bc : classes) {
                 bc.updateAllDependencies();
