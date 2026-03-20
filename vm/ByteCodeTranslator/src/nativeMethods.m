@@ -1747,14 +1747,8 @@ static void cn1_compute_timezone_raw(void* data) {
 }
 #endif
 
+#if !defined(__APPLE__) || !defined(__OBJC__)
 JAVA_OBJECT java_util_TimeZone_getTimezoneId___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
-#if defined(__APPLE__) && defined(__OBJC__)
-    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-    NSString* name = [[NSTimeZone defaultTimeZone] name];
-    JAVA_OBJECT out = fromNSString(threadStateData, name);
-    [pool release];
-    return out;
-#else
     time_t now = time(NULL);
     struct tm localTm;
     localtime_r(&now, &localTm);
@@ -1765,28 +1759,9 @@ JAVA_OBJECT java_util_TimeZone_getTimezoneId___R_java_lang_String(CODENAME_ONE_T
 #endif
     const char* tz = getenv("TZ");
     return newStringFromCString(threadStateData, tz == NULL ? "GMT" : tz);
-#endif
 }
 
 JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name, JAVA_INT year, JAVA_INT month, JAVA_INT day, JAVA_INT timeOfDayMillis) {
-#if defined(__APPLE__) && defined(__OBJC__)
-    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-    NSString* n = toNSString(threadStateData, name);
-    NSTimeZone* tzone = [NSTimeZone timeZoneWithName:n];
-    NSCalendar* cal = [[[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian] autorelease];
-    [cal setTimeZone:tzone];
-    NSDateComponents* comps = [[[NSDateComponents alloc] init] autorelease];
-    [comps setYear:year];
-    [comps setMonth:month];
-    [comps setDay:day];
-    [comps setHour:timeOfDayMillis / 3600000];
-    [comps setMinute:(timeOfDayMillis / 60000) % 60];
-    [comps setSecond:(timeOfDayMillis / 1000) % 60];
-    NSDate* date = [cal dateFromComponents:comps];
-    JAVA_INT out = (JAVA_INT)([tzone secondsFromGMTForDate:date] * 1000);
-    [pool release];
-    return out;
-#else
     JAVA_ARRAY_CHAR chars = ((JAVA_ARRAY_CHAR)((struct obj__java_lang_String*)name)->java_lang_String_value)->data;
     int len = ((struct obj__java_lang_String*)name)->java_lang_String_count;
     char buffer[256];
@@ -1804,21 +1779,9 @@ JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int
     ctx.result = 0;
     cn1_with_timezone(buffer, cn1_compute_timezone_offset, &ctx);
     return ctx.result;
-#endif
 }
 
 JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name) {
-#if defined(__APPLE__) && defined(__OBJC__)
-    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-    NSString* n = toNSString(threadStateData, name);
-    NSTimeZone* tzone = [NSTimeZone timeZoneWithName:n];
-    JAVA_INT result = (JAVA_INT)([tzone secondsFromGMT] * 1000);
-    if ([tzone isDaylightSavingTime]) {
-        result -= (JAVA_INT)([tzone daylightSavingTimeOffset] * 1000);
-    }
-    [pool release];
-    return result;
-#else
     JAVA_ARRAY_CHAR chars = ((JAVA_ARRAY_CHAR)((struct obj__java_lang_String*)name)->java_lang_String_value)->data;
     int len = ((struct obj__java_lang_String*)name)->java_lang_String_count;
     char buffer[256];
@@ -1833,19 +1796,9 @@ JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String_R_int(CODENA
     ctx.julyOffset = 0;
     cn1_with_timezone(buffer, cn1_compute_timezone_raw, &ctx);
     return abs(ctx.januaryOffset) <= abs(ctx.julyOffset) ? ctx.januaryOffset : ctx.julyOffset;
-#endif
 }
 
 JAVA_BOOLEAN java_util_TimeZone_isTimezoneDST___java_lang_String_long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name, JAVA_LONG millis) {
-#if defined(__APPLE__) && defined(__OBJC__)
-    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-    NSString* n = toNSString(threadStateData, name);
-    NSTimeZone* tzone = [NSTimeZone timeZoneWithName:n];
-    NSDate* date = [NSDate dateWithTimeIntervalSince1970:(millis / 1000)];
-    JAVA_BOOLEAN out = [tzone isDaylightSavingTimeForDate:date] ? JAVA_TRUE : JAVA_FALSE;
-    [pool release];
-    return out;
-#else
     JAVA_ARRAY_CHAR chars = ((JAVA_ARRAY_CHAR)((struct obj__java_lang_String*)name)->java_lang_String_value)->data;
     int len = ((struct obj__java_lang_String*)name)->java_lang_String_count;
     char buffer[256];
@@ -1860,8 +1813,8 @@ JAVA_BOOLEAN java_util_TimeZone_isTimezoneDST___java_lang_String_long_R_boolean(
     ctx.result = JAVA_FALSE;
     cn1_with_timezone(buffer, cn1_compute_timezone_dst, &ctx);
     return ctx.result;
-#endif
 }
+#endif
 
 /*JAVA_OBJECT java_util_Locale_getOSCountry___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
 }*/
