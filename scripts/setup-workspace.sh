@@ -248,22 +248,27 @@ if [ ! -f "$BUILD_CLIENT" ]; then
 fi
 
 log "Installing cn1-maven-archetypes"
-set +e  # don't let a transient git failure abort the whole build
-if [ -d cn1-maven-archetypes/.git ]; then
-  log "Updating existing cn1-maven-archetypes checkout"
-  if ! git -C cn1-maven-archetypes fetch --all --tags; then
-    log "git fetch failed (exit 128?). Leaving existing copy as-is."
-  else
-    git -C cn1-maven-archetypes reset --hard origin/master || \
-      log "git reset failed; keeping local state."
-  fi
+if [ "${SKIP_CN1_ARCHETYPES:-0}" = "1" ]; then
+  log "Skipping cn1-maven-archetypes install because SKIP_CN1_ARCHETYPES=1"
+  skip_archetypes=1
 else
-  if ! git clone https://github.com/shannah/cn1-maven-archetypes cn1-maven-archetypes; then
-    log "git clone failed (likely exit 128). Skipping archetype install."
-    skip_archetypes=1
+  set +e  # don't let a transient git failure abort the whole build
+  if [ -d cn1-maven-archetypes/.git ]; then
+    log "Updating existing cn1-maven-archetypes checkout"
+    if ! git -C cn1-maven-archetypes fetch --all --tags; then
+      log "git fetch failed (exit 128?). Leaving existing copy as-is."
+    else
+      git -C cn1-maven-archetypes reset --hard origin/master || \
+        log "git reset failed; keeping local state."
+    fi
+  else
+    if ! git clone https://github.com/shannah/cn1-maven-archetypes cn1-maven-archetypes; then
+      log "git clone failed (likely exit 128). Skipping archetype install."
+      skip_archetypes=1
+    fi
   fi
+  set -e
 fi
-set -e
 
 if [ "${skip_archetypes:-0}" -eq 0 ]; then
   (

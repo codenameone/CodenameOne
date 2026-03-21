@@ -1,5 +1,6 @@
 package java.time.format;
 
+import com.codename1.impl.time.TimeZoneSupport;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -214,7 +215,7 @@ public final class DateTimeFormatter {
         TimeZone original = TimeZone.getDefault();
         try {
             if (zone != null) {
-                TimeZone.setDefault(zone.toTimeZone());
+                TimeZone.setDefault(TimeZoneSupport.toTimeZone(zone));
             }
             return sdf.format(new Date(instant.toEpochMilli()));
         } finally {
@@ -230,7 +231,7 @@ public final class DateTimeFormatter {
         TimeZone original = TimeZone.getDefault();
         try {
             if (defaultZone != null) {
-                TimeZone.setDefault(defaultZone.toTimeZone());
+                TimeZone.setDefault(TimeZoneSupport.toTimeZone(defaultZone));
             }
             SimpleDateFormat sdf = newFormat(pattern, defaultZone, locale);
             Date date = sdf.parse(text);

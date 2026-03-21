@@ -22,6 +22,7 @@ WEBSITE_INCLUDE_JAVADOCS="${WEBSITE_INCLUDE_JAVADOCS:-false}"
 WEBSITE_INCLUDE_DEVGUIDE="${WEBSITE_INCLUDE_DEVGUIDE:-auto}"
 WEBSITE_INCLUDE_INITIALIZR="${WEBSITE_INCLUDE_INITIALIZR:-false}"
 WEBSITE_INCLUDE_PLAYGROUND="${WEBSITE_INCLUDE_PLAYGROUND:-false}"
+WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS="${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS:-auto}"
 CN1_USER="${CN1_USER:-}"
 CN1_TOKEN="${CN1_TOKEN:-}"
 
@@ -33,6 +34,36 @@ if [ "${WEBSITE_INCLUDE_INITIALIZR}" = "auto" ]; then
   fi
 fi
 
+bootstrap_local_cn1_snapshots() {
+  if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" != "true" ]; then
+    return
+  fi
+
+  echo "Bootstrapping local Codename One snapshot Maven artifacts..." >&2
+  (
+    cd "${REPO_ROOT}"
+    SKIP_CN1_ARCHETYPES=1 ./scripts/setup-workspace.sh -q -DskipTests
+  )
+}
+
+activate_bootstrapped_java17() {
+  local env_file="${TMPDIR:-/tmp}/codenameone-tools/tools/env.sh"
+  if [ ! -f "${env_file}" ]; then
+    echo "Expected workspace environment file was not created: ${env_file}" >&2
+    exit 1
+  fi
+
+  # shellcheck disable=SC1090
+  source "${env_file}"
+  if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "${JAVA17_HOME}/bin/java" ]; then
+    echo "Workspace bootstrap did not provide a usable JAVA17_HOME." >&2
+    exit 1
+  fi
+
+  export JAVA_HOME="${JAVA17_HOME}"
+  export PATH="${JAVA_HOME}/bin:${PATH}"
+}
+
 if [ "${WEBSITE_INCLUDE_PLAYGROUND}" = "auto" ]; then
   if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
     WEBSITE_INCLUDE_PLAYGROUND="true"
@@ -41,11 +72,19 @@ if [ "${WEBSITE_INCLUDE_PLAYGROUND}" = "auto" ]; then
   fi
 fi
 
+if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" = "auto" ]; then
+  if [ "${WEBSITE_INCLUDE_PLAYGROUND}" = "true" ]; then
+    WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS="true"
+  else
+    WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS="false"
+  fi
+fi
+
 set_cn1_user_token() {
   local project_dir="$1"
 
   if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
-    if ! ./mvnw -q -U -pl javascript -am \
+    if ! sh ./mvnw -q -U -pl javascript -am \
       cn1:set-user-token \
       -Dcodename1.platform=javascript \
       -Duser="${CN1_USER}" \
@@ -515,9 +554,9 @@ build_initializr_for_site() {
 
     run_initializr_mvn() {
       if command -v xvfb-run >/dev/null 2>&1; then
-        xvfb-run -a ./mvnw "$@"
+        xvfb-run -a sh ./mvnw "$@"
       else
-        ./mvnw "$@"
+        sh ./mvnw "$@"
       fi
     }
 
@@ -568,15 +607,18 @@ build_playground_for_site() {
     return
   fi
 
+  bootstrap_local_cn1_snapshots
+
   echo "Building Playground JavaScript bundle for website..." >&2
   (
     cd "${REPO_ROOT}/scripts/cn1playground"
+    activate_bootstrapped_java17
 
     run_playground_mvn() {
       if command -v xvfb-run >/dev/null 2>&1; then
-        xvfb-run -a ./mvnw "$@"
+        xvfb-run -a sh ./mvnw "$@"
       else
-        ./mvnw "$@"
+        sh ./mvnw "$@"
       fi
     }
 

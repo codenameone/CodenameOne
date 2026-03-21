@@ -214,7 +214,7 @@ public final class DateTimeFormatter {
         TimeZone original = TimeZone.getDefault();
         try {
             if (zone != null) {
-                TimeZone.setDefault(zone.toTimeZone());
+                TimeZone.setDefault(toTimeZone(zone));
             }
             return sdf.format(new Date(instant.toEpochMilli()));
         } finally {
@@ -230,7 +230,7 @@ public final class DateTimeFormatter {
         TimeZone original = TimeZone.getDefault();
         try {
             if (defaultZone != null) {
-                TimeZone.setDefault(defaultZone.toTimeZone());
+                TimeZone.setDefault(toTimeZone(defaultZone));
             }
             SimpleDateFormat sdf = newFormat(pattern, defaultZone, locale);
             Date date = sdf.parse(text);
@@ -256,6 +256,14 @@ public final class DateTimeFormatter {
 
     private static int parseInt(String text, int start, int end) {
         return Integer.parseInt(text.substring(start, end));
+    }
+
+    private static TimeZone toTimeZone(ZoneId zone) {
+        if (zone instanceof ZoneOffset) {
+            ZoneOffset offset = (ZoneOffset) zone;
+            return TimeZone.getTimeZone(offset.getId().equals("Z") ? "GMT" : "GMT" + offset.getId());
+        }
+        return TimeZone.getTimeZone(zone.getId());
     }
 
     private static String pad(int value, int length) {

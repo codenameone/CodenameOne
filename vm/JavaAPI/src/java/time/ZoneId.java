@@ -1,5 +1,6 @@
 package java.time;
 
+import com.codename1.impl.time.TimeZoneSupport;
 import java.util.TimeZone;
 
 public class ZoneId {
@@ -37,11 +38,7 @@ public class ZoneId {
     }
 
     TimeZone toTimeZone() {
-        if (this instanceof ZoneOffset) {
-            ZoneOffset offset = (ZoneOffset) this;
-            return TimeZone.getTimeZone(offset.getId().equals("Z") ? "GMT" : "GMT" + offset.getId());
-        }
-        return TimeZone.getTimeZone(id);
+        return TimeZoneSupport.toTimeZone(this);
     }
 
     public boolean equals(Object obj) {
