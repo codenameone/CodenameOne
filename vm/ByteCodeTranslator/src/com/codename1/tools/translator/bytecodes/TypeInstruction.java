@@ -39,6 +39,14 @@ public class TypeInstruction extends Instruction {
         this.type = type;
     }
 
+    public String getTypeName() {
+        return type;
+    }
+
+    public String getActualType() {
+        return actualType;
+    }
+
     @Override
     public void addDependencies(List<String> dependencyList) {
         String t = type.replace('.', '_').replace('/', '_').replace('$', '_');

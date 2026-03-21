@@ -64,6 +64,13 @@ public class ByteCodeTranslator {
                 return "c";
             }
 
+        },
+        OUTPUT_TYPE_JAVASCRIPT {
+            @Override
+            public String extension() {
+                return "js";
+            }
+
         };
 
         public abstract String extension();
@@ -144,7 +151,7 @@ public class ByteCodeTranslator {
         }
         
         if(args.length != 9) {
-            System.out.println("We accept 9 arguments output type (ios, csharp, clean), input directory, output directory, app name, package name, app dispaly name, version, type (ios/iphone/ipad) and additional frameworks");
+            System.out.println("We accept 9 arguments output type (ios, csharp, clean, javascript), input directory, output directory, app name, package name, app dispaly name, version, type (ios/iphone/ipad) and additional frameworks");
             System.exit(1);
             return;
         }
@@ -163,6 +170,8 @@ public class ByteCodeTranslator {
             output = OutputType.OUTPUT_TYPE_CSHARP;
         } else if(args[0].equalsIgnoreCase("clean")) {
             output = OutputType.OUTPUT_TYPE_CLEAN;
+        } else if(args[0].equalsIgnoreCase("javascript")) {
+            output = OutputType.OUTPUT_TYPE_JAVASCRIPT;
         }
         String[] sourceDirectories = args[1].split(";");
         File[] sources = new File[sourceDirectories.length];
@@ -188,6 +197,9 @@ public class ByteCodeTranslator {
                 break;
             case OUTPUT_TYPE_CLEAN:
                 handleCleanOutput(b, sources, dest, appName);
+                break;
+            case OUTPUT_TYPE_JAVASCRIPT:
+                handleJavascriptOutput(b, sources, dest, appName);
                 break;
             default:
                 handleDefaultOutput(b, sources, dest);
@@ -248,6 +260,18 @@ public class ByteCodeTranslator {
         }
 
         writeCmakeProject(root, srcRoot, appName);
+    }
+
+    private static void handleJavascriptOutput(ByteCodeTranslator b, File[] sources, File dest, String appName) throws Exception {
+        File root = new File(dest, "dist");
+        root.mkdirs();
+        if(verbose) {
+            System.out.println("Root is: " + root.getAbsolutePath());
+        }
+        File srcRoot = new File(root, appName + "-js");
+        srcRoot.mkdirs();
+        b.execute(sources, srcRoot);
+        Parser.writeOutput(srcRoot);
     }
 
     private static void handleIosOutput(ByteCodeTranslator b, File[] sources, File dest, String appName, String appPackageName, String appDisplayName, String appVersion, String appType, String addFrameworks) throws Exception {

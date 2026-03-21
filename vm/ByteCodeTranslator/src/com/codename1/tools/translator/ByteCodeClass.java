@@ -93,6 +93,13 @@ public class ByteCodeClass {
     private boolean finalClass;
     private boolean isEnum;
     private static Set<String> writableFields = new HashSet<String>();
+
+    static void cleanup() {
+        arrayTypes.clear();
+        writableFields.clear();
+        mainClass = null;
+        saveUnitTests = false;
+    }
     
     /**
      * 
@@ -169,6 +176,10 @@ public class ByteCodeClass {
     
     public String generateCSharpCode() {
         return "";
+    }
+
+    public String generateJavascriptCode(List<ByteCodeClass> allClasses) {
+        return JavascriptMethodGenerator.generateClassJavascript(this, allClasses);
     }
     
     public void addWritableField(String field) {

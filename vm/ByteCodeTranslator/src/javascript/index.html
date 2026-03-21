@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ParparVM JS</title>
+</head>
+<body>
+<script>
+const worker = new Worker('worker.js');
+window.__parparMessages = [];
+worker.onmessage = function(event) {
+  window.__parparMessages.push(event.data);
+  if (event.data && event.data.type === 'result') {
+    window.__parparResult = event.data;
+  }
+  if (event.data && event.data.type === 'error') {
+    window.__parparError = event.data;
+  }
+};
+worker.postMessage({ type: 'start' });
+</script>
+</body>
+</html>

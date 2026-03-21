@@ -69,6 +69,22 @@ public class TryCatch extends Instruction {
     public static boolean isTryCatchInMethod() {
         return hasTryCatch;
     }
+
+    public Label getStart() {
+        return start;
+    }
+
+    public Label getEnd() {
+        return end;
+    }
+
+    public Label getHandler() {
+        return handler;
+    }
+
+    public String getType() {
+        return type;
+    }
     
     @Override
     public void appendInstruction(StringBuilder b, List<Instruction> instructions) {

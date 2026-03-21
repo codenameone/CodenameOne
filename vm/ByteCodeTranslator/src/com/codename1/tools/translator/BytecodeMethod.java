@@ -747,6 +747,44 @@ public class BytecodeMethod implements SignatureSet {
     public boolean isSynchronizedMethod() {
         return synchronizedMethod;
     }
+
+    public List<Instruction> getInstructions() {
+        return instructions;
+    }
+
+    public List<ByteCodeMethodArg> getArguments() {
+        return arguments;
+    }
+
+    public ByteCodeMethodArg getReturnType() {
+        return returnType;
+    }
+
+    public int getMaxStack() {
+        return maxStack;
+    }
+
+    public int getMaxLocals() {
+        return maxLocals;
+    }
+
+    public boolean isConstructor() {
+        return constructor;
+    }
+
+    public String getMethodIdentifier() {
+        StringBuilder b = new StringBuilder();
+        b.append(clsName).append("_");
+        if(methodName.equals("<init>")) {
+            b.append("__INIT__");
+        } else if(methodName.equals("<clinit>")) {
+            b.append("__CLINIT__");
+        } else {
+            b.append(getCMethodName());
+        }
+        appendMethodSignatureSuffixFromDesc(desc, b, new ArrayList<String>());
+        return b.toString();
+    }
     
     private boolean hasLocalVariableWithIndex(char qualifier, int index) {
         for (LocalVariable lv : localVariables) {

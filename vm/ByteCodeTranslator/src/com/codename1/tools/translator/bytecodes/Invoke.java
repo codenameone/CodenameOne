@@ -54,19 +54,19 @@ public class Invoke extends Instruction {
         this.itf = itf;
     }
     
-    String getOwner() {
+    public String getOwner() {
         return owner;
     }
     
-    String getName() {
+    public String getName() {
         return name;
     }
     
-    String getDesc() {
+    public String getDesc() {
         return desc;
     }
     
-    boolean isItf() {
+    public boolean isItf() {
         return itf;
     }
     

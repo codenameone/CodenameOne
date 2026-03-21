@@ -1,0 +1,918 @@
+package com.codename1.tools.translator;
+
+import com.codename1.tools.translator.bytecodes.BasicInstruction;
+import com.codename1.tools.translator.bytecodes.Field;
+import com.codename1.tools.translator.bytecodes.IInc;
+import com.codename1.tools.translator.bytecodes.Instruction;
+import com.codename1.tools.translator.bytecodes.Invoke;
+import com.codename1.tools.translator.bytecodes.Jump;
+import com.codename1.tools.translator.bytecodes.LabelInstruction;
+import com.codename1.tools.translator.bytecodes.Ldc;
+import com.codename1.tools.translator.bytecodes.LineNumber;
+import com.codename1.tools.translator.bytecodes.LocalVariable;
+import com.codename1.tools.translator.bytecodes.SwitchInstruction;
+import com.codename1.tools.translator.bytecodes.TryCatch;
+import com.codename1.tools.translator.bytecodes.TypeInstruction;
+import com.codename1.tools.translator.bytecodes.VarOp;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
+
+final class JavascriptMethodGenerator {
+    private JavascriptMethodGenerator() {
+    }
+
+    static String generateClassJavascript(ByteCodeClass cls, List<ByteCodeClass> allClasses) {
+        StringBuilder out = new StringBuilder();
+        out.append("// ").append(cls.getClsName()).append("\n");
+        appendClassRegistration(out, cls, allClasses);
+        for (BytecodeMethod method : cls.getMethods()) {
+            if (method.isNative() || method.isAbstract() || method.isEliminated()) {
+                continue;
+            }
+            appendMethod(out, cls, method);
+        }
+        for (BytecodeMethod method : cls.getMethods()) {
+            if (!method.isNative() || method.isEliminated()) {
+                continue;
+            }
+            appendNativeStubIfNeeded(out, cls, method);
+            if (!method.isStatic() && !method.isConstructor()) {
+                String jsMethodName = jsMethodIdentifier(cls, method);
+                out.append("jvm.addVirtualMethod(\"").append(cls.getClsName()).append("\", \"")
+                        .append(jsMethodName).append("\", ")
+                        .append(jsMethodName).append(");\n");
+            }
+        }
+        return out.toString();
+    }
+
+    private static void appendClassRegistration(StringBuilder out, ByteCodeClass cls, List<ByteCodeClass> allClasses) {
+        out.append("jvm.defineClass({\n");
+        out.append("  name: \"").append(cls.getClsName()).append("\",\n");
+        out.append("  baseClass: ");
+        if (cls.getBaseClass() == null) {
+            out.append("null");
+        } else {
+            out.append("\"").append(JavascriptNameUtil.sanitizeClassName(cls.getBaseClass())).append("\"");
+        }
+        out.append(",\n");
+        out.append("  interfaces: [");
+        boolean first = true;
+        for (String iface : cls.getBaseInterfaces()) {
+            if (!first) {
+                out.append(", ");
+            }
+            first = false;
+            out.append("\"").append(JavascriptNameUtil.sanitizeClassName(iface)).append("\"");
+        }
+        out.append("],\n");
+        out.append("  isInterface: ").append(cls.isIsInterface()).append(",\n");
+        out.append("  isAbstract: ").append(cls.isIsAbstract()).append(",\n");
+        appendAssignableTypes(out, cls, allClasses);
+        out.append("  instanceFields: [");
+        first = true;
+        for (ByteCodeField field : cls.getFields()) {
+            if (field.isStaticField()) {
+                continue;
+            }
+            if (!first) {
+                out.append(", ");
+            }
+            first = false;
+            out.append("{ owner: \"").append(field.getClsName()).append("\", name: \"")
+                    .append(field.getFieldName()).append("\", desc: \"")
+                    .append(JavascriptNameUtil.escapeJs(field.getType() == null ? "" : field.getType())).append("\", prop: \"")
+                    .append(JavascriptNameUtil.fieldProperty(field.getClsName(), field.getFieldName())).append("\" }");
+        }
+        out.append("],\n");
+        out.append("  staticFields: {");
+        first = true;
+        for (ByteCodeField field : cls.getFields()) {
+            if (!field.isStaticField()) {
+                continue;
+            }
+            if (!first) {
+                out.append(", ");
+            }
+            first = false;
+            out.append("\"").append(field.getFieldName()).append("\": ")
+                    .append(field.getValue() == null ? JavascriptNameUtil.defaultValue(field.getType()) : renderStaticConstant(field));
+        }
+        out.append("},\n");
+        out.append("  methods: {},\n");
+        out.append("  classObject: null\n");
+        out.append("});\n");
+    }
+
+    private static void appendAssignableTypes(StringBuilder out, ByteCodeClass cls, List<ByteCodeClass> allClasses) {
+        List<String> assignableTypes = new java.util.ArrayList<String>();
+        collectAssignableTypes(cls, allClasses, assignableTypes);
+        out.append("  assignableTo: {");
+        for (int i = 0; i < assignableTypes.size(); i++) {
+            if (i > 0) {
+                out.append(", ");
+            }
+            out.append("\"").append(assignableTypes.get(i)).append("\": true");
+        }
+        out.append("},\n");
+    }
+
+    private static void collectAssignableTypes(ByteCodeClass cls, List<ByteCodeClass> allClasses, List<String> out) {
+        addAssignableType(out, JavascriptNameUtil.runtimeTypeName(cls.getClsName()));
+        addAssignableType(out, "java_lang_Object");
+        collectAssignableTypesFromBase(cls.getBaseClass(), allClasses, out);
+        for (String iface : cls.getBaseInterfaces()) {
+            collectAssignableTypesFromBase(iface, allClasses, out);
+        }
+    }
+
+    private static void collectAssignableTypesFromBase(String className, List<ByteCodeClass> allClasses, List<String> out) {
+        String normalized = JavascriptNameUtil.runtimeTypeName(className);
+        if (normalized == null || containsType(out, normalized)) {
+            return;
+        }
+        addAssignableType(out, normalized);
+        ByteCodeClass base = findClass(normalized, allClasses);
+        if (base == null) {
+            return;
+        }
+        collectAssignableTypesFromBase(base.getBaseClass(), allClasses, out);
+        for (String iface : base.getBaseInterfaces()) {
+            collectAssignableTypesFromBase(iface, allClasses, out);
+        }
+    }
+
+    private static void addAssignableType(List<String> out, String className) {
+        if (className != null && !containsType(out, className)) {
+            out.add(className);
+        }
+    }
+
+    private static boolean containsType(List<String> types, String className) {
+        for (int i = 0; i < types.size(); i++) {
+            if (className.equals(types.get(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static ByteCodeClass findClass(String className, List<ByteCodeClass> allClasses) {
+        for (int i = 0; i < allClasses.size(); i++) {
+            ByteCodeClass candidate = allClasses.get(i);
+            if (className.equals(candidate.getClsName())) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private static String renderStaticConstant(ByteCodeField field) {
+        Object value = field.getValue();
+        if (value instanceof String) {
+            return "jvm.createStringLiteral(\"" + JavascriptNameUtil.escapeJs((String) value) + "\")";
+        }
+        if (value instanceof Boolean) {
+            return ((Boolean) value).booleanValue() ? "1" : "0";
+        }
+        if (value instanceof Number) {
+            return value.toString();
+        }
+        return JavascriptNameUtil.defaultValue(field.getType());
+    }
+
+    private static void appendMethod(StringBuilder out, ByteCodeClass cls, BytecodeMethod method) {
+        List<Instruction> instructions = method.getInstructions();
+        Map<Label, Integer> labelToIndex = buildLabelMap(instructions);
+        String jsMethodName = jsMethodIdentifier(cls, method);
+        out.append("function* ").append(jsMethodName).append("(");
+        boolean first = true;
+        if (!method.isStatic()) {
+            out.append("__cn1ThisObject");
+            first = false;
+        }
+        List<ByteCodeMethodArg> arguments = method.getArguments();
+        for (int i = 0; i < arguments.size(); i++) {
+            if (!first) {
+                out.append(", ");
+            }
+            first = false;
+            out.append("__cn1Arg").append(i + 1);
+        }
+        out.append("){\n");
+        if (method.isStatic() && !"__CLINIT__".equals(method.getMethodName())) {
+            out.append("  jvm.ensureClassInitialized(\"").append(cls.getClsName()).append("\");\n");
+        }
+        out.append("  const locals = new Array(").append(Math.max(1, method.getMaxLocals())).append(").fill(null);\n");
+        out.append("  const stack = [];\n");
+        out.append("  let pc = 0;\n");
+        if (!method.isStatic()) {
+            out.append("  locals[0] = __cn1ThisObject;\n");
+        }
+        int localIndex = method.isStatic() ? 0 : 1;
+        for (int i = 0; i < arguments.size(); i++) {
+            out.append("  locals[").append(localIndex).append("] = __cn1Arg").append(i + 1).append(";\n");
+            localIndex++;
+            if (arguments.get(i).isDoubleOrLong()) {
+                localIndex++;
+            }
+        }
+        appendTryCatchTable(out, instructions, labelToIndex);
+        if (method.isSynchronizedMethod()) {
+            out.append("  const __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
+            out.append("  jvm.monitorEnter(jvm.currentThread, __cn1Monitor);\n");
+            out.append("  try {\n");
+        }
+        out.append("  while (true) {\n");
+        out.append("    try {\n");
+        out.append("    switch (pc) {\n");
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction instruction = instructions.get(i);
+            out.append("      case ").append(i).append(": {\n");
+            appendInstruction(out, method, instructions, labelToIndex, instruction, i);
+            out.append("      }\n");
+        }
+        out.append("      default:\n");
+        out.append("        return null;\n");
+        out.append("    }\n");
+        out.append("    } catch (__cn1Error) {\n");
+        out.append("      const __handler = jvm.findExceptionHandler(__cn1TryCatch, pc, __cn1Error);\n");
+        out.append("      if (!__handler) {\n");
+        out.append("        throw __cn1Error;\n");
+        out.append("      }\n");
+        out.append("      stack.length = 0;\n");
+        out.append("      stack.push(__cn1Error);\n");
+        out.append("      pc = __handler.handler;\n");
+        out.append("    }\n");
+        out.append("  }\n");
+        if (method.isSynchronizedMethod()) {
+            out.append("  } finally {\n");
+            out.append("    jvm.monitorExit(jvm.currentThread, __cn1Monitor);\n");
+            out.append("  }\n");
+        }
+        out.append("}\n");
+        if ("__CLINIT__".equals(method.getMethodName())) {
+            out.append("jvm.classes[\"").append(cls.getClsName()).append("\"].clinit = ").append(jsMethodName).append(";\n");
+        }
+        if (!method.isStatic() && !method.isConstructor()) {
+            out.append("jvm.addVirtualMethod(\"").append(cls.getClsName()).append("\", \"")
+                    .append(jsMethodName).append("\", ").append(jsMethodName).append(");\n");
+        }
+    }
+
+    private static void appendTryCatchTable(StringBuilder out, List<Instruction> instructions, Map<Label, Integer> labelToIndex) {
+        out.append("  const __cn1TryCatch = [");
+        boolean first = true;
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction instruction = instructions.get(i);
+            if (!(instruction instanceof TryCatch)) {
+                continue;
+            }
+            TryCatch tryCatch = (TryCatch) instruction;
+            if (!first) {
+                out.append(", ");
+            }
+            first = false;
+            out.append("{ start: ").append(resolveLabelIndex(labelToIndex, tryCatch.getStart(), "try start"));
+            out.append(", end: ").append(resolveLabelIndex(labelToIndex, tryCatch.getEnd(), "try end"));
+            out.append(", handler: ").append(resolveLabelIndex(labelToIndex, tryCatch.getHandler(), "try handler"));
+            out.append(", type: ");
+            if (tryCatch.getType() == null) {
+                out.append("null");
+            } else {
+                out.append("\"").append(JavascriptNameUtil.runtimeTypeName(tryCatch.getType())).append("\"");
+            }
+            out.append("}");
+        }
+        out.append("];\n");
+    }
+
+    private static String jsMethodIdentifier(ByteCodeClass cls, BytecodeMethod method) {
+        return JavascriptNameUtil.methodIdentifier(cls.getClsName(), method.getMethodName(), method.getSignature());
+    }
+
+    private static void appendNativeStubIfNeeded(StringBuilder out, ByteCodeClass cls, BytecodeMethod method) {
+        String jsMethodName = jsMethodIdentifier(cls, method);
+        if (JavascriptNativeRegistry.hasRuntimeImplementation(jsMethodName)) {
+            return;
+        }
+        String reason = JavascriptNativeRegistry.unsupportedReason(jsMethodName);
+        out.append("if (typeof ").append(jsMethodName).append(" === \"undefined\") {\n");
+        out.append("  ").append(jsMethodName).append(" = function*(");
+        boolean first = true;
+        if (!method.isStatic()) {
+            out.append("__cn1ThisObject");
+            first = false;
+        }
+        List<ByteCodeMethodArg> arguments = method.getArguments();
+        for (int i = 0; i < arguments.size(); i++) {
+            if (!first) {
+                out.append(", ");
+            }
+            first = false;
+            out.append("__cn1Arg").append(i + 1);
+        }
+        out.append(") { throw new Error(\"");
+        if (reason == null) {
+            out.append("Missing javascript native method ").append(jsMethodName);
+        } else {
+            out.append(JavascriptNameUtil.escapeJs(reason));
+        }
+        out.append("\"); };\n");
+        out.append("}\n");
+    }
+
+    private static Map<Label, Integer> buildLabelMap(List<Instruction> instructions) {
+        Map<Label, Integer> out = new HashMap<Label, Integer>();
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction instruction = instructions.get(i);
+            if (instruction instanceof LabelInstruction) {
+                out.put(((LabelInstruction) instruction).getLabel(), Integer.valueOf(i));
+            }
+        }
+        return out;
+    }
+
+    private static void appendInstruction(StringBuilder out, BytecodeMethod method, List<Instruction> allInstructions,
+            Map<Label, Integer> labelToIndex, Instruction instruction, int index) {
+        if (instruction instanceof LabelInstruction || instruction instanceof LineNumber || instruction instanceof LocalVariable
+                || instruction instanceof TryCatch) {
+            out.append("        pc = ").append(index + 1).append("; break;\n");
+            return;
+        }
+        if (instruction instanceof BasicInstruction) {
+            appendBasicInstruction(out, method, (BasicInstruction) instruction, index);
+            return;
+        }
+        if (instruction instanceof VarOp) {
+            appendVarInstruction(out, (VarOp) instruction, index);
+            return;
+        }
+        if (instruction instanceof IInc) {
+            IInc iinc = (IInc) instruction;
+            out.append("        locals[").append(iinc.getVar()).append("] = (locals[").append(iinc.getVar())
+                    .append("] || 0) + ").append(iinc.getAmount()).append(";\n");
+            out.append("        pc = ").append(index + 1).append("; break;\n");
+            return;
+        }
+        if (instruction instanceof Ldc) {
+            appendLdcInstruction(out, (Ldc) instruction, index);
+            return;
+        }
+        if (instruction instanceof TypeInstruction) {
+            appendTypeInstruction(out, (TypeInstruction) instruction, index);
+            return;
+        }
+        if (instruction instanceof Field) {
+            appendFieldInstruction(out, (Field) instruction, index);
+            return;
+        }
+        if (instruction instanceof Jump) {
+            appendJumpInstruction(out, (Jump) instruction, labelToIndex, index);
+            return;
+        }
+        if (instruction instanceof Invoke) {
+            appendInvokeInstruction(out, (Invoke) instruction, index);
+            return;
+        }
+        if (instruction instanceof SwitchInstruction) {
+            appendSwitchInstruction(out, (SwitchInstruction) instruction, labelToIndex, index);
+            return;
+        }
+        throw new IllegalArgumentException("Unsupported instruction type in javascript output: "
+                + instruction.getClass().getName() + " for " + method.getMethodIdentifier());
+    }
+
+    private static void appendSwitchInstruction(StringBuilder out, SwitchInstruction instruction, Map<Label, Integer> labelToIndex, int index) {
+        out.append("        const __switchValue = stack.pop() | 0;\n");
+        out.append("        switch (__switchValue) {\n");
+        int[] keys = instruction.getKeys();
+        Label[] labels = instruction.getLabels();
+        for (int i = 0; i < keys.length; i++) {
+            out.append("          case ").append(keys[i]).append(": pc = ")
+                    .append(resolveLabelIndex(labelToIndex, labels[i], "switch case")).append("; break;\n");
+        }
+        Label defaultLabel = instruction.getDefaultLabel();
+        if (defaultLabel != null) {
+            out.append("          default: pc = ").append(resolveLabelIndex(labelToIndex, defaultLabel, "switch default")).append("; break;\n");
+        } else {
+            out.append("          default: pc = ").append(index + 1).append("; break;\n");
+        }
+        out.append("        }\n");
+        out.append("        break;\n");
+    }
+
+    private static int resolveLabelIndex(Map<Label, Integer> labelToIndex, Label label, String context) {
+        Integer target = labelToIndex.get(label);
+        if (target == null) {
+            throw new IllegalStateException("Missing label target for " + context + " in JS backend");
+        }
+        return target.intValue();
+    }
+
+    private static void appendBasicInstruction(StringBuilder out, BytecodeMethod method, BasicInstruction instruction, int index) {
+        switch (instruction.getOpcode()) {
+            case Opcodes.NOP:
+                out.append("        pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.ACONST_NULL:
+                out.append("        stack.push(null); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.ICONST_M1:
+                out.append("        stack.push(-1); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.ICONST_0:
+            case Opcodes.ICONST_1:
+            case Opcodes.ICONST_2:
+            case Opcodes.ICONST_3:
+            case Opcodes.ICONST_4:
+            case Opcodes.ICONST_5:
+                out.append("        stack.push(").append(instruction.getOpcode() - Opcodes.ICONST_0).append("); pc = ")
+                        .append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.LCONST_0:
+                out.append("        stack.push(0); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.LCONST_1:
+                out.append("        stack.push(1); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.FCONST_0:
+            case Opcodes.DCONST_0:
+                out.append("        stack.push(0.0); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.FCONST_1:
+            case Opcodes.DCONST_1:
+                out.append("        stack.push(1.0); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.FCONST_2:
+                out.append("        stack.push(2.0); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.BIPUSH:
+            case Opcodes.SIPUSH:
+                out.append("        stack.push(").append(instruction.getValue()).append("); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.POP:
+                out.append("        stack.pop(); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.POP2:
+                out.append("        stack.pop(); stack.pop(); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.DUP:
+                out.append("        stack.push(stack[stack.length - 1]); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.DUP_X1:
+                out.append("        { const v1 = stack.pop(); const v2 = stack.pop(); stack.push(v1); stack.push(v2); stack.push(v1); pc = ")
+                        .append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.DUP_X2:
+                out.append("        { const v1 = stack.pop(); const v2 = stack.pop(); const v3 = stack.pop(); stack.push(v1); stack.push(v3); stack.push(v2); stack.push(v1); pc = ")
+                        .append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.DUP2:
+                out.append("        { const v1 = stack.pop(); const v2 = stack.pop(); stack.push(v2); stack.push(v1); stack.push(v2); stack.push(v1); pc = ")
+                        .append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.DUP2_X1:
+                out.append("        { const v1 = stack.pop(); const v2 = stack.pop(); const v3 = stack.pop(); stack.push(v2); stack.push(v1); stack.push(v3); stack.push(v2); stack.push(v1); pc = ")
+                        .append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.DUP2_X2:
+                out.append("        { const v1 = stack.pop(); const v2 = stack.pop(); const v3 = stack.pop(); const v4 = stack.pop(); stack.push(v2); stack.push(v1); stack.push(v4); stack.push(v3); stack.push(v2); stack.push(v1); pc = ")
+                        .append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.SWAP:
+                out.append("        { const v1 = stack.pop(); const v2 = stack.pop(); stack.push(v1); stack.push(v2); pc = ")
+                        .append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IADD:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) + (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.ISUB:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) - (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IMUL:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) * (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.LADD:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a + b); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.LSUB:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a - b); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.LMUL:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a * b); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IDIV:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(((a|0) / (b|0)) | 0); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.LDIV:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(Math.trunc(a / b)); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IREM:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) % (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.LREM:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a % b); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.INEG:
+                out.append("        stack.push(-(stack.pop()|0)); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.LNEG:
+                out.append("        stack.push(-stack.pop()); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.ISHL:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) << (b & 31)); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.LSHL:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a * Math.pow(2, b & 63)); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.ISHR:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) >> (b & 31)); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.LSHR:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(Math.trunc(a / Math.pow(2, b & 63))); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IUSHR:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a >>> (b & 31)) | 0); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.LUSHR:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(Math.floor((a < 0 ? a + 18446744073709551616 : a) / Math.pow(2, b & 63))); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IAND:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) & (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.LAND:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a & b); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IOR:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) | (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.LOR:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a | b); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IXOR:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) ^ (b|0)); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.LXOR:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a ^ b); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.I2L:
+            case Opcodes.F2D:
+            case Opcodes.D2F:
+                out.append("        pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.I2B:
+                out.append("        stack.push((stack.pop() << 24) >> 24); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.I2C:
+                out.append("        stack.push(stack.pop() & 65535); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.I2S:
+                out.append("        stack.push((stack.pop() << 16) >> 16); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.L2I:
+            case Opcodes.F2I:
+            case Opcodes.D2I:
+                out.append("        stack.push(stack.pop() | 0); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.I2F:
+            case Opcodes.I2D:
+            case Opcodes.L2F:
+            case Opcodes.L2D:
+            case Opcodes.F2L:
+            case Opcodes.D2L:
+                out.append("        pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.LCMP:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a < b ? -1 : (a > b ? 1 : 0)); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.FCMPL:
+            case Opcodes.DCMPL:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((isNaN(a) || isNaN(b)) ? -1 : (a < b ? -1 : (a > b ? 1 : 0))); pc = ")
+                        .append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.FCMPG:
+            case Opcodes.DCMPG:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((isNaN(a) || isNaN(b)) ? 1 : (a < b ? -1 : (a > b ? 1 : 0))); pc = ")
+                        .append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IRETURN:
+            case Opcodes.ARETURN:
+            case Opcodes.LRETURN:
+            case Opcodes.FRETURN:
+            case Opcodes.DRETURN:
+                out.append("        return stack.pop();\n");
+                return;
+            case Opcodes.ATHROW:
+                out.append("        throw stack.pop();\n");
+                return;
+            case Opcodes.RETURN:
+                out.append("        return null;\n");
+                return;
+            case Opcodes.ARRAYLENGTH:
+                out.append("        { const arr = stack.pop(); stack.push(arr.length); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.AALOAD:
+            case Opcodes.IALOAD:
+            case Opcodes.LALOAD:
+            case Opcodes.FALOAD:
+            case Opcodes.DALOAD:
+            case Opcodes.BALOAD:
+            case Opcodes.CALOAD:
+            case Opcodes.SALOAD:
+                out.append("        { const idx = stack.pop(); const arr = stack.pop(); if (!arr.__array) throw new Error(\"Array expected\"); if (idx < 0 || idx >= arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); stack.push(arr[idx]); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.AASTORE:
+            case Opcodes.IASTORE:
+            case Opcodes.LASTORE:
+            case Opcodes.FASTORE:
+            case Opcodes.DASTORE:
+            case Opcodes.BASTORE:
+            case Opcodes.CASTORE:
+            case Opcodes.SASTORE:
+                out.append("        { const value = stack.pop(); const idx = stack.pop(); const arr = stack.pop(); if (!arr.__array) throw new Error(\"Array expected\"); if (idx < 0 || idx >= arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); arr[idx] = value; pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.MONITORENTER:
+                out.append("        jvm.monitorEnter(jvm.currentThread, stack.pop()); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.MONITOREXIT:
+                out.append("        jvm.monitorExit(jvm.currentThread, stack.pop()); pc = ").append(index + 1).append("; break;\n");
+                return;
+            default:
+                throw new IllegalArgumentException("Unsupported basic opcode " + instruction.getOpcode()
+                        + " in " + method.getMethodIdentifier());
+        }
+    }
+
+    private static void appendVarInstruction(StringBuilder out, VarOp instruction, int index) {
+        switch (instruction.getOpcode()) {
+            case Opcodes.BIPUSH:
+            case Opcodes.SIPUSH:
+                out.append("        stack.push(").append(instruction.getIndex()).append("); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.NEWARRAY:
+                out.append("        { const size = stack.pop(); stack.push(jvm.newArray(size, \"")
+                        .append(primitiveArrayType(instruction.getIndex())).append("\", 1)); pc = ")
+                        .append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.ILOAD:
+            case Opcodes.LLOAD:
+            case Opcodes.FLOAD:
+            case Opcodes.DLOAD:
+            case Opcodes.ALOAD:
+                out.append("        stack.push(locals[").append(instruction.getIndex()).append("]); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.ISTORE:
+            case Opcodes.LSTORE:
+            case Opcodes.FSTORE:
+            case Opcodes.DSTORE:
+            case Opcodes.ASTORE:
+                out.append("        locals[").append(instruction.getIndex()).append("] = stack.pop(); pc = ").append(index + 1).append("; break;\n");
+                return;
+            default:
+                throw new IllegalArgumentException("Unsupported var opcode " + instruction.getOpcode());
+        }
+    }
+
+    private static String primitiveArrayType(int operand) {
+        switch (operand) {
+            case Opcodes.T_BOOLEAN:
+                return "JAVA_BOOLEAN";
+            case Opcodes.T_CHAR:
+                return "JAVA_CHAR";
+            case Opcodes.T_FLOAT:
+                return "JAVA_FLOAT";
+            case Opcodes.T_DOUBLE:
+                return "JAVA_DOUBLE";
+            case Opcodes.T_BYTE:
+                return "JAVA_BYTE";
+            case Opcodes.T_SHORT:
+                return "JAVA_SHORT";
+            case Opcodes.T_INT:
+                return "JAVA_INT";
+            case Opcodes.T_LONG:
+                return "JAVA_LONG";
+            default:
+                throw new IllegalArgumentException("Unsupported NEWARRAY operand " + operand);
+        }
+    }
+
+    private static void appendLdcInstruction(StringBuilder out, Ldc instruction, int index) {
+        Object value = instruction.getValue();
+        if (value instanceof String) {
+            out.append("        stack.push(jvm.createStringLiteral(\"")
+                    .append(JavascriptNameUtil.escapeJs((String) value)).append("\")); pc = ").append(index + 1).append("; break;\n");
+            return;
+        }
+        if (value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Double) {
+            out.append("        stack.push(").append(value.toString()).append("); pc = ").append(index + 1).append("; break;\n");
+            return;
+        }
+        if (value instanceof Type) {
+            Type type = (Type) value;
+            if (type.getSort() == Type.OBJECT) {
+                out.append("        stack.push(jvm.getClassObject(\"").append(JavascriptNameUtil.sanitizeClassName(type.getInternalName()))
+                        .append("\")); pc = ").append(index + 1).append("; break;\n");
+                return;
+            }
+        }
+        throw new IllegalArgumentException("Unsupported ldc constant in javascript backend: " + value);
+    }
+
+    private static void appendTypeInstruction(StringBuilder out, TypeInstruction instruction, int index) {
+        String typeName = JavascriptNameUtil.runtimeTypeName(instruction.getTypeName());
+        switch (instruction.getOpcode()) {
+            case Opcodes.NEW:
+                out.append("        stack.push(jvm.newObject(\"").append(typeName).append("\")); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.ANEWARRAY:
+                out.append("        { const size = stack.pop(); stack.push(jvm.newArray(size, \"").append(typeName)
+                        .append("\", 1)); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.CHECKCAST:
+                out.append("        { const value = stack[stack.length - 1]; if (value != null && !jvm.instanceOf(value, \"")
+                        .append(typeName)
+                        .append("\")) throw new Error(\"ClassCastException\"); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.INSTANCEOF:
+                out.append("        { const value = stack.pop(); stack.push(jvm.instanceOf(value, \"").append(typeName)
+                        .append("\") ? 1 : 0); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            default:
+                throw new IllegalArgumentException("Unsupported type opcode " + instruction.getOpcode());
+        }
+    }
+
+    private static void appendFieldInstruction(StringBuilder out, Field field, int index) {
+        String owner = JavascriptNameUtil.sanitizeClassName(field.getOwner());
+        String fieldName = field.getFieldName();
+        String propertyName = JavascriptNameUtil.fieldProperty(field.getOwner(), fieldName);
+        switch (field.getOpcode()) {
+            case Opcodes.GETSTATIC:
+                out.append("        jvm.ensureClassInitialized(\"").append(owner).append("\"); stack.push(jvm.classes[\"")
+                        .append(owner).append("\"].staticFields[\"").append(fieldName).append("\"]); pc = ")
+                        .append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.PUTSTATIC:
+                out.append("        jvm.ensureClassInitialized(\"").append(owner).append("\"); jvm.classes[\"")
+                        .append(owner).append("\"].staticFields[\"").append(fieldName).append("\"] = stack.pop(); pc = ")
+                        .append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.GETFIELD:
+                out.append("        { const target = stack.pop(); stack.push(target[\"").append(propertyName)
+                        .append("\"]); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.PUTFIELD:
+                out.append("        { const value = stack.pop(); const target = stack.pop(); target[\"").append(propertyName)
+                        .append("\"] = value; pc = ").append(index + 1).append("; break; }\n");
+                return;
+            default:
+                throw new IllegalArgumentException("Unsupported field opcode " + field.getOpcode());
+        }
+    }
+
+    private static void appendJumpInstruction(StringBuilder out, Jump jump, Map<Label, Integer> labelToIndex, int index) {
+        Integer target = labelToIndex.get(jump.getLabel());
+        if (target == null) {
+            throw new IllegalStateException("Missing label target for jump in JS backend");
+        }
+        switch (jump.getOpcode()) {
+            case Opcodes.GOTO:
+                out.append("        pc = ").append(target.intValue()).append("; break;\n");
+                return;
+            case Opcodes.IFEQ:
+                out.append("        pc = ((stack.pop()|0) == 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.IFNE:
+                out.append("        pc = ((stack.pop()|0) != 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.IFLT:
+                out.append("        pc = ((stack.pop()|0) < 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.IFLE:
+                out.append("        pc = ((stack.pop()|0) <= 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.IFGT:
+                out.append("        pc = ((stack.pop()|0) > 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.IFGE:
+                out.append("        pc = ((stack.pop()|0) >= 0) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.IFNULL:
+                out.append("        pc = (stack.pop() == null) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.IFNONNULL:
+                out.append("        pc = (stack.pop() != null) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.IF_ICMPEQ:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = ((a|0) == (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IF_ICMPNE:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = ((a|0) != (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IF_ICMPLT:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = ((a|0) < (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IF_ICMPLE:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = ((a|0) <= (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IF_ICMPGT:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = ((a|0) > (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IF_ICMPGE:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = ((a|0) >= (b|0)) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IF_ACMPEQ:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = (a === b) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.IF_ACMPNE:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); pc = (a !== b) ? ").append(target.intValue()).append(" : ").append(index + 1).append("; break; }\n");
+                return;
+            default:
+                throw new IllegalArgumentException("Unsupported jump opcode " + jump.getOpcode());
+        }
+    }
+
+    private static void appendInvokeInstruction(StringBuilder out, Invoke invoke, int index) {
+        String owner = JavascriptNameUtil.sanitizeClassName(invoke.getOwner());
+        String methodId = JavascriptNameUtil.methodIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        List<String> args = JavascriptNameUtil.argumentTypes(invoke.getDesc());
+        boolean hasReturn = invoke.getDesc().charAt(invoke.getDesc().length() - 1) != 'V';
+        int argCount = args.size();
+        switch (invoke.getOpcode()) {
+            case Opcodes.INVOKESTATIC:
+            case Opcodes.INVOKESPECIAL:
+                break;
+            case Opcodes.INVOKEVIRTUAL:
+            case Opcodes.INVOKEINTERFACE:
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported invoke opcode " + invoke.getOpcode());
+        }
+
+        if (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE) {
+            out.append("        {\n");
+            out.append("          const __args = [];\n");
+            for (int i = argCount - 1; i >= 0; i--) {
+                out.append("          __args.unshift(stack.pop());\n");
+            }
+            out.append("          const __target = stack.pop();\n");
+            out.append("          const __class = jvm.classes[__target.__class];\n");
+            out.append("          const __method = (__class && __class.methods && __class.methods[\"").append(methodId)
+                    .append("\"]) || jvm.resolveVirtual(__target.__class, \"").append(methodId).append("\");\n");
+            if (hasReturn) {
+                out.append("          const __result = yield* __method(");
+                appendInvocationArguments(out, true, argCount);
+                out.append(");\n");
+                out.append("          stack.push(__result);\n");
+            } else {
+                out.append("          yield* __method(");
+                appendInvocationArguments(out, true, argCount);
+                out.append(");\n");
+            }
+            out.append("          pc = ").append(index + 1).append("; break;\n");
+            out.append("        }\n");
+            return;
+        }
+
+        out.append("        {\n");
+        out.append("          const __args = [];\n");
+        for (int i = argCount - 1; i >= 0; i--) {
+            out.append("          __args.unshift(stack.pop());\n");
+        }
+        if (invoke.getOpcode() != Opcodes.INVOKESTATIC) {
+            out.append("          const __target = stack.pop();\n");
+        }
+        if (hasReturn) {
+            out.append("          const __result = yield* ").append(methodId).append("(");
+        } else {
+            out.append("          yield* ").append(methodId).append("(");
+        }
+        appendInvocationArguments(out, invoke.getOpcode() != Opcodes.INVOKESTATIC, argCount);
+        out.append(");\n");
+        if (hasReturn) {
+            out.append("          stack.push(__result);\n");
+        }
+        out.append("          pc = ").append(index + 1).append("; break;\n");
+        out.append("        }\n");
+    }
+
+    private static void appendInvocationArguments(StringBuilder out, boolean includeTarget, int argCount) {
+        boolean first = true;
+        if (includeTarget) {
+            out.append("__target");
+            first = false;
+        }
+        for (int i = 0; i < argCount; i++) {
+            if (!first) {
+                out.append(", ");
+            }
+            first = false;
+            out.append("__args[").append(i).append("]");
+        }
+    }
+}

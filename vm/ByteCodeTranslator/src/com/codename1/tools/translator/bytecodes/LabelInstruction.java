@@ -68,6 +68,10 @@ public class LabelInstruction extends Instruction {
         super(-1);
         this.parent = parent;
     }
+
+    public Label getLabel() {
+        return parent;
+    }
     
     public static int getLabelCatchDepth(Label l, List<Instruction> inst) {
         Integer i = labelCatchDepth.get(l);

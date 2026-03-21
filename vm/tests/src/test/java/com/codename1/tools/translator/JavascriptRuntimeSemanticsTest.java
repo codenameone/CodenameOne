@@ -1,0 +1,293 @@
+package com.codename1.tools.translator;
+
+import org.junit.jupiter.params.ParameterizedTest;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class JavascriptRuntimeSemanticsTest {
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void executesArrayCovarianceInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsArrayCovarianceApp.java", "JsArrayCovarianceApp");
+
+        assertEquals(511, result.result, "Translated runtime should preserve CN1-relevant array covariance semantics");
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void executesLocaleTimeZoneAndDateFormatInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsLocaleTimeZoneApp.java", "JsLocaleTimeZoneApp");
+
+        assertEquals(511, result.result, "Translated runtime should preserve browser-safe Locale/TimeZone/DateFormat semantics");
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void executesThreadWaitSleepJoinAndInterruptInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsThreadSemanticsApp.java", "JsThreadSemanticsApp");
+
+        assertEquals(32717, result.result, "Translated runtime should preserve CN1-relevant thread semantics");
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void executesGeneratedWorkerProtocolEndToEnd(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-worker-src");
+        Path classesDir = Files.createTempDirectory("js-worker-classes");
+        Path javaApiDir = Files.createTempDirectory("js-worker-javaapi");
+
+        Files.write(sourceDir.resolve("JsWorkerProtocolApp.java"),
+                JavascriptTargetIntegrationTest.loadFixture("JsWorkerProtocolApp.java").getBytes(StandardCharsets.UTF_8));
+
+        JavascriptTargetIntegrationTest.compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-worker-output");
+        JavascriptTargetIntegrationTest.runJavascriptTranslator(classesDir, outputDir, "JsWorkerProtocolApp");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsWorkerProtocolApp-js");
+        WorkerRunResult result = runGeneratedWorkerBundle(distDir);
+
+        assertEquals("result", result.type, "Generated worker bundle should report completion through the worker protocol");
+        assertEquals(321, result.result, "Generated worker bundle should execute start/result flow end-to-end");
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Generated worker bundle should not emit an error message");
+    }
+
+    private static WorkerRunResult translateAndRunFixture(CompilerHelper.CompilerConfig config, String fixtureName, String appName) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-runtime-src");
+        Path classesDir = Files.createTempDirectory("js-runtime-classes");
+        Path javaApiDir = Files.createTempDirectory("js-runtime-javaapi");
+
+        Files.write(sourceDir.resolve(appName + ".java"),
+                JavascriptTargetIntegrationTest.loadFixture(fixtureName).getBytes(StandardCharsets.UTF_8));
+
+        JavascriptTargetIntegrationTest.compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-runtime-output");
+        JavascriptTargetIntegrationTest.runJavascriptTranslator(classesDir, outputDir, appName);
+
+        Path distDir = outputDir.resolve("dist").resolve(appName + "-js");
+        return runWorkerBundle(distDir, appName);
+    }
+
+    private static WorkerRunResult runWorkerBundle(Path distDir, String appName) throws Exception {
+        Path harness = Files.createTempFile("js-worker-runtime", ".js");
+        Files.write(harness, workerHarnessSource(distDir, appName).getBytes(StandardCharsets.UTF_8));
+        Process process = new ProcessBuilder("node", harness.toString()).start();
+        String output = readAll(process.getInputStream());
+        String errors = readAll(process.getErrorStream());
+        int rc = process.waitFor();
+        assertEquals(0, rc, "Node worker harness should exit cleanly. stderr: " + errors);
+        WorkerRunResult out = new WorkerRunResult();
+        out.rawMessage = output.trim();
+        out.type = extractJsonString(output, "type");
+        String result = extractJsonNumber(output, "result");
+        out.result = result == null ? Integer.MIN_VALUE : Integer.parseInt(result);
+        out.errorMessage = extractJsonString(output, "message");
+        return out;
+    }
+
+    private static WorkerRunResult runGeneratedWorkerBundle(Path distDir) throws Exception {
+        Path harness = Files.createTempFile("js-worker-protocol", ".js");
+        Files.write(harness, generatedWorkerHarnessSource(distDir).getBytes(StandardCharsets.UTF_8));
+        Process process = new ProcessBuilder("node", harness.toString()).start();
+        String output = readAll(process.getInputStream());
+        String errors = readAll(process.getErrorStream());
+        int rc = process.waitFor();
+        assertEquals(0, rc, "Node worker-thread harness should exit cleanly. stderr: " + errors);
+        WorkerRunResult out = new WorkerRunResult();
+        out.rawMessage = output.trim();
+        out.type = extractJsonString(output, "type");
+        String result = extractJsonNumber(output, "result");
+        out.result = result == null ? Integer.MIN_VALUE : Integer.parseInt(result);
+        out.errorMessage = extractJsonString(output, "message");
+        return out;
+    }
+
+    private static String readAll(InputStream input) throws Exception {
+        try (InputStream in = input; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int len;
+            while ((len = in.read(buffer)) > -1) {
+                out.write(buffer, 0, len);
+            }
+            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private static String extractJsonString(String json, String key) {
+        String marker = "\"" + key + "\":\"";
+        int start = json.indexOf(marker);
+        if (start < 0) {
+            return null;
+        }
+        start += marker.length();
+        int end = json.indexOf('"', start);
+        return end < 0 ? null : json.substring(start, end);
+    }
+
+    private static String extractJsonNumber(String json, String key) {
+        String marker = "\"" + key + "\":";
+        int start = json.indexOf(marker);
+        if (start < 0) {
+            return null;
+        }
+        start += marker.length();
+        int end = start;
+        while (end < json.length()) {
+            char ch = json.charAt(end);
+            if ((ch < '0' || ch > '9') && ch != '-') {
+                break;
+            }
+            end++;
+        }
+        return json.substring(start, end);
+    }
+
+    private static String workerHarnessSource(Path distDir, String appName) {
+        return ""
+                + "const fs = require('fs');\n"
+                + "const path = require('path');\n"
+                + "const vm = require('vm');\n"
+                + "const __messages = [];\n"
+                + "let __timerId = 1;\n"
+                + "let __now = 0;\n"
+                + "const __timers = [];\n"
+                + "global.self = global;\n"
+                + "global.window = global;\n"
+                + "global.global = global;\n"
+                + "Date.now = function() { return __now; };\n"
+                + "global.setTimeout = function(fn, millis) {\n"
+                + "  const timer = { id: __timerId++, due: __now + Math.max(0, millis | 0), fn: fn, cleared: false };\n"
+                + "  __timers.push(timer);\n"
+                + "  return timer;\n"
+                + "};\n"
+                + "global.clearTimeout = function(timer) {\n"
+                + "  if (timer) {\n"
+                + "    timer.cleared = true;\n"
+                + "  }\n"
+                + "};\n"
+                + "global.postMessage = function(msg) { __messages.push(msg); };\n"
+                + "global.importScripts = function() {\n"
+                + "  for (const script of arguments) {\n"
+                + "    const scriptPath = path.join(" + quoteJs(distDir.toString()) + ", String(script));\n"
+                + "    let src = fs.readFileSync(scriptPath, 'utf8');\n"
+                + "    if (String(script) === 'translated_app.js') {\n"
+                + "      src += '\\nif (typeof jvm !== \"undefined\" && jvm.mainMethod) { global.__cn1ExportedMain = eval(jvm.mainMethod); }\\n';\n"
+                + "    }\n"
+                + "    vm.runInThisContext(src, { filename: scriptPath });\n"
+                + "  }\n"
+                + "};\n"
+                + "importScripts('parparvm_runtime.js');\n"
+                + "importScripts('translated_app.js');\n"
+                + "const mainFn = global.__cn1ExportedMain;\n"
+                + "const mainThreadObject = jvm.newObject('java_lang_Thread');\n"
+                + "mainThreadObject.cn1_java_lang_Thread_alive = 1;\n"
+                + "mainThreadObject.cn1_java_lang_Thread_name = jvm.createStringLiteral('main');\n"
+                + "jvm.spawn(mainThreadObject, mainFn(jvm.newArray(0, 'java_lang_String', 1)));\n"
+                + "while (jvm.runnable.length || __timers.length) {\n"
+                + "  if (jvm.runnable.length) {\n"
+                + "    jvm.drain();\n"
+                + "    continue;\n"
+                + "  }\n"
+                + "  __timers.sort(function(a, b) { return a.due - b.due || a.id - b.id; });\n"
+                + "  const timer = __timers.shift();\n"
+                + "  if (!timer || timer.cleared) {\n"
+                + "    continue;\n"
+                + "  }\n"
+                + "  __now = Math.max(__now, timer.due);\n"
+                + "  timer.fn();\n"
+                + "}\n"
+                + "const resultValue = jvm.classes[" + quoteJs(appName) + "].staticFields['result'];\n"
+                + "const finalMessage = __messages.length ? __messages[__messages.length - 1] : { type: 'result', result: resultValue };\n"
+                + "if (finalMessage.type !== 'error') {\n"
+                + "  finalMessage.type = 'result';\n"
+                + "  finalMessage.result = resultValue;\n"
+                + "}\n"
+                + "console.log(JSON.stringify(finalMessage));\n";
+    }
+
+    private static String generatedWorkerHarnessSource(Path distDir) {
+        return ""
+                + "const fs = require('fs');\n"
+                + "const path = require('path');\n"
+                + "const { Worker } = require('worker_threads');\n"
+                + "const bootstrapPath = path.join(" + quoteJs(distDir.toString()) + ", '__node_worker_bootstrap.js');\n"
+                + "fs.writeFileSync(bootstrapPath, `\n"
+                + "const fs = require('fs');\n"
+                + "const path = require('path');\n"
+                + "const vm = require('vm');\n"
+                + "const { parentPort, workerData } = require('worker_threads');\n"
+                + "global.self = global;\n"
+                + "global.window = global;\n"
+                + "global.global = global;\n"
+                + "global.postMessage = function(msg) { parentPort.postMessage(msg); };\n"
+                + "global.importScripts = function() {\n"
+                + "  for (const script of arguments) {\n"
+                + "    const scriptPath = path.join(workerData.distDir, String(script));\n"
+                + "    const src = fs.readFileSync(scriptPath, 'utf8');\n"
+                + "    vm.runInThisContext(src, { filename: scriptPath });\n"
+                + "  }\n"
+                + "};\n"
+                + "parentPort.on('message', function(data) {\n"
+                + "  if (typeof self.onmessage === 'function') {\n"
+                + "    self.onmessage({ data: data });\n"
+                + "  }\n"
+                + "});\n"
+                + "const workerSrc = fs.readFileSync(path.join(workerData.distDir, 'worker.js'), 'utf8');\n"
+                + "vm.runInThisContext(workerSrc, { filename: path.join(workerData.distDir, 'worker.js') });\n"
+                + "`);\n"
+                + "const worker = new Worker(bootstrapPath, { workerData: { distDir: " + quoteJs(distDir.toString()) + " } });\n"
+                + "let done = false;\n"
+                + "worker.on('message', function(msg) {\n"
+                + "  if (done) {\n"
+                + "    return;\n"
+                + "  }\n"
+                + "  if (msg && (msg.type === 'result' || msg.type === 'error')) {\n"
+                + "    done = true;\n"
+                + "    console.log(JSON.stringify(msg));\n"
+                + "    worker.terminate().then(function() { process.exit(0); });\n"
+                + "  }\n"
+                + "});\n"
+                + "worker.on('error', function(err) {\n"
+                + "  if (done) {\n"
+                + "    return;\n"
+                + "  }\n"
+                + "  done = true;\n"
+                + "  console.log(JSON.stringify({ type: 'error', message: String(err) }));\n"
+                + "  process.exit(1);\n"
+                + "});\n"
+                + "worker.postMessage({ type: 'start' });\n"
+                + "setTimeout(function() {\n"
+                + "  if (!done) {\n"
+                + "    console.log(JSON.stringify({ type: 'error', message: 'Timed out waiting for worker result' }));\n"
+                + "    worker.terminate().then(function() { process.exit(1); });\n"
+                + "  }\n"
+                + "}, 3000);\n";
+    }
+
+    private static String quoteJs(String value) {
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+    }
+
+    private static final class WorkerRunResult {
+        String type;
+        int result;
+        String errorMessage;
+        String rawMessage;
+    }
+}

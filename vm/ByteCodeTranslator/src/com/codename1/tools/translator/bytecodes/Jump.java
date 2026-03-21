@@ -123,7 +123,7 @@ public class Jump extends Instruction {
         }
     }
     
-    Label getLabel() {
+    public Label getLabel() {
         return label;
     }
     

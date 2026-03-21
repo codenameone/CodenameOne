@@ -82,4 +82,16 @@ public class SwitchInstruction extends Instruction {
         b.append("    }\n");
     }
 
+    public Label getDefaultLabel() {
+        return dflt;
+    }
+
+    public int[] getKeys() {
+        return keys;
+    }
+
+    public Label[] getLabels() {
+        return labels;
+    }
+
 }

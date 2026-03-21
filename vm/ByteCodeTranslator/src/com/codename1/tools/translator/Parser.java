@@ -60,6 +60,7 @@ public class Parser extends ClassVisitor {
         classes.clear();
         dependencyGraph.clear();
         BytecodeMethod.setDependencyGraph(null);
+        ByteCodeClass.cleanup();
         LabelInstruction.cleanup();
     }
     public static void parse(File sourceFile) throws Exception {
@@ -437,16 +438,20 @@ public class Parser extends ClassVisitor {
                 }
             }
 
-            generateClassAndMethodIndexHeader(outputDirectory);
+            if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+                JavascriptBundleWriter.write(outputDirectory, classes);
+            } else {
+                generateClassAndMethodIndexHeader(outputDirectory);
 
-            boolean concatenate = "true".equals(System.getProperty("concatenateFiles", "false"));
-            ConcatenatingFileOutputStream cos = concatenate ? new ConcatenatingFileOutputStream(outputDirectory) : null;
+                boolean concatenate = "true".equals(System.getProperty("concatenateFiles", "false"));
+                ConcatenatingFileOutputStream cos = concatenate ? new ConcatenatingFileOutputStream(outputDirectory) : null;
 
-            for(ByteCodeClass bc : classes) {
-                file = bc.getClsName();
-                writeFile(bc, outputDirectory, cos);
+                for(ByteCodeClass bc : classes) {
+                    file = bc.getClsName();
+                    writeFile(bc, outputDirectory, cos);
+                }
+                if (cos != null) cos.realClose();
             }
-            if (cos != null) cos.realClose();
         } catch(Throwable t) {
             System.out.println("Error while working with the class: " + file);
             t.printStackTrace();
@@ -629,6 +634,9 @@ public class Parser extends ClassVisitor {
         }
         if(ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_CSHARP) {
             outMain.write(cls.generateCSharpCode().getBytes(StandardCharsets.UTF_8));
+            outMain.close();
+        } else if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
+            outMain.write(cls.generateJavascriptCode(classes).getBytes(StandardCharsets.UTF_8));
             outMain.close();
         } else {
             outMain.write(cls.generateCCode(classes).getBytes(StandardCharsets.UTF_8));

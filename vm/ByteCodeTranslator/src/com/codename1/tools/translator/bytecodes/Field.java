@@ -50,6 +50,18 @@ public class Field extends Instruction implements AssignableExpression {
         char c = desc.charAt(0);
         return c == '[' || c == 'L';
     }
+
+    public String getOwner() {
+        return owner;
+    }
+
+    public String getFieldName() {
+        return name;
+    }
+
+    public String getDesc() {
+        return desc;
+    }
     
     @Override
     public void addDependencies(List<String> dependencyList) {

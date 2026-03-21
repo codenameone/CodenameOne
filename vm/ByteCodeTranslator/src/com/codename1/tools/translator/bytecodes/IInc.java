@@ -43,6 +43,10 @@ public class IInc extends Instruction {
         return var;
     }
 
+    public int getAmount() {
+        return num;
+    }
+
     @Override
     public void appendInstruction(StringBuilder b) {
         if(getMethod() != null && getMethod().isBarebone()) {
