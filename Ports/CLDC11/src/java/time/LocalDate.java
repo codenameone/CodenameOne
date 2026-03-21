@@ -33,11 +33,11 @@ public final class LocalDate implements Comparable<LocalDate>, TemporalAccessor 
     }
 
     public static LocalDate parse(CharSequence text) {
-        return DateTimeFormatter.ISO_LOCAL_DATE.parseLocalDate(text.toString());
+        return (LocalDate) DateTimeFormatter.ISO_LOCAL_DATE.parse(text);
     }
 
     public static LocalDate parse(CharSequence text, DateTimeFormatter formatter) {
-        return formatter.parseLocalDate(text.toString());
+        return (LocalDate) formatter.parse(text);
     }
 
     public int getYear() {

@@ -3,7 +3,7 @@ package java.time;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
 
-public final class ZonedDateTime implements Comparable<ZonedDateTime>, TemporalAccessor, DateTimeSupport.TemporalCarrier {
+public final class ZonedDateTime implements Comparable<ZonedDateTime>, TemporalAccessor {
     private final LocalDateTime dateTime;
     private final ZoneId zone;
     private final ZoneOffset offset;
@@ -40,11 +40,11 @@ public final class ZonedDateTime implements Comparable<ZonedDateTime>, TemporalA
     }
 
     public static ZonedDateTime parse(CharSequence text) {
-        return DateTimeFormatter.ISO_ZONED_DATE_TIME.parseZonedDateTime(text.toString());
+        return (ZonedDateTime) DateTimeFormatter.ISO_ZONED_DATE_TIME.parse(text);
     }
 
     public static ZonedDateTime parse(CharSequence text, DateTimeFormatter formatter) {
-        return formatter.parseZonedDateTime(text.toString());
+        return (ZonedDateTime) formatter.parse(text);
     }
 
     public LocalDateTime toLocalDateTime() {
@@ -88,7 +88,7 @@ public final class ZonedDateTime implements Comparable<ZonedDateTime>, TemporalA
         return DateTimeFormatter.ISO_ZONED_DATE_TIME.format(this);
     }
 
-    public ZoneId getZoneForFormatting() {
+    ZoneId getZoneForFormatting() {
         return zone;
     }
 }

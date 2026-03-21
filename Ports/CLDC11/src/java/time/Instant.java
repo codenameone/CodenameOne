@@ -3,7 +3,7 @@ package java.time;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
 
-public final class Instant implements Comparable<Instant>, TemporalAccessor, DateTimeSupport.TemporalCarrier {
+public final class Instant implements Comparable<Instant>, TemporalAccessor {
     private final long epochSecond;
     private final int nano;
 
@@ -33,7 +33,7 @@ public final class Instant implements Comparable<Instant>, TemporalAccessor, Dat
     }
 
     public static Instant parse(CharSequence text) {
-        return DateTimeFormatter.ISO_INSTANT.parseInstant(text.toString());
+        return (Instant) DateTimeFormatter.ISO_INSTANT.parse(text);
     }
 
     public long getEpochSecond() {
@@ -83,11 +83,11 @@ public final class Instant implements Comparable<Instant>, TemporalAccessor, Dat
         return DateTimeFormatter.ISO_INSTANT.format(this);
     }
 
-    public Instant toInstant() {
+    Instant toInstant() {
         return this;
     }
 
-    public ZoneId getZoneForFormatting() {
+    ZoneId getZoneForFormatting() {
         return ZoneOffset.UTC;
     }
 }

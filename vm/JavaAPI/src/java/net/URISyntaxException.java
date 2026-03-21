@@ -64,7 +64,7 @@ public class URISyntaxException extends Exception {
 	/**
 	 * @param index the index to set
 	 */
-	public void setIndex(int index) {
+	void setIndex(int index) {
 		this.index = index;
 	}
 
@@ -78,7 +78,7 @@ public class URISyntaxException extends Exception {
 	/**
 	 * @param input the input to set
 	 */
-	public void setInput(String input) {
+	void setInput(String input) {
 		this.input = input;
 	}
 
@@ -92,7 +92,7 @@ public class URISyntaxException extends Exception {
 	/**
 	 * @param reason the reason to set
 	 */
-	public void setReason(String reason) {
+	void setReason(String reason) {
 		this.reason = reason;
 	}
 }

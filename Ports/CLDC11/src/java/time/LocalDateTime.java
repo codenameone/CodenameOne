@@ -3,7 +3,7 @@ package java.time;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
 
-public final class LocalDateTime implements Comparable<LocalDateTime>, TemporalAccessor, DateTimeSupport.TemporalCarrier {
+public final class LocalDateTime implements Comparable<LocalDateTime>, TemporalAccessor {
     private final LocalDate date;
     private final LocalTime time;
 
@@ -41,11 +41,11 @@ public final class LocalDateTime implements Comparable<LocalDateTime>, TemporalA
     }
 
     public static LocalDateTime parse(CharSequence text) {
-        return DateTimeFormatter.ISO_LOCAL_DATE_TIME.parseLocalDateTime(text.toString());
+        return (LocalDateTime) DateTimeFormatter.ISO_LOCAL_DATE_TIME.parse(text);
     }
 
     public static LocalDateTime parse(CharSequence text, DateTimeFormatter formatter) {
-        return formatter.parseLocalDateTime(text.toString());
+        return (LocalDateTime) formatter.parse(text);
     }
 
     public LocalDate toLocalDate() {
@@ -131,11 +131,11 @@ public final class LocalDateTime implements Comparable<LocalDateTime>, TemporalA
         return DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(this);
     }
 
-    public Instant toInstant() {
+    Instant toInstant() {
         return toInstant(ZoneOffset.UTC);
     }
 
-    public ZoneId getZoneForFormatting() {
+    ZoneId getZoneForFormatting() {
         return ZoneOffset.UTC;
     }
 }

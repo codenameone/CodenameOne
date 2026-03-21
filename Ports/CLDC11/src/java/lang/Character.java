@@ -93,22 +93,22 @@ public final class Character{
     /**
      * Determines if the specified character is alphabetic.
      */
-    public static boolean isAlpha(char ch){
+    static boolean isLetterCompat(char ch){
         return isLowerCase(ch) || isUpperCase(ch);
     }
 
     /**
      * Determines if the specified character is numeric.
      */
-    public static boolean isNumeric(char ch){
+    static boolean isDigitCompat(char ch){
         return isDigit(ch);
     }
 
     /**
      * Determines if the specified character is alphabetic or numeric.
      */
-    public static boolean isAlphaNumeric(char ch){
-        return isAlpha(ch) || isNumeric(ch);
+    static boolean isLetterOrDigitCompat(char ch){
+        return isLetterCompat(ch) || isDigitCompat(ch);
     }
 
     /**

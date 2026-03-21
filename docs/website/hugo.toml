@@ -86,6 +86,12 @@ url = "/initializr/"
 weight = 16
 
 [[menu.main]]
+parent = "developers"
+name = "Playground"
+url = "/playground/"
+weight = 17
+
+[[menu.main]]
 identifier = "resources"
 name = "RESOURCES"
 url = "#"

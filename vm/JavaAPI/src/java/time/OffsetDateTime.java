@@ -3,7 +3,7 @@ package java.time;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
 
-public final class OffsetDateTime implements Comparable<OffsetDateTime>, TemporalAccessor, DateTimeSupport.TemporalCarrier {
+public final class OffsetDateTime implements Comparable<OffsetDateTime>, TemporalAccessor {
     private final LocalDateTime dateTime;
     private final ZoneOffset offset;
 
@@ -27,11 +27,11 @@ public final class OffsetDateTime implements Comparable<OffsetDateTime>, Tempora
     }
 
     public static OffsetDateTime parse(CharSequence text) {
-        return DateTimeFormatter.ISO_OFFSET_DATE_TIME.parseOffsetDateTime(text.toString());
+        return (OffsetDateTime) DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(text);
     }
 
     public static OffsetDateTime parse(CharSequence text, DateTimeFormatter formatter) {
-        return formatter.parseOffsetDateTime(text.toString());
+        return (OffsetDateTime) formatter.parse(text);
     }
 
     public LocalDateTime toLocalDateTime() {
@@ -67,7 +67,7 @@ public final class OffsetDateTime implements Comparable<OffsetDateTime>, Tempora
         return DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(this);
     }
 
-    public ZoneId getZoneForFormatting() {
+    ZoneId getZoneForFormatting() {
         return offset;
     }
 }

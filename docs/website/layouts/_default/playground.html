@@ -1,0 +1,230 @@
+{{- define "main" }}
+<section class="cn1-playground-page">
+  <div class="cn1-playground-shell">
+    <div class="cn1-playground-loader" id="cn1-playground-loader" aria-live="polite">
+      <img class="icon" src="/playground-app/icon.png" alt="Playground icon" />
+      <div class="cn1-loader-ring"></div>
+      <div class="cn1-loader-progress">
+        <div class="cn1-loader-progress-bar"></div>
+      </div>
+      <p class="cn1-loader-label">Loading Playground...</p>
+    </div>
+    <iframe
+      id="cn1-playground-frame"
+      class="cn1-playground-frame"
+      src="/playground-app/index.html"
+      title="Codename One Playground"
+      loading="eager">
+    </iframe>
+  </div>
+</section>
+
+<style>
+:root {
+  --cn1-playground-bg: #eef3ff;
+  --cn1-playground-loader-bg: #eef3ff;
+  --cn1-playground-loader-text: #1d2638;
+  --cn1-playground-loader-progress-bg: rgba(255, 255, 255, 0.72);
+  --cn1-playground-loader-progress-border: rgba(49, 105, 230, 0.25);
+}
+
+body.dark,
+body.cn1-playground-dark {
+  --cn1-playground-bg: #0a111d;
+  --cn1-playground-loader-bg: #0a111d;
+  --cn1-playground-loader-text: #d8e4ff;
+  --cn1-playground-loader-progress-bg: rgba(10, 18, 31, 0.86);
+  --cn1-playground-loader-progress-border: rgba(84, 128, 221, 0.45);
+}
+
+.cn1-playground-page {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  background: var(--cn1-playground-bg);
+}
+
+.cn1-playground-shell {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: var(--cn1-playground-bg);
+  box-shadow: none;
+}
+
+.cn1-playground-loader {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 1rem;
+  z-index: 2;
+  text-align: center;
+  padding: 2rem;
+  color: var(--cn1-playground-loader-text);
+  background-color: var(--cn1-playground-loader-bg);
+  background-image:
+    radial-gradient(1000px 420px at 20% 0%, rgba(99, 142, 255, 0.22), rgba(99, 142, 255, 0) 65%),
+    radial-gradient(720px 360px at 100% 100%, rgba(60, 173, 216, 0.2), rgba(60, 173, 216, 0) 65%);
+  transition: opacity 220ms ease-out, visibility 220ms ease-out;
+}
+
+.cn1-playground-loader.done {
+  opacity: 0;
+  visibility: hidden;
+}
+
+body.dark .cn1-playground-loader,
+body.cn1-playground-dark .cn1-playground-loader {
+  background-image:
+    radial-gradient(1000px 420px at 20% 0%, rgba(80, 120, 216, 0.26), rgba(80, 120, 216, 0) 65%),
+    radial-gradient(720px 360px at 100% 100%, rgba(52, 168, 196, 0.24), rgba(52, 168, 196, 0) 65%);
+}
+
+.cn1-playground-loader .icon {
+  width: 110px;
+  height: auto;
+  border-radius: 18px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+}
+
+.cn1-loader-ring {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 3px solid rgba(49, 105, 230, 0.25);
+  border-top-color: #3169e6;
+  animation: cn1-spin 0.9s linear infinite;
+}
+
+.cn1-loader-progress {
+  width: min(340px, 75vw);
+  height: 9px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--cn1-playground-loader-progress-border);
+  background: var(--cn1-playground-loader-progress-bg);
+}
+
+.cn1-loader-progress-bar {
+  width: 35%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2f66e4, #3dc8d1);
+  box-shadow: 0 0 18px rgba(47, 102, 228, 0.5);
+  animation: cn1-shimmer 1.2s ease-in-out infinite;
+}
+
+.cn1-loader-label {
+  margin: 0;
+  font-size: 0.95rem;
+  opacity: 0.88;
+}
+
+.cn1-playground-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--cn1-playground-bg);
+}
+
+@keyframes cn1-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes cn1-shimmer {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(300%); }
+}
+
+body.cn1-playground-page-body {
+  overflow: hidden;
+}
+
+body.cn1-playground-page-body .main {
+  padding: 0;
+  margin: 0;
+  max-width: none;
+  width: 100%;
+  height: calc(100dvh - var(--cn1-playground-header-height, 76px));
+  overflow: hidden;
+}
+</style>
+
+<script>
+(function () {
+  var body = document.body;
+  var root = document.documentElement;
+  var frame = document.getElementById("cn1-playground-frame");
+  var loader = document.getElementById("cn1-playground-loader");
+  var siteHeader = document.querySelector(".header");
+  var mediaQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+
+  function syncHeight() {
+    var h = siteHeader ? siteHeader.offsetHeight : 76;
+    root.style.setProperty("--cn1-playground-header-height", h + "px");
+  }
+
+  function syncTheme() {
+    var pref = "";
+    var dark = false;
+    try {
+      pref = localStorage.getItem("pref-theme") || "";
+    } catch (e) {
+      pref = "";
+    }
+    if (pref === "dark") {
+      dark = true;
+    } else if (pref === "light") {
+      dark = false;
+    } else {
+      dark = body.classList.contains("dark") || !!(mediaQuery && mediaQuery.matches);
+    }
+    body.classList.toggle("cn1-playground-dark", dark);
+  }
+
+  body.classList.add("cn1-playground-page-body");
+  syncHeight();
+  syncTheme();
+  window.addEventListener("resize", syncHeight);
+  document.addEventListener("click", function (evt) {
+    if (evt.target && evt.target.id === "theme-toggle") {
+      window.requestAnimationFrame(syncTheme);
+    }
+  });
+  if (mediaQuery && mediaQuery.addEventListener) {
+    mediaQuery.addEventListener("change", syncTheme);
+  } else if (mediaQuery && mediaQuery.addListener) {
+    mediaQuery.addListener(syncTheme);
+  }
+  if (window.MutationObserver) {
+    new MutationObserver(syncTheme).observe(body, {
+      attributes: true,
+      attributeFilter: ["class"]
+    });
+  }
+
+  if (frame && loader) {
+    var loaderHidden = false;
+    var hideLoader = function () {
+      if (loaderHidden) {
+        return;
+      }
+      loaderHidden = true;
+      loader.classList.add("done");
+    };
+
+    frame.addEventListener("load", function () {
+      window.setTimeout(hideLoader, 1200);
+    });
+  }
+})();
+</script>
+{{- end }}

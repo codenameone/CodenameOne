@@ -36,7 +36,7 @@ public class Locale {
         this.country = locale;
     }
     
-    public Locale() {
+    Locale() {
         language = getOSLanguage();
         int pos;
         if (language != null && (pos = language.indexOf('-')) != -1) {

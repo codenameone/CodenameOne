@@ -30,11 +30,11 @@ import java.util.TimeZone;
  * 
  */
 public class DateFormatSymbols implements Cloneable {
-	public static final int ZONE_ID = 0;
-	public static final int ZONE_LONGNAME = 1;
-	public static final int ZONE_SHORTNAME = 2;
-	public static final int ZONE_LONGNAME_DST = 3;
-	public static final int ZONE_SHORTNAME_DST = 4;
+	static final int ZONE_ID = 0;
+	static final int ZONE_LONGNAME = 1;
+	static final int ZONE_SHORTNAME = 2;
+	static final int ZONE_LONGNAME_DST = 3;
+	static final int ZONE_SHORTNAME_DST = 4;
 	private static final String L10N_ZONE_LONGNAME = "ZONE_LONGNAME_";
 	private static final String L10N_ZONE_SHORTNAME = "ZONE_SHORTNAME_";
 	private static final String L10N_ZONE_LONGNAME_DST = "ZONE_LONGNAME_DST_";
@@ -83,11 +83,11 @@ public class DateFormatSymbols implements Cloneable {
 		ampms = newAmpms;
 	}
 
-	public Hashtable<String, String> getResourceBundle() {
+	Hashtable<String, String> getResourceBundle() {
 		return resourceBundle;
 	}
 
-	public void setResourceBundle(Hashtable<String, String> newResourceBundle) {
+	void setResourceBundle(Hashtable<String, String> newResourceBundle) {
 		this.resourceBundle = newResourceBundle;
 		// force rebuild
 		ampms = null;

@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'docs/website/**'
+      - 'scripts/cn1playground/**'
       - 'scripts/initializr/**'
       - 'scripts/website/**'
       - '.github/workflows/website-docs.yml'
@@ -12,6 +13,7 @@ on:
     branches: [main, master]
     paths:
       - 'docs/website/**'
+      - 'scripts/cn1playground/**'
       - 'scripts/initializr/**'
       - 'scripts/website/**'
       - '.github/workflows/website-docs.yml'
@@ -88,6 +90,7 @@ jobs:
           WEBSITE_INCLUDE_JAVADOCS: "true"
           WEBSITE_INCLUDE_DEVGUIDE: "true"
           WEBSITE_INCLUDE_INITIALIZR: "auto"
+          WEBSITE_INCLUDE_PLAYGROUND: "auto"
           CN1_USER: ${{ secrets.CN1_USER }}
           CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
 
@@ -96,6 +99,11 @@ jobs:
           set -euo pipefail
           test -f docs/website/public/initializr/index.html
 
+      - name: Validate Playground page output
+        run: |
+          set -euo pipefail
+          test -f docs/website/public/playground/index.html
+
       - name: Validate Initializr JS bundle output
         run: |
           set -euo pipefail
@@ -103,6 +111,18 @@ jobs:
             test -f docs/website/public/initializr-app/index.html
           else
             echo "CN1 credentials not configured; skipping Initializr JS bundle output validation."
+          fi
+        env:
+          CN1_USER: ${{ secrets.CN1_USER }}
+          CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
+
+      - name: Validate Playground JS bundle output
+        run: |
+          set -euo pipefail
+          if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
+            test -f docs/website/public/playground-app/index.html
+          else
+            echo "CN1 credentials not configured; skipping Playground JS bundle output validation."
           fi
         env:
           CN1_USER: ${{ secrets.CN1_USER }}

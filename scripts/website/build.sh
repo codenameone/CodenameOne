@@ -21,6 +21,7 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 WEBSITE_INCLUDE_JAVADOCS="${WEBSITE_INCLUDE_JAVADOCS:-false}"
 WEBSITE_INCLUDE_DEVGUIDE="${WEBSITE_INCLUDE_DEVGUIDE:-auto}"
 WEBSITE_INCLUDE_INITIALIZR="${WEBSITE_INCLUDE_INITIALIZR:-false}"
+WEBSITE_INCLUDE_PLAYGROUND="${WEBSITE_INCLUDE_PLAYGROUND:-false}"
 CN1_USER="${CN1_USER:-}"
 CN1_TOKEN="${CN1_TOKEN:-}"
 
@@ -31,6 +32,49 @@ if [ "${WEBSITE_INCLUDE_INITIALIZR}" = "auto" ]; then
     WEBSITE_INCLUDE_INITIALIZR="false"
   fi
 fi
+
+if [ "${WEBSITE_INCLUDE_PLAYGROUND}" = "auto" ]; then
+  if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
+    WEBSITE_INCLUDE_PLAYGROUND="true"
+  else
+    WEBSITE_INCLUDE_PLAYGROUND="false"
+  fi
+fi
+
+set_cn1_user_token() {
+  local project_dir="$1"
+
+  if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
+    if ! ./mvnw -q -U -pl javascript -am \
+      cn1:set-user-token \
+      -Dcodename1.platform=javascript \
+      -Duser="${CN1_USER}" \
+      -Dtoken="${CN1_TOKEN}"; then
+      echo "cn1:set-user-token is unavailable in this plugin version for ${project_dir}; writing CN1 credentials directly to Java preferences." >&2
+      local tmp_dir
+      tmp_dir="$(mktemp -d)"
+      cat > "${tmp_dir}/SetCn1Prefs.java" <<'JAVA'
+import java.util.prefs.Preferences;
+
+public class SetCn1Prefs {
+    public static void main(String[] args) {
+        if (args.length != 2) {
+            throw new IllegalArgumentException("Usage: SetCn1Prefs <user> <token>");
+        }
+        Preferences prefs = Preferences.userRoot().node("/com/codename1/ui");
+        prefs.put("user", args[0]);
+        prefs.put("token", args[1]);
+    }
+}
+JAVA
+      javac "${tmp_dir}/SetCn1Prefs.java"
+      java -cp "${tmp_dir}" SetCn1Prefs "${CN1_USER}" "${CN1_TOKEN}"
+      rm -rf "${tmp_dir}"
+    fi
+  else
+    echo "CN1_USER/CN1_TOKEN not provided; building ${project_dir} JavaScript without setting token." >&2
+  fi
+}
 
 build_javadocs_for_site() {
   if [ "${WEBSITE_INCLUDE_JAVADOCS}" != "true" ]; then
@@ -489,36 +533,7 @@ build_initializr_for_site() {
       -Dcodename1.platform=javascript \
       install
 
-    if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
-      if ! run_initializr_mvn -q -U -pl javascript -am \
-        cn1:set-user-token \
-        -Dcodename1.platform=javascript \
-        -Duser="${CN1_USER}" \
-        -Dtoken="${CN1_TOKEN}"; then
-        echo "cn1:set-user-token is unavailable in this plugin version; writing CN1 credentials directly to Java preferences." >&2
-        local tmp_dir
-        tmp_dir="$(mktemp -d)"
-        cat > "${tmp_dir}/SetCn1Prefs.java" <<'JAVA'
-import java.util.prefs.Preferences;
-
-public class SetCn1Prefs {
-    public static void main(String[] args) {
-        if (args.length != 2) {
-            throw new IllegalArgumentException("Usage: SetCn1Prefs <user> <token>");
-        }
-        Preferences prefs = Preferences.userRoot().node("/com/codename1/ui");
-        prefs.put("user", args[0]);
-        prefs.put("token", args[1]);
-    }
-}
-JAVA
-        javac "${tmp_dir}/SetCn1Prefs.java"
-        java -cp "${tmp_dir}" SetCn1Prefs "${CN1_USER}" "${CN1_TOKEN}"
-        rm -rf "${tmp_dir}"
-      fi
-    else
-      echo "CN1_USER/CN1_TOKEN not provided; building Initializr JavaScript without setting token." >&2
-    fi
+    set_cn1_user_token "Initializr"
 
     run_initializr_mvn -q -U -pl javascript -am \
       -DskipTests \
@@ -548,6 +563,52 @@ JAVA
   fi
 }
 
+build_playground_for_site() {
+  if [ "${WEBSITE_INCLUDE_PLAYGROUND}" != "true" ]; then
+    return
+  fi
+
+  echo "Building Playground JavaScript bundle for website..." >&2
+  (
+    cd "${REPO_ROOT}/scripts/cn1playground"
+
+    run_playground_mvn() {
+      if command -v xvfb-run >/dev/null 2>&1; then
+        xvfb-run -a ./mvnw "$@"
+      else
+        ./mvnw "$@"
+      fi
+    }
+
+    set_cn1_user_token "Playground"
+    run_playground_mvn -q -U -pl javascript -am \
+      -DskipTests \
+      -Dautomated=true \
+      -Dcodename1.platform=javascript \
+      package
+  )
+
+  local output_dir="${WEBSITE_DIR}/static/playground-app"
+  local result_zip="${REPO_ROOT}/scripts/cn1playground/javascript/target/result.zip"
+  if [ ! -f "${result_zip}" ]; then
+    result_zip="$(ls -1 "${REPO_ROOT}"/scripts/cn1playground/javascript/target/cn1playground-javascript-*.zip 2>/dev/null | head -n1 || true)"
+  fi
+
+  if [ -z "${result_zip}" ] || [ ! -f "${result_zip}" ]; then
+    echo "Could not locate Playground JavaScript build zip output in scripts/cn1playground/javascript/target." >&2
+    exit 1
+  fi
+
+  rm -rf "${output_dir}"
+  mkdir -p "${output_dir}"
+  unzip -q -o "${result_zip}" -d "${output_dir}"
+
+  if [ ! -f "${output_dir}/index.html" ]; then
+    echo "Playground website bundle is missing index.html after extraction." >&2
+    exit 1
+  fi
+}
+
 if ! command -v "${HUGO_BIN}" >/dev/null 2>&1; then
   echo "Hugo binary not found. Install Hugo (extended) and retry." >&2
   exit 1
@@ -556,6 +617,7 @@ fi
 build_javadocs_for_site
 build_developer_guide_for_site
 build_initializr_for_site
+build_playground_for_site
 
 cd "${WEBSITE_DIR}"
 

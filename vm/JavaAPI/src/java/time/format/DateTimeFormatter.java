@@ -1,6 +1,7 @@
 package java.time.format;
 
-import java.time.DateTimeSupport;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -10,7 +11,9 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAccessor;
+import java.util.Date;
 import java.util.Locale;
+import java.util.TimeZone;
 
 public final class DateTimeFormatter {
     private static final int TYPE_PATTERN = 0;
@@ -92,9 +95,9 @@ public final class DateTimeFormatter {
         }
     }
 
-    public LocalDate parseLocalDate(String text) {
+    LocalDate parseLocalDate(String text) {
         if (type == TYPE_PATTERN) {
-            DateTimeSupport.ParsedPatternResult parsed = DateTimeSupport.parsePattern(text, pattern, ZoneOffset.UTC, locale);
+            ParsedPatternResult parsed = parsePattern(text, pattern, ZoneOffset.UTC, locale);
             return LocalDateTime.ofInstant(parsed.instant, ZoneOffset.UTC).toLocalDate();
         }
         if (type != TYPE_ISO_LOCAL_DATE) {
@@ -103,9 +106,9 @@ public final class DateTimeFormatter {
         return LocalDate.of(parseInt(text, 0, 4), parseInt(text, 5, 7), parseInt(text, 8, 10));
     }
 
-    public LocalTime parseLocalTime(String text) {
+    LocalTime parseLocalTime(String text) {
         if (type == TYPE_PATTERN) {
-            DateTimeSupport.ParsedPatternResult parsed = DateTimeSupport.parsePattern(text, pattern, ZoneOffset.UTC, locale);
+            ParsedPatternResult parsed = parsePattern(text, pattern, ZoneOffset.UTC, locale);
             return LocalDateTime.ofInstant(parsed.instant, ZoneOffset.UTC).toLocalTime();
         }
         if (type != TYPE_ISO_LOCAL_TIME) {
@@ -129,9 +132,9 @@ public final class DateTimeFormatter {
         return LocalTime.of(hour, minute, second, nano);
     }
 
-    public LocalDateTime parseLocalDateTime(String text) {
+    LocalDateTime parseLocalDateTime(String text) {
         if (type == TYPE_PATTERN) {
-            DateTimeSupport.ParsedPatternResult parsed = DateTimeSupport.parsePattern(text, pattern, ZoneOffset.UTC, locale);
+            ParsedPatternResult parsed = parsePattern(text, pattern, ZoneOffset.UTC, locale);
             return LocalDateTime.ofInstant(parsed.instant, ZoneOffset.UTC);
         }
         if (type != TYPE_ISO_LOCAL_DATE_TIME) {
@@ -141,9 +144,9 @@ public final class DateTimeFormatter {
         return LocalDateTime.of(parseLocalDate(text.substring(0, t)), parseLocalTime(text.substring(t + 1)));
     }
 
-    public OffsetDateTime parseOffsetDateTime(String text) {
+    OffsetDateTime parseOffsetDateTime(String text) {
         if (type == TYPE_PATTERN) {
-            DateTimeSupport.ParsedPatternResult parsed = DateTimeSupport.parsePattern(text, pattern, ZoneOffset.UTC, locale);
+            ParsedPatternResult parsed = parsePattern(text, pattern, ZoneOffset.UTC, locale);
             return OffsetDateTime.ofInstant(parsed.instant, parsed.zone);
         }
         if (type != TYPE_ISO_OFFSET_DATE_TIME) {
@@ -158,9 +161,9 @@ public final class DateTimeFormatter {
         return OffsetDateTime.of(ldt, offset);
     }
 
-    public ZonedDateTime parseZonedDateTime(String text) {
+    ZonedDateTime parseZonedDateTime(String text) {
         if (type == TYPE_PATTERN) {
-            DateTimeSupport.ParsedPatternResult parsed = DateTimeSupport.parsePattern(text, pattern, ZoneId.systemDefault(), locale);
+            ParsedPatternResult parsed = parsePattern(text, pattern, ZoneId.systemDefault(), locale);
             return ZonedDateTime.ofInstant(parsed.instant, parsed.zone);
         }
         if (type != TYPE_ISO_ZONED_DATE_TIME) {
@@ -177,7 +180,7 @@ public final class DateTimeFormatter {
         return ZonedDateTime.ofInstant(ldt.toInstant(offset), zone);
     }
 
-    public Instant parseInstant(String text) {
+    Instant parseInstant(String text) {
         if (type != TYPE_ISO_INSTANT) {
             throw new DateTimeParseException("Formatter does not produce Instant", text, 0);
         }
@@ -188,10 +191,67 @@ public final class DateTimeFormatter {
     }
 
     private String formatPattern(TemporalAccessor temporal) {
-        if (!(temporal instanceof DateTimeSupport.TemporalCarrier)) {
+        ZoneId zone;
+        Instant instant;
+        if (temporal instanceof Instant) {
+            instant = (Instant) temporal;
+            zone = ZoneOffset.UTC;
+        } else if (temporal instanceof LocalDateTime) {
+            instant = ((LocalDateTime) temporal).toInstant(ZoneOffset.UTC);
+            zone = ZoneOffset.UTC;
+        } else if (temporal instanceof OffsetDateTime) {
+            OffsetDateTime offsetDateTime = (OffsetDateTime) temporal;
+            instant = offsetDateTime.toInstant();
+            zone = offsetDateTime.getOffset();
+        } else if (temporal instanceof ZonedDateTime) {
+            ZonedDateTime zonedDateTime = (ZonedDateTime) temporal;
+            instant = zonedDateTime.toInstant();
+            zone = zonedDateTime.getZone();
+        } else {
             throw new IllegalArgumentException("Unsupported temporal type");
         }
-        return DateTimeSupport.formatPattern(pattern, (DateTimeSupport.TemporalCarrier) temporal, locale);
+        SimpleDateFormat sdf = newFormat(pattern, zone, locale);
+        TimeZone original = TimeZone.getDefault();
+        try {
+            if (zone != null) {
+                TimeZone.setDefault(zone.toTimeZone());
+            }
+            return sdf.format(new Date(instant.toEpochMilli()));
+        } finally {
+            TimeZone.setDefault(original);
+        }
+    }
+
+    private static SimpleDateFormat newFormat(String pattern, ZoneId zone, Locale locale) {
+        return new SimpleDateFormat(pattern);
+    }
+
+    private static ParsedPatternResult parsePattern(String text, String pattern, ZoneId defaultZone, Locale locale) {
+        TimeZone original = TimeZone.getDefault();
+        try {
+            if (defaultZone != null) {
+                TimeZone.setDefault(defaultZone.toTimeZone());
+            }
+            SimpleDateFormat sdf = newFormat(pattern, defaultZone, locale);
+            Date date = sdf.parse(text);
+            Instant instant = Instant.ofEpochMilli(date.getTime());
+            ZoneId zone = defaultZone == null ? ZoneOffset.UTC : defaultZone;
+            return new ParsedPatternResult(instant, zone);
+        } catch (ParseException err) {
+            throw new DateTimeParseException(err.getMessage(), text, 0);
+        } finally {
+            TimeZone.setDefault(original);
+        }
+    }
+
+    private static final class ParsedPatternResult {
+        final Instant instant;
+        final ZoneId zone;
+
+        ParsedPatternResult(Instant instant, ZoneId zone) {
+            this.instant = instant;
+            this.zone = zone;
+        }
     }
 
     private static int parseInt(String text, int start, int end) {

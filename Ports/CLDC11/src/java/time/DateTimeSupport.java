@@ -7,7 +7,7 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
 
-public final class DateTimeSupport {
+final class DateTimeSupport {
     static final long MILLIS_PER_SECOND = 1000L;
     static final long MILLIS_PER_DAY = 86400000L;
     static final long SECONDS_PER_DAY = 86400L;
@@ -20,7 +20,7 @@ public final class DateTimeSupport {
     private DateTimeSupport() {
     }
 
-    public static int floorDiv(int x, int y) {
+    static int floorDiv(int x, int y) {
         int r = x / y;
         if ((x ^ y) < 0 && (r * y != x)) {
             r--;
@@ -28,7 +28,7 @@ public final class DateTimeSupport {
         return r;
     }
 
-    public static long floorDiv(long x, long y) {
+    static long floorDiv(long x, long y) {
         long r = x / y;
         if ((x ^ y) < 0 && (r * y != x)) {
             r--;
@@ -36,19 +36,19 @@ public final class DateTimeSupport {
         return r;
     }
 
-    public static int floorMod(int x, int y) {
+    static int floorMod(int x, int y) {
         return x - floorDiv(x, y) * y;
     }
 
-    public static long floorMod(long x, long y) {
+    static long floorMod(long x, long y) {
         return x - floorDiv(x, y) * y;
     }
 
-    public static boolean isLeapYear(int year) {
+    static boolean isLeapYear(int year) {
         return ((year & 3) == 0) && ((year % 100) != 0 || (year % 400) == 0);
     }
 
-    public static int lengthOfMonth(int year, int month) {
+    static int lengthOfMonth(int year, int month) {
         switch (month) {
             case 2:
                 return isLeapYear(year) ? 29 : 28;
@@ -62,7 +62,7 @@ public final class DateTimeSupport {
         }
     }
 
-    public static long toEpochDay(int year, int month, int dayOfMonth) {
+    static long toEpochDay(int year, int month, int dayOfMonth) {
         long y = year;
         long m = month;
         long total = 365L * y;
@@ -82,7 +82,7 @@ public final class DateTimeSupport {
         return total - DAYS_0000_TO_1970;
     }
 
-    public static int[] epochDayToDate(long epochDay) {
+    static int[] epochDayToDate(long epochDay) {
         long zeroDay = epochDay + DAYS_0000_TO_1970;
         zeroDay -= 60;
         long adjust = 0;
@@ -106,7 +106,7 @@ public final class DateTimeSupport {
         return new int[] { (int) yearEst, month, day };
     }
 
-    public static void checkDate(int year, int month, int day) {
+    static void checkDate(int year, int month, int day) {
         if (month < 1 || month > 12) {
             throw new IllegalArgumentException("Invalid month: " + month);
         }
@@ -116,7 +116,7 @@ public final class DateTimeSupport {
         }
     }
 
-    public static void checkTime(int hour, int minute, int second, int nano) {
+    static void checkTime(int hour, int minute, int second, int nano) {
         if (hour < 0 || hour > 23) {
             throw new IllegalArgumentException("Invalid hour: " + hour);
         }
@@ -131,22 +131,22 @@ public final class DateTimeSupport {
         }
     }
 
-    public static long toEpochSecond(LocalDate date, LocalTime time, ZoneOffset offset) {
+    static long toEpochSecond(LocalDate date, LocalTime time, ZoneOffset offset) {
         long days = date.toEpochDay();
         long secs = days * SECONDS_PER_DAY + time.toSecondOfDay();
         return secs - offset.getTotalSeconds();
     }
 
-    public static int millisOfSecond(int nano) {
+    static int millisOfSecond(int nano) {
         return nano / 1000000;
     }
 
-    public static Calendar newCalendar(TimeZone tz) {
+    static Calendar newCalendar(TimeZone tz) {
         Calendar out = Calendar.getInstance(tz);
         return out;
     }
 
-    public static LocalDateTime localDateTimeFromInstant(Instant instant, ZoneId zone) {
+    static LocalDateTime localDateTimeFromInstant(Instant instant, ZoneId zone) {
         ZoneOffset offset = offsetFromInstant(instant, zone);
         long localSecond = instant.getEpochSecond() + offset.getTotalSeconds();
         long epochDay = floorDiv(localSecond, SECONDS_PER_DAY);
@@ -156,7 +156,7 @@ public final class DateTimeSupport {
         return LocalDateTime.of(date, time);
     }
 
-    public static ZoneOffset offsetFromInstant(Instant instant, ZoneId zone) {
+    static ZoneOffset offsetFromInstant(Instant instant, ZoneId zone) {
         TimeZone tz = zone.toTimeZone();
         Calendar cal = newCalendar(TimeZone.getTimeZone("GMT"));
         cal.setTime(new Date(instant.toEpochMilli()));
@@ -171,12 +171,12 @@ public final class DateTimeSupport {
         return ZoneOffset.ofTotalSeconds(offsetMillis / 1000);
     }
 
-    public static SimpleDateFormat newFormat(String pattern, ZoneId zone, Locale locale) {
+    static SimpleDateFormat newFormat(String pattern, ZoneId zone, Locale locale) {
         SimpleDateFormat sdf = new SimpleDateFormat(pattern);
         return sdf;
     }
 
-    public static String formatPattern(String pattern, TemporalCarrier carrier, Locale locale) {
+    static String formatPattern(String pattern, TemporalCarrier carrier, Locale locale) {
         ZoneId zone = carrier.getZoneForFormatting();
         SimpleDateFormat sdf = newFormat(pattern, zone, locale);
         TimeZone original = TimeZone.getDefault();
@@ -190,7 +190,7 @@ public final class DateTimeSupport {
         }
     }
 
-    public static ParsedPatternResult parsePattern(String text, String pattern, ZoneId defaultZone, Locale locale) {
+    static ParsedPatternResult parsePattern(String text, String pattern, ZoneId defaultZone, Locale locale) {
         TimeZone original = TimeZone.getDefault();
         try {
             if (defaultZone != null) {
@@ -208,12 +208,12 @@ public final class DateTimeSupport {
         }
     }
 
-    public interface TemporalCarrier {
+    interface TemporalCarrier {
         Instant toInstant();
         ZoneId getZoneForFormatting();
     }
 
-    public static final class ParsedPatternResult {
+    static final class ParsedPatternResult {
         public final Instant instant;
         public final ZoneId zone;
 

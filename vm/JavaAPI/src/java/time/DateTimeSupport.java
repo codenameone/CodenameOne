@@ -7,7 +7,7 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
 
-public final class DateTimeSupport {
+final class DateTimeSupport {
     static final long MILLIS_PER_SECOND = 1000L;
     static final long MILLIS_PER_DAY = 86400000L;
     static final long SECONDS_PER_DAY = 86400L;

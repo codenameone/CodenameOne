@@ -28,7 +28,7 @@ package java.text;
  * @author Eric Coolman
  *
  */
-public class DateFormatPatterns {
+class DateFormatPatterns {
 	/**
 	 * Pattern for parsing/formatting RFC-2822 timestamp.
 	 */

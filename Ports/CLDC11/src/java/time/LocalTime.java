@@ -54,11 +54,11 @@ public final class LocalTime implements Comparable<LocalTime>, TemporalAccessor 
     }
 
     public static LocalTime parse(CharSequence text) {
-        return DateTimeFormatter.ISO_LOCAL_TIME.parseLocalTime(text.toString());
+        return (LocalTime) DateTimeFormatter.ISO_LOCAL_TIME.parse(text);
     }
 
     public static LocalTime parse(CharSequence text, DateTimeFormatter formatter) {
-        return formatter.parseLocalTime(text.toString());
+        return (LocalTime) formatter.parse(text);
     }
 
     public int getHour() {

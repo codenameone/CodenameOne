@@ -3858,7 +3858,7 @@ public class Arrays {
         throw new IllegalArgumentException();
     }
     
-    public static boolean[] copyOf(boolean[] original) {
+    static boolean[] copyOf(boolean[] original) {
         return copyOfRange(original, 0, original.length);
     }
     
@@ -3869,7 +3869,7 @@ public class Arrays {
         return copyOfRange(original, 0, newlen);
     }
     
-    public static char[] copyOf(char[] original) {
+    static char[] copyOf(char[] original) {
         return copyOfRange(original, 0, original.length);
     }
     
@@ -3880,7 +3880,7 @@ public class Arrays {
         return copyOfRange(original, 0, newlen);
     }
     
-    public static double[] copyOf(double[] original) {
+    static double[] copyOf(double[] original) {
         return copyOfRange(original, 0, original.length);
     }
     public static double[] copyOf(double[] original, int newlen) {
@@ -3890,7 +3890,7 @@ public class Arrays {
         return copyOfRange(original, 0, newlen);
     }
     
-    public static float[] copyOf(float[] original) {
+    static float[] copyOf(float[] original) {
         return copyOfRange(original, 0, original.length);
     }
     public static float[] copyOf(float[] original, int newlen) {
@@ -3900,7 +3900,7 @@ public class Arrays {
         return copyOfRange(original, 0, newlen);
     }
     
-    public static long[] copyOf(long[] original) {
+    static long[] copyOf(long[] original) {
         return copyOfRange(original, 0, original.length);
     }
     
@@ -3911,7 +3911,7 @@ public class Arrays {
         return copyOfRange(original, 0, newlen);
     }
     
-    public static int[] copyOf(int[] original) {
+    static int[] copyOf(int[] original) {
         return copyOfRange(original, 0, original.length);
     }
     
@@ -3922,7 +3922,7 @@ public class Arrays {
         return copyOfRange(original, 0, newlen);
     }
     
-    public static byte[] copyOf(byte[] original) {
+    static byte[] copyOf(byte[] original) {
         return copyOfRange(original, 0, original.length);
     }
     
@@ -3935,7 +3935,7 @@ public class Arrays {
         return copyOfRange(original, 0, newlen);
     }
     
-    public static short[] copyOf(short[] original) {
+    static short[] copyOf(short[] original) {
         return copyOfRange(original, 0, original.length);
     }
     

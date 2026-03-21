@@ -1,0 +1,431 @@
+package bsh.cn1.gen;
+
+import bsh.cn1.CN1AccessException;
+
+public final class GeneratedAccess_com_codename1_xml {
+    private GeneratedAccess_com_codename1_xml() {
+    }
+
+    public static Class<?> findClass(String name) {
+        if ("com.codename1.xml.Element".equals(name)) return com.codename1.xml.Element.class;
+        if ("com.codename1.xml.ParserCallback".equals(name)) return com.codename1.xml.ParserCallback.class;
+        if ("com.codename1.xml.XMLParser".equals(name)) return com.codename1.xml.XMLParser.class;
+        if ("com.codename1.xml.XMLWriter".equals(name)) return com.codename1.xml.XMLWriter.class;
+        return null;
+    }
+
+    public static Object construct(Class<?> type, Object[] args) throws Exception {
+        Object[] safeArgs = safeArgs(args);
+        if (type == com.codename1.xml.Element.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                return new com.codename1.xml.Element((java.lang.String) safeArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
+                return new com.codename1.xml.Element((java.lang.String) safeArgs[0], ((Boolean) safeArgs[1]).booleanValue());
+            }
+        }
+        if (type == com.codename1.xml.XMLWriter.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                return new com.codename1.xml.XMLWriter(((Boolean) safeArgs[0]).booleanValue());
+            }
+        }
+        throw unsupportedConstruct(type, safeArgs);
+    }
+
+    public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
+        Object[] safeArgs = safeArgs(args);
+        throw unsupportedStatic(type, name, safeArgs);
+    }
+
+    public static Object invoke(Object target, String name, Object[] args) throws Exception {
+        Object[] safeArgs = safeArgs(args);
+        CN1AccessException unsupported = null;
+        if (target instanceof com.codename1.xml.Element) {
+            try {
+                return invoke0((com.codename1.xml.Element) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.xml.XMLParser) {
+            try {
+                return invoke1((com.codename1.xml.XMLParser) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.xml.XMLWriter) {
+            try {
+                return invoke2((com.codename1.xml.XMLWriter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.xml.ParserCallback) {
+            try {
+                return invoke3((com.codename1.xml.ParserCallback) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (unsupported != null) {
+            throw unsupported;
+        }
+        throw unsupportedInstance(target, name, safeArgs);
+    }
+
+    private static Object invoke0(com.codename1.xml.Element typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("addChild".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false)) {
+                typedTarget.addChild((com.codename1.xml.Element) safeArgs[0]); return null;
+            }
+        }
+        if ("contains".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false)) {
+                return typedTarget.contains((com.codename1.xml.Element) safeArgs[0]);
+            }
+        }
+        if ("getAttribute".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                return typedTarget.getAttribute((java.lang.String) safeArgs[0]);
+            }
+        }
+        if ("getAttributeAsInt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
+                return typedTarget.getAttributeAsInt((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).intValue());
+            }
+        }
+        if ("getAttributes".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getAttributes();
+            }
+        }
+        if ("getChildAt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                return typedTarget.getChildAt(((Number) safeArgs[0]).intValue());
+            }
+        }
+        if ("getChildIndex".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false)) {
+                return typedTarget.getChildIndex((com.codename1.xml.Element) safeArgs[0]);
+            }
+        }
+        if ("getChildrenByTagName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                return typedTarget.getChildrenByTagName((java.lang.String) safeArgs[0]);
+            }
+        }
+        if ("getDescendantsByTagName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                return typedTarget.getDescendantsByTagName((java.lang.String) safeArgs[0]);
+            }
+        }
+        if ("getDescendantsByTagName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
+                return typedTarget.getDescendantsByTagName((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).intValue());
+            }
+        }
+        if ("getDescendantsByTagNameAndAttribute".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Integer.class}, false)) {
+                return typedTarget.getDescendantsByTagNameAndAttribute((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1], ((Number) safeArgs[2]).intValue());
+            }
+        }
+        if ("getElementById".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                return typedTarget.getElementById((java.lang.String) safeArgs[0]);
+            }
+        }
+        if ("getFirstChildByTagName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                return typedTarget.getFirstChildByTagName((java.lang.String) safeArgs[0]);
+            }
+        }
+        if ("getNumChildren".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getNumChildren();
+            }
+        }
+        if ("getParent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getParent();
+            }
+        }
+        if ("getTagName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getTagName();
+            }
+        }
+        if ("getText".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getText();
+            }
+        }
+        if ("getTextChildren".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
+                return typedTarget.getTextChildren((java.lang.String) safeArgs[0], ((Boolean) safeArgs[1]).booleanValue());
+            }
+        }
+        if ("getTextDescendants".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
+                return typedTarget.getTextDescendants((java.lang.String) safeArgs[0], ((Boolean) safeArgs[1]).booleanValue());
+            }
+        }
+        if ("getTextDescendants".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
+                return typedTarget.getTextDescendants((java.lang.String) safeArgs[0], ((Boolean) safeArgs[1]).booleanValue(), ((Number) safeArgs[2]).intValue());
+            }
+        }
+        if ("hasTextChild".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.hasTextChild();
+            }
+        }
+        if ("insertChildAt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class, java.lang.Integer.class}, false)) {
+                typedTarget.insertChildAt((com.codename1.xml.Element) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+            }
+        }
+        if ("isEmpty".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.isEmpty();
+            }
+        }
+        if ("isTextElement".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.isTextElement();
+            }
+        }
+        if ("iterator".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.iterator();
+            }
+        }
+        if ("removeAttribute".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                typedTarget.removeAttribute((java.lang.String) safeArgs[0]); return null;
+            }
+        }
+        if ("removeChildAt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                typedTarget.removeChildAt(((Number) safeArgs[0]).intValue()); return null;
+            }
+        }
+        if ("replaceChild".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class, com.codename1.xml.Element.class}, false)) {
+                typedTarget.replaceChild((com.codename1.xml.Element) safeArgs[0], (com.codename1.xml.Element) safeArgs[1]); return null;
+            }
+        }
+        if ("setAttribute".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                return typedTarget.setAttribute((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1]);
+            }
+        }
+        if ("setText".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                typedTarget.setText((java.lang.String) safeArgs[0]); return null;
+            }
+        }
+        if ("toString".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.toString();
+            }
+        }
+        if ("toString".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                return typedTarget.toString((java.lang.String) safeArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke1(com.codename1.xml.XMLParser typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("addCharEntitiesRange".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.Integer.class}, false)) {
+                typedTarget.addCharEntitiesRange((java.lang.String[]) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+            }
+        }
+        if ("addCharEntity".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
+                typedTarget.addCharEntity((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+            }
+        }
+        if ("isCaseSensitive".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.isCaseSensitive();
+            }
+        }
+        if ("setCaseSensitive".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                typedTarget.setCaseSensitive(((Boolean) safeArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setIncludeWhitespacesBetweenTags".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                typedTarget.setIncludeWhitespacesBetweenTags(((Boolean) safeArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setParserCallback".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.xml.ParserCallback.class}, false)) {
+                typedTarget.setParserCallback((com.codename1.xml.ParserCallback) safeArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke2(com.codename1.xml.XMLWriter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("toXML".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false)) {
+                return typedTarget.toXML((com.codename1.xml.Element) safeArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke3(com.codename1.xml.ParserCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("parsingError".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
+                return typedTarget.parsingError(((Number) safeArgs[0]).intValue(), (java.lang.String) safeArgs[1], (java.lang.String) safeArgs[2], (java.lang.String) safeArgs[3], (java.lang.String) safeArgs[4]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.xml.Element.class) {
+            if ("DEPTH_INFINITE".equals(name)) return com.codename1.xml.Element.DEPTH_INFINITE;
+        }
+        if (type == com.codename1.xml.ParserCallback.class) {
+            if ("ERROR_ATTIBUTE_VALUE_INVALID".equals(name)) return com.codename1.xml.ParserCallback.ERROR_ATTIBUTE_VALUE_INVALID;
+            if ("ERROR_ATTRIBUTE_NOT_SUPPORTED".equals(name)) return com.codename1.xml.ParserCallback.ERROR_ATTRIBUTE_NOT_SUPPORTED;
+            if ("ERROR_ENCODING".equals(name)) return com.codename1.xml.ParserCallback.ERROR_ENCODING;
+            if ("ERROR_MULTIPLE_ROOTS".equals(name)) return com.codename1.xml.ParserCallback.ERROR_MULTIPLE_ROOTS;
+            if ("ERROR_NO_CLOSE_TAG".equals(name)) return com.codename1.xml.ParserCallback.ERROR_NO_CLOSE_TAG;
+            if ("ERROR_NO_ROOTS".equals(name)) return com.codename1.xml.ParserCallback.ERROR_NO_ROOTS;
+            if ("ERROR_TAG_NOT_SUPPORTED".equals(name)) return com.codename1.xml.ParserCallback.ERROR_TAG_NOT_SUPPORTED;
+            if ("ERROR_UNEXPECTED_CHARACTER".equals(name)) return com.codename1.xml.ParserCallback.ERROR_UNEXPECTED_CHARACTER;
+            if ("ERROR_UNEXPECTED_TAG_CLOSING".equals(name)) return com.codename1.xml.ParserCallback.ERROR_UNEXPECTED_TAG_CLOSING;
+            if ("ERROR_UNRECOGNIZED_CHAR_ENTITY".equals(name)) return com.codename1.xml.ParserCallback.ERROR_UNRECOGNIZED_CHAR_ENTITY;
+        }
+        throw unsupportedStaticField(type, name);
+    }
+
+    public static Object getField(Object target, String name) throws Exception {
+        throw unsupportedField(target, name);
+    }
+
+    public static void setStaticField(Class<?> type, String name, Object value) throws Exception {
+        throw unsupportedStaticFieldWrite(type, name, value);
+    }
+
+    public static void setField(Object target, String name, Object value) throws Exception {
+        throw unsupportedFieldWrite(target, name, value);
+    }
+
+    private static Object[] safeArgs(Object[] args) {
+        return args == null ? new Object[0] : args;
+    }
+
+    private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (!varArgs) {
+            if (args.length != paramTypes.length) {
+                return false;
+            }
+            for (int i = 0; i < paramTypes.length; i++) {
+                if (!matchesType(args[i], paramTypes[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (paramTypes.length == 0) {
+            return true;
+        }
+        int fixedCount = paramTypes.length - 1;
+        if (args.length < fixedCount) {
+            return false;
+        }
+        for (int i = 0; i < fixedCount; i++) {
+            if (!matchesType(args[i], paramTypes[i])) {
+                return false;
+            }
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < args.length; i++) {
+            if (!matchesType(args[i], componentType)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean matchesType(Object value, Class<?> type) {
+        if (type == Object.class) {
+            return true;
+        }
+        if (value == null) {
+            return !type.isPrimitive();
+        }
+        if (type.isArray()) {
+            return type.isInstance(value);
+        }
+        if ("boolean".equals(type.getName()) || type == Boolean.class) {
+            return value instanceof Boolean;
+        }
+        if ("char".equals(type.getName()) || type == Character.class) {
+            return value instanceof Character;
+        }
+        if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
+                || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
+                || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
+            return value instanceof Number;
+        }
+        return type.isInstance(value);
+    }
+
+    private static CN1AccessException unsupportedConstruct(Class<?> type, Object[] args) {
+        return new CN1AccessException("Generated constructor dispatch not implemented for " + type.getName() + describeArgs(args));
+    }
+
+    private static CN1AccessException unsupportedStatic(Class<?> type, String name, Object[] args) {
+        return new CN1AccessException("Generated static dispatch not implemented for " + type.getName() + "." + name + describeArgs(args));
+    }
+
+    private static CN1AccessException unsupportedInstance(Object target, String name, Object[] args) {
+        return new CN1AccessException("Generated instance dispatch not implemented for " + target.getClass().getName() + "." + name + describeArgs(args));
+    }
+
+    private static CN1AccessException unsupportedStaticField(Class<?> type, String name) {
+        return new CN1AccessException("Generated static field access not implemented for " + type.getName() + "." + name);
+    }
+
+    private static CN1AccessException unsupportedField(Object target, String name) {
+        return new CN1AccessException("Generated field access not implemented for " + target.getClass().getName() + "." + name);
+    }
+
+    private static CN1AccessException unsupportedStaticFieldWrite(Class<?> type, String name, Object value) {
+        return new CN1AccessException("Generated static field write not implemented for " + type.getName() + "." + name + " value=" + describeValue(value));
+    }
+
+    private static CN1AccessException unsupportedFieldWrite(Object target, String name, Object value) {
+        return new CN1AccessException("Generated field write not implemented for " + target.getClass().getName() + "." + name + " value=" + describeValue(value));
+    }
+
+    private static String describeArgs(Object[] args) {
+        if (args == null || args.length == 0) {
+            return "()";
+        }
+        StringBuilder sb = new StringBuilder("(");
+        for (int i = 0; i < args.length; i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(describeValue(args[i]));
+        }
+        sb.append(')');
+        return sb.toString();
+    }
+
+    private static String describeValue(Object value) {
+        return value == null ? "null" : value.getClass().getName();
+    }
+}

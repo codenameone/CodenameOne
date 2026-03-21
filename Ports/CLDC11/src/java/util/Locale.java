@@ -13,7 +13,7 @@ public class Locale {
         this.country = locale;
     }
 
-    public Locale() {
+    Locale() {
         language = "en";
         int pos;
         if (language != null && (pos = language.indexOf('-')) != -1) {

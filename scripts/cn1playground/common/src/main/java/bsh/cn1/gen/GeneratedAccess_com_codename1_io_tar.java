@@ -1,0 +1,688 @@
+package bsh.cn1.gen;
+
+import bsh.cn1.CN1AccessException;
+
+public final class GeneratedAccess_com_codename1_io_tar {
+    private GeneratedAccess_com_codename1_io_tar() {
+    }
+
+    public static Class<?> findClass(String name) {
+        if ("com.codename1.io.tar.Octal".equals(name)) return com.codename1.io.tar.Octal.class;
+        if ("com.codename1.io.tar.TarConstants".equals(name)) return com.codename1.io.tar.TarConstants.class;
+        if ("com.codename1.io.tar.TarEntry".equals(name)) return com.codename1.io.tar.TarEntry.class;
+        if ("com.codename1.io.tar.TarHeader".equals(name)) return com.codename1.io.tar.TarHeader.class;
+        if ("com.codename1.io.tar.TarInputStream".equals(name)) return com.codename1.io.tar.TarInputStream.class;
+        if ("com.codename1.io.tar.TarOutputStream".equals(name)) return com.codename1.io.tar.TarOutputStream.class;
+        if ("com.codename1.io.tar.TarUtils".equals(name)) return com.codename1.io.tar.TarUtils.class;
+        return null;
+    }
+
+    public static Object construct(Class<?> type, Object[] args) throws Exception {
+        Object[] safeArgs = safeArgs(args);
+        if (type == com.codename1.io.tar.TarEntry.class) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
+                return new com.codename1.io.tar.TarEntry((byte[]) safeArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                return new com.codename1.io.tar.TarEntry((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1]);
+            }
+        }
+        if (type == com.codename1.io.tar.TarHeader.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return new com.codename1.io.tar.TarHeader();
+            }
+        }
+        throw unsupportedConstruct(type, safeArgs);
+    }
+
+    public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
+        Object[] safeArgs = safeArgs(args);
+        if (type == com.codename1.io.tar.Octal.class) return invokeStatic0(name, safeArgs);
+        if (type == com.codename1.io.tar.TarHeader.class) return invokeStatic1(name, safeArgs);
+        if (type == com.codename1.io.tar.TarUtils.class) return invokeStatic2(name, safeArgs);
+        throw unsupportedStatic(type, name, safeArgs);
+    }
+
+    private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
+        if ("getCheckSumOctalBytes".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                return com.codename1.io.tar.Octal.getCheckSumOctalBytes(((Number) safeArgs[0]).longValue(), (byte[]) safeArgs[1], ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue());
+            }
+        }
+        if ("getLongOctalBytes".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                return com.codename1.io.tar.Octal.getLongOctalBytes(((Number) safeArgs[0]).longValue(), (byte[]) safeArgs[1], ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue());
+            }
+        }
+        if ("getOctalBytes".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                return com.codename1.io.tar.Octal.getOctalBytes(((Number) safeArgs[0]).longValue(), (byte[]) safeArgs[1], ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue());
+            }
+        }
+        if ("parseOctal".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                return com.codename1.io.tar.Octal.parseOctal((byte[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+            }
+        }
+        throw unsupportedStatic(com.codename1.io.tar.Octal.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
+        if ("getNameBytes".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.StringBuffer.class, byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                return com.codename1.io.tar.TarHeader.getNameBytes((java.lang.StringBuffer) safeArgs[0], (byte[]) safeArgs[1], ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue());
+            }
+        }
+        if ("parseName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                return com.codename1.io.tar.TarHeader.parseName((byte[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+            }
+        }
+        throw unsupportedStatic(com.codename1.io.tar.TarHeader.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
+        if ("calculateTarSize".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                return com.codename1.io.tar.TarUtils.calculateTarSize((java.lang.String) safeArgs[0]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.io.tar.TarUtils.class, name, safeArgs);
+    }
+
+    public static Object invoke(Object target, String name, Object[] args) throws Exception {
+        Object[] safeArgs = safeArgs(args);
+        CN1AccessException unsupported = null;
+        if (target instanceof com.codename1.io.tar.TarEntry) {
+            try {
+                return invoke0((com.codename1.io.tar.TarEntry) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.io.tar.TarInputStream) {
+            try {
+                return invoke1((com.codename1.io.tar.TarInputStream) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.io.tar.TarOutputStream) {
+            try {
+                return invoke2((com.codename1.io.tar.TarOutputStream) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (unsupported != null) {
+            throw unsupported;
+        }
+        throw unsupportedInstance(target, name, safeArgs);
+    }
+
+    private static Object invoke0(com.codename1.io.tar.TarEntry typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("computeCheckSum".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
+                return typedTarget.computeCheckSum((byte[]) safeArgs[0]);
+            }
+        }
+        if ("equals".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.io.tar.TarEntry.class}, false)) {
+                return typedTarget.equals((com.codename1.io.tar.TarEntry) safeArgs[0]);
+            }
+        }
+        if ("equals".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                return typedTarget.equals((java.lang.Object) safeArgs[0]);
+            }
+        }
+        if ("extractTarHeader".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                typedTarget.extractTarHeader((java.lang.String) safeArgs[0]); return null;
+            }
+        }
+        if ("getFile".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getFile();
+            }
+        }
+        if ("getGroupId".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getGroupId();
+            }
+        }
+        if ("getGroupName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getGroupName();
+            }
+        }
+        if ("getHeader".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getHeader();
+            }
+        }
+        if ("getModTime".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getModTime();
+            }
+        }
+        if ("getName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getName();
+            }
+        }
+        if ("getSize".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getSize();
+            }
+        }
+        if ("getUserId".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getUserId();
+            }
+        }
+        if ("getUserName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getUserName();
+            }
+        }
+        if ("hashCode".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.hashCode();
+            }
+        }
+        if ("isDescendent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.io.tar.TarEntry.class}, false)) {
+                return typedTarget.isDescendent((com.codename1.io.tar.TarEntry) safeArgs[0]);
+            }
+        }
+        if ("isDirectory".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.isDirectory();
+            }
+        }
+        if ("parseTarHeader".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
+                typedTarget.parseTarHeader((byte[]) safeArgs[0]); return null;
+            }
+        }
+        if ("setGroupId".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                typedTarget.setGroupId(((Number) safeArgs[0]).intValue()); return null;
+            }
+        }
+        if ("setGroupName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                typedTarget.setGroupName((java.lang.String) safeArgs[0]); return null;
+            }
+        }
+        if ("setIds".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                typedTarget.setIds(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue()); return null;
+            }
+        }
+        if ("setModTime".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
+                typedTarget.setModTime((java.util.Date) safeArgs[0]); return null;
+            }
+        }
+        if ("setModTime".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
+                typedTarget.setModTime(((Number) safeArgs[0]).longValue()); return null;
+            }
+        }
+        if ("setName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                typedTarget.setName((java.lang.String) safeArgs[0]); return null;
+            }
+        }
+        if ("setSize".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
+                typedTarget.setSize(((Number) safeArgs[0]).longValue()); return null;
+            }
+        }
+        if ("setUserId".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                typedTarget.setUserId(((Number) safeArgs[0]).intValue()); return null;
+            }
+        }
+        if ("setUserName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                typedTarget.setUserName((java.lang.String) safeArgs[0]); return null;
+            }
+        }
+        if ("writeEntryHeader".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
+                typedTarget.writeEntryHeader((byte[]) safeArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke1(com.codename1.io.tar.TarInputStream typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("available".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.available();
+            }
+        }
+        if ("close".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                typedTarget.close(); return null;
+            }
+        }
+        if ("getConnection".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getConnection();
+            }
+        }
+        if ("getLastActivityTime".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getLastActivityTime();
+            }
+        }
+        if ("getName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getName();
+            }
+        }
+        if ("getNextEntry".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getNextEntry();
+            }
+        }
+        if ("getTotalBytesRead".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getTotalBytesRead();
+            }
+        }
+        if ("getYield".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getYield();
+            }
+        }
+        if ("isDefaultSkip".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.isDefaultSkip();
+            }
+        }
+        if ("isDisableBuffering".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.isDisableBuffering();
+            }
+        }
+        if ("isPrintInput".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.isPrintInput();
+            }
+        }
+        if ("mark".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                typedTarget.mark(((Number) safeArgs[0]).intValue()); return null;
+            }
+        }
+        if ("markSupported".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.markSupported();
+            }
+        }
+        if ("read".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.read();
+            }
+        }
+        if ("read".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
+                return typedTarget.read((byte[]) safeArgs[0]);
+            }
+        }
+        if ("read".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                return typedTarget.read((byte[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+            }
+        }
+        if ("reset".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                typedTarget.reset(); return null;
+            }
+        }
+        if ("setConnection".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                typedTarget.setConnection((java.lang.Object) safeArgs[0]); return null;
+            }
+        }
+        if ("setDefaultSkip".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                typedTarget.setDefaultSkip(((Boolean) safeArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setDisableBuffering".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                typedTarget.setDisableBuffering(((Boolean) safeArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setPrintInput".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                typedTarget.setPrintInput(((Boolean) safeArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setProgressListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.io.IOProgressListener.class}, false)) {
+                typedTarget.setProgressListener((com.codename1.io.IOProgressListener) safeArgs[0]); return null;
+            }
+        }
+        if ("setYield".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                typedTarget.setYield(((Number) safeArgs[0]).intValue()); return null;
+            }
+        }
+        if ("skip".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
+                return typedTarget.skip(((Number) safeArgs[0]).longValue());
+            }
+        }
+        if ("stop".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                typedTarget.stop(); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke2(com.codename1.io.tar.TarOutputStream typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("close".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                typedTarget.close(); return null;
+            }
+        }
+        if ("flush".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                typedTarget.flush(); return null;
+            }
+        }
+        if ("flushBuffer".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                typedTarget.flushBuffer(); return null;
+            }
+        }
+        if ("getConnection".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getConnection();
+            }
+        }
+        if ("getLastActivityTime".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getLastActivityTime();
+            }
+        }
+        if ("getName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getName();
+            }
+        }
+        if ("getTotalBytesWritten".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.getTotalBytesWritten();
+            }
+        }
+        if ("putNextEntry".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.io.tar.TarEntry.class}, false)) {
+                typedTarget.putNextEntry((com.codename1.io.tar.TarEntry) safeArgs[0]); return null;
+            }
+        }
+        if ("setConnection".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                typedTarget.setConnection((java.lang.Object) safeArgs[0]); return null;
+            }
+        }
+        if ("setProgressListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.io.IOProgressListener.class}, false)) {
+                typedTarget.setProgressListener((com.codename1.io.IOProgressListener) safeArgs[0]); return null;
+            }
+        }
+        if ("write".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
+                typedTarget.write((byte[]) safeArgs[0]); return null;
+            }
+        }
+        if ("write".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                typedTarget.write(((Number) safeArgs[0]).intValue()); return null;
+            }
+        }
+        if ("write".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                typedTarget.write((byte[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.io.tar.TarConstants.class) {
+            if ("DATA_BLOCK".equals(name)) return com.codename1.io.tar.TarConstants.DATA_BLOCK;
+            if ("EOF_BLOCK".equals(name)) return com.codename1.io.tar.TarConstants.EOF_BLOCK;
+            if ("HEADER_BLOCK".equals(name)) return com.codename1.io.tar.TarConstants.HEADER_BLOCK;
+        }
+        if (type == com.codename1.io.tar.TarHeader.class) {
+            if ("CHKSUMLEN".equals(name)) return com.codename1.io.tar.TarHeader.CHKSUMLEN;
+            if ("DEVLEN".equals(name)) return com.codename1.io.tar.TarHeader.DEVLEN;
+            if ("GIDLEN".equals(name)) return com.codename1.io.tar.TarHeader.GIDLEN;
+            if ("GNAMELEN".equals(name)) return com.codename1.io.tar.TarHeader.GNAMELEN;
+            if ("GNU_TMAGIC".equals(name)) return com.codename1.io.tar.TarHeader.GNU_TMAGIC;
+            if ("LF_BLK".equals(name)) return com.codename1.io.tar.TarHeader.LF_BLK;
+            if ("LF_CHR".equals(name)) return com.codename1.io.tar.TarHeader.LF_CHR;
+            if ("LF_CONTIG".equals(name)) return com.codename1.io.tar.TarHeader.LF_CONTIG;
+            if ("LF_DIR".equals(name)) return com.codename1.io.tar.TarHeader.LF_DIR;
+            if ("LF_FIFO".equals(name)) return com.codename1.io.tar.TarHeader.LF_FIFO;
+            if ("LF_LINK".equals(name)) return com.codename1.io.tar.TarHeader.LF_LINK;
+            if ("LF_NORMAL".equals(name)) return com.codename1.io.tar.TarHeader.LF_NORMAL;
+            if ("LF_OLDNORM".equals(name)) return com.codename1.io.tar.TarHeader.LF_OLDNORM;
+            if ("LF_SYMLINK".equals(name)) return com.codename1.io.tar.TarHeader.LF_SYMLINK;
+            if ("MAGICLEN".equals(name)) return com.codename1.io.tar.TarHeader.MAGICLEN;
+            if ("MODELEN".equals(name)) return com.codename1.io.tar.TarHeader.MODELEN;
+            if ("MODTIMELEN".equals(name)) return com.codename1.io.tar.TarHeader.MODTIMELEN;
+            if ("NAMELEN".equals(name)) return com.codename1.io.tar.TarHeader.NAMELEN;
+            if ("SIZELEN".equals(name)) return com.codename1.io.tar.TarHeader.SIZELEN;
+            if ("TMAGIC".equals(name)) return com.codename1.io.tar.TarHeader.TMAGIC;
+            if ("UIDLEN".equals(name)) return com.codename1.io.tar.TarHeader.UIDLEN;
+            if ("UNAMELEN".equals(name)) return com.codename1.io.tar.TarHeader.UNAMELEN;
+        }
+        throw unsupportedStaticField(type, name);
+    }
+
+    public static Object getField(Object target, String name) throws Exception {
+        if (target instanceof com.codename1.io.tar.TarHeader) {
+            com.codename1.io.tar.TarHeader typedTarget = (com.codename1.io.tar.TarHeader) target;
+            if ("checkSum".equals(name)) return typedTarget.checkSum;
+            if ("devMajor".equals(name)) return typedTarget.devMajor;
+            if ("devMinor".equals(name)) return typedTarget.devMinor;
+            if ("groupId".equals(name)) return typedTarget.groupId;
+            if ("groupName".equals(name)) return typedTarget.groupName;
+            if ("linkFlag".equals(name)) return typedTarget.linkFlag;
+            if ("linkName".equals(name)) return typedTarget.linkName;
+            if ("magic".equals(name)) return typedTarget.magic;
+            if ("modTime".equals(name)) return typedTarget.modTime;
+            if ("mode".equals(name)) return typedTarget.mode;
+            if ("name".equals(name)) return typedTarget.name;
+            if ("size".equals(name)) return typedTarget.size;
+            if ("userId".equals(name)) return typedTarget.userId;
+            if ("userName".equals(name)) return typedTarget.userName;
+        }
+        throw unsupportedField(target, name);
+    }
+
+    public static void setStaticField(Class<?> type, String name, Object value) throws Exception {
+        throw unsupportedStaticFieldWrite(type, name, value);
+    }
+
+    public static void setField(Object target, String name, Object value) throws Exception {
+        if (target instanceof com.codename1.io.tar.TarHeader) {
+            com.codename1.io.tar.TarHeader typedTarget = (com.codename1.io.tar.TarHeader) target;
+            if ("checkSum".equals(name)) {
+                typedTarget.checkSum = ((Number) value).intValue();
+                return;
+            }
+            if ("devMajor".equals(name)) {
+                typedTarget.devMajor = ((Number) value).intValue();
+                return;
+            }
+            if ("devMinor".equals(name)) {
+                typedTarget.devMinor = ((Number) value).intValue();
+                return;
+            }
+            if ("groupId".equals(name)) {
+                typedTarget.groupId = ((Number) value).intValue();
+                return;
+            }
+            if ("groupName".equals(name)) {
+                typedTarget.groupName = (java.lang.StringBuffer) value;
+                return;
+            }
+            if ("linkFlag".equals(name)) {
+                typedTarget.linkFlag = ((Number) value).byteValue();
+                return;
+            }
+            if ("linkName".equals(name)) {
+                typedTarget.linkName = (java.lang.StringBuffer) value;
+                return;
+            }
+            if ("magic".equals(name)) {
+                typedTarget.magic = (java.lang.StringBuffer) value;
+                return;
+            }
+            if ("modTime".equals(name)) {
+                typedTarget.modTime = ((Number) value).longValue();
+                return;
+            }
+            if ("mode".equals(name)) {
+                typedTarget.mode = ((Number) value).intValue();
+                return;
+            }
+            if ("name".equals(name)) {
+                typedTarget.name = (java.lang.StringBuffer) value;
+                return;
+            }
+            if ("size".equals(name)) {
+                typedTarget.size = ((Number) value).longValue();
+                return;
+            }
+            if ("userId".equals(name)) {
+                typedTarget.userId = ((Number) value).intValue();
+                return;
+            }
+            if ("userName".equals(name)) {
+                typedTarget.userName = (java.lang.StringBuffer) value;
+                return;
+            }
+        }
+        throw unsupportedFieldWrite(target, name, value);
+    }
+
+    private static Object[] safeArgs(Object[] args) {
+        return args == null ? new Object[0] : args;
+    }
+
+    private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (!varArgs) {
+            if (args.length != paramTypes.length) {
+                return false;
+            }
+            for (int i = 0; i < paramTypes.length; i++) {
+                if (!matchesType(args[i], paramTypes[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (paramTypes.length == 0) {
+            return true;
+        }
+        int fixedCount = paramTypes.length - 1;
+        if (args.length < fixedCount) {
+            return false;
+        }
+        for (int i = 0; i < fixedCount; i++) {
+            if (!matchesType(args[i], paramTypes[i])) {
+                return false;
+            }
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < args.length; i++) {
+            if (!matchesType(args[i], componentType)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean matchesType(Object value, Class<?> type) {
+        if (type == Object.class) {
+            return true;
+        }
+        if (value == null) {
+            return !type.isPrimitive();
+        }
+        if (type.isArray()) {
+            return type.isInstance(value);
+        }
+        if ("boolean".equals(type.getName()) || type == Boolean.class) {
+            return value instanceof Boolean;
+        }
+        if ("char".equals(type.getName()) || type == Character.class) {
+            return value instanceof Character;
+        }
+        if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
+                || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
+                || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
+            return value instanceof Number;
+        }
+        return type.isInstance(value);
+    }
+
+    private static CN1AccessException unsupportedConstruct(Class<?> type, Object[] args) {
+        return new CN1AccessException("Generated constructor dispatch not implemented for " + type.getName() + describeArgs(args));
+    }
+
+    private static CN1AccessException unsupportedStatic(Class<?> type, String name, Object[] args) {
+        return new CN1AccessException("Generated static dispatch not implemented for " + type.getName() + "." + name + describeArgs(args));
+    }
+
+    private static CN1AccessException unsupportedInstance(Object target, String name, Object[] args) {
+        return new CN1AccessException("Generated instance dispatch not implemented for " + target.getClass().getName() + "." + name + describeArgs(args));
+    }
+
+    private static CN1AccessException unsupportedStaticField(Class<?> type, String name) {
+        return new CN1AccessException("Generated static field access not implemented for " + type.getName() + "." + name);
+    }
+
+    private static CN1AccessException unsupportedField(Object target, String name) {
+        return new CN1AccessException("Generated field access not implemented for " + target.getClass().getName() + "." + name);
+    }
+
+    private static CN1AccessException unsupportedStaticFieldWrite(Class<?> type, String name, Object value) {
+        return new CN1AccessException("Generated static field write not implemented for " + type.getName() + "." + name + " value=" + describeValue(value));
+    }
+
+    private static CN1AccessException unsupportedFieldWrite(Object target, String name, Object value) {
+        return new CN1AccessException("Generated field write not implemented for " + target.getClass().getName() + "." + name + " value=" + describeValue(value));
+    }
+
+    private static String describeArgs(Object[] args) {
+        if (args == null || args.length == 0) {
+            return "()";
+        }
+        StringBuilder sb = new StringBuilder("(");
+        for (int i = 0; i < args.length; i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(describeValue(args[i]));
+        }
+        sb.append(')');
+        return sb.toString();
+    }
+
+    private static String describeValue(Object value) {
+        return value == null ? "null" : value.getClass().getName();
+    }
+}
