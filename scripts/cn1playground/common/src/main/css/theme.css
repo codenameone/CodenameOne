@@ -16,6 +16,10 @@ Title {
     font-size: 6mm;
 }
 
+TitleArea {
+    background: #e5e7eb;
+}
+
 /** Style for Dialog body */
 DialogBody {
     font-family: "native:MainLight";
@@ -48,6 +52,7 @@ SideCommand {
     border: none;
     text-decoration: none;
     color: black;
+    background: white;
     font-family: "native:MainLight";
     font-size: 4mm;
     border-bottom: 2px solid #cccccc;

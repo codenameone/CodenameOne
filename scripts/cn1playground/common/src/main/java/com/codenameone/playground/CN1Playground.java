@@ -1,5 +1,6 @@
 package com.codenameone.playground;
 
+import com.codename1.io.Util;
 import com.codename1.components.MultiButton;
 import com.codename1.components.SplitPane;
 import com.codename1.system.Lifecycle;
@@ -14,9 +15,12 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 import com.codename1.ui.util.UITimer;
+import com.codename1.util.Base64;
 
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,13 +43,15 @@ public class CN1Playground extends Lifecycle {
     public void runApp() {
         com.codename1.ui.CN.setProperty("platformHint.javascript.beforeUnloadMessage", null);
         theme = Resources.getGlobalResources();
-        currentScript = PlaygroundStateStore.loadCurrentScript();
+        currentScript = resolveInitialScript();
 
         Form form = new Form("CN1 Playground", new BorderLayout());
         appForm = form;
         Toolbar toolbar = form.getToolbar();
         toolbar.setTitleCentered(false);
         setThemeRole(form.getContentPane(), "form");
+        setThemeRole(form.getTitleArea(), "header");
+        setThemeRole(toolbar.getTitleComponent(), "headerTitle");
 
         editor = new PlaygroundBrowserEditor(currentScript, websiteDarkMode, this::handleSourceChanged);
         previewRoot = createPreviewRoot();
@@ -98,6 +104,10 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void runScript(Form form) {
+        com.codename1.ui.CN.callSerially(() -> executeRunScript(form));
+    }
+
+    private void executeRunScript(Form form) {
         List<PlaygroundStateStore.HistoryEntry> history = PlaygroundStateStore.pushHistory(currentScript);
         refreshHistoryMenu(form.getToolbar(), history);
         previewRoot.removeAll();
@@ -135,6 +145,11 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void installSideMenu(Toolbar toolbar, Form form) {
+        toolbar.addComponentToSideMenu(new PlaygroundMenuSection("Share"));
+        toolbar.addComponentToSideMenu(createSideMenuButton("Copy Current URL", () -> {
+            copyCurrentSourceUrl();
+            toolbar.closeSideMenu();
+        }));
         toolbar.addComponentToSideMenu(new PlaygroundMenuSection("Samples"));
         for (PlaygroundExamples.Sample sample : PlaygroundExamples.SAMPLES) {
             toolbar.addComponentToSideMenu(createSideMenuButton(sample.title, () -> {
@@ -177,8 +192,107 @@ public class CN1Playground extends Lifecycle {
     private Button createSideMenuButton(String text, Runnable action) {
         Button button = new Button(text);
         button.setUIID("SideCommand");
+        setThemeRole(button, "sideCommand");
         button.addActionListener(e -> action.run());
         return button;
+    }
+
+    private String resolveInitialScript() {
+        String sharedScript = scriptFromUrl();
+        if (sharedScript != null) {
+            PlaygroundStateStore.saveCurrentState(sharedScript, PlaygroundStateStore.loadCurrentOutput());
+            return sharedScript;
+        }
+        return PlaygroundStateStore.loadCurrentScript();
+    }
+
+    private String scriptFromUrl() {
+        String href = com.codename1.ui.CN.getProperty("browser.window.location.href", null);
+        if (href == null || href.length() == 0) {
+            return null;
+        }
+        String code = queryParam(href, "code");
+        if (code != null && code.length() > 0) {
+            String decoded = decodeSharedScript(code);
+            if (decoded != null && decoded.trim().length() > 0) {
+                return decoded;
+            }
+        }
+        String sample = queryParam(href, "sample");
+        PlaygroundExamples.Sample found = PlaygroundExamples.findBySlug(sample);
+        return found == null ? null : found.script;
+    }
+
+    private String queryParam(String href, String name) {
+        int queryStart = href.indexOf('?');
+        if (queryStart < 0 || queryStart == href.length() - 1) {
+            return null;
+        }
+        String query = href.substring(queryStart + 1);
+        int hash = query.indexOf('#');
+        if (hash >= 0) {
+            query = query.substring(0, hash);
+        }
+        String prefix = name + "=";
+        String[] pairs = Util.split(query, "&");
+        for (int i = 0; i < pairs.length; i++) {
+            String pair = pairs[i];
+            if (pair.startsWith(prefix)) {
+                return pair.substring(prefix.length());
+            }
+        }
+        return null;
+    }
+
+    private String decodeSharedScript(String encoded) {
+        try {
+            String normalized = encoded.replace('-', '+').replace('_', '/');
+            int pad = normalized.length() % 4;
+            if (pad > 0) {
+                normalized = normalized + "====".substring(pad);
+            }
+            byte[] data = Base64.decode(normalized.getBytes("UTF-8"));
+            return new String(data, "UTF-8");
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private void copyCurrentSourceUrl() {
+        String base = com.codename1.ui.CN.getProperty("browser.window.location.href", null);
+        if (base == null || base.length() == 0) {
+            return;
+        }
+        int query = base.indexOf('?');
+        if (query >= 0) {
+            base = base.substring(0, query);
+        }
+        int hash = base.indexOf('#');
+        if (hash >= 0) {
+            base = base.substring(0, hash);
+        }
+        String encoded = encodeSharedScript(currentScript);
+        if (encoded.length() == 0) {
+            return;
+        }
+        com.codename1.ui.Display.getInstance().copyToClipboard(base + "?code=" + encoded);
+    }
+
+    private String encodeSharedScript(String script) {
+        if (script == null || script.length() == 0) {
+            return "";
+        }
+        try {
+            String encoded = Base64.encodeNoNewline(script.getBytes("UTF-8"))
+                    .replace('+', '-')
+                    .replace('/', '_');
+            while (encoded.endsWith("=")) {
+                encoded = encoded.substring(0, encoded.length() - 1);
+            }
+            return encoded;
+        } catch (UnsupportedEncodingException ex) {
+            return "";
+        }
     }
 
     private void setScript(String script, boolean runNow) {
@@ -306,6 +420,7 @@ public class CN1Playground extends Lifecycle {
                 applyWebsiteTheme(cnt.getComponentAt(i), dark);
             }
         }
+        applyGlobalThemeStyles(dark);
     }
 
     private void applyRoleStyle(Component component, String role, boolean dark) {
@@ -340,8 +455,37 @@ public class CN1Playground extends Lifecycle {
             case "headerTitle":
                 style.setFgColor(dark ? 0xf8fafc : 0x111827);
                 break;
+            case "sideCommand":
+                style.setBgTransparency(255);
+                style.setBgColor(dark ? 0x111827 : 0xffffff);
+                style.setFgColor(dark ? 0xe5e7eb : 0x111827);
+                break;
             default:
                 break;
+        }
+    }
+
+    private void applyGlobalThemeStyles(boolean dark) {
+        tintUiid("TitleArea", dark ? 0x111827 : 0xe5e7eb, 0, true);
+        tintUiid("Title", dark ? 0x111827 : 0xe5e7eb, dark ? 0xf8fafc : 0x111827, true);
+        tintUiid("SideNavigationPanel", dark ? 0x0f172a : 0xffffff, dark ? 0xe5e7eb : 0x111827, true);
+        tintUiid("SideCommand", dark ? 0x0f172a : 0xffffff, dark ? 0xe5e7eb : 0x111827, false);
+        tintUiid("PlaygroundMenuSection", dark ? 0x0f172a : 0xffffff, 0, true);
+        tintUiid("PlaygroundMenuSectionTitle", dark ? 0x94a3b8 : 0x6b7280, dark ? 0x94a3b8 : 0x6b7280, false);
+        tintUiid("PlaygroundMenuEmpty", dark ? 0x0f172a : 0xffffff, dark ? 0x94a3b8 : 0x6b7280, false);
+    }
+
+    private void tintUiid(String uiid, int bgColor, int fgColor, boolean updateBackground) {
+        Style style = UIManager.getInstance().getComponentStyle(uiid);
+        if (style == null) {
+            return;
+        }
+        if (updateBackground) {
+            style.setBgTransparency(255);
+            style.setBgColor(bgColor);
+        }
+        if (fgColor != 0) {
+            style.setFgColor(fgColor);
         }
     }
 

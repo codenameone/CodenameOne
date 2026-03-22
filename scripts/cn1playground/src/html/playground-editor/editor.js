@@ -88,26 +88,30 @@
 
   function registerCompletionProvider() {
     monaco.languages.registerCompletionItemProvider("java", {
-      triggerCharacters: [".", "(", ","],
+      triggerCharacters: [".", "(", ",", " "],
       provideCompletionItems: function(model, position) {
         if (!state.metadata) {
           return { suggestions: [] };
         }
         var text = model.getValue();
         var offset = model.getOffsetAt(position);
-        return { suggestions: collectSuggestions(text, offset) };
+        return { suggestions: collectSuggestions(model, position, text, offset) };
       }
     });
   }
 
-  function collectSuggestions(text, offset) {
+  function collectSuggestions(model, position, text, offset) {
+    var importContext = findImportContext(model, position);
+    if (importContext) {
+      return importSuggestions(importContext, model, position);
+    }
     var visibleTypes = getVisibleTypes(text);
     var receiver = findReceiver(text, offset);
     if (receiver) {
       var typeName = inferExpressionType(receiver, text, visibleTypes);
       return memberSuggestions(typeName);
     }
-    return globalSuggestions(visibleTypes);
+    return globalSuggestions(model, position, text, visibleTypes);
   }
 
   function memberSuggestions(typeName) {
@@ -138,33 +142,167 @@
     return suggestions;
   }
 
-  function globalSuggestions(visibleTypes) {
+  function globalSuggestions(model, position, text, visibleTypes) {
     var suggestions = [];
+    var word = model.getWordUntilPosition(position);
+    var prefix = (word && word.word ? word.word : "");
+    var range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
     var globals = state.metadata.globals || {};
     Object.keys(globals).forEach(function(name) {
+      if (!matchesPrefix(name, prefix)) {
+        return;
+      }
       suggestions.push({
         label: name,
         kind: monaco.languages.CompletionItemKind.Variable,
         insertText: name,
-        detail: globals[name]
+        detail: globals[name],
+        range: range
       });
     });
     Object.keys(visibleTypes).forEach(function(simple) {
+      if (!matchesPrefix(simple, prefix)) {
+        return;
+      }
       suggestions.push({
         label: simple,
         kind: monaco.languages.CompletionItemKind.Class,
         insertText: simple,
-        detail: visibleTypes[simple]
+        detail: visibleTypes[simple],
+        range: range
       });
     });
+    Object.keys(state.metadata.simpleIndex || {}).forEach(function(simple) {
+      if (visibleTypes[simple] || !matchesPrefix(simple, prefix)) {
+        return;
+      }
+      var candidates = state.metadata.simpleIndex[simple];
+      for (var i = 0; i < candidates.length; i++) {
+        suggestions.push(typeSuggestion(simple, candidates[i], text, range));
+      }
+    });
     ["import", "new", "return", "if", "for", "while", "class"].forEach(function(keyword) {
+      if (!matchesPrefix(keyword, prefix)) {
+        return;
+      }
       suggestions.push({
         label: keyword,
         kind: monaco.languages.CompletionItemKind.Keyword,
-        insertText: keyword
+        insertText: keyword,
+        range: range
       });
     });
     return suggestions;
+  }
+
+  function findImportContext(model, position) {
+    var line = model.getLineContent(position.lineNumber).substring(0, position.column - 1);
+    var match = line.match(/^\s*import\s+([A-Za-z0-9_$.]*)$/);
+    if (!match) {
+      return null;
+    }
+    var path = match[1] || "";
+    var lastDot = path.lastIndexOf(".");
+    if (lastDot < 0) {
+      return {
+        parentPath: "",
+        segmentPrefix: path
+      };
+    }
+    return {
+      parentPath: path.substring(0, lastDot),
+      segmentPrefix: path.substring(lastDot + 1)
+    };
+  }
+
+  function importSuggestions(context, model, position) {
+    var suggestions = [];
+    var word = model.getWordUntilPosition(position);
+    var range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
+    var seen = {};
+    var packageNames = Object.keys(state.metadata.packages || {});
+    for (var i = 0; i < packageNames.length; i++) {
+      var packageName = packageNames[i];
+      var child = childPackageSegment(packageName, context.parentPath);
+      if (child && matchesPrefix(child, context.segmentPrefix) && !seen["pkg:" + child]) {
+        seen["pkg:" + child] = true;
+        suggestions.push({
+          label: child,
+          kind: monaco.languages.CompletionItemKind.Module,
+          insertText: child,
+          detail: context.parentPath ? context.parentPath + "." + child : child,
+          range: range
+        });
+      }
+    }
+    var importPackage = context.segmentPrefix.length === 0 ? context.parentPath : null;
+    if (importPackage && state.metadata.packages[importPackage]) {
+      suggestions.push({
+        label: "*",
+        kind: monaco.languages.CompletionItemKind.Module,
+        insertText: "*",
+        detail: importPackage + ".*",
+        range: range
+      });
+      var classes = state.metadata.packages[importPackage];
+      for (var j = 0; j < classes.length; j++) {
+        suggestions.push({
+          label: classes[j],
+          kind: monaco.languages.CompletionItemKind.Class,
+          insertText: classes[j],
+          detail: importPackage + "." + classes[j],
+          range: range
+        });
+      }
+    }
+    return suggestions;
+  }
+
+  function typeSuggestion(simple, qualifiedName, text, range) {
+    var packageName = qualifiedName.substring(0, qualifiedName.lastIndexOf("."));
+    return {
+      label: simple,
+      kind: monaco.languages.CompletionItemKind.Class,
+      insertText: simple,
+      detail: qualifiedName,
+      range: range,
+      additionalTextEdits: buildImportEdits(text, qualifiedName, packageName + ".*")
+    };
+  }
+
+  function buildImportEdits(text, qualifiedName, wildcardImport) {
+    if (text.indexOf("import " + qualifiedName + ";") >= 0 || text.indexOf("import " + wildcardImport + ";") >= 0) {
+      return [];
+    }
+    var lines = text.split("\n");
+    var insertAfter = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var trimmed = lines[i].trim();
+      if (trimmed.indexOf("package ") === 0 || trimmed.indexOf("import ") === 0) {
+        insertAfter = i + 1;
+      }
+    }
+    return [{
+      range: new monaco.Range(insertAfter + 1, 1, insertAfter + 1, 1),
+      text: "import " + qualifiedName + ";\n"
+    }];
+  }
+
+  function childPackageSegment(packageName, parentPath) {
+    if (!parentPath) {
+      var rootDot = packageName.indexOf(".");
+      return rootDot < 0 ? packageName : packageName.substring(0, rootDot);
+    }
+    if (packageName === parentPath || packageName.indexOf(parentPath + ".") !== 0) {
+      return "";
+    }
+    var remainder = packageName.substring(parentPath.length() + 1);
+    var nextDot = remainder.indexOf(".");
+    return nextDot < 0 ? remainder : remainder.substring(0, nextDot);
+  }
+
+  function matchesPrefix(candidate, prefix) {
+    return !prefix || candidate.toLowerCase().indexOf(prefix.toLowerCase()) === 0;
   }
 
   function findReceiver(text, offset) {
@@ -295,30 +433,42 @@
     for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
       var line = lines[lineIndex];
       var inString = "";
+      var codeLine = "";
       for (var column = 0; column < line.length; column++) {
         var ch = line.charAt(column);
         var next = column + 1 < line.length ? line.charAt(column + 1) : "";
         if (inBlockComment) {
+          codeLine += " ";
           if (ch === "*" && next === "/") {
             inBlockComment = false;
+            codeLine += " ";
             column += 1;
           }
           continue;
         }
         if (!inString && ch === "/" && next === "/") {
+          while (codeLine.length < line.length) {
+            codeLine += " ";
+          }
           break;
         }
         if (!inString && ch === "/" && next === "*") {
           inBlockComment = true;
+          codeLine += "  ";
           column += 1;
           continue;
         }
         if (!inString && (ch === '"' || ch === "'")) {
           inString = ch;
+          codeLine += " ";
           continue;
         }
         if (inString) {
+          codeLine += " ";
           if (ch === "\\") {
+            if (column + 1 < line.length) {
+              codeLine += " ";
+            }
             column += 1;
             continue;
           }
@@ -327,6 +477,7 @@
           }
           continue;
         }
+        codeLine += ch;
         if (ch === "{" || ch === "(" || ch === "[") {
           braceStack.push({ ch: ch, line: lineIndex + 1, column: column + 1 });
         } else if (ch === "}" || ch === ")" || ch === "]") {
@@ -336,7 +487,7 @@
           }
         }
       }
-      collectUnknownTypeMarkers(markers, line, lineIndex + 1, text);
+      collectUnknownTypeMarkers(markers, codeLine, lineIndex + 1, text);
     }
     for (var i = 0; i < braceStack.length; i++) {
       var item = braceStack[i];
@@ -354,7 +505,7 @@
       if (isIgnoredTypeToken(line, token, match.index)) {
         continue;
       }
-      if (!visible[token] && !state.metadata.simpleToQualified[token]) {
+      if (!visible[token] && !(state.metadata.simpleIndex && state.metadata.simpleIndex[token])) {
         markers.push(marker(lineNumber, match.index + 1, lineNumber, match.index + token.length + 1,
           "Unknown type " + token, monaco.MarkerSeverity.Warning));
       }
@@ -433,17 +584,20 @@
 
   function normalizeMetadata(raw) {
     var packages = {};
-    var simpleToQualified = {};
+    var simpleIndex = {};
     Object.keys(raw.types || {}).forEach(function(name) {
       var info = raw.types[name];
       if (!packages[info.package]) {
         packages[info.package] = [];
       }
       packages[info.package].push(info.simple);
-      simpleToQualified[info.simple] = name;
+      if (!simpleIndex[info.simple]) {
+        simpleIndex[info.simple] = [];
+      }
+      simpleIndex[info.simple].push(name);
     });
     raw.packages = packages;
-    raw.simpleToQualified = simpleToQualified;
+    raw.simpleIndex = simpleIndex;
     return raw;
   }
 

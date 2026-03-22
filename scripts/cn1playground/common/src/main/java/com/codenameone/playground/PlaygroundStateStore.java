@@ -28,7 +28,7 @@ final class PlaygroundStateStore {
 
         String detail(List<HistoryEntry> allEntries) {
             String detail = summarize(script, allEntries);
-            return detail.length() > 0 ? detail : "Saved playground draft";
+            return detail.length() > 0 ? detail : "Saved at " + title();
         }
     }
 
@@ -162,7 +162,7 @@ final class PlaygroundStateStore {
         if (!candidateLines.isEmpty()) {
             return ellipsize(candidateLines.get(0));
         }
-        return "Saved playground draft";
+        return "";
     }
 
     private static boolean isDistinctive(String line, List<HistoryEntry> allEntries) {
