@@ -25,9 +25,6 @@ public final class GeneratedAccess_com_codename1_analytics {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("AnalyticsService".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.analytics -> com.codename1.analytics.AnalyticsService");
-            }
             return com.codename1.analytics.AnalyticsService.class;
         }
         return null;

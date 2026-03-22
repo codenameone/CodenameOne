@@ -25,33 +25,18 @@ public final class GeneratedAccess_com_codename1_db {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Cursor".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.db -> com.codename1.db.Cursor");
-            }
             return com.codename1.db.Cursor.class;
         }
         if ("Database".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.db -> com.codename1.db.Database");
-            }
             return com.codename1.db.Database.class;
         }
         if ("Row".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.db -> com.codename1.db.Row");
-            }
             return com.codename1.db.Row.class;
         }
         if ("RowExt".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.db -> com.codename1.db.RowExt");
-            }
             return com.codename1.db.RowExt.class;
         }
         if ("ThreadSafeDatabase".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.db -> com.codename1.db.ThreadSafeDatabase");
-            }
             return com.codename1.db.ThreadSafeDatabase.class;
         }
         return null;

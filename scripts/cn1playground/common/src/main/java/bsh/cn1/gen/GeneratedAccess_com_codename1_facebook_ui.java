@@ -25,9 +25,6 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("LikeButton".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook.ui -> com.codename1.facebook.ui.LikeButton");
-            }
             return com.codename1.facebook.ui.LikeButton.class;
         }
         return null;

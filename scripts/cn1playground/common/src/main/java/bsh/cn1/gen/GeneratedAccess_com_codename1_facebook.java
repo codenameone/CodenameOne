@@ -25,45 +25,24 @@ public final class GeneratedAccess_com_codename1_facebook {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Album".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook -> com.codename1.facebook.Album");
-            }
             return com.codename1.facebook.Album.class;
         }
         if ("FBObject".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook -> com.codename1.facebook.FBObject");
-            }
             return com.codename1.facebook.FBObject.class;
         }
         if ("FaceBookAccess".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook -> com.codename1.facebook.FaceBookAccess");
-            }
             return com.codename1.facebook.FaceBookAccess.class;
         }
         if ("Page".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook -> com.codename1.facebook.Page");
-            }
             return com.codename1.facebook.Page.class;
         }
         if ("Photo".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook -> com.codename1.facebook.Photo");
-            }
             return com.codename1.facebook.Photo.class;
         }
         if ("Post".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook -> com.codename1.facebook.Post");
-            }
             return com.codename1.facebook.Post.class;
         }
         if ("User".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook -> com.codename1.facebook.User");
-            }
             return com.codename1.facebook.User.class;
         }
         return null;

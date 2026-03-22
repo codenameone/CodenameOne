@@ -25,63 +25,33 @@ public final class GeneratedAccess_com_codename1_charts_models {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("AreaSeries".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.AreaSeries");
-            }
             return com.codename1.charts.models.AreaSeries.class;
         }
         if ("CategorySeries".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.CategorySeries");
-            }
             return com.codename1.charts.models.CategorySeries.class;
         }
         if ("MultipleCategorySeries".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.MultipleCategorySeries");
-            }
             return com.codename1.charts.models.MultipleCategorySeries.class;
         }
         if ("Point".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.Point");
-            }
             return com.codename1.charts.models.Point.class;
         }
         if ("RangeCategorySeries".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.RangeCategorySeries");
-            }
             return com.codename1.charts.models.RangeCategorySeries.class;
         }
         if ("SeriesSelection".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.SeriesSelection");
-            }
             return com.codename1.charts.models.SeriesSelection.class;
         }
         if ("TimeSeries".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.TimeSeries");
-            }
             return com.codename1.charts.models.TimeSeries.class;
         }
         if ("XYMultipleSeriesDataset".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.XYMultipleSeriesDataset");
-            }
             return com.codename1.charts.models.XYMultipleSeriesDataset.class;
         }
         if ("XYSeries".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.XYSeries");
-            }
             return com.codename1.charts.models.XYSeries.class;
         }
         if ("XYValueSeries".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.XYValueSeries");
-            }
             return com.codename1.charts.models.XYValueSeries.class;
         }
         return null;

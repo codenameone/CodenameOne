@@ -25,237 +25,120 @@ public final class GeneratedAccess_com_codename1_components {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Accordion".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.Accordion");
-            }
             return com.codename1.components.Accordion.class;
         }
         if ("Ads".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.Ads");
-            }
             return com.codename1.components.Ads.class;
         }
         if ("AudioRecorderComponent".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.AudioRecorderComponent");
-            }
             return com.codename1.components.AudioRecorderComponent.class;
         }
         if ("ButtonList".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ButtonList");
-            }
             return com.codename1.components.ButtonList.class;
         }
         if ("CheckBoxList".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.CheckBoxList");
-            }
             return com.codename1.components.CheckBoxList.class;
         }
         if ("ClearableTextField".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ClearableTextField");
-            }
             return com.codename1.components.ClearableTextField.class;
         }
         if ("FileEncodedImage".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.FileEncodedImage");
-            }
             return com.codename1.components.FileEncodedImage.class;
         }
         if ("FileEncodedImageAsync".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.FileEncodedImageAsync");
-            }
             return com.codename1.components.FileEncodedImageAsync.class;
         }
         if ("FileTree".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.FileTree");
-            }
             return com.codename1.components.FileTree.class;
         }
         if ("FileTreeModel".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.FileTreeModel");
-            }
             return com.codename1.components.FileTreeModel.class;
         }
         if ("FloatingActionButton".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.FloatingActionButton");
-            }
             return com.codename1.components.FloatingActionButton.class;
         }
         if ("FloatingHint".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.FloatingHint");
-            }
             return com.codename1.components.FloatingHint.class;
         }
         if ("ImageViewer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ImageViewer");
-            }
             return com.codename1.components.ImageViewer.class;
         }
         if ("InfiniteProgress".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.InfiniteProgress");
-            }
             return com.codename1.components.InfiniteProgress.class;
         }
         if ("InfiniteScrollAdapter".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.InfiniteScrollAdapter");
-            }
             return com.codename1.components.InfiniteScrollAdapter.class;
         }
         if ("InteractionDialog".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.InteractionDialog");
-            }
             return com.codename1.components.InteractionDialog.class;
         }
         if ("MasterDetail".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.MasterDetail");
-            }
             return com.codename1.components.MasterDetail.class;
         }
         if ("MediaPlayer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.MediaPlayer");
-            }
             return com.codename1.components.MediaPlayer.class;
         }
         if ("MultiButton".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.MultiButton");
-            }
             return com.codename1.components.MultiButton.class;
         }
         if ("OnOffSwitch".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.OnOffSwitch");
-            }
             return com.codename1.components.OnOffSwitch.class;
         }
         if ("Progress".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.Progress");
-            }
             return com.codename1.components.Progress.class;
         }
         if ("RSSReader".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.RSSReader");
-            }
             return com.codename1.components.RSSReader.class;
         }
         if ("RadioButtonList".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.RadioButtonList");
-            }
             return com.codename1.components.RadioButtonList.class;
         }
         if ("ReplaceableImage".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ReplaceableImage");
-            }
             return com.codename1.components.ReplaceableImage.class;
         }
         if ("ScaleImageButton".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ScaleImageButton");
-            }
             return com.codename1.components.ScaleImageButton.class;
         }
         if ("ScaleImageLabel".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ScaleImageLabel");
-            }
             return com.codename1.components.ScaleImageLabel.class;
         }
         if ("ShareButton".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ShareButton");
-            }
             return com.codename1.components.ShareButton.class;
         }
         if ("SignatureComponent".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.SignatureComponent");
-            }
             return com.codename1.components.SignatureComponent.class;
         }
         if ("SliderBridge".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.SliderBridge");
-            }
             return com.codename1.components.SliderBridge.class;
         }
         if ("SpanButton".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.SpanButton");
-            }
             return com.codename1.components.SpanButton.class;
         }
         if ("SpanLabel".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.SpanLabel");
-            }
             return com.codename1.components.SpanLabel.class;
         }
         if ("SpanMultiButton".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.SpanMultiButton");
-            }
             return com.codename1.components.SpanMultiButton.class;
         }
         if ("SplitPane".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.SplitPane");
-            }
             return com.codename1.components.SplitPane.class;
         }
         if ("StorageImage".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.StorageImage");
-            }
             return com.codename1.components.StorageImage.class;
         }
         if ("StorageImageAsync".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.StorageImageAsync");
-            }
             return com.codename1.components.StorageImageAsync.class;
         }
         if ("Switch".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.Switch");
-            }
             return com.codename1.components.Switch.class;
         }
         if ("SwitchList".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.SwitchList");
-            }
             return com.codename1.components.SwitchList.class;
         }
         if ("ToastBar".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ToastBar");
-            }
             return com.codename1.components.ToastBar.class;
         }
         if ("WebBrowser".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.WebBrowser");
-            }
             return com.codename1.components.WebBrowser.class;
         }
         return null;

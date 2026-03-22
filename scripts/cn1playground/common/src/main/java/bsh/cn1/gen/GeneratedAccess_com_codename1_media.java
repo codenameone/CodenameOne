@@ -25,57 +25,30 @@ public final class GeneratedAccess_com_codename1_media {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("AbstractMedia".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.AbstractMedia");
-            }
             return com.codename1.media.AbstractMedia.class;
         }
         if ("AsyncMedia".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.AsyncMedia");
-            }
             return com.codename1.media.AsyncMedia.class;
         }
         if ("AudioBuffer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.AudioBuffer");
-            }
             return com.codename1.media.AudioBuffer.class;
         }
         if ("Media".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.Media");
-            }
             return com.codename1.media.Media.class;
         }
         if ("MediaManager".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.MediaManager");
-            }
             return com.codename1.media.MediaManager.class;
         }
         if ("MediaMetaData".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.MediaMetaData");
-            }
             return com.codename1.media.MediaMetaData.class;
         }
         if ("MediaRecorderBuilder".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.MediaRecorderBuilder");
-            }
             return com.codename1.media.MediaRecorderBuilder.class;
         }
         if ("RemoteControlListener".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.RemoteControlListener");
-            }
             return com.codename1.media.RemoteControlListener.class;
         }
         if ("WAVWriter".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.WAVWriter");
-            }
             return com.codename1.media.WAVWriter.class;
         }
         return null;

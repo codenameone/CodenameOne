@@ -25,21 +25,12 @@ public final class GeneratedAccess_com_codename1_plugin_event {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("IsGalleryTypeSupportedEvent".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.plugin.event -> com.codename1.plugin.event.IsGalleryTypeSupportedEvent");
-            }
             return com.codename1.plugin.event.IsGalleryTypeSupportedEvent.class;
         }
         if ("OpenGalleryEvent".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.plugin.event -> com.codename1.plugin.event.OpenGalleryEvent");
-            }
             return com.codename1.plugin.event.OpenGalleryEvent.class;
         }
         if ("PluginEvent".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.plugin.event -> com.codename1.plugin.event.PluginEvent");
-            }
             return com.codename1.plugin.event.PluginEvent.class;
         }
         return null;

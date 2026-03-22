@@ -25,57 +25,30 @@ public final class GeneratedAccess_com_codename1_payment {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("ApplePromotionalOffer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.payment -> com.codename1.payment.ApplePromotionalOffer");
-            }
             return com.codename1.payment.ApplePromotionalOffer.class;
         }
         if ("PendingPurchaseCallback".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.payment -> com.codename1.payment.PendingPurchaseCallback");
-            }
             return com.codename1.payment.PendingPurchaseCallback.class;
         }
         if ("Product".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.payment -> com.codename1.payment.Product");
-            }
             return com.codename1.payment.Product.class;
         }
         if ("PromotionalOffer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.payment -> com.codename1.payment.PromotionalOffer");
-            }
             return com.codename1.payment.PromotionalOffer.class;
         }
         if ("Purchase".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.payment -> com.codename1.payment.Purchase");
-            }
             return com.codename1.payment.Purchase.class;
         }
         if ("PurchaseCallback".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.payment -> com.codename1.payment.PurchaseCallback");
-            }
             return com.codename1.payment.PurchaseCallback.class;
         }
         if ("Receipt".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.payment -> com.codename1.payment.Receipt");
-            }
             return com.codename1.payment.Receipt.class;
         }
         if ("ReceiptStore".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.payment -> com.codename1.payment.ReceiptStore");
-            }
             return com.codename1.payment.ReceiptStore.class;
         }
         if ("RestoreCallback".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.payment -> com.codename1.payment.RestoreCallback");
-            }
             return com.codename1.payment.RestoreCallback.class;
         }
         return null;

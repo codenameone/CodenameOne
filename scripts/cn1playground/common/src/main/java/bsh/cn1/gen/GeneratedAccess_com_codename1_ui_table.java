@@ -25,39 +25,21 @@ public final class GeneratedAccess_com_codename1_ui_table {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("AbstractTableModel".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.AbstractTableModel");
-            }
             return com.codename1.ui.table.AbstractTableModel.class;
         }
         if ("DefaultTableModel".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.DefaultTableModel");
-            }
             return com.codename1.ui.table.DefaultTableModel.class;
         }
         if ("SortableTableModel".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.SortableTableModel");
-            }
             return com.codename1.ui.table.SortableTableModel.class;
         }
         if ("Table".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.Table");
-            }
             return com.codename1.ui.table.Table.class;
         }
         if ("TableLayout".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.TableLayout");
-            }
             return com.codename1.ui.table.TableLayout.class;
         }
         if ("TableModel".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.TableModel");
-            }
             return com.codename1.ui.table.TableModel.class;
         }
         return null;

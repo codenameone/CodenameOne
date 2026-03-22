@@ -66,7 +66,6 @@ final class PlaygroundRunner {
 
     private void bindGlobals(Interpreter interpreter, PlaygroundContext context) throws EvalError {
         NameSpace namespace = interpreter.getNameSpace();
-        PlaygroundContext.debug("bindGlobals namespace=" + namespace.getName());
         interpreter.set("ctx", context);
         interpreter.set("theme", context.getTheme());
         interpreter.set("hostForm", context.getHostForm());
@@ -86,13 +85,6 @@ final class PlaygroundRunner {
         namespace.importPackage("com.codename1.components");
         namespace.importPackage("com.codename1.ui.geom");
         namespace.importClass("com.codenameone.playground.PlaygroundContext");
-        try {
-            PlaygroundContext.debug("post-import Container=" + namespace.getClass("Container"));
-            PlaygroundContext.debug("post-import BoxLayout=" + namespace.getClass("BoxLayout"));
-            PlaygroundContext.debug("post-import SpanLabel=" + namespace.getClass("SpanLabel"));
-        } catch (UtilEvalError ex) {
-            PlaygroundContext.debug("post-import lookup failed: " + ex.getMessage());
-        }
     }
 
     private String adaptScript(String script) {

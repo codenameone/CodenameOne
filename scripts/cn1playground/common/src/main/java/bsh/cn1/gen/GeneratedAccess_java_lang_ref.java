@@ -25,15 +25,9 @@ public final class GeneratedAccess_java_lang_ref {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Reference".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.ref -> java.lang.ref.Reference");
-            }
             return java.lang.ref.Reference.class;
         }
         if ("WeakReference".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.ref -> java.lang.ref.WeakReference");
-            }
             return java.lang.ref.WeakReference.class;
         }
         return null;

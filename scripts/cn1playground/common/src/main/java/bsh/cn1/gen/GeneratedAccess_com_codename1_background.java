@@ -25,9 +25,6 @@ public final class GeneratedAccess_com_codename1_background {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("BackgroundFetch".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.background -> com.codename1.background.BackgroundFetch");
-            }
             return com.codename1.background.BackgroundFetch.class;
         }
         return null;

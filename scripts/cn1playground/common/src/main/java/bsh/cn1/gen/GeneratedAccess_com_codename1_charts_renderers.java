@@ -25,39 +25,21 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("BasicStroke".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.BasicStroke");
-            }
             return com.codename1.charts.renderers.BasicStroke.class;
         }
         if ("DefaultRenderer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.DefaultRenderer");
-            }
             return com.codename1.charts.renderers.DefaultRenderer.class;
         }
         if ("DialRenderer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.DialRenderer");
-            }
             return com.codename1.charts.renderers.DialRenderer.class;
         }
         if ("SimpleSeriesRenderer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.SimpleSeriesRenderer");
-            }
             return com.codename1.charts.renderers.SimpleSeriesRenderer.class;
         }
         if ("XYMultipleSeriesRenderer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.XYMultipleSeriesRenderer");
-            }
             return com.codename1.charts.renderers.XYMultipleSeriesRenderer.class;
         }
         if ("XYSeriesRenderer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.XYSeriesRenderer");
-            }
             return com.codename1.charts.renderers.XYSeriesRenderer.class;
         }
         return null;

@@ -25,27 +25,15 @@ public final class GeneratedAccess_com_codename1_charts_transitions {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("SeriesTransition".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.transitions -> com.codename1.charts.transitions.SeriesTransition");
-            }
             return com.codename1.charts.transitions.SeriesTransition.class;
         }
         if ("XYMultiSeriesTransition".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.transitions -> com.codename1.charts.transitions.XYMultiSeriesTransition");
-            }
             return com.codename1.charts.transitions.XYMultiSeriesTransition.class;
         }
         if ("XYSeriesTransition".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.transitions -> com.codename1.charts.transitions.XYSeriesTransition");
-            }
             return com.codename1.charts.transitions.XYSeriesTransition.class;
         }
         if ("XYValueSeriesTransition".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.transitions -> com.codename1.charts.transitions.XYValueSeriesTransition");
-            }
             return com.codename1.charts.transitions.XYValueSeriesTransition.class;
         }
         return null;

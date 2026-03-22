@@ -25,15 +25,9 @@ public final class GeneratedAccess_com_codename1_codescan {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("CodeScanner".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.codescan -> com.codename1.codescan.CodeScanner");
-            }
             return com.codename1.codescan.CodeScanner.class;
         }
         if ("ScanResult".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.codescan -> com.codename1.codescan.ScanResult");
-            }
             return com.codename1.codescan.ScanResult.class;
         }
         return null;

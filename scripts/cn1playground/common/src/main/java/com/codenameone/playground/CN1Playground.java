@@ -1,8 +1,8 @@
 package com.codenameone.playground;
 
-import bsh.cn1.GeneratedCN1Access;
-import com.codename1.system.Lifecycle;
 import com.codename1.components.SplitPane;
+import com.codename1.system.Lifecycle;
+import com.codename1.system.NativeLookup;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
@@ -15,14 +15,18 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.util.UITimer;
 import com.codename1.ui.util.Resources;
 
 public class CN1Playground extends Lifecycle {
+    private static final String THEME_ROLE = "playgroundThemeRole";
+
     private final PlaygroundRunner runner = new PlaygroundRunner();
     private TextArea editor;
     private TextArea output;
     private Container previewRoot;
     private Resources theme;
+    private boolean websiteDarkMode;
 
     @Override
     public void runApp() {
@@ -30,20 +34,24 @@ public class CN1Playground extends Lifecycle {
         Form form = new Form("CN1 Playground", new BorderLayout());
         Toolbar toolbar = form.getToolbar();
         toolbar.setTitleCentered(false);
+        setThemeRole(form.getContentPane(), "form");
 
         editor = createEditor();
         output = createOutput();
         previewRoot = createPreviewRoot();
 
         Container editorPanel = new Container(new BorderLayout());
+        setThemeRole(editorPanel, "panel");
         editorPanel.add(BorderLayout.CENTER, editor);
         editorPanel.add(BorderLayout.SOUTH, output);
 
         Container previewPanel = new Container(new BorderLayout());
+        setThemeRole(previewPanel, "panel");
         previewPanel.add(BorderLayout.NORTH, createPreviewHeader());
         previewPanel.add(BorderLayout.CENTER, previewRoot);
 
         Component content = createMainContent(editorPanel, previewPanel);
+        setThemeRole(content, "content");
         form.add(BorderLayout.CENTER, content);
 
         Command runCommand = Command.create("Run", null, e -> runScript(form));
@@ -54,7 +62,9 @@ public class CN1Playground extends Lifecycle {
         toolbar.addCommandToOverflowMenu(exampleCommand);
 
         runScript(form);
+        initWebsiteThemeSync(form);
         form.show();
+        notifyWebsiteUiReady();
     }
 
     private TextArea createEditor() {
@@ -63,6 +73,7 @@ public class CN1Playground extends Lifecycle {
         area.setGrowByContent(false);
         area.setRows(18);
         area.setMaxSize(100000);
+        setThemeRole(area, "editor");
         return area;
     }
 
@@ -79,6 +90,7 @@ public class CN1Playground extends Lifecycle {
         area.getAllStyles().setBgTransparency(255);
         area.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
         area.getAllStyles().setPadding(2, 2, 2, 2);
+        setThemeRole(area, "output");
         return area;
     }
 
@@ -89,13 +101,17 @@ public class CN1Playground extends Lifecycle {
         root.getAllStyles().setBgTransparency(255);
         root.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
         root.getAllStyles().setPadding(2, 2, 2, 2);
+        setThemeRole(root, "preview");
         return root;
     }
 
     private Container createPreviewHeader() {
         Container header = new Container(BoxLayout.x());
+        setThemeRole(header, "header");
         Label title = new Label("Live Preview");
+        setThemeRole(title, "headerTitle");
         Button reload = new Button("Run");
+        setThemeRole(reload, "headerButton");
         reload.addActionListener(e -> {
             Form current = reload.getComponentForm();
             if (current != null) {
@@ -119,66 +135,10 @@ public class CN1Playground extends Lifecycle {
         previewRoot.removeAll();
         output.setText("");
         appendOutput("Running script...");
-        appendRuntimeSmoke();
         PlaygroundContext context = new PlaygroundContext(form, previewRoot, theme, this::appendOutput);
         PlaygroundRunner.RunResult result = runner.run(editor.getText(), context);
         replacePreview(result.getComponent());
         appendOutput(result.getMessage());
-    }
-
-    private void appendRuntimeSmoke() {
-        appendOutput("Smoke platform=" + com.codename1.ui.CN.getPlatformName());
-        appendOutput("Smoke registry size=" + GeneratedCN1Access.debugClassIndexSize());
-        appendSmokeLiteral("Container", new ClassSupplier() {
-            public Class<?> get() {
-                return Container.class;
-            }
-        });
-        appendSmokeLiteral("BoxLayout", new ClassSupplier() {
-            public Class<?> get() {
-                return BoxLayout.class;
-            }
-        });
-        appendSmokeLiteral("SpanLabel", new ClassSupplier() {
-            public Class<?> get() {
-                return com.codename1.components.SpanLabel.class;
-            }
-        });
-        appendSmokeContains("com.codename1.ui.Container");
-        appendSmokeContains("com.codename1.ui.layouts.BoxLayout");
-        appendSmokeContains("com.codename1.components.SpanLabel");
-        appendSmokeLookup("com.codename1.ui.Container");
-        appendSmokeLookup("com.codename1.ui.layouts.BoxLayout");
-        appendSmokeLookup("com.codename1.components.SpanLabel");
-    }
-
-    private void appendSmokeLiteral(String label, ClassSupplier supplier) {
-        try {
-            Class<?> type = supplier.get();
-            appendOutput("Smoke literal " + label + "=" + describeClass(type));
-        } catch (Throwable t) {
-            appendOutput("Smoke literal " + label + " failed: " + t);
-        }
-    }
-
-    private void appendSmokeLookup(String name) {
-        try {
-            appendOutput("Smoke registry " + name + "=" + describeClass(GeneratedCN1Access.INSTANCE.findClass(name)));
-        } catch (Throwable t) {
-            appendOutput("Smoke registry " + name + " failed: " + t);
-        }
-    }
-
-    private void appendSmokeContains(String name) {
-        try {
-            appendOutput("Smoke registry contains " + name + "=" + GeneratedCN1Access.debugClassIndexContains(name));
-        } catch (Throwable t) {
-            appendOutput("Smoke registry contains " + name + " failed: " + t);
-        }
-    }
-
-    private String describeClass(Class<?> type) {
-        return type == null ? "null" : type.getName();
     }
 
     private void replacePreview(Component component) {
@@ -220,8 +180,105 @@ public class CN1Playground extends Lifecycle {
         }
     }
 
-    private interface ClassSupplier {
-        Class<?> get();
+    private void initWebsiteThemeSync(Form form) {
+        WebsiteThemeNative websiteThemeNative = NativeLookup.create(WebsiteThemeNative.class);
+        if (websiteThemeNative == null || !websiteThemeNative.isSupported()) {
+            return;
+        }
+        websiteDarkMode = websiteThemeNative.isDarkMode();
+        applyWebsiteTheme(form, websiteDarkMode);
+        form.refreshTheme();
+        UITimer.timer(900, true, form, () -> {
+            boolean dark = websiteThemeNative.isDarkMode();
+            if (dark != websiteDarkMode) {
+                websiteDarkMode = dark;
+                applyWebsiteTheme(form, dark);
+                form.refreshTheme();
+            }
+        });
     }
 
+    private void notifyWebsiteUiReady() {
+        WebsiteThemeNative nativeBridge = NativeLookup.create(WebsiteThemeNative.class);
+        if (nativeBridge != null && nativeBridge.isSupported()) {
+            nativeBridge.notifyUiReady();
+        }
+    }
+
+    private void applyWebsiteTheme(Component component, boolean dark) {
+        applyRoleStyle(component, getThemeRole(component), dark);
+        if (component instanceof Container) {
+            Container cnt = (Container) component;
+            for (int i = 0; i < cnt.getComponentCount(); i++) {
+                applyWebsiteTheme(cnt.getComponentAt(i), dark);
+            }
+        }
+    }
+
+    private void applyRoleStyle(Component component, String role, boolean dark) {
+        if (role == null) {
+            return;
+        }
+        Style style = component.getAllStyles();
+        style.setPaddingUnit(Style.UNIT_TYPE_DIPS);
+        switch (role) {
+            case "form":
+                style.setBgTransparency(255);
+                style.setBgColor(dark ? 0x111827 : 0xf5f7fb);
+                break;
+            case "content":
+                style.setBgTransparency(255);
+                style.setBgColor(dark ? 0x111827 : 0xf5f7fb);
+                break;
+            case "panel":
+                style.setBgTransparency(255);
+                style.setBgColor(dark ? 0x1f2937 : 0xffffff);
+                style.setMarginUnit(Style.UNIT_TYPE_DIPS);
+                style.setMargin(1, 1, 1, 1);
+                style.setPadding(1, 1, 1, 1);
+                break;
+            case "editor":
+                style.setBgTransparency(255);
+                style.setBgColor(dark ? 0x0f172a : 0xffffff);
+                style.setFgColor(dark ? 0xe5e7eb : 0x111827);
+                style.setPadding(2, 2, 2, 2);
+                break;
+            case "output":
+                style.setBgTransparency(255);
+                style.setBgColor(dark ? 0x111827 : 0xf3f4f6);
+                style.setFgColor(dark ? 0xcbd5e1 : 0x1f2937);
+                style.setPadding(2, 2, 2, 2);
+                break;
+            case "preview":
+                style.setBgTransparency(255);
+                style.setBgColor(dark ? 0x0f172a : 0xffffff);
+                style.setPadding(2, 2, 2, 2);
+                break;
+            case "header":
+                style.setBgTransparency(255);
+                style.setBgColor(dark ? 0x1f2937 : 0xe5e7eb);
+                style.setPadding(1, 1, 2, 2);
+                break;
+            case "headerTitle":
+                style.setFgColor(dark ? 0xf8fafc : 0x111827);
+                break;
+            case "headerButton":
+                style.setBgTransparency(255);
+                style.setBgColor(dark ? 0x2563eb : 0x1d4ed8);
+                style.setFgColor(0xffffff);
+                style.setPadding(1, 1, 2, 2);
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void setThemeRole(Component component, String role) {
+        component.putClientProperty(THEME_ROLE, role);
+    }
+
+    private String getThemeRole(Component component) {
+        Object role = component.getClientProperty(THEME_ROLE);
+        return role instanceof String ? (String) role : null;
+    }
 }

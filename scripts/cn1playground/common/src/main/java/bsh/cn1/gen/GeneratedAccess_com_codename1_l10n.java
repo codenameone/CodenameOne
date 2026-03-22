@@ -25,45 +25,24 @@ public final class GeneratedAccess_com_codename1_l10n {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("DateFormat".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.l10n -> com.codename1.l10n.DateFormat");
-            }
             return com.codename1.l10n.DateFormat.class;
         }
         if ("DateFormatPatterns".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.l10n -> com.codename1.l10n.DateFormatPatterns");
-            }
             return com.codename1.l10n.DateFormatPatterns.class;
         }
         if ("DateFormatSymbols".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.l10n -> com.codename1.l10n.DateFormatSymbols");
-            }
             return com.codename1.l10n.DateFormatSymbols.class;
         }
         if ("Format".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.l10n -> com.codename1.l10n.Format");
-            }
             return com.codename1.l10n.Format.class;
         }
         if ("L10NManager".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.l10n -> com.codename1.l10n.L10NManager");
-            }
             return com.codename1.l10n.L10NManager.class;
         }
         if ("ParseException".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.l10n -> com.codename1.l10n.ParseException");
-            }
             return com.codename1.l10n.ParseException.class;
         }
         if ("SimpleDateFormat".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.l10n -> com.codename1.l10n.SimpleDateFormat");
-            }
             return com.codename1.l10n.SimpleDateFormat.class;
         }
         return null;

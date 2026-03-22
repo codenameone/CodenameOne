@@ -25,27 +25,15 @@ public final class GeneratedAccess_java_lang_reflect {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Array".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.reflect -> java.lang.reflect.Array");
-            }
             return java.lang.reflect.Array.class;
         }
         if ("Constructor".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.reflect -> java.lang.reflect.Constructor");
-            }
             return java.lang.reflect.Constructor.class;
         }
         if ("Method".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.reflect -> java.lang.reflect.Method");
-            }
             return java.lang.reflect.Method.class;
         }
         if ("Type".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.reflect -> java.lang.reflect.Type");
-            }
             return java.lang.reflect.Type.class;
         }
         return null;

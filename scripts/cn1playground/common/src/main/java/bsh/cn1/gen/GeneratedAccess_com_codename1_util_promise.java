@@ -25,21 +25,12 @@ public final class GeneratedAccess_com_codename1_util_promise {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("ExecutorFunction".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.promise -> com.codename1.util.promise.ExecutorFunction");
-            }
             return com.codename1.util.promise.ExecutorFunction.class;
         }
         if ("Functor".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.promise -> com.codename1.util.promise.Functor");
-            }
             return com.codename1.util.promise.Functor.class;
         }
         if ("Promise".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.promise -> com.codename1.util.promise.Promise");
-            }
             return com.codename1.util.promise.Promise.class;
         }
         return null;

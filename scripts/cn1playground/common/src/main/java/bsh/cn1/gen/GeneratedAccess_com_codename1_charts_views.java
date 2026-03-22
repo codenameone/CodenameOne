@@ -25,123 +25,63 @@ public final class GeneratedAccess_com_codename1_charts_views {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("AbstractChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.AbstractChart");
-            }
             return com.codename1.charts.views.AbstractChart.class;
         }
         if ("BarChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.BarChart");
-            }
             return com.codename1.charts.views.BarChart.class;
         }
         if ("BubbleChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.BubbleChart");
-            }
             return com.codename1.charts.views.BubbleChart.class;
         }
         if ("ClickableArea".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.ClickableArea");
-            }
             return com.codename1.charts.views.ClickableArea.class;
         }
         if ("CombinedXYChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.CombinedXYChart");
-            }
             return com.codename1.charts.views.CombinedXYChart.class;
         }
         if ("CubicLineChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.CubicLineChart");
-            }
             return com.codename1.charts.views.CubicLineChart.class;
         }
         if ("DialChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.DialChart");
-            }
             return com.codename1.charts.views.DialChart.class;
         }
         if ("DoughnutChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.DoughnutChart");
-            }
             return com.codename1.charts.views.DoughnutChart.class;
         }
         if ("LineChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.LineChart");
-            }
             return com.codename1.charts.views.LineChart.class;
         }
         if ("PieChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.PieChart");
-            }
             return com.codename1.charts.views.PieChart.class;
         }
         if ("PieMapper".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.PieMapper");
-            }
             return com.codename1.charts.views.PieMapper.class;
         }
         if ("PieSegment".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.PieSegment");
-            }
             return com.codename1.charts.views.PieSegment.class;
         }
         if ("PointStyle".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.PointStyle");
-            }
             return com.codename1.charts.views.PointStyle.class;
         }
         if ("RadarChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.RadarChart");
-            }
             return com.codename1.charts.views.RadarChart.class;
         }
         if ("RangeBarChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.RangeBarChart");
-            }
             return com.codename1.charts.views.RangeBarChart.class;
         }
         if ("RangeStackedBarChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.RangeStackedBarChart");
-            }
             return com.codename1.charts.views.RangeStackedBarChart.class;
         }
         if ("RoundChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.RoundChart");
-            }
             return com.codename1.charts.views.RoundChart.class;
         }
         if ("ScatterChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.ScatterChart");
-            }
             return com.codename1.charts.views.ScatterChart.class;
         }
         if ("TimeChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.TimeChart");
-            }
             return com.codename1.charts.views.TimeChart.class;
         }
         if ("XYChart".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.XYChart");
-            }
             return com.codename1.charts.views.XYChart.class;
         }
         return null;

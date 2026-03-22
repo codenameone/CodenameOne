@@ -9,7 +9,6 @@ import com.codename1.ui.util.Resources;
  */
 public class PlaygroundContext {
     private static final ThreadLocal<PlaygroundContext> CURRENT = new ThreadLocal<PlaygroundContext>();
-    private static final boolean DEBUG_LOGGING = true;
 
     public interface Logger {
         void log(String message);
@@ -53,17 +52,10 @@ public class PlaygroundContext {
     }
 
     public static void debug(String message) {
-        if (!DEBUG_LOGGING) {
-            return;
-        }
-        System.out.println("[CN1Playground] " + message);
     }
 
     public static boolean interceptMethodInvocation(Object target, String methodName, Object[] args) {
         PlaygroundContext context = CURRENT.get();
-        debug("interceptMethodInvocation target=" + describe(target) + " method=" + methodName
-                + " args=" + (args == null ? "null" : String.valueOf(args.length))
-                + " contextPresent=" + (context != null));
         if (context == null || !(target instanceof Form) || !"show".equals(methodName)) {
             return false;
         }
@@ -79,7 +71,6 @@ public class PlaygroundContext {
     }
 
     public void captureShownForm(Form form) {
-        debug("captureShownForm " + describe(form));
         shownForm = form;
     }
 
@@ -103,12 +94,5 @@ public class PlaygroundContext {
     public void setTitle(String title) {
         hostForm.setTitle(title);
         hostForm.revalidate();
-    }
-
-    private static String describe(Object value) {
-        if (value == null) {
-            return "null";
-        }
-        return value.getClass().getName();
     }
 }

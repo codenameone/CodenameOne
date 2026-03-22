@@ -25,9 +25,6 @@ public final class GeneratedAccess_com_codename1_compat_java_util {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Objects".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.compat.java.util -> com.codename1.compat.java.util.Objects");
-            }
             return com.codename1.compat.java.util.Objects.class;
         }
         return null;

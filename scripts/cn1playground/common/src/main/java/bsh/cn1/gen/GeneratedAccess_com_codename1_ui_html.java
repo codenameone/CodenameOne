@@ -25,75 +25,39 @@ public final class GeneratedAccess_com_codename1_ui_html {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("AsyncDocumentRequestHandler".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.AsyncDocumentRequestHandler");
-            }
             return com.codename1.ui.html.AsyncDocumentRequestHandler.class;
         }
         if ("AsyncDocumentRequestHandlerImpl".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.AsyncDocumentRequestHandlerImpl");
-            }
             return com.codename1.ui.html.AsyncDocumentRequestHandlerImpl.class;
         }
         if ("DefaultDocumentRequestHandler".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.DefaultDocumentRequestHandler");
-            }
             return com.codename1.ui.html.DefaultDocumentRequestHandler.class;
         }
         if ("DefaultHTMLCallback".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.DefaultHTMLCallback");
-            }
             return com.codename1.ui.html.DefaultHTMLCallback.class;
         }
         if ("DocumentInfo".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.DocumentInfo");
-            }
             return com.codename1.ui.html.DocumentInfo.class;
         }
         if ("DocumentRequestHandler".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.DocumentRequestHandler");
-            }
             return com.codename1.ui.html.DocumentRequestHandler.class;
         }
         if ("HTMLCallback".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.HTMLCallback");
-            }
             return com.codename1.ui.html.HTMLCallback.class;
         }
         if ("HTMLComponent".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.HTMLComponent");
-            }
             return com.codename1.ui.html.HTMLComponent.class;
         }
         if ("HTMLElement".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.HTMLElement");
-            }
             return com.codename1.ui.html.HTMLElement.class;
         }
         if ("HTMLParser".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.HTMLParser");
-            }
             return com.codename1.ui.html.HTMLParser.class;
         }
         if ("HTMLUtils".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.HTMLUtils");
-            }
             return com.codename1.ui.html.HTMLUtils.class;
         }
         if ("IOCallback".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.IOCallback");
-            }
             return com.codename1.ui.html.IOCallback.class;
         }
         return null;

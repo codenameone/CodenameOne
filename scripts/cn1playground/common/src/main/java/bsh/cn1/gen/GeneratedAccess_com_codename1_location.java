@@ -25,45 +25,24 @@ public final class GeneratedAccess_com_codename1_location {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Geofence".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.location -> com.codename1.location.Geofence");
-            }
             return com.codename1.location.Geofence.class;
         }
         if ("GeofenceListener".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.location -> com.codename1.location.GeofenceListener");
-            }
             return com.codename1.location.GeofenceListener.class;
         }
         if ("GeofenceManager".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.location -> com.codename1.location.GeofenceManager");
-            }
             return com.codename1.location.GeofenceManager.class;
         }
         if ("Location".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.location -> com.codename1.location.Location");
-            }
             return com.codename1.location.Location.class;
         }
         if ("LocationListener".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.location -> com.codename1.location.LocationListener");
-            }
             return com.codename1.location.LocationListener.class;
         }
         if ("LocationManager".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.location -> com.codename1.location.LocationManager");
-            }
             return com.codename1.location.LocationManager.class;
         }
         if ("LocationRequest".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.location -> com.codename1.location.LocationRequest");
-            }
             return com.codename1.location.LocationRequest.class;
         }
         return null;

@@ -25,27 +25,15 @@ public final class GeneratedAccess_com_codename1_charts_compat {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Canvas".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.compat -> com.codename1.charts.compat.Canvas");
-            }
             return com.codename1.charts.compat.Canvas.class;
         }
         if ("GradientDrawable".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.compat -> com.codename1.charts.compat.GradientDrawable");
-            }
             return com.codename1.charts.compat.GradientDrawable.class;
         }
         if ("Paint".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.compat -> com.codename1.charts.compat.Paint");
-            }
             return com.codename1.charts.compat.Paint.class;
         }
         if ("PathMeasure".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.compat -> com.codename1.charts.compat.PathMeasure");
-            }
             return com.codename1.charts.compat.PathMeasure.class;
         }
         return null;

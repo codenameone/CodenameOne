@@ -25,16 +25,13 @@ public final class GeneratedAccess_com_codenameone_playground {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("CN1Playground".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codenameone.playground -> com.codenameone.playground.CN1Playground");
-            }
             return com.codenameone.playground.CN1Playground.class;
         }
         if ("PlaygroundContext".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codenameone.playground -> com.codenameone.playground.PlaygroundContext");
-            }
             return com.codenameone.playground.PlaygroundContext.class;
+        }
+        if ("WebsiteThemeNative".equals(simpleName)) {
+            return com.codenameone.playground.WebsiteThemeNative.class;
         }
         return null;
     }
@@ -86,6 +83,13 @@ public final class GeneratedAccess_com_codenameone_playground {
         if (target instanceof com.codenameone.playground.PlaygroundContext) {
             try {
                 return invoke1((com.codenameone.playground.PlaygroundContext) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codenameone.playground.WebsiteThemeNative) {
+            try {
+                return invoke2((com.codenameone.playground.WebsiteThemeNative) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -179,6 +183,25 @@ public final class GeneratedAccess_com_codenameone_playground {
         if ("setTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 typedTarget.setTitle((java.lang.String) safeArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke2(com.codenameone.playground.WebsiteThemeNative typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("isDarkMode".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.isDarkMode();
+            }
+        }
+        if ("isSupported".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                return typedTarget.isSupported();
+            }
+        }
+        if ("notifyUiReady".equals(name)) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                typedTarget.notifyUiReady(); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);

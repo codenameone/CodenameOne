@@ -25,15 +25,9 @@ public final class GeneratedAccess_com_codename1_charts {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("ChartComponent".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts -> com.codename1.charts.ChartComponent");
-            }
             return com.codename1.charts.ChartComponent.class;
         }
         if ("ChartUtil".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts -> com.codename1.charts.ChartUtil");
-            }
             return com.codename1.charts.ChartUtil.class;
         }
         return null;

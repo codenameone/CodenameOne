@@ -25,63 +25,33 @@ public final class GeneratedAccess_com_codename1_ui_geom {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("AffineTransform".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.AffineTransform");
-            }
             return com.codename1.ui.geom.AffineTransform.class;
         }
         if ("Dimension".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.Dimension");
-            }
             return com.codename1.ui.geom.Dimension.class;
         }
         if ("Dimension2D".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.Dimension2D");
-            }
             return com.codename1.ui.geom.Dimension2D.class;
         }
         if ("GeneralPath".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.GeneralPath");
-            }
             return com.codename1.ui.geom.GeneralPath.class;
         }
         if ("PathIterator".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.PathIterator");
-            }
             return com.codename1.ui.geom.PathIterator.class;
         }
         if ("Point".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.Point");
-            }
             return com.codename1.ui.geom.Point.class;
         }
         if ("Point2D".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.Point2D");
-            }
             return com.codename1.ui.geom.Point2D.class;
         }
         if ("Rectangle".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.Rectangle");
-            }
             return com.codename1.ui.geom.Rectangle.class;
         }
         if ("Rectangle2D".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.Rectangle2D");
-            }
             return com.codename1.ui.geom.Rectangle2D.class;
         }
         if ("Shape".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.Shape");
-            }
             return com.codename1.ui.geom.Shape.class;
         }
         return null;

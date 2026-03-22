@@ -25,45 +25,24 @@ public final class GeneratedAccess_com_codename1_push {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Push".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.Push");
-            }
             return com.codename1.push.Push.class;
         }
         if ("PushAction".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushAction");
-            }
             return com.codename1.push.PushAction.class;
         }
         if ("PushActionCategory".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushActionCategory");
-            }
             return com.codename1.push.PushActionCategory.class;
         }
         if ("PushActionsProvider".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushActionsProvider");
-            }
             return com.codename1.push.PushActionsProvider.class;
         }
         if ("PushBuilder".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushBuilder");
-            }
             return com.codename1.push.PushBuilder.class;
         }
         if ("PushCallback".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushCallback");
-            }
             return com.codename1.push.PushCallback.class;
         }
         if ("PushContent".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushContent");
-            }
             return com.codename1.push.PushContent.class;
         }
         return null;

@@ -25,15 +25,9 @@ public final class GeneratedAccess_com_codename1_plugin {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Plugin".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.plugin -> com.codename1.plugin.Plugin");
-            }
             return com.codename1.plugin.Plugin.class;
         }
         if ("PluginSupport".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.plugin -> com.codename1.plugin.PluginSupport");
-            }
             return com.codename1.plugin.PluginSupport.class;
         }
         return null;

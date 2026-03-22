@@ -25,135 +25,69 @@ public final class GeneratedAccess_java_io {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("ByteArrayInputStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.ByteArrayInputStream");
-            }
             return java.io.ByteArrayInputStream.class;
         }
         if ("ByteArrayOutputStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.ByteArrayOutputStream");
-            }
             return java.io.ByteArrayOutputStream.class;
         }
         if ("DataInput".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.DataInput");
-            }
             return java.io.DataInput.class;
         }
         if ("DataInputStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.DataInputStream");
-            }
             return java.io.DataInputStream.class;
         }
         if ("DataOutput".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.DataOutput");
-            }
             return java.io.DataOutput.class;
         }
         if ("DataOutputStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.DataOutputStream");
-            }
             return java.io.DataOutputStream.class;
         }
         if ("EOFException".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.EOFException");
-            }
             return java.io.EOFException.class;
         }
         if ("Flushable".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.Flushable");
-            }
             return java.io.Flushable.class;
         }
         if ("IOException".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.IOException");
-            }
             return java.io.IOException.class;
         }
         if ("InputStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.InputStream");
-            }
             return java.io.InputStream.class;
         }
         if ("InputStreamReader".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.InputStreamReader");
-            }
             return java.io.InputStreamReader.class;
         }
         if ("InterruptedIOException".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.InterruptedIOException");
-            }
             return java.io.InterruptedIOException.class;
         }
         if ("OutputStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.OutputStream");
-            }
             return java.io.OutputStream.class;
         }
         if ("OutputStreamWriter".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.OutputStreamWriter");
-            }
             return java.io.OutputStreamWriter.class;
         }
         if ("PrintStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.PrintStream");
-            }
             return java.io.PrintStream.class;
         }
         if ("Reader".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.Reader");
-            }
             return java.io.Reader.class;
         }
         if ("Serializable".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.Serializable");
-            }
             return java.io.Serializable.class;
         }
         if ("StringReader".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.StringReader");
-            }
             return java.io.StringReader.class;
         }
         if ("StringWriter".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.StringWriter");
-            }
             return java.io.StringWriter.class;
         }
         if ("UTFDataFormatException".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.UTFDataFormatException");
-            }
             return java.io.UTFDataFormatException.class;
         }
         if ("UnsupportedEncodingException".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.UnsupportedEncodingException");
-            }
             return java.io.UnsupportedEncodingException.class;
         }
         if ("Writer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.Writer");
-            }
             return java.io.Writer.class;
         }
         return null;

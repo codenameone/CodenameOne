@@ -25,45 +25,24 @@ public final class GeneratedAccess_com_codename1_io_tar {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Octal".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.Octal");
-            }
             return com.codename1.io.tar.Octal.class;
         }
         if ("TarConstants".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarConstants");
-            }
             return com.codename1.io.tar.TarConstants.class;
         }
         if ("TarEntry".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarEntry");
-            }
             return com.codename1.io.tar.TarEntry.class;
         }
         if ("TarHeader".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarHeader");
-            }
             return com.codename1.io.tar.TarHeader.class;
         }
         if ("TarInputStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarInputStream");
-            }
             return com.codename1.io.tar.TarInputStream.class;
         }
         if ("TarOutputStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarOutputStream");
-            }
             return com.codename1.io.tar.TarOutputStream.class;
         }
         if ("TarUtils".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarUtils");
-            }
             return com.codename1.io.tar.TarUtils.class;
         }
         return null;

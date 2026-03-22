@@ -25,15 +25,9 @@ public final class GeneratedAccess_com_codename1_notifications {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("LocalNotification".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.notifications -> com.codename1.notifications.LocalNotification");
-            }
             return com.codename1.notifications.LocalNotification.class;
         }
         if ("LocalNotificationCallback".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.notifications -> com.codename1.notifications.LocalNotificationCallback");
-            }
             return com.codename1.notifications.LocalNotificationCallback.class;
         }
         return null;

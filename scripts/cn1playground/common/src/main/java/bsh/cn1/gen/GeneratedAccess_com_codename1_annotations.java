@@ -25,9 +25,6 @@ public final class GeneratedAccess_com_codename1_annotations {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Async".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.annotations -> com.codename1.annotations.Async");
-            }
             return com.codename1.annotations.Async.class;
         }
         return null;

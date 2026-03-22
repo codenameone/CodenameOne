@@ -25,63 +25,33 @@ public final class GeneratedAccess_com_codename1_ui_animations {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Animation".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.Animation");
-            }
             return com.codename1.ui.animations.Animation.class;
         }
         if ("AnimationObject".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.AnimationObject");
-            }
             return com.codename1.ui.animations.AnimationObject.class;
         }
         if ("BubbleTransition".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.BubbleTransition");
-            }
             return com.codename1.ui.animations.BubbleTransition.class;
         }
         if ("CommonTransitions".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.CommonTransitions");
-            }
             return com.codename1.ui.animations.CommonTransitions.class;
         }
         if ("ComponentAnimation".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.ComponentAnimation");
-            }
             return com.codename1.ui.animations.ComponentAnimation.class;
         }
         if ("FlipTransition".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.FlipTransition");
-            }
             return com.codename1.ui.animations.FlipTransition.class;
         }
         if ("MorphTransition".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.MorphTransition");
-            }
             return com.codename1.ui.animations.MorphTransition.class;
         }
         if ("Motion".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.Motion");
-            }
             return com.codename1.ui.animations.Motion.class;
         }
         if ("Timeline".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.Timeline");
-            }
             return com.codename1.ui.animations.Timeline.class;
         }
         if ("Transition".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.Transition");
-            }
             return com.codename1.ui.animations.Transition.class;
         }
         return null;

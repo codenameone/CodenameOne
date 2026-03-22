@@ -25,39 +25,21 @@ public final class GeneratedAccess_com_codename1_testing {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("AbstractTest".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.testing -> com.codename1.testing.AbstractTest");
-            }
             return com.codename1.testing.AbstractTest.class;
         }
         if ("DeviceRunner".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.testing -> com.codename1.testing.DeviceRunner");
-            }
             return com.codename1.testing.DeviceRunner.class;
         }
         if ("TestReporting".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.testing -> com.codename1.testing.TestReporting");
-            }
             return com.codename1.testing.TestReporting.class;
         }
         if ("TestRunnerComponent".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.testing -> com.codename1.testing.TestRunnerComponent");
-            }
             return com.codename1.testing.TestRunnerComponent.class;
         }
         if ("TestUtils".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.testing -> com.codename1.testing.TestUtils");
-            }
             return com.codename1.testing.TestUtils.class;
         }
         if ("UnitTest".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.testing -> com.codename1.testing.UnitTest");
-            }
             return com.codename1.testing.UnitTest.class;
         }
         return null;

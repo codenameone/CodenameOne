@@ -25,15 +25,9 @@ public final class GeneratedAccess_com_codename1_ui_painter {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("BackgroundPainter".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.painter -> com.codename1.ui.painter.BackgroundPainter");
-            }
             return com.codename1.ui.painter.BackgroundPainter.class;
         }
         if ("PainterChain".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.painter -> com.codename1.ui.painter.PainterChain");
-            }
             return com.codename1.ui.painter.PainterChain.class;
         }
         return null;

@@ -25,27 +25,15 @@ public final class GeneratedAccess_com_codename1_share {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("EmailShare".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.share -> com.codename1.share.EmailShare");
-            }
             return com.codename1.share.EmailShare.class;
         }
         if ("FacebookShare".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.share -> com.codename1.share.FacebookShare");
-            }
             return com.codename1.share.FacebookShare.class;
         }
         if ("SMSShare".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.share -> com.codename1.share.SMSShare");
-            }
             return com.codename1.share.SMSShare.class;
         }
         if ("ShareService".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.share -> com.codename1.share.ShareService");
-            }
             return com.codename1.share.ShareService.class;
         }
         return null;

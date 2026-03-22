@@ -673,6 +673,7 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("com.codename1.xml.XMLWriter", com.codename1.xml.XMLWriter.class);
         index.put("com.codenameone.playground.CN1Playground", com.codenameone.playground.CN1Playground.class);
         index.put("com.codenameone.playground.PlaygroundContext", com.codenameone.playground.PlaygroundContext.class);
+        index.put("com.codenameone.playground.WebsiteThemeNative", com.codenameone.playground.WebsiteThemeNative.class);
         index.put("java.io.ByteArrayInputStream", java.io.ByteArrayInputStream.class);
         index.put("java.io.ByteArrayOutputStream", java.io.ByteArrayOutputStream.class);
         index.put("java.io.DataInput", java.io.DataInput.class);
@@ -705,10 +706,10 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.lang.Byte", java.lang.Byte.class);
         index.put("java.lang.CharSequence", java.lang.CharSequence.class);
         index.put("java.lang.Character", java.lang.Character.class);
-        index.put("java.lang.Class", java.lang.Class.class);
     }
 
     private static void fillClassIndex9(Map<String, Class<?>> index) {
+        index.put("java.lang.Class", java.lang.Class.class);
         index.put("java.lang.ClassCastException", java.lang.ClassCastException.class);
         index.put("java.lang.ClassLoader", java.lang.ClassLoader.class);
         index.put("java.lang.ClassNotFoundException", java.lang.ClassNotFoundException.class);
@@ -772,10 +773,10 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.nio.charset.Charset", java.nio.charset.Charset.class);
         index.put("java.text.DateFormat", java.text.DateFormat.class);
         index.put("java.text.DateFormatSymbols", java.text.DateFormatSymbols.class);
-        index.put("java.text.Format", java.text.Format.class);
     }
 
     private static void fillClassIndex10(Map<String, Class<?>> index) {
+        index.put("java.text.Format", java.text.Format.class);
         index.put("java.text.ParseException", java.text.ParseException.class);
         index.put("java.text.SimpleDateFormat", java.text.SimpleDateFormat.class);
         index.put("java.util.AbstractCollection", java.util.AbstractCollection.class);
@@ -840,34 +841,10 @@ public final class GeneratedCN1Access implements CN1Access {
 
     @Override
     public Class<?> findClass(String name) {
-        if (shouldDebugFindClass(name)) {
-            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass(" + name + ") size=" + CLASS_INDEX.size() + " contains=" + CLASS_INDEX.containsKey(name));
-        }
         if (name == null) {
-            if (shouldDebugFindClass(name)) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass miss " + name);
-            }
             return null;
         }
-        Class<?> found = CLASS_INDEX.get(name);
-        if (shouldDebugFindClass(name) && found != null) {
-            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit " + name + " -> " + found);
-        }
-        if (found != null) {
-            return found;
-        }
-        if (shouldDebugFindClass(name)) {
-            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass miss " + name);
-        }
-        return null;
-    }
-
-    public static int debugClassIndexSize() {
-        return CLASS_INDEX.size();
-    }
-
-    public static boolean debugClassIndexContains(String name) {
-        return CLASS_INDEX.containsKey(name);
+        return CLASS_INDEX.get(name);
     }
 
     @Override
@@ -3188,10 +3165,6 @@ public final class GeneratedCN1Access implements CN1Access {
 
     private static CN1AccessException unsupportedFieldWrite(Object target, String name, Object value) {
         return new CN1AccessException("Generated field write not implemented for " + target.getClass().getName() + "." + name + " value=" + describeValue(value));
-    }
-
-    private static boolean shouldDebugFindClass(String name) {
-        return name != null && (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components."));
     }
 
     private static String describeArgs(Object[] args) {

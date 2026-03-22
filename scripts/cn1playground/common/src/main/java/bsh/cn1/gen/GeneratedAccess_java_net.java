@@ -25,15 +25,9 @@ public final class GeneratedAccess_java_net {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("URI".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.net -> java.net.URI");
-            }
             return java.net.URI.class;
         }
         if ("URISyntaxException".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.net -> java.net.URISyntaxException");
-            }
             return java.net.URISyntaxException.class;
         }
         return null;

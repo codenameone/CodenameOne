@@ -25,33 +25,18 @@ public final class GeneratedAccess_java_text {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("DateFormat".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.text -> java.text.DateFormat");
-            }
             return java.text.DateFormat.class;
         }
         if ("DateFormatSymbols".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.text -> java.text.DateFormatSymbols");
-            }
             return java.text.DateFormatSymbols.class;
         }
         if ("Format".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.text -> java.text.Format");
-            }
             return java.text.Format.class;
         }
         if ("ParseException".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.text -> java.text.ParseException");
-            }
             return java.text.ParseException.class;
         }
         if ("SimpleDateFormat".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.text -> java.text.SimpleDateFormat");
-            }
             return java.text.SimpleDateFormat.class;
         }
         return null;

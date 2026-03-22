@@ -25,9 +25,6 @@ public final class GeneratedAccess_com_codename1_messaging {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Message".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.messaging -> com.codename1.messaging.Message");
-            }
             return com.codename1.messaging.Message.class;
         }
         return null;

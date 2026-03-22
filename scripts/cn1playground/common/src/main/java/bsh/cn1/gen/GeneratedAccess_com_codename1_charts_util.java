@@ -25,21 +25,12 @@ public final class GeneratedAccess_com_codename1_charts_util {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("ColorUtil".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.util -> com.codename1.charts.util.ColorUtil");
-            }
             return com.codename1.charts.util.ColorUtil.class;
         }
         if ("MathHelper".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.util -> com.codename1.charts.util.MathHelper");
-            }
             return com.codename1.charts.util.MathHelper.class;
         }
         if ("NumberFormat".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.util -> com.codename1.charts.util.NumberFormat");
-            }
             return com.codename1.charts.util.NumberFormat.class;
         }
         return null;

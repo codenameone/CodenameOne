@@ -25,39 +25,21 @@ public final class GeneratedAccess_com_codename1_maps_layers {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("AbstractLayer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.AbstractLayer");
-            }
             return com.codename1.maps.layers.AbstractLayer.class;
         }
         if ("ArrowLinesLayer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.ArrowLinesLayer");
-            }
             return com.codename1.maps.layers.ArrowLinesLayer.class;
         }
         if ("Layer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.Layer");
-            }
             return com.codename1.maps.layers.Layer.class;
         }
         if ("LinesLayer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.LinesLayer");
-            }
             return com.codename1.maps.layers.LinesLayer.class;
         }
         if ("PointLayer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.PointLayer");
-            }
             return com.codename1.maps.layers.PointLayer.class;
         }
         if ("PointsLayer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.PointsLayer");
-            }
             return com.codename1.maps.layers.PointsLayer.class;
         }
         return null;

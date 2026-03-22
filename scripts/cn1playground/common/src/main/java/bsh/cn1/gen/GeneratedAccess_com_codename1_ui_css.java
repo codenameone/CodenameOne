@@ -25,9 +25,6 @@ public final class GeneratedAccess_com_codename1_ui_css {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("CSSThemeCompiler".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.css -> com.codename1.ui.css.CSSThemeCompiler");
-            }
             return com.codename1.ui.css.CSSThemeCompiler.class;
         }
         return null;

@@ -641,9 +641,6 @@ build_playground_for_site() {
     exit 1
   fi
 
-  echo "Playground bundle selected: ${result_zip}" >&2
-  shasum "${result_zip}" >&2
-
   rm -rf "${output_dir}"
   mkdir -p "${output_dir}"
   unzip -q -o "${result_zip}" -d "${output_dir}"
@@ -652,28 +649,6 @@ build_playground_for_site() {
     echo "Playground website bundle is missing index.html after extraction." >&2
     exit 1
   fi
-
-  local classes_js="${output_dir}/teavm/classes.js"
-  if [ ! -f "${classes_js}" ]; then
-    echo "Playground website bundle is missing teavm/classes.js after extraction." >&2
-    exit 1
-  fi
-
-  if ! grep -q 'GeneratedCN1Access.findClass(' "${classes_js}"; then
-    echo "Playground website bundle is missing GeneratedCN1Access debug marker in teavm/classes.js." >&2
-    exit 1
-  fi
-  if ! grep -q 'Smoke registry size=' "${classes_js}"; then
-    echo "Playground website bundle is missing smoke marker in teavm/classes.js." >&2
-    exit 1
-  fi
-  if ! grep -q 'com.codename1.ui.Container' "${classes_js}"; then
-    echo "Playground website bundle is missing com.codename1.ui.Container in teavm/classes.js." >&2
-    exit 1
-  fi
-
-  echo "Playground bundle markers verified in ${classes_js}" >&2
-  echo "Playground bundle git SHA: $(git -C "${REPO_ROOT}" rev-parse HEAD)" >&2
 }
 
 if ! command -v "${HUGO_BIN}" >/dev/null 2>&1; then

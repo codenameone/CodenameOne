@@ -25,27 +25,15 @@ public final class GeneratedAccess_com_codename1_io_rest {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("ErrorCodeHandler".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.rest -> com.codename1.io.rest.ErrorCodeHandler");
-            }
             return com.codename1.io.rest.ErrorCodeHandler.class;
         }
         if ("RequestBuilder".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.rest -> com.codename1.io.rest.RequestBuilder");
-            }
             return com.codename1.io.rest.RequestBuilder.class;
         }
         if ("Response".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.rest -> com.codename1.io.rest.Response");
-            }
             return com.codename1.io.rest.Response.class;
         }
         if ("Rest".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.rest -> com.codename1.io.rest.Rest");
-            }
             return com.codename1.io.rest.Rest.class;
         }
         return null;

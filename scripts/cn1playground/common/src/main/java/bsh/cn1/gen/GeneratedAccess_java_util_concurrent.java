@@ -25,9 +25,6 @@ public final class GeneratedAccess_java_util_concurrent {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("ThreadLocalRandom".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util.concurrent -> java.util.concurrent.ThreadLocalRandom");
-            }
             return java.util.concurrent.ThreadLocalRandom.class;
         }
         return null;

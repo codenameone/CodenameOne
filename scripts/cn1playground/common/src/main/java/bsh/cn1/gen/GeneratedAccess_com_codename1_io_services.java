@@ -25,33 +25,18 @@ public final class GeneratedAccess_com_codename1_io_services {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("CachedData".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.services -> com.codename1.io.services.CachedData");
-            }
             return com.codename1.io.services.CachedData.class;
         }
         if ("CachedDataService".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.services -> com.codename1.io.services.CachedDataService");
-            }
             return com.codename1.io.services.CachedDataService.class;
         }
         if ("ImageDownloadService".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.services -> com.codename1.io.services.ImageDownloadService");
-            }
             return com.codename1.io.services.ImageDownloadService.class;
         }
         if ("RSSService".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.services -> com.codename1.io.services.RSSService");
-            }
             return com.codename1.io.services.RSSService.class;
         }
         if ("TwitterRESTService".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.services -> com.codename1.io.services.TwitterRESTService");
-            }
             return com.codename1.io.services.TwitterRESTService.class;
         }
         return null;

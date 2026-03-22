@@ -25,39 +25,21 @@ public final class GeneratedAccess_com_codename1_system {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("CrashReport".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.system -> com.codename1.system.CrashReport");
-            }
             return com.codename1.system.CrashReport.class;
         }
         if ("DefaultCrashReporter".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.system -> com.codename1.system.DefaultCrashReporter");
-            }
             return com.codename1.system.DefaultCrashReporter.class;
         }
         if ("Lifecycle".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.system -> com.codename1.system.Lifecycle");
-            }
             return com.codename1.system.Lifecycle.class;
         }
         if ("NativeInterface".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.system -> com.codename1.system.NativeInterface");
-            }
             return com.codename1.system.NativeInterface.class;
         }
         if ("NativeLookup".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.system -> com.codename1.system.NativeLookup");
-            }
             return com.codename1.system.NativeLookup.class;
         }
         if ("URLCallback".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.system -> com.codename1.system.URLCallback");
-            }
             return com.codename1.system.URLCallback.class;
         }
         return null;

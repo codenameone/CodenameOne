@@ -25,15 +25,9 @@ public final class GeneratedAccess_com_codename1_capture {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Capture".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.capture -> com.codename1.capture.Capture");
-            }
             return com.codename1.capture.Capture.class;
         }
         if ("VideoCaptureConstraints".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.capture -> com.codename1.capture.VideoCaptureConstraints");
-            }
             return com.codename1.capture.VideoCaptureConstraints.class;
         }
         return null;

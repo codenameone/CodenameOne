@@ -25,15 +25,9 @@ public final class GeneratedAccess_com_codename1_ads {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("AdsService".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ads -> com.codename1.ads.AdsService");
-            }
             return com.codename1.ads.AdsService.class;
         }
         if ("InnerActive".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ads -> com.codename1.ads.InnerActive");
-            }
             return com.codename1.ads.InnerActive.class;
         }
         return null;

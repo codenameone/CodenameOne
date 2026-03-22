@@ -25,9 +25,6 @@ public final class GeneratedAccess_java_nio_charset {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Charset".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.nio.charset -> java.nio.charset.Charset");
-            }
             return java.nio.charset.Charset.class;
         }
         return null;

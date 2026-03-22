@@ -25,27 +25,15 @@ public final class GeneratedAccess_com_codename1_social {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("FacebookConnect".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.social -> com.codename1.social.FacebookConnect");
-            }
             return com.codename1.social.FacebookConnect.class;
         }
         if ("GoogleConnect".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.social -> com.codename1.social.GoogleConnect");
-            }
             return com.codename1.social.GoogleConnect.class;
         }
         if ("Login".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.social -> com.codename1.social.Login");
-            }
             return com.codename1.social.Login.class;
         }
         if ("LoginCallback".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.social -> com.codename1.social.LoginCallback");
-            }
             return com.codename1.social.LoginCallback.class;
         }
         return null;

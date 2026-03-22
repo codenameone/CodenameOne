@@ -25,75 +25,39 @@ public final class GeneratedAccess_com_codename1_ui_events {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("ActionEvent".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.ActionEvent");
-            }
             return com.codename1.ui.events.ActionEvent.class;
         }
         if ("ActionListener".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.ActionListener");
-            }
             return com.codename1.ui.events.ActionListener.class;
         }
         if ("ActionSource".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.ActionSource");
-            }
             return com.codename1.ui.events.ActionSource.class;
         }
         if ("BrowserNavigationCallback".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.BrowserNavigationCallback");
-            }
             return com.codename1.ui.events.BrowserNavigationCallback.class;
         }
         if ("ComponentStateChangeEvent".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.ComponentStateChangeEvent");
-            }
             return com.codename1.ui.events.ComponentStateChangeEvent.class;
         }
         if ("DataChangedListener".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.DataChangedListener");
-            }
             return com.codename1.ui.events.DataChangedListener.class;
         }
         if ("FocusListener".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.FocusListener");
-            }
             return com.codename1.ui.events.FocusListener.class;
         }
         if ("MessageEvent".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.MessageEvent");
-            }
             return com.codename1.ui.events.MessageEvent.class;
         }
         if ("ScrollListener".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.ScrollListener");
-            }
             return com.codename1.ui.events.ScrollListener.class;
         }
         if ("SelectionListener".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.SelectionListener");
-            }
             return com.codename1.ui.events.SelectionListener.class;
         }
         if ("StyleListener".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.StyleListener");
-            }
             return com.codename1.ui.events.StyleListener.class;
         }
         if ("WindowEvent".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.WindowEvent");
-            }
             return com.codename1.ui.events.WindowEvent.class;
         }
         return null;

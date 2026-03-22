@@ -25,57 +25,30 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Border".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.Border");
-            }
             return com.codename1.ui.plaf.Border.class;
         }
         if ("CSSBorder".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.CSSBorder");
-            }
             return com.codename1.ui.plaf.CSSBorder.class;
         }
         if ("DefaultLookAndFeel".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.DefaultLookAndFeel");
-            }
             return com.codename1.ui.plaf.DefaultLookAndFeel.class;
         }
         if ("LookAndFeel".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.LookAndFeel");
-            }
             return com.codename1.ui.plaf.LookAndFeel.class;
         }
         if ("RoundBorder".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.RoundBorder");
-            }
             return com.codename1.ui.plaf.RoundBorder.class;
         }
         if ("RoundRectBorder".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.RoundRectBorder");
-            }
             return com.codename1.ui.plaf.RoundRectBorder.class;
         }
         if ("Style".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.Style");
-            }
             return com.codename1.ui.plaf.Style.class;
         }
         if ("StyleParser".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.StyleParser");
-            }
             return com.codename1.ui.plaf.StyleParser.class;
         }
         if ("UIManager".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.UIManager");
-            }
             return com.codename1.ui.plaf.UIManager.class;
         }
         return null;

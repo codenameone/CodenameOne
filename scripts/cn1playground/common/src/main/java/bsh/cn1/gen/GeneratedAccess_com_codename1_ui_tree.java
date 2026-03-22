@@ -25,15 +25,9 @@ public final class GeneratedAccess_com_codename1_ui_tree {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Tree".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.tree -> com.codename1.ui.tree.Tree");
-            }
             return com.codename1.ui.tree.Tree.class;
         }
         if ("TreeModel".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.tree -> com.codename1.ui.tree.TreeModel");
-            }
             return com.codename1.ui.tree.TreeModel.class;
         }
         return null;

@@ -25,45 +25,24 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("BaseSpinner".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.spinner -> com.codename1.ui.spinner.BaseSpinner");
-            }
             return com.codename1.ui.spinner.BaseSpinner.class;
         }
         if ("DateSpinner".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.spinner -> com.codename1.ui.spinner.DateSpinner");
-            }
             return com.codename1.ui.spinner.DateSpinner.class;
         }
         if ("DateTimeSpinner".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.spinner -> com.codename1.ui.spinner.DateTimeSpinner");
-            }
             return com.codename1.ui.spinner.DateTimeSpinner.class;
         }
         if ("GenericSpinner".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.spinner -> com.codename1.ui.spinner.GenericSpinner");
-            }
             return com.codename1.ui.spinner.GenericSpinner.class;
         }
         if ("NumericSpinner".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.spinner -> com.codename1.ui.spinner.NumericSpinner");
-            }
             return com.codename1.ui.spinner.NumericSpinner.class;
         }
         if ("Picker".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.spinner -> com.codename1.ui.spinner.Picker");
-            }
             return com.codename1.ui.spinner.Picker.class;
         }
         if ("TimeSpinner".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.spinner -> com.codename1.ui.spinner.TimeSpinner");
-            }
             return com.codename1.ui.spinner.TimeSpinner.class;
         }
         return null;

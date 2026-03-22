@@ -25,27 +25,15 @@ public final class GeneratedAccess_com_codename1_maps_providers {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("GoogleMapsProvider".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.providers -> com.codename1.maps.providers.GoogleMapsProvider");
-            }
             return com.codename1.maps.providers.GoogleMapsProvider.class;
         }
         if ("MapProvider".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.providers -> com.codename1.maps.providers.MapProvider");
-            }
             return com.codename1.maps.providers.MapProvider.class;
         }
         if ("OpenStreetMapProvider".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.providers -> com.codename1.maps.providers.OpenStreetMapProvider");
-            }
             return com.codename1.maps.providers.OpenStreetMapProvider.class;
         }
         if ("TiledProvider".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.providers -> com.codename1.maps.providers.TiledProvider");
-            }
             return com.codename1.maps.providers.TiledProvider.class;
         }
         return null;

@@ -25,27 +25,15 @@ public final class GeneratedAccess_com_codename1_contacts {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Address".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.contacts -> com.codename1.contacts.Address");
-            }
             return com.codename1.contacts.Address.class;
         }
         if ("Contact".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.contacts -> com.codename1.contacts.Contact");
-            }
             return com.codename1.contacts.Contact.class;
         }
         if ("ContactsManager".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.contacts -> com.codename1.contacts.ContactsManager");
-            }
             return com.codename1.contacts.ContactsManager.class;
         }
         if ("ContactsModel".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.contacts -> com.codename1.contacts.ContactsModel");
-            }
             return com.codename1.contacts.ContactsModel.class;
         }
         return null;

@@ -25,27 +25,15 @@ public final class GeneratedAccess_com_codename1_xml {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Element".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.xml -> com.codename1.xml.Element");
-            }
             return com.codename1.xml.Element.class;
         }
         if ("ParserCallback".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.xml -> com.codename1.xml.ParserCallback");
-            }
             return com.codename1.xml.ParserCallback.class;
         }
         if ("XMLParser".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.xml -> com.codename1.xml.XMLParser");
-            }
             return com.codename1.xml.XMLParser.class;
         }
         if ("XMLWriter".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.xml -> com.codename1.xml.XMLWriter");
-            }
             return com.codename1.xml.XMLWriter.class;
         }
         return null;

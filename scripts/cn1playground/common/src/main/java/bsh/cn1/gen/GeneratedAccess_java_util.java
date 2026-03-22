@@ -25,327 +25,165 @@ public final class GeneratedAccess_java_util {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("AbstractCollection".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.AbstractCollection");
-            }
             return java.util.AbstractCollection.class;
         }
         if ("AbstractList".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.AbstractList");
-            }
             return java.util.AbstractList.class;
         }
         if ("AbstractMap".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.AbstractMap");
-            }
             return java.util.AbstractMap.class;
         }
         if ("AbstractQueue".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.AbstractQueue");
-            }
             return java.util.AbstractQueue.class;
         }
         if ("AbstractSequentialList".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.AbstractSequentialList");
-            }
             return java.util.AbstractSequentialList.class;
         }
         if ("AbstractSet".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.AbstractSet");
-            }
             return java.util.AbstractSet.class;
         }
         if ("ArrayDeque".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.ArrayDeque");
-            }
             return java.util.ArrayDeque.class;
         }
         if ("ArrayList".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.ArrayList");
-            }
             return java.util.ArrayList.class;
         }
         if ("Arrays".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Arrays");
-            }
             return java.util.Arrays.class;
         }
         if ("BitSet".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.BitSet");
-            }
             return java.util.BitSet.class;
         }
         if ("Calendar".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Calendar");
-            }
             return java.util.Calendar.class;
         }
         if ("Collection".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Collection");
-            }
             return java.util.Collection.class;
         }
         if ("Collections".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Collections");
-            }
             return java.util.Collections.class;
         }
         if ("Comparator".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Comparator");
-            }
             return java.util.Comparator.class;
         }
         if ("ConcurrentModificationException".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.ConcurrentModificationException");
-            }
             return java.util.ConcurrentModificationException.class;
         }
         if ("Date".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Date");
-            }
             return java.util.Date.class;
         }
         if ("Deque".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Deque");
-            }
             return java.util.Deque.class;
         }
         if ("Dictionary".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Dictionary");
-            }
             return java.util.Dictionary.class;
         }
         if ("EmptyStackException".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.EmptyStackException");
-            }
             return java.util.EmptyStackException.class;
         }
         if ("Enumeration".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Enumeration");
-            }
             return java.util.Enumeration.class;
         }
         if ("EventListener".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.EventListener");
-            }
             return java.util.EventListener.class;
         }
         if ("HashMap".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.HashMap");
-            }
             return java.util.HashMap.class;
         }
         if ("HashSet".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.HashSet");
-            }
             return java.util.HashSet.class;
         }
         if ("Hashtable".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Hashtable");
-            }
             return java.util.Hashtable.class;
         }
         if ("IdentityHashMap".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.IdentityHashMap");
-            }
             return java.util.IdentityHashMap.class;
         }
         if ("Iterator".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Iterator");
-            }
             return java.util.Iterator.class;
         }
         if ("LinkedHashMap".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.LinkedHashMap");
-            }
             return java.util.LinkedHashMap.class;
         }
         if ("LinkedHashSet".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.LinkedHashSet");
-            }
             return java.util.LinkedHashSet.class;
         }
         if ("LinkedList".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.LinkedList");
-            }
             return java.util.LinkedList.class;
         }
         if ("List".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.List");
-            }
             return java.util.List.class;
         }
         if ("ListIterator".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.ListIterator");
-            }
             return java.util.ListIterator.class;
         }
         if ("Locale".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Locale");
-            }
             return java.util.Locale.class;
         }
         if ("Map".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Map");
-            }
             return java.util.Map.class;
         }
         if ("NavigableMap".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.NavigableMap");
-            }
             return java.util.NavigableMap.class;
         }
         if ("NavigableSet".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.NavigableSet");
-            }
             return java.util.NavigableSet.class;
         }
         if ("NoSuchElementException".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.NoSuchElementException");
-            }
             return java.util.NoSuchElementException.class;
         }
         if ("Objects".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Objects");
-            }
             return java.util.Objects.class;
         }
         if ("Observable".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Observable");
-            }
             return java.util.Observable.class;
         }
         if ("Observer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Observer");
-            }
             return java.util.Observer.class;
         }
         if ("PriorityQueue".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.PriorityQueue");
-            }
             return java.util.PriorityQueue.class;
         }
         if ("Queue".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Queue");
-            }
             return java.util.Queue.class;
         }
         if ("Random".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Random");
-            }
             return java.util.Random.class;
         }
         if ("RandomAccess".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.RandomAccess");
-            }
             return java.util.RandomAccess.class;
         }
         if ("Set".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Set");
-            }
             return java.util.Set.class;
         }
         if ("SortedMap".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.SortedMap");
-            }
             return java.util.SortedMap.class;
         }
         if ("SortedSet".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.SortedSet");
-            }
             return java.util.SortedSet.class;
         }
         if ("Stack".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Stack");
-            }
             return java.util.Stack.class;
         }
         if ("StringTokenizer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.StringTokenizer");
-            }
             return java.util.StringTokenizer.class;
         }
         if ("TimeZone".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.TimeZone");
-            }
             return java.util.TimeZone.class;
         }
         if ("Timer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Timer");
-            }
             return java.util.Timer.class;
         }
         if ("TimerTask".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.TimerTask");
-            }
             return java.util.TimerTask.class;
         }
         if ("TreeMap".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.TreeMap");
-            }
             return java.util.TreeMap.class;
         }
         if ("TreeSet".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.TreeSet");
-            }
             return java.util.TreeSet.class;
         }
         if ("Vector".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Vector");
-            }
             return java.util.Vector.class;
         }
         return null;

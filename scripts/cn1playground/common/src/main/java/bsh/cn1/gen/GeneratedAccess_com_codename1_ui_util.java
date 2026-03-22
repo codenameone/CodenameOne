@@ -25,75 +25,39 @@ public final class GeneratedAccess_com_codename1_ui_util {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Effects".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.Effects");
-            }
             return com.codename1.ui.util.Effects.class;
         }
         if ("EmbeddedContainer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.EmbeddedContainer");
-            }
             return com.codename1.ui.util.EmbeddedContainer.class;
         }
         if ("EventDispatcher".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.EventDispatcher");
-            }
             return com.codename1.ui.util.EventDispatcher.class;
         }
         if ("GlassTutorial".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.GlassTutorial");
-            }
             return com.codename1.ui.util.GlassTutorial.class;
         }
         if ("ImageIO".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.ImageIO");
-            }
             return com.codename1.ui.util.ImageIO.class;
         }
         if ("MutableResouce".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.MutableResouce");
-            }
             return com.codename1.ui.util.MutableResouce.class;
         }
         if ("MutableResource".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.MutableResource");
-            }
             return com.codename1.ui.util.MutableResource.class;
         }
         if ("Resources".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.Resources");
-            }
             return com.codename1.ui.util.Resources.class;
         }
         if ("SwipeBackSupport".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.SwipeBackSupport");
-            }
             return com.codename1.ui.util.SwipeBackSupport.class;
         }
         if ("UIBuilder".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.UIBuilder");
-            }
             return com.codename1.ui.util.UIBuilder.class;
         }
         if ("UITimer".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.UITimer");
-            }
             return com.codename1.ui.util.UITimer.class;
         }
         if ("WeakHashMap".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.WeakHashMap");
-            }
             return com.codename1.ui.util.WeakHashMap.class;
         }
         return null;

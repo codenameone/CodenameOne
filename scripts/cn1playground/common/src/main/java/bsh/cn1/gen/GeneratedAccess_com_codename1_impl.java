@@ -25,33 +25,18 @@ public final class GeneratedAccess_com_codename1_impl {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("CodenameOneImplementation".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.impl -> com.codename1.impl.CodenameOneImplementation");
-            }
             return com.codename1.impl.CodenameOneImplementation.class;
         }
         if ("CodenameOneThread".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.impl -> com.codename1.impl.CodenameOneThread");
-            }
             return com.codename1.impl.CodenameOneThread.class;
         }
         if ("FullScreenAdService".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.impl -> com.codename1.impl.FullScreenAdService");
-            }
             return com.codename1.impl.FullScreenAdService.class;
         }
         if ("VServAds".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.impl -> com.codename1.impl.VServAds");
-            }
             return com.codename1.impl.VServAds.class;
         }
         if ("VirtualKeyboardInterface".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.impl -> com.codename1.impl.VirtualKeyboardInterface");
-            }
             return com.codename1.impl.VirtualKeyboardInterface.class;
         }
         return null;

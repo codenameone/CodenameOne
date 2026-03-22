@@ -25,51 +25,27 @@ public final class GeneratedAccess_com_codename1_ui_scene {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Bounds".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.Bounds");
-            }
             return com.codename1.ui.scene.Bounds.class;
         }
         if ("Camera".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.Camera");
-            }
             return com.codename1.ui.scene.Camera.class;
         }
         if ("Node".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.Node");
-            }
             return com.codename1.ui.scene.Node.class;
         }
         if ("NodePainter".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.NodePainter");
-            }
             return com.codename1.ui.scene.NodePainter.class;
         }
         if ("PerspectiveCamera".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.PerspectiveCamera");
-            }
             return com.codename1.ui.scene.PerspectiveCamera.class;
         }
         if ("Point3D".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.Point3D");
-            }
             return com.codename1.ui.scene.Point3D.class;
         }
         if ("Scene".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.Scene");
-            }
             return com.codename1.ui.scene.Scene.class;
         }
         if ("TextPainter".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.TextPainter");
-            }
             return com.codename1.ui.scene.TextPainter.class;
         }
         return null;

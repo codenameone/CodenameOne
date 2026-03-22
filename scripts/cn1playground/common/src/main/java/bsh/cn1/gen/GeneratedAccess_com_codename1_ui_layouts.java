@@ -25,81 +25,42 @@ public final class GeneratedAccess_com_codename1_ui_layouts {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("BorderLayout".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts -> com.codename1.ui.layouts.BorderLayout");
-            }
             return com.codename1.ui.layouts.BorderLayout.class;
         }
         if ("BoxLayout".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts -> com.codename1.ui.layouts.BoxLayout");
-            }
             return com.codename1.ui.layouts.BoxLayout.class;
         }
         if ("CoordinateLayout".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts -> com.codename1.ui.layouts.CoordinateLayout");
-            }
             return com.codename1.ui.layouts.CoordinateLayout.class;
         }
         if ("FlowLayout".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts -> com.codename1.ui.layouts.FlowLayout");
-            }
             return com.codename1.ui.layouts.FlowLayout.class;
         }
         if ("GridBagConstraints".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts -> com.codename1.ui.layouts.GridBagConstraints");
-            }
             return com.codename1.ui.layouts.GridBagConstraints.class;
         }
         if ("GridBagLayout".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts -> com.codename1.ui.layouts.GridBagLayout");
-            }
             return com.codename1.ui.layouts.GridBagLayout.class;
         }
         if ("GridLayout".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts -> com.codename1.ui.layouts.GridLayout");
-            }
             return com.codename1.ui.layouts.GridLayout.class;
         }
         if ("GroupLayout".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts -> com.codename1.ui.layouts.GroupLayout");
-            }
             return com.codename1.ui.layouts.GroupLayout.class;
         }
         if ("Insets".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts -> com.codename1.ui.layouts.Insets");
-            }
             return com.codename1.ui.layouts.Insets.class;
         }
         if ("LayeredLayout".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts -> com.codename1.ui.layouts.LayeredLayout");
-            }
             return com.codename1.ui.layouts.LayeredLayout.class;
         }
         if ("Layout".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts -> com.codename1.ui.layouts.Layout");
-            }
             return com.codename1.ui.layouts.Layout.class;
         }
         if ("LayoutStyle".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts -> com.codename1.ui.layouts.LayoutStyle");
-            }
             return com.codename1.ui.layouts.LayoutStyle.class;
         }
         if ("TextModeLayout".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts -> com.codename1.ui.layouts.TextModeLayout");
-            }
             return com.codename1.ui.layouts.TextModeLayout.class;
         }
         return null;

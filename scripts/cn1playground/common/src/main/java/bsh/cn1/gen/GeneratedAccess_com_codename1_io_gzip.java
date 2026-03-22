@@ -25,99 +25,51 @@ public final class GeneratedAccess_com_codename1_io_gzip {
 
     private static Class<?> findClassChunk0(String simpleName) {
         if ("Adler32".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.Adler32");
-            }
             return com.codename1.io.gzip.Adler32.class;
         }
         if ("CRC32".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.CRC32");
-            }
             return com.codename1.io.gzip.CRC32.class;
         }
         if ("Deflate".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.Deflate");
-            }
             return com.codename1.io.gzip.Deflate.class;
         }
         if ("Deflater".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.Deflater");
-            }
             return com.codename1.io.gzip.Deflater.class;
         }
         if ("DeflaterOutputStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.DeflaterOutputStream");
-            }
             return com.codename1.io.gzip.DeflaterOutputStream.class;
         }
         if ("FilterInputStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.FilterInputStream");
-            }
             return com.codename1.io.gzip.FilterInputStream.class;
         }
         if ("FilterOutputStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.FilterOutputStream");
-            }
             return com.codename1.io.gzip.FilterOutputStream.class;
         }
         if ("GZConnectionRequest".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.GZConnectionRequest");
-            }
             return com.codename1.io.gzip.GZConnectionRequest.class;
         }
         if ("GZIPException".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.GZIPException");
-            }
             return com.codename1.io.gzip.GZIPException.class;
         }
         if ("GZIPHeader".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.GZIPHeader");
-            }
             return com.codename1.io.gzip.GZIPHeader.class;
         }
         if ("GZIPInputStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.GZIPInputStream");
-            }
             return com.codename1.io.gzip.GZIPInputStream.class;
         }
         if ("GZIPOutputStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.GZIPOutputStream");
-            }
             return com.codename1.io.gzip.GZIPOutputStream.class;
         }
         if ("Inflater".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.Inflater");
-            }
             return com.codename1.io.gzip.Inflater.class;
         }
         if ("InflaterInputStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.InflaterInputStream");
-            }
             return com.codename1.io.gzip.InflaterInputStream.class;
         }
         if ("JZlib".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.JZlib");
-            }
             return com.codename1.io.gzip.JZlib.class;
         }
         if ("ZStream".equals(simpleName)) {
-            if (simpleName != null) {
-                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.ZStream");
-            }
             return com.codename1.io.gzip.ZStream.class;
         }
         return null;
