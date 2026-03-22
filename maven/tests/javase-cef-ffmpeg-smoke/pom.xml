@@ -2,89 +2,75 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
     <parent>
         <artifactId>codenameone</artifactId>
         <groupId>com.codenameone</groupId>
         <version>8.0-SNAPSHOT</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
-    <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.codenameone.tests</groupId>
     <artifactId>javase-cef-ffmpeg-smoke</artifactId>
     <version>8.0-SNAPSHOT</version>
-    <packaging>cn1app</packaging>
+    <packaging>pom</packaging>
     <name>javase-cef-ffmpeg-smoke</name>
 
+    <modules>
+        <module>common</module>
+        <module>javase</module>
+    </modules>
+
     <properties>
+        <cn1.version>8.0-SNAPSHOT</cn1.version>
+        <cn1.plugin.version>${cn1.version}</cn1.plugin.version>
+        <cn1app.name>javase-cef-ffmpeg-smoke</cn1app.name>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
-        <exec.mainClass>com.codename1.impl.javase.Simulator</exec.mainClass>
+        <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
     </properties>
 
-    <dependencies>
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-javase</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-core</artifactId>
-            <version>${cn1.version}</version>
-        </dependency>
-    </dependencies>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>java-runtime</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-core</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-javase</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
-        <plugins>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>properties-maven-plugin</artifactId>
-                <version>1.0.0</version>
-                <executions>
-                    <execution>
-                        <phase>initialize</phase>
-                        <goals>
-                            <goal>read-project-properties</goal>
-                        </goals>
-                        <configuration>
-                            <files>
-                                <file>${basedir}/codenameone_settings.properties</file>
-                            </files>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>com.codenameone</groupId>
-                <artifactId>codenameone-maven-plugin</artifactId>
-                <version>${cn1.version}</version>
-                <extensions>true</extensions>
-                <executions>
-                    <execution>
-                        <id>cn1-process-classes</id>
-                        <phase>process-classes</phase>
-                        <goals>
-                            <goal>compile-javase-sources</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-        </plugins>
-    </build>
-
-    <profiles>
-        <profile>
-            <id>simulator</id>
-            <dependencies>
-                <dependency>
+        <pluginManagement>
+            <plugins>
+                <plugin>
                     <groupId>com.codenameone</groupId>
-                    <artifactId>codenameone-javase</artifactId>
-                    <scope>runtime</scope>
-                </dependency>
-            </dependencies>
-        </profile>
-    </profiles>
+                    <artifactId>codenameone-maven-plugin</artifactId>
+                    <version>${cn1.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>exec-maven-plugin</artifactId>
+                    <version>3.0.0</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>

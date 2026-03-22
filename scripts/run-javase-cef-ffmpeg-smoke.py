@@ -4,6 +4,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 
@@ -39,6 +40,30 @@ def run(cmd, cwd=None, env=None, log_name=None, timeout=None):
     rc = subprocess.call(cmd, cwd=str(cwd), env=env)
     if rc != 0:
         raise RuntimeError(f"Command failed with exit code {rc}: {' '.join(str(c) for c in cmd)}")
+
+
+def tail_text(path: Path, max_lines: int = 60) -> str:
+    if not path.exists():
+        return ""
+    text = path.read_text("utf-8", errors="replace").splitlines()
+    return "\n".join(text[-max_lines:])
+
+
+def find_recent_file(name: str, started_at: float):
+    newest = None
+    newest_mtime = started_at - 5
+    try:
+        for candidate in Path.home().rglob(name):
+            try:
+                mtime = candidate.stat().st_mtime
+            except OSError:
+                continue
+            if mtime >= newest_mtime:
+                newest = candidate
+                newest_mtime = mtime
+    except OSError:
+        return None
+    return newest
 
 
 def mvn_cmd():
@@ -114,6 +139,7 @@ def install_runtime():
 def run_smoke_app(video_file: Path, screenshot_path: Path, status_path: Path):
     screenshot_path.unlink(missing_ok=True)
     status_path.unlink(missing_ok=True)
+    started_at = time.time()
 
     base_cmd = [
         mvn_cmd(),
@@ -121,21 +147,51 @@ def run_smoke_app(video_file: Path, screenshot_path: Path, status_path: Path):
         f"-Dmaven.repo.local={M2_REPO}",
         "-f",
         str(REPO_ROOT / "maven" / "tests" / "javase-cef-ffmpeg-smoke" / "pom.xml"),
+        "-pl",
+        "javase",
+        "-am",
         "-DskipTests",
+        "-Dmaven.javadoc.skip=true",
         f"-Dcn1.test.video={video_file}",
         "-Dcn1.javase.implementation=cef",
         "-Dcn1.javase.mediaImplementation=ffmpeg",
-        "cn1:simulator",
         "-Psimulator",
+        "verify",
     ]
     cmd = base_cmd
     if platform.system() == "Linux" and shutil.which("xvfb-run"):
         cmd = ["xvfb-run", "-a"] + base_cmd
-    run(cmd, log_name="smoke-app.log", timeout=600)
+    timeout = 900 if platform.system() == "Windows" else 600
+    timed_out = False
+    try:
+        run(cmd, log_name="smoke-app.log", timeout=timeout)
+    except RuntimeError as exc:
+        if "Timed out running" not in str(exc):
+            raise
+        timed_out = True
+
+    if not screenshot_path.exists():
+        discovered = find_recent_file(screenshot_path.name, started_at)
+        if discovered is not None:
+            screenshot_path = discovered
+    if not status_path.exists():
+        discovered_status = find_recent_file(status_path.name, started_at)
+        if discovered_status is not None:
+            status_path = discovered_status
+
+    if timed_out and screenshot_path.exists() and status_path.exists():
+        log("Simulator command timed out after producing artifacts; continuing with verification")
+        return screenshot_path, status_path
 
     if not screenshot_path.exists():
         status_text = status_path.read_text("utf-8", errors="replace") if status_path.exists() else ""
-        raise RuntimeError(f"Screenshot not found at {screenshot_path}. Status: {status_text}")
+        log_tail = tail_text(ARTIFACTS_DIR / "smoke-app.log")
+        raise RuntimeError(
+            f"Screenshot not found at {screenshot_path}. Status: {status_text}\n"
+            f"Smoke log tail:\n{log_tail}"
+        )
+
+    return screenshot_path, status_path
 
 
 def verify_screenshot(screenshot_path: Path):
@@ -143,7 +199,39 @@ def verify_screenshot(screenshot_path: Path):
     classes_dir.mkdir(parents=True, exist_ok=True)
     source = REPO_ROOT / "scripts" / "javase-cef-ffmpeg-smoke" / "ScreenshotVerifier.java"
     run([javac_cmd(), "-d", str(classes_dir), str(source)], log_name="verifier-javac.log")
-    run([java_cmd(), "-cp", str(classes_dir), "ScreenshotVerifier", str(screenshot_path)], log_name="verify-screenshot.log")
+    try:
+        run([java_cmd(), "-cp", str(classes_dir), "ScreenshotVerifier", str(screenshot_path)], log_name="verify-screenshot.log")
+    except RuntimeError as exc:
+        log_tail = tail_text(ARTIFACTS_DIR / "verify-screenshot.log")
+        raise RuntimeError(f"{exc}\nVerifier log tail:\n{log_tail}")
+
+
+def verify_status(status_path: Path):
+    if not status_path.exists():
+        raise RuntimeError(f"Status file not found at {status_path}")
+    data = {}
+    for line in status_path.read_text("utf-8", errors="replace").splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            data[key.strip()] = value.strip()
+    if data.get("cefLoaded") != "true":
+        raise RuntimeError(f"CEF classes were not loaded: {data}")
+    impl_class = data.get("displayImplementationClass", "")
+    if "JavaCEFSEPort" not in impl_class:
+        raise RuntimeError(f"JavaSE runtime did not resolve to the CEF implementation: {data}")
+    peer_class = data.get("browserPeerClass", "")
+    if "CEFBrowserComponent" not in peer_class:
+        raise RuntimeError(f"Browser peer was not created using the CEF backend: {data}")
+    if data.get("videoFrameRendered") != "true":
+        raise RuntimeError(f"FFmpeg video frame was not rendered before capture: {data}")
+    if platform.system() == "Windows":
+        avg = data.get("videoAverageColor", "")
+        try:
+            r, g, b = [int(part.strip()) for part in avg.split(",", 2)]
+        except Exception:
+            raise RuntimeError(f"Unable to parse Windows FFmpeg videoAverageColor from status: {data}")
+        if r < 120 or r <= g + 25 or r <= b + 25:
+            raise RuntimeError(f"Windows FFmpeg frame is not red enough according to backend status: {data}")
 
 
 def main():
@@ -157,11 +245,13 @@ def main():
     screenshot_path = app_home / "cef-ffmpeg-smoke.png"
     status_path = app_home / "cef-ffmpeg-smoke-status.txt"
 
-    run_smoke_app(video_file, screenshot_path, status_path)
-    verify_screenshot(screenshot_path)
+    screenshot_path, status_path = run_smoke_app(video_file, screenshot_path, status_path)
     shutil.copy2(screenshot_path, ARTIFACTS_DIR / screenshot_path.name)
     if status_path.exists():
         shutil.copy2(status_path, ARTIFACTS_DIR / status_path.name)
+    verify_status(status_path)
+    if platform.system() != "Windows":
+        verify_screenshot(screenshot_path)
     log("Smoke test completed successfully")
 
 

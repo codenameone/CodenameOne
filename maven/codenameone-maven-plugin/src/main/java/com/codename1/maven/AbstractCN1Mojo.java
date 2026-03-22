@@ -954,7 +954,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
 
     private File extractCefBundle(File nativeJar) {
-        File extractedDir = new File(nativeJar.getParentFile(), nativeJar.getName() + "-extracted");
+        File extractedDir = new File(project.getBuild().getDirectory(), "cn1-cef-" + getCefPlatform());
         File cefRoot = new File(extractedDir, "cef");
         File runtimeDir = new File(cefRoot, getCefRuntimeSubdir());
         File tempExtract = new File(extractedDir, "tmp");

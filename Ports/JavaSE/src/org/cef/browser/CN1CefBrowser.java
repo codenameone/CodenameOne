@@ -30,6 +30,7 @@ import com.codename1.ui.CN;
 */
 import org.cef.CefClient;
 import org.cef.callback.CefDragData;
+import org.cef.handler.CefRenderHandlerAdapter;
 import org.cef.handler.CefRenderHandler;
 
 import java.awt.Component;
@@ -61,7 +62,7 @@ import org.cef.handler.CefScreenInfo;
  * The visibility of this class is "package". To create a new
  * CefBrowser instance, please use CefBrowserFactory.
  */
-public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
+public class CN1CefBrowser extends CefBrowser_N {
     //private CefRenderer renderer_;
     //private GLCanvas canvas_;
     private long window_handle_ = 0;
@@ -72,6 +73,47 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
     //private BufferedImage bufferedImage_;
     private WeakReference<PixelBuffer> bufferRef;
     private byte[] buf_;
+    private final CefRenderHandler renderHandler_ = new CefRenderHandlerAdapter() {
+        @Override
+        public Rectangle getViewRect(CefBrowser browser) {
+            return CN1CefBrowser.this.getViewRectImpl(browser);
+        }
+
+        @Override
+        public boolean getScreenInfo(CefBrowser browser, CefScreenInfo screenInfo) {
+            return CN1CefBrowser.this.getScreenInfoImpl(browser, screenInfo);
+        }
+
+        @Override
+        public Point getScreenPoint(CefBrowser browser, Point viewPoint) {
+            return CN1CefBrowser.this.getScreenPointImpl(browser, viewPoint);
+        }
+
+        @Override
+        public void onPopupShow(CefBrowser browser, boolean show) {
+            CN1CefBrowser.this.onPopupShowImpl(browser, show);
+        }
+
+        @Override
+        public void onPopupSize(CefBrowser browser, Rectangle size) {
+            CN1CefBrowser.this.onPopupSizeImpl(browser, size);
+        }
+
+        @Override
+        public void onPaint(CefBrowser browser, boolean popup, Rectangle[] dirtyRects, ByteBuffer buffer, int width, int height) {
+            CN1CefBrowser.this.onPaintImpl(browser, popup, dirtyRects, buffer, width, height);
+        }
+
+        @Override
+        public boolean startDragging(CefBrowser browser, CefDragData dragData, int mask, int x, int y) {
+            return CN1CefBrowser.this.startDraggingImpl(browser, dragData, mask, x, y);
+        }
+
+        @Override
+        public void updateDragCursor(CefBrowser browser, int operation) {
+            CN1CefBrowser.this.updateDragCursorImpl(browser, operation);
+        }
+    };
     
 
     public CN1CefBrowser(CefClient client, String url, boolean transparent, CefRequestContext context) {
@@ -110,7 +152,7 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
 
     @Override
     public CefRenderHandler getRenderHandler() {
-        return this;
+        return renderHandler_;
     }
 
     @Override
@@ -120,7 +162,6 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
                 client, url, isTransparent_, context, (CN1CefBrowser) this, inspectAt);
     }
 
-    @Override
     public CompletableFuture<BufferedImage> createScreenshot(boolean nativeResolution) {
         return CompletableFuture.completedFuture(null);
     }
@@ -365,13 +406,11 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
     
     
     
-    @Override
-    public Rectangle getViewRect(CefBrowser browser) {
+    public Rectangle getViewRectImpl(CefBrowser browser) {
         return browser_rect_;
     }
 
-    @Override
-    public Point getScreenPoint(CefBrowser browser, Point viewPoint) {
+    public Point getScreenPointImpl(CefBrowser browser, Point viewPoint) {
         try {
             Point screenPoint = new Point(screenPoint_);
             screenPoint.translate(viewPoint.x, viewPoint.y);
@@ -383,8 +422,7 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
         }
     }
 
-    @Override
-    public void onPopupShow(CefBrowser browser, boolean show) {
+    public void onPopupShowImpl(CefBrowser browser, boolean show) {
         try {
             if (!show) {
                 //renderer_.clearPopupRects();
@@ -396,8 +434,7 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
         }
     }
 
-    @Override
-    public void onPopupSize(CefBrowser browser, Rectangle size) {
+    public void onPopupSizeImpl(CefBrowser browser, Rectangle size) {
         try {
             //renderer_.onPopupSize(size);
         } catch (Throwable t) {
@@ -408,16 +445,15 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
 
     private boolean firstPaint=true;
     
-    @Override
-    public void onPaint(final CefBrowser browser, final boolean popup, final Rectangle[] dirtyRects,
+    public void onPaintImpl(final CefBrowser browser, final boolean popup, final Rectangle[] dirtyRects,
             final ByteBuffer buffer, final int width, final int height) {
         try {
-            _onPaint(browser, popup, dirtyRects, buffer, width, height);
+            _onPaintImpl(browser, popup, dirtyRects, buffer, width, height);
         } catch (Throwable t) {
             t.printStackTrace();
         }
     }
-    public void _onPaint(final CefBrowser browser, final boolean popup, final Rectangle[] dirtyRects,
+    public void _onPaintImpl(final CefBrowser browser, final boolean popup, final Rectangle[] dirtyRects,
             final ByteBuffer buffer, final int width, final int height) {    
         final PixelBuffer buffer_ = bufferRef.get();
         if (buffer_ == null) {
@@ -494,24 +530,12 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
         }
     }
 
-    @Override
-    public boolean onCursorChange(CefBrowser browser, final int cursorType) {
-        SwingUtilities.invokeLater(new Runnable() {
-            public void run() {
-                component_.setCursor(new Cursor(cursorType));
-            }
-        });
-        return true;
-    }
-
-    @Override
-    public boolean startDragging(CefBrowser browser, CefDragData dragData, int mask, int x, int y) {
+    public boolean startDraggingImpl(CefBrowser browser, CefDragData dragData, int mask, int x, int y) {
         // TODO(JCEF) Prepared for DnD support using OSR mode.
         return false;
     }
 
-    @Override
-    public void updateDragCursor(CefBrowser browser, int operation) {
+    public void updateDragCursorImpl(CefBrowser browser, int operation) {
         // TODO(JCEF) Prepared for DnD support using OSR mode.
     }
 
@@ -550,8 +574,7 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
         componentFactory = factory;
     }
 
-    @Override
-    public boolean getScreenInfo(CefBrowser browser, CefScreenInfo screenInfo) {
+    public boolean getScreenInfoImpl(CefBrowser browser, CefScreenInfo screenInfo) {
         try {
             GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
             GraphicsConfiguration graphicsConfig = graphicsDevice.getDefaultConfiguration();

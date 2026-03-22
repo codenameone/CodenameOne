@@ -1,5 +1,8 @@
 name: JavaSE CEF/FFmpeg Smoke
 
+permissions:
+  contents: read
+
 on:
   pull_request:
     paths:

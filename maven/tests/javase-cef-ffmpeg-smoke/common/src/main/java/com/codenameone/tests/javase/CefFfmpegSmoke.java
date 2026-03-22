@@ -14,6 +14,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import com.codename1.ui.Toolbar;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
@@ -21,22 +22,35 @@ import com.codename1.ui.util.ImageIO;
 import com.codename1.ui.util.UITimer;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
 public class CefFfmpegSmoke extends Lifecycle {
     private static final String SCREENSHOT_NAME = "cef-ffmpeg-smoke.png";
     private static final String STATUS_NAME = "cef-ffmpeg-smoke-status.txt";
-    private static final int CAPTURE_DELAY_MS = 1500;
-    private static final int FALLBACK_TIMEOUT_MS = 12000;
+    private static final int CAPTURE_DELAY_MS = 3000;
+    private static final int FALLBACK_TIMEOUT_MS = 20000;
 
     private Form current;
     private Media media;
     private boolean browserLoaded;
+    private boolean browserJsVerified;
+    private String browserColor = "";
+    private String browserReadyState = "";
+    private boolean videoFrameRendered;
+    private int videoFrameCount;
+    private String videoAverageColor = "";
+    private boolean cefLoaded;
+    private String displayImplementationClass = "";
+    private String browserPeerClass = "";
+    private boolean browserPeerReady;
     private boolean captureScheduled;
     private boolean captured;
 
     @Override
     public void init(Object context) {
-        super.init(context);
+        CN.updateNetworkThreadCount(2);
+        Toolbar.setGlobalToolbar(true);
         Display.getInstance().setProperty("BrowserComponent.useCEF", "true");
     }
 
@@ -70,8 +84,7 @@ public class CefFfmpegSmoke extends Lifecycle {
         browser.setPreferredW(320);
         browser.setPreferredH(240);
         browser.addWebEventListener(BrowserComponent.onLoad, evt -> {
-            browserLoaded = true;
-            maybeScheduleCapture(form);
+            probeBrowser(browser, form);
         });
         browser.setPage("<html><body style='margin:0;background:#00ff00;'></body></html>", null);
 
@@ -94,6 +107,17 @@ public class CefFfmpegSmoke extends Lifecycle {
 
         current = form;
         form.show();
+
+        final UITimer[] browserProbe = new UITimer[1];
+        browserProbe[0] = UITimer.timer(500, true, form, () -> {
+            if (captured) {
+                browserProbe[0].cancel();
+                return;
+            }
+            if (probeBrowser(browser, form)) {
+                browserProbe[0].cancel();
+            }
+        });
 
         UITimer.timer(300, false, form, () -> {
             try {
@@ -134,11 +158,12 @@ public class CefFfmpegSmoke extends Lifecycle {
     }
 
     private void maybeScheduleCapture(Form form) {
-        if (captureScheduled || captured || !browserLoaded || media == null) {
+        inspectMediaState();
+        if (captureScheduled || captured || !browserPeerReady || media == null || !videoFrameRendered) {
             return;
         }
         captureScheduled = true;
-        UITimer.timer(CAPTURE_DELAY_MS, false, form, () -> captureAndExit("browser-loaded"));
+        UITimer.timer(CAPTURE_DELAY_MS, false, form, () -> captureAndExit("browser-peer-and-video-ready"));
     }
 
     private void captureAndExit(String reason) {
@@ -147,7 +172,17 @@ public class CefFfmpegSmoke extends Lifecycle {
         }
         captured = true;
         writeStatus("captureReason=" + reason + "\n" +
+                "cefLoaded=" + cefLoaded + "\n" +
+                "displayImplementationClass=" + displayImplementationClass + "\n" +
+                "browserPeerClass=" + browserPeerClass + "\n" +
+                "browserPeerReady=" + browserPeerReady + "\n" +
+                "videoFrameRendered=" + videoFrameRendered + "\n" +
+                "videoFrameCount=" + videoFrameCount + "\n" +
+                "videoAverageColor=" + videoAverageColor + "\n" +
                 "browserLoaded=" + browserLoaded + "\n" +
+                "browserJsVerified=" + browserJsVerified + "\n" +
+                "browserReadyState=" + browserReadyState + "\n" +
+                "browserColor=" + browserColor + "\n" +
                 "mediaImplementation=" + System.getProperty("cn1.javase.mediaImplementation", "") + "\n" +
                 "browserImplementation=" + System.getProperty("cn1.javase.implementation", "") + "\n");
         Display.getInstance().screenshot(img -> {
@@ -194,6 +229,87 @@ public class CefFfmpegSmoke extends Lifecycle {
             os.write(text.getBytes("UTF-8"));
         } catch (IOException ex) {
             Log.e(ex);
+        }
+    }
+
+    private boolean probeBrowser(BrowserComponent browser, Form form) {
+        inspectBrowserBackend(browser);
+        inspectMediaState();
+        try {
+            browserReadyState = browser.executeAndReturnString("document.readyState");
+            browserColor = browser.executeAndReturnString("window.getComputedStyle(document.body).backgroundColor");
+            browserLoaded = browserReadyState != null && browserReadyState.length() > 0;
+            browserJsVerified = browserColor != null && browserColor.indexOf("0, 255, 0") >= 0;
+            if (browserLoaded || browserPeerReady) {
+                maybeScheduleCapture(form);
+            }
+            return browserLoaded;
+        } catch (RuntimeException ex) {
+            browserReadyState = "error:" + ex.getMessage();
+            browserColor = "";
+            browserJsVerified = false;
+            if (browserPeerReady) {
+                maybeScheduleCapture(form);
+            }
+            return false;
+        }
+    }
+
+    private void inspectBrowserBackend(BrowserComponent browser) {
+        cefLoaded = isCefLoaded();
+        displayImplementationClass = getDisplayImplementationClass();
+        browserPeerClass = getBrowserPeerClass(browser);
+        browserPeerReady = browserPeerClass.length() > 0;
+    }
+
+    private void inspectMediaState() {
+        if (media == null) {
+            videoFrameRendered = false;
+            videoFrameCount = 0;
+            return;
+        }
+        Object rendered = media.getVariable("ffmpeg.videoFrameRendered");
+        videoFrameRendered = Boolean.TRUE.equals(rendered);
+        Object count = media.getVariable("ffmpeg.videoFrameCount");
+        if (count instanceof Number) {
+            videoFrameCount = ((Number) count).intValue();
+        } else {
+            videoFrameCount = 0;
+        }
+        Object avg = media.getVariable("ffmpeg.videoAverageColor");
+        videoAverageColor = avg == null ? "" : String.valueOf(avg);
+    }
+
+    private boolean isCefLoaded() {
+        try {
+            Class<?> cls = Class.forName("com.codename1.impl.javase.CN1Bootstrap");
+            Method m = cls.getMethod("isCEFLoaded");
+            Object out = m.invoke(null);
+            return Boolean.TRUE.equals(out);
+        } catch (Throwable ex) {
+            return false;
+        }
+    }
+
+    private String getDisplayImplementationClass() {
+        try {
+            Method m = Display.class.getDeclaredMethod("getImplementation");
+            m.setAccessible(true);
+            Object impl = m.invoke(Display.getInstance());
+            return impl == null ? "" : impl.getClass().getName();
+        } catch (Throwable ex) {
+            return "error:" + ex.getClass().getName();
+        }
+    }
+
+    private String getBrowserPeerClass(BrowserComponent browser) {
+        try {
+            Field f = BrowserComponent.class.getDeclaredField("internal");
+            f.setAccessible(true);
+            Object peer = f.get(browser);
+            return peer == null ? "" : peer.getClass().getName();
+        } catch (Throwable ex) {
+            return "error:" + ex.getClass().getName();
         }
     }
 

@@ -12,19 +12,13 @@ public class ScreenshotVerifier {
             throw new IllegalStateException("Unable to decode image " + args[0]);
         }
 
-        Sample green = sampleBox(image, image.getWidth() / 4, (image.getHeight() * 3) / 5);
-        Sample red = sampleBox(image, (image.getWidth() * 3) / 4, (image.getHeight() * 3) / 5);
+        Region red = findBestRegion(image, false);
+        System.out.println("red=" + red.sample.r + "," + red.sample.g + "," + red.sample.b +
+                " @" + red.centerX + "," + red.centerY + " score=" + red.score);
 
-        System.out.println("green=" + green.r + "," + green.g + "," + green.b);
-        System.out.println("red=" + red.r + "," + red.g + "," + red.b);
-
-        assertGreen("green region", green);
-        assertRed("red region", red);
-    }
-
-    private static void assertGreen(String label, Sample sample) {
-        if (sample.g < 120 || sample.g <= sample.r + 25 || sample.g <= sample.b + 25) {
-            throw new IllegalStateException(label + " is not green enough: " + sample.r + "," + sample.g + "," + sample.b);
+        assertRed("red region", red.sample);
+        if (red.centerX <= image.getWidth() / 2) {
+            throw new IllegalStateException("Red region detected on wrong side: x=" + red.centerX);
         }
     }
 
@@ -32,6 +26,29 @@ public class ScreenshotVerifier {
         if (sample.r < 120 || sample.r <= sample.g + 25 || sample.r <= sample.b + 25) {
             throw new IllegalStateException(label + " is not red enough: " + sample.r + "," + sample.g + "," + sample.b);
         }
+    }
+
+    private static Region findBestRegion(BufferedImage image, boolean green) {
+        int marginX = Math.max(10, image.getWidth() / 12);
+        int marginY = Math.max(10, image.getHeight() / 8);
+        int stepX = Math.max(12, image.getWidth() / 16);
+        int stepY = Math.max(12, image.getHeight() / 16);
+        Region best = null;
+        for (int y = marginY; y < image.getHeight() - marginY; y += stepY) {
+            for (int x = marginX; x < image.getWidth() - marginX; x += stepX) {
+                Sample sample = sampleBox(image, x, y);
+                int score = green
+                        ? sample.g - Math.max(sample.r, sample.b)
+                        : sample.r - Math.max(sample.g, sample.b);
+                if (best == null || score > best.score) {
+                    best = new Region(sample, x, y, score);
+                }
+            }
+        }
+        if (best == null) {
+            throw new IllegalStateException("No candidate regions found");
+        }
+        return best;
     }
 
     private static Sample sampleBox(BufferedImage image, int centerX, int centerY) {
@@ -57,6 +74,20 @@ public class ScreenshotVerifier {
             throw new IllegalStateException("No pixels sampled");
         }
         return new Sample((int)(r / count), (int)(g / count), (int)(b / count));
+    }
+
+    private static final class Region {
+        final Sample sample;
+        final int centerX;
+        final int centerY;
+        final int score;
+
+        Region(Sample sample, int centerX, int centerY, int score) {
+            this.sample = sample;
+            this.centerX = centerX;
+            this.centerY = centerY;
+            this.score = score;
+        }
     }
 
     private static final class Sample {

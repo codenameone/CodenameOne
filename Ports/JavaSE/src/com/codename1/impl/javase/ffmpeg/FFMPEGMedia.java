@@ -317,6 +317,15 @@ public final class FFMPEGMedia {
 
         @Override
         public Object getVariable(String key) {
+            if ("ffmpeg.videoFrameRendered".equals(key)) {
+                return Boolean.valueOf(videoPanel != null && videoPanel.hasFrame());
+            }
+            if ("ffmpeg.videoFrameCount".equals(key)) {
+                return Integer.valueOf(videoPanel != null ? videoPanel.getFrameCount() : 0);
+            }
+            if ("ffmpeg.videoAverageColor".equals(key)) {
+                return videoPanel != null ? videoPanel.getAverageColor() : "";
+            }
             return null;
         }
 
@@ -630,6 +639,7 @@ public final class FFMPEGMedia {
 
     private static class VideoPanel extends JPanel implements HierarchyListener {
         private volatile BufferedImage image;
+        private volatile int frameCount;
 
         VideoPanel(int width, int height) {
             setBackground(Color.BLACK);
@@ -652,7 +662,41 @@ public final class FFMPEGMedia {
             }
             next.setRGB(0, 0, width, height, argb, 0, width);
             image = next;
+            frameCount++;
             repaint();
+        }
+
+        boolean hasFrame() {
+            return image != null;
+        }
+
+        int getFrameCount() {
+            return frameCount;
+        }
+
+        String getAverageColor() {
+            BufferedImage current = image;
+            if (current == null) {
+                return "";
+            }
+            long r = 0;
+            long g = 0;
+            long b = 0;
+            int width = current.getWidth();
+            int height = current.getHeight();
+            int count = width * height;
+            if (count == 0) {
+                return "";
+            }
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    int rgb = current.getRGB(x, y);
+                    r += (rgb >> 16) & 0xff;
+                    g += (rgb >> 8) & 0xff;
+                    b += rgb & 0xff;
+                }
+            }
+            return (r / count) + "," + (g / count) + "," + (b / count);
         }
 
         @Override
