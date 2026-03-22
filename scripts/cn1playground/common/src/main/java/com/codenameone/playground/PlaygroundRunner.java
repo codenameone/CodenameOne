@@ -64,6 +64,7 @@ final class PlaygroundRunner {
     }
 
     private void bindGlobals(Interpreter interpreter, PlaygroundContext context) throws EvalError {
+        NameSpace namespace = interpreter.getNameSpace();
         interpreter.set("ctx", context);
         interpreter.set("theme", context.getTheme());
         interpreter.set("hostForm", context.getHostForm());
@@ -78,11 +79,11 @@ final class PlaygroundRunner {
         interpreter.set("GridLayout", GridLayout.class);
         interpreter.set("LayeredLayout", LayeredLayout.class);
         interpreter.set("Style", Style.class);
-        interpreter.eval("import com.codename1.ui.*;");
-        interpreter.eval("import com.codename1.ui.layouts.*;");
-        interpreter.eval("import com.codename1.components.*;");
-        interpreter.eval("import com.codename1.ui.geom.*;");
-        interpreter.eval("import com.codenameone.playground.PlaygroundContext;");
+        namespace.importPackage("com.codename1.ui");
+        namespace.importPackage("com.codename1.ui.layouts");
+        namespace.importPackage("com.codename1.components");
+        namespace.importPackage("com.codename1.ui.geom");
+        namespace.importClass("com.codenameone.playground.PlaygroundContext");
     }
 
     private String adaptScript(String script) {

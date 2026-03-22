@@ -247,20 +247,38 @@ class BSHAllocationExpression extends SimpleNode
             Class<?> type, BSHArrayDimensions dimensionsNode,
             CallStack callstack, Interpreter interpreter) throws EvalError {
         if ( dimensionsNode.numUndefinedDims > 0 ) {
-            Object proto = Array.newInstance(
-                type, new int [dimensionsNode.numUndefinedDims] ); // zeros
-            type = proto.getClass();
+            type = arrayClass(type, dimensionsNode.numUndefinedDims);
         }
 
         try {
-            Object arr = Array.newInstance(
-                type, dimensionsNode.definedDimensions);
+            Object arr = allocateArray(type, dimensionsNode.definedDimensions, 0);
             return arr;
         } catch( NegativeArraySizeException e1 ) {
             throw new TargetError( e1, this, callstack );
         } catch( Exception e ) {
             throw new EvalException("Can't construct primitive array: "
                     + e.getMessage(), this, callstack, e);
+            }
+    }
+
+    private static Class<?> arrayClass(Class<?> baseType, int dimensions) {
+        Class<?> type = baseType;
+        for (int i = 0; i < dimensions; i++) {
+            type = Array.newInstance(type, 0).getClass();
         }
+        return type;
+    }
+
+    private static Object allocateArray(Class<?> baseType, int[] dimensions, int offset) {
+        Class<?> componentType = arrayClass(baseType, dimensions.length - offset - 1);
+        Object array = Array.newInstance(componentType, dimensions[offset]);
+        if (offset == dimensions.length - 1) {
+            return array;
+        }
+        Object[] objectArray = (Object[]) array;
+        for (int i = 0; i < dimensions[offset]; i++) {
+            objectArray[i] = allocateArray(baseType, dimensions, offset + 1);
+        }
+        return array;
     }
 }

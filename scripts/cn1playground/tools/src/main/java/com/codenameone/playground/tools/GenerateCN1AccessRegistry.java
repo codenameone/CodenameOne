@@ -600,11 +600,35 @@ public final class GenerateCN1AccessRegistry {
     }
 
     private static boolean isSupportedJavaClass(String qualifiedName) {
-        return !"java.lang.Record".equals(qualifiedName);
+        return !"java.lang.Record".equals(qualifiedName)
+                && !"java.lang.AbstractMethodError".equals(qualifiedName)
+                && !"java.lang.IllegalThreadStateException".equals(qualifiedName)
+                && !"java.lang.SuppressWarnings".equals(qualifiedName)
+                && !"java.util.EventListenerProxy".equals(qualifiedName);
     }
 
     private static boolean isSupportedJavaMethod(String qualifiedName, ApiMethod method) {
         return !("java.lang.Class".equals(qualifiedName) && "isRecord".equals(method.name) && method.paramTypes.isEmpty())
+                && !("java.lang.Class".equals(qualifiedName)
+                && ("isAnnotation".equals(method.name) || "isAnonymousClass".equals(method.name))
+                && method.paramTypes.isEmpty())
+                && !("java.lang.System".equals(qualifiedName) && "exit".equals(method.name) && method.isStatic
+                && method.paramTypes.size() == 1 && "int".equals(method.paramTypes.get(0).baseName))
+                && !("java.lang.reflect.Array".equals(qualifiedName) && "newInstance".equals(method.name) && method.isStatic
+                && method.paramTypes.size() == 2 && "java.lang.Class".equals(method.paramTypes.get(0).baseName)
+                && "int".equals(method.paramTypes.get(1).baseName) && method.paramTypes.get(1).arrayDepth == 1)
+                && !("java.util.Collections".equals(qualifiedName)
+                && ("asLifoQueue".equals(method.name)
+                || "synchronizedSortedMap".equals(method.name)
+                || "synchronizedSortedSet".equals(method.name)
+                || "unmodifiableSortedMap".equals(method.name)
+                || "unmodifiableSortedSet".equals(method.name)))
+                && !("java.util.TimerTask".equals(qualifiedName) && "scheduledExecutionTime".equals(method.name)
+                && method.paramTypes.isEmpty())
+                && !("java.io.PrintStream".equals(qualifiedName) && "print".equals(method.name)
+                && method.paramTypes.size() == 1
+                && ("boolean".equals(method.paramTypes.get(0).baseName)
+                || "float".equals(method.paramTypes.get(0).baseName)))
                 && !("java.util.TimeZone".equals(qualifiedName) && "setDefault".equals(method.name) && method.isStatic
                 && method.paramTypes.size() == 1 && "java.util.TimeZone".equals(method.paramTypes.get(0).baseName));
     }
@@ -729,6 +753,8 @@ public final class GenerateCN1AccessRegistry {
 
     private static boolean isSupportedJavaDispatchPackage(String packageName) {
         return packageName.startsWith("java.")
+                && !isPackageOrChild(packageName, "java.lang.annotation")
+                && !isPackageOrChild(packageName, "java.lang.invoke")
                 && !isPackageOrChild(packageName, "java.time")
                 && !isPackageOrChild(packageName, "java.util.function")
                 && !isPackageOrChild(packageName, "java.util.stream");
@@ -746,6 +772,7 @@ public final class GenerateCN1AccessRegistry {
             return true;
         }
         return !name.startsWith("java.lang.reflect.")
+                && !name.startsWith("java.lang.annotation.")
                 && !name.startsWith("java.lang.invoke.")
                 && !name.startsWith("java.lang.constant.")
                 && !isPackageOrChild(name, "java.time")

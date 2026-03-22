@@ -149,12 +149,10 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
 
         if ( arrayDims > 0 ) {
             try {
-                // Get the type by constructing a prototype array with
-                // arbitrary (zero) length in each dimension.
-                int[] dims = new int[arrayDims]; // int array default zeros
-                Object obj = Array.newInstance(
-                        null == baseType ? Object.class : baseType, dims);
-                type = obj.getClass();
+                // Build the array class incrementally to avoid relying on
+                // Array.newInstance(Class, int[]), which is not available in
+                // the JavaScript runtime subset.
+                type = arrayClass(null == baseType ? Object.class : baseType, arrayDims);
             } catch(Exception e) {
                 throw new EvalException("Couldn't construct array type",
                     this, callstack, e);
@@ -168,6 +166,14 @@ class BSHType extends SimpleNode implements BshClassManager.Listener {
             isListener = true;
         }
 
+        return type;
+    }
+
+    private static Class<?> arrayClass(Class<?> baseType, int dimensions) {
+        Class<?> type = baseType;
+        for (int i = 0; i < dimensions; i++) {
+            type = Array.newInstance(type, 0).getClass();
+        }
         return type;
     }
 

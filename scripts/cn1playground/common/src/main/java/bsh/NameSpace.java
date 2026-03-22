@@ -365,12 +365,12 @@ public class NameSpace
      * @param recurse determines whether we will search for the variable in our
      *        parent's scope before assigning locally.
      * @throws UtilEvalError the util eval error */
-    void setVariableOrProperty(final String name, final Object value,
+    void setVariableOrProperty(final String name, Object value,
             final boolean strictJava, final boolean recurse)
             throws UtilEvalError {
         // primitives should have been wrapped
         if (value == null)
-            throw new InterpreterError("null variable value");
+            value = Primitive.NULL;
         // Locate the variable definition if it exists.
         final Variable existing = this.getVariableImpl(name, recurse);
         // Found an existing variable here (or above if recurse allowed)

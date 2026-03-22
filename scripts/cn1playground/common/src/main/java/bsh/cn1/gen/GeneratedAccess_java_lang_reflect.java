@@ -31,11 +31,6 @@ public final class GeneratedAccess_java_lang_reflect {
                 return java.lang.reflect.Array.newInstance((java.lang.Class) safeArgs[0], ((Number) safeArgs[1]).intValue());
             }
         }
-        if ("newInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, int[].class}, false)) {
-                return java.lang.reflect.Array.newInstance((java.lang.Class) safeArgs[0], (int[]) safeArgs[1]);
-            }
-        }
         throw unsupportedStatic(java.lang.reflect.Array.class, name, safeArgs);
     }
 

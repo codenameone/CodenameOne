@@ -34,6 +34,11 @@ public final class GeneratedAccess_com_codenameone_playground {
                 return com.codenameone.playground.PlaygroundContext.getCurrent();
             }
         }
+        if ("interceptMethodInvocation".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class, java.lang.Object[].class}, false)) {
+                return com.codenameone.playground.PlaygroundContext.interceptMethodInvocation((java.lang.Object) safeArgs[0], (java.lang.String) safeArgs[1], (java.lang.Object[]) safeArgs[2]);
+            }
+        }
         throw unsupportedStatic(com.codenameone.playground.PlaygroundContext.class, name, safeArgs);
     }
 

@@ -526,7 +526,7 @@ public class Interpreter
         }
 
         if ( interactive && exitOnEOF )
-            System.exit(0);
+            return;
     }
 
     // begin source and eval

@@ -71,8 +71,6 @@ import bsh.cn1.gen.GeneratedAccess_com_codename1_xml;
 import bsh.cn1.gen.GeneratedAccess_com_codenameone_playground;
 import bsh.cn1.gen.GeneratedAccess_java_io;
 import bsh.cn1.gen.GeneratedAccess_java_lang;
-import bsh.cn1.gen.GeneratedAccess_java_lang_annotation;
-import bsh.cn1.gen.GeneratedAccess_java_lang_invoke;
 import bsh.cn1.gen.GeneratedAccess_java_lang_ref;
 import bsh.cn1.gen.GeneratedAccess_java_lang_reflect;
 import bsh.cn1.gen.GeneratedAccess_java_net;
@@ -369,14 +367,6 @@ public final class GeneratedCN1Access implements CN1Access {
         if (found != null) {
             return found;
         }
-        found = GeneratedAccess_java_lang_annotation.findClass(name);
-        if (found != null) {
-            return found;
-        }
-        found = GeneratedAccess_java_lang_invoke.findClass(name);
-        if (found != null) {
-            return found;
-        }
         found = GeneratedAccess_java_lang_ref.findClass(name);
         if (found != null) {
             return found;
@@ -618,12 +608,6 @@ public final class GeneratedCN1Access implements CN1Access {
         if ("java.lang".equals(packageName)) {
             return GeneratedAccess_java_lang.construct(type, args);
         }
-        if ("java.lang.annotation".equals(packageName)) {
-            return GeneratedAccess_java_lang_annotation.construct(type, args);
-        }
-        if ("java.lang.invoke".equals(packageName)) {
-            return GeneratedAccess_java_lang_invoke.construct(type, args);
-        }
         if ("java.lang.ref".equals(packageName)) {
             return GeneratedAccess_java_lang_ref.construct(type, args);
         }
@@ -857,12 +841,6 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         if ("java.lang".equals(packageName)) {
             return GeneratedAccess_java_lang.invokeStatic(type, name, args);
-        }
-        if ("java.lang.annotation".equals(packageName)) {
-            return GeneratedAccess_java_lang_annotation.invokeStatic(type, name, args);
-        }
-        if ("java.lang.invoke".equals(packageName)) {
-            return GeneratedAccess_java_lang_invoke.invokeStatic(type, name, args);
         }
         if ("java.lang.ref".equals(packageName)) {
             return GeneratedAccess_java_lang_ref.invokeStatic(type, name, args);
@@ -1240,16 +1218,6 @@ public final class GeneratedCN1Access implements CN1Access {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_lang_annotation.invoke(target, name, args);
-        } catch (CN1AccessException ex) {
-            unsupported = ex;
-        }
-        try {
-            return GeneratedAccess_java_lang_invoke.invoke(target, name, args);
-        } catch (CN1AccessException ex) {
-            unsupported = ex;
-        }
-        try {
             return GeneratedAccess_java_lang_ref.invoke(target, name, args);
         } catch (CN1AccessException ex) {
             unsupported = ex;
@@ -1511,12 +1479,6 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         if ("java.lang".equals(packageName)) {
             return GeneratedAccess_java_lang.getStaticField(type, name);
-        }
-        if ("java.lang.annotation".equals(packageName)) {
-            return GeneratedAccess_java_lang_annotation.getStaticField(type, name);
-        }
-        if ("java.lang.invoke".equals(packageName)) {
-            return GeneratedAccess_java_lang_invoke.getStaticField(type, name);
         }
         if ("java.lang.ref".equals(packageName)) {
             return GeneratedAccess_java_lang_ref.getStaticField(type, name);
@@ -1891,16 +1853,6 @@ public final class GeneratedCN1Access implements CN1Access {
             unsupported = ex;
         }
         try {
-            return GeneratedAccess_java_lang_annotation.getField(target, name);
-        } catch (CN1AccessException ex) {
-            unsupported = ex;
-        }
-        try {
-            return GeneratedAccess_java_lang_invoke.getField(target, name);
-        } catch (CN1AccessException ex) {
-            unsupported = ex;
-        }
-        try {
             return GeneratedAccess_java_lang_ref.getField(target, name);
         } catch (CN1AccessException ex) {
             unsupported = ex;
@@ -2218,14 +2170,6 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         if ("java.lang".equals(packageName)) {
             GeneratedAccess_java_lang.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.lang.annotation".equals(packageName)) {
-            GeneratedAccess_java_lang_annotation.setStaticField(type, name, value);
-            return;
-        }
-        if ("java.lang.invoke".equals(packageName)) {
-            GeneratedAccess_java_lang_invoke.setStaticField(type, name, value);
             return;
         }
         if ("java.lang.ref".equals(packageName)) {
@@ -2672,18 +2616,6 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         try {
             GeneratedAccess_java_lang.setField(target, name, value);
-            return;
-        } catch (CN1AccessException ex) {
-            unsupported = ex;
-        }
-        try {
-            GeneratedAccess_java_lang_annotation.setField(target, name, value);
-            return;
-        } catch (CN1AccessException ex) {
-            unsupported = ex;
-        }
-        try {
-            GeneratedAccess_java_lang_invoke.setField(target, name, value);
             return;
         } catch (CN1AccessException ex) {
             unsupported = ex;

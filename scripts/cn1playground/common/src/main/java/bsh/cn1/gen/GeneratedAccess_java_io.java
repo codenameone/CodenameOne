@@ -782,11 +782,6 @@ public final class GeneratedAccess_java_io {
             }
         }
         if ("print".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.print(((Boolean) safeArgs[0]).booleanValue()); return null;
-            }
-        }
-        if ("print".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Character.class}, false)) {
                 typedTarget.print(((Character) safeArgs[0]).charValue()); return null;
             }
@@ -794,11 +789,6 @@ public final class GeneratedAccess_java_io {
         if ("print".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
                 typedTarget.print(((Number) safeArgs[0]).doubleValue()); return null;
-            }
-        }
-        if ("print".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.print(((Number) safeArgs[0]).floatValue()); return null;
             }
         }
         if ("print".equals(name)) {
