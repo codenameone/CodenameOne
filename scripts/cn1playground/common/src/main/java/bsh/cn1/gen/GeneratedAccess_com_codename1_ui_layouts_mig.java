@@ -7,23 +7,108 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.layouts.mig.AC".equals(name)) return com.codename1.ui.layouts.mig.AC.class;
-        if ("com.codename1.ui.layouts.mig.BoundSize".equals(name)) return com.codename1.ui.layouts.mig.BoundSize.class;
-        if ("com.codename1.ui.layouts.mig.CC".equals(name)) return com.codename1.ui.layouts.mig.CC.class;
-        if ("com.codename1.ui.layouts.mig.ComponentWrapper".equals(name)) return com.codename1.ui.layouts.mig.ComponentWrapper.class;
-        if ("com.codename1.ui.layouts.mig.ConstraintParser".equals(name)) return com.codename1.ui.layouts.mig.ConstraintParser.class;
-        if ("com.codename1.ui.layouts.mig.ContainerWrapper".equals(name)) return com.codename1.ui.layouts.mig.ContainerWrapper.class;
-        if ("com.codename1.ui.layouts.mig.DimConstraint".equals(name)) return com.codename1.ui.layouts.mig.DimConstraint.class;
-        if ("com.codename1.ui.layouts.mig.Grid".equals(name)) return com.codename1.ui.layouts.mig.Grid.class;
-        if ("com.codename1.ui.layouts.mig.InCellGapProvider".equals(name)) return com.codename1.ui.layouts.mig.InCellGapProvider.class;
-        if ("com.codename1.ui.layouts.mig.LC".equals(name)) return com.codename1.ui.layouts.mig.LC.class;
-        if ("com.codename1.ui.layouts.mig.LayoutCallback".equals(name)) return com.codename1.ui.layouts.mig.LayoutCallback.class;
-        if ("com.codename1.ui.layouts.mig.LayoutUtil".equals(name)) return com.codename1.ui.layouts.mig.LayoutUtil.class;
-        if ("com.codename1.ui.layouts.mig.LinkHandler".equals(name)) return com.codename1.ui.layouts.mig.LinkHandler.class;
-        if ("com.codename1.ui.layouts.mig.MigLayout".equals(name)) return com.codename1.ui.layouts.mig.MigLayout.class;
-        if ("com.codename1.ui.layouts.mig.PlatformDefaults".equals(name)) return com.codename1.ui.layouts.mig.PlatformDefaults.class;
-        if ("com.codename1.ui.layouts.mig.UnitConverter".equals(name)) return com.codename1.ui.layouts.mig.UnitConverter.class;
-        if ("com.codename1.ui.layouts.mig.UnitValue".equals(name)) return com.codename1.ui.layouts.mig.UnitValue.class;
+        if ("com.codename1.ui.layouts.mig.AC".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.AC");
+            }
+            return com.codename1.ui.layouts.mig.AC.class;
+        }
+        if ("com.codename1.ui.layouts.mig.BoundSize".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.BoundSize");
+            }
+            return com.codename1.ui.layouts.mig.BoundSize.class;
+        }
+        if ("com.codename1.ui.layouts.mig.CC".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.CC");
+            }
+            return com.codename1.ui.layouts.mig.CC.class;
+        }
+        if ("com.codename1.ui.layouts.mig.ComponentWrapper".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.ComponentWrapper");
+            }
+            return com.codename1.ui.layouts.mig.ComponentWrapper.class;
+        }
+        if ("com.codename1.ui.layouts.mig.ConstraintParser".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.ConstraintParser");
+            }
+            return com.codename1.ui.layouts.mig.ConstraintParser.class;
+        }
+        if ("com.codename1.ui.layouts.mig.ContainerWrapper".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.ContainerWrapper");
+            }
+            return com.codename1.ui.layouts.mig.ContainerWrapper.class;
+        }
+        if ("com.codename1.ui.layouts.mig.DimConstraint".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.DimConstraint");
+            }
+            return com.codename1.ui.layouts.mig.DimConstraint.class;
+        }
+        if ("com.codename1.ui.layouts.mig.Grid".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.Grid");
+            }
+            return com.codename1.ui.layouts.mig.Grid.class;
+        }
+        if ("com.codename1.ui.layouts.mig.InCellGapProvider".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.InCellGapProvider");
+            }
+            return com.codename1.ui.layouts.mig.InCellGapProvider.class;
+        }
+        if ("com.codename1.ui.layouts.mig.LC".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.LC");
+            }
+            return com.codename1.ui.layouts.mig.LC.class;
+        }
+        if ("com.codename1.ui.layouts.mig.LayoutCallback".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.LayoutCallback");
+            }
+            return com.codename1.ui.layouts.mig.LayoutCallback.class;
+        }
+        if ("com.codename1.ui.layouts.mig.LayoutUtil".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.LayoutUtil");
+            }
+            return com.codename1.ui.layouts.mig.LayoutUtil.class;
+        }
+        if ("com.codename1.ui.layouts.mig.LinkHandler".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.LinkHandler");
+            }
+            return com.codename1.ui.layouts.mig.LinkHandler.class;
+        }
+        if ("com.codename1.ui.layouts.mig.MigLayout".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.MigLayout");
+            }
+            return com.codename1.ui.layouts.mig.MigLayout.class;
+        }
+        if ("com.codename1.ui.layouts.mig.PlatformDefaults".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.PlatformDefaults");
+            }
+            return com.codename1.ui.layouts.mig.PlatformDefaults.class;
+        }
+        if ("com.codename1.ui.layouts.mig.UnitConverter".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.UnitConverter");
+            }
+            return com.codename1.ui.layouts.mig.UnitConverter.class;
+        }
+        if ("com.codename1.ui.layouts.mig.UnitValue".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.layouts.mig -> com.codename1.ui.layouts.mig.UnitValue");
+            }
+            return com.codename1.ui.layouts.mig.UnitValue.class;
+        }
         return null;
     }
 

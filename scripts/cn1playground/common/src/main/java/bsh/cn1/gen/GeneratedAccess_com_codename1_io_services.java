@@ -7,11 +7,36 @@ public final class GeneratedAccess_com_codename1_io_services {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.io.services.CachedData".equals(name)) return com.codename1.io.services.CachedData.class;
-        if ("com.codename1.io.services.CachedDataService".equals(name)) return com.codename1.io.services.CachedDataService.class;
-        if ("com.codename1.io.services.ImageDownloadService".equals(name)) return com.codename1.io.services.ImageDownloadService.class;
-        if ("com.codename1.io.services.RSSService".equals(name)) return com.codename1.io.services.RSSService.class;
-        if ("com.codename1.io.services.TwitterRESTService".equals(name)) return com.codename1.io.services.TwitterRESTService.class;
+        if ("com.codename1.io.services.CachedData".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.services -> com.codename1.io.services.CachedData");
+            }
+            return com.codename1.io.services.CachedData.class;
+        }
+        if ("com.codename1.io.services.CachedDataService".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.services -> com.codename1.io.services.CachedDataService");
+            }
+            return com.codename1.io.services.CachedDataService.class;
+        }
+        if ("com.codename1.io.services.ImageDownloadService".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.services -> com.codename1.io.services.ImageDownloadService");
+            }
+            return com.codename1.io.services.ImageDownloadService.class;
+        }
+        if ("com.codename1.io.services.RSSService".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.services -> com.codename1.io.services.RSSService");
+            }
+            return com.codename1.io.services.RSSService.class;
+        }
+        if ("com.codename1.io.services.TwitterRESTService".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.services -> com.codename1.io.services.TwitterRESTService");
+            }
+            return com.codename1.io.services.TwitterRESTService.class;
+        }
         return null;
     }
 

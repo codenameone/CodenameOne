@@ -7,12 +7,42 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.charts.renderers.BasicStroke".equals(name)) return com.codename1.charts.renderers.BasicStroke.class;
-        if ("com.codename1.charts.renderers.DefaultRenderer".equals(name)) return com.codename1.charts.renderers.DefaultRenderer.class;
-        if ("com.codename1.charts.renderers.DialRenderer".equals(name)) return com.codename1.charts.renderers.DialRenderer.class;
-        if ("com.codename1.charts.renderers.SimpleSeriesRenderer".equals(name)) return com.codename1.charts.renderers.SimpleSeriesRenderer.class;
-        if ("com.codename1.charts.renderers.XYMultipleSeriesRenderer".equals(name)) return com.codename1.charts.renderers.XYMultipleSeriesRenderer.class;
-        if ("com.codename1.charts.renderers.XYSeriesRenderer".equals(name)) return com.codename1.charts.renderers.XYSeriesRenderer.class;
+        if ("com.codename1.charts.renderers.BasicStroke".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.BasicStroke");
+            }
+            return com.codename1.charts.renderers.BasicStroke.class;
+        }
+        if ("com.codename1.charts.renderers.DefaultRenderer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.DefaultRenderer");
+            }
+            return com.codename1.charts.renderers.DefaultRenderer.class;
+        }
+        if ("com.codename1.charts.renderers.DialRenderer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.DialRenderer");
+            }
+            return com.codename1.charts.renderers.DialRenderer.class;
+        }
+        if ("com.codename1.charts.renderers.SimpleSeriesRenderer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.SimpleSeriesRenderer");
+            }
+            return com.codename1.charts.renderers.SimpleSeriesRenderer.class;
+        }
+        if ("com.codename1.charts.renderers.XYMultipleSeriesRenderer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.XYMultipleSeriesRenderer");
+            }
+            return com.codename1.charts.renderers.XYMultipleSeriesRenderer.class;
+        }
+        if ("com.codename1.charts.renderers.XYSeriesRenderer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.XYSeriesRenderer");
+            }
+            return com.codename1.charts.renderers.XYSeriesRenderer.class;
+        }
         return null;
     }
 

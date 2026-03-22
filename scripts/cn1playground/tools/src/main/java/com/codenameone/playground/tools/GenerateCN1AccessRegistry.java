@@ -941,13 +941,23 @@ public final class GenerateCN1AccessRegistry {
     private static void writeRootFindClass(Writer writer, List<GeneratedPackage> packages) throws IOException {
         writer.write("    @Override\n");
         writer.write("    public Class<?> findClass(String name) {\n");
+        writer.write("        if (shouldDebugFindClass(name)) {\n");
+        writer.write("            com.codenameone.playground.PlaygroundContext.debug(\"GeneratedCN1Access.findClass(\" + name + \")\");\n");
+        writer.write("        }\n");
         writer.write("        Class<?> found;\n");
         for (GeneratedPackage generatedPackage : packages) {
             writer.write("        found = " + generatedPackage.helperClassName + ".findClass(name);\n");
+            writer.write("        if (shouldDebugFindClass(name) && found != null) {\n");
+            writer.write("            com.codenameone.playground.PlaygroundContext.debug(\"GeneratedCN1Access.findClass hit "
+                    + generatedPackage.packageName + " -> \" + found);\n");
+            writer.write("        }\n");
             writer.write("        if (found != null) {\n");
             writer.write("            return found;\n");
             writer.write("        }\n");
         }
+        writer.write("        if (shouldDebugFindClass(name)) {\n");
+        writer.write("            com.codenameone.playground.PlaygroundContext.debug(\"GeneratedCN1Access.findClass miss \" + name);\n");
+        writer.write("        }\n");
         writer.write("        return null;\n");
         writer.write("    }\n\n");
     }
@@ -1101,13 +1111,22 @@ public final class GenerateCN1AccessRegistry {
         writer.write("    private static CN1AccessException unsupportedFieldWrite(Object target, String name, Object value) {\n");
         writer.write("        return new CN1AccessException(\"Generated field write not implemented for \" + target.getClass().getName() + \".\" + name + \" value=\" + describeValue(value));\n");
         writer.write("    }\n\n");
+        writer.write("    private static boolean shouldDebugFindClass(String name) {\n");
+        writer.write("        return name != null && (name.startsWith(\"com.codename1.ui.\") || name.startsWith(\"com.codename1.components.\"));\n");
+        writer.write("    }\n\n");
         writeDescribeHelpers(writer);
     }
 
     private static void writeFindClass(Writer writer, List<ApiClass> classes) throws IOException {
         writer.write("    public static Class<?> findClass(String name) {\n");
         for (ApiClass apiClass : classes) {
-            writer.write("        if (\"" + apiClass.qualifiedName + "\".equals(name)) return " + typeLiteral(apiClass.qualifiedName) + ";\n");
+            writer.write("        if (\"" + apiClass.qualifiedName + "\".equals(name)) {\n");
+            writer.write("            if (name.startsWith(\"com.codename1.ui.\") || name.startsWith(\"com.codename1.components.\")) {\n");
+            writer.write("                com.codenameone.playground.PlaygroundContext.debug(\""
+                    + ROOT_CLASS_NAME + " helper hit " + apiClass.packageName + " -> " + apiClass.qualifiedName + "\");\n");
+            writer.write("            }\n");
+            writer.write("            return " + typeLiteral(apiClass.qualifiedName) + ";\n");
+            writer.write("        }\n");
         }
         writer.write("        return null;\n");
         writer.write("    }\n\n");

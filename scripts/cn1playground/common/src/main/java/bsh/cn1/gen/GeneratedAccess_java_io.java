@@ -7,28 +7,138 @@ public final class GeneratedAccess_java_io {
     }
 
     public static Class<?> findClass(String name) {
-        if ("java.io.ByteArrayInputStream".equals(name)) return java.io.ByteArrayInputStream.class;
-        if ("java.io.ByteArrayOutputStream".equals(name)) return java.io.ByteArrayOutputStream.class;
-        if ("java.io.DataInput".equals(name)) return java.io.DataInput.class;
-        if ("java.io.DataInputStream".equals(name)) return java.io.DataInputStream.class;
-        if ("java.io.DataOutput".equals(name)) return java.io.DataOutput.class;
-        if ("java.io.DataOutputStream".equals(name)) return java.io.DataOutputStream.class;
-        if ("java.io.EOFException".equals(name)) return java.io.EOFException.class;
-        if ("java.io.Flushable".equals(name)) return java.io.Flushable.class;
-        if ("java.io.IOException".equals(name)) return java.io.IOException.class;
-        if ("java.io.InputStream".equals(name)) return java.io.InputStream.class;
-        if ("java.io.InputStreamReader".equals(name)) return java.io.InputStreamReader.class;
-        if ("java.io.InterruptedIOException".equals(name)) return java.io.InterruptedIOException.class;
-        if ("java.io.OutputStream".equals(name)) return java.io.OutputStream.class;
-        if ("java.io.OutputStreamWriter".equals(name)) return java.io.OutputStreamWriter.class;
-        if ("java.io.PrintStream".equals(name)) return java.io.PrintStream.class;
-        if ("java.io.Reader".equals(name)) return java.io.Reader.class;
-        if ("java.io.Serializable".equals(name)) return java.io.Serializable.class;
-        if ("java.io.StringReader".equals(name)) return java.io.StringReader.class;
-        if ("java.io.StringWriter".equals(name)) return java.io.StringWriter.class;
-        if ("java.io.UTFDataFormatException".equals(name)) return java.io.UTFDataFormatException.class;
-        if ("java.io.UnsupportedEncodingException".equals(name)) return java.io.UnsupportedEncodingException.class;
-        if ("java.io.Writer".equals(name)) return java.io.Writer.class;
+        if ("java.io.ByteArrayInputStream".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.ByteArrayInputStream");
+            }
+            return java.io.ByteArrayInputStream.class;
+        }
+        if ("java.io.ByteArrayOutputStream".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.ByteArrayOutputStream");
+            }
+            return java.io.ByteArrayOutputStream.class;
+        }
+        if ("java.io.DataInput".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.DataInput");
+            }
+            return java.io.DataInput.class;
+        }
+        if ("java.io.DataInputStream".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.DataInputStream");
+            }
+            return java.io.DataInputStream.class;
+        }
+        if ("java.io.DataOutput".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.DataOutput");
+            }
+            return java.io.DataOutput.class;
+        }
+        if ("java.io.DataOutputStream".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.DataOutputStream");
+            }
+            return java.io.DataOutputStream.class;
+        }
+        if ("java.io.EOFException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.EOFException");
+            }
+            return java.io.EOFException.class;
+        }
+        if ("java.io.Flushable".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.Flushable");
+            }
+            return java.io.Flushable.class;
+        }
+        if ("java.io.IOException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.IOException");
+            }
+            return java.io.IOException.class;
+        }
+        if ("java.io.InputStream".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.InputStream");
+            }
+            return java.io.InputStream.class;
+        }
+        if ("java.io.InputStreamReader".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.InputStreamReader");
+            }
+            return java.io.InputStreamReader.class;
+        }
+        if ("java.io.InterruptedIOException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.InterruptedIOException");
+            }
+            return java.io.InterruptedIOException.class;
+        }
+        if ("java.io.OutputStream".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.OutputStream");
+            }
+            return java.io.OutputStream.class;
+        }
+        if ("java.io.OutputStreamWriter".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.OutputStreamWriter");
+            }
+            return java.io.OutputStreamWriter.class;
+        }
+        if ("java.io.PrintStream".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.PrintStream");
+            }
+            return java.io.PrintStream.class;
+        }
+        if ("java.io.Reader".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.Reader");
+            }
+            return java.io.Reader.class;
+        }
+        if ("java.io.Serializable".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.Serializable");
+            }
+            return java.io.Serializable.class;
+        }
+        if ("java.io.StringReader".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.StringReader");
+            }
+            return java.io.StringReader.class;
+        }
+        if ("java.io.StringWriter".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.StringWriter");
+            }
+            return java.io.StringWriter.class;
+        }
+        if ("java.io.UTFDataFormatException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.UTFDataFormatException");
+            }
+            return java.io.UTFDataFormatException.class;
+        }
+        if ("java.io.UnsupportedEncodingException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.UnsupportedEncodingException");
+            }
+            return java.io.UnsupportedEncodingException.class;
+        }
+        if ("java.io.Writer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.io -> java.io.Writer");
+            }
+            return java.io.Writer.class;
+        }
         return null;
     }
 

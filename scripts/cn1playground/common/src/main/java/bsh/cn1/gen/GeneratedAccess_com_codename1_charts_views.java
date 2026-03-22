@@ -7,26 +7,126 @@ public final class GeneratedAccess_com_codename1_charts_views {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.charts.views.AbstractChart".equals(name)) return com.codename1.charts.views.AbstractChart.class;
-        if ("com.codename1.charts.views.BarChart".equals(name)) return com.codename1.charts.views.BarChart.class;
-        if ("com.codename1.charts.views.BubbleChart".equals(name)) return com.codename1.charts.views.BubbleChart.class;
-        if ("com.codename1.charts.views.ClickableArea".equals(name)) return com.codename1.charts.views.ClickableArea.class;
-        if ("com.codename1.charts.views.CombinedXYChart".equals(name)) return com.codename1.charts.views.CombinedXYChart.class;
-        if ("com.codename1.charts.views.CubicLineChart".equals(name)) return com.codename1.charts.views.CubicLineChart.class;
-        if ("com.codename1.charts.views.DialChart".equals(name)) return com.codename1.charts.views.DialChart.class;
-        if ("com.codename1.charts.views.DoughnutChart".equals(name)) return com.codename1.charts.views.DoughnutChart.class;
-        if ("com.codename1.charts.views.LineChart".equals(name)) return com.codename1.charts.views.LineChart.class;
-        if ("com.codename1.charts.views.PieChart".equals(name)) return com.codename1.charts.views.PieChart.class;
-        if ("com.codename1.charts.views.PieMapper".equals(name)) return com.codename1.charts.views.PieMapper.class;
-        if ("com.codename1.charts.views.PieSegment".equals(name)) return com.codename1.charts.views.PieSegment.class;
-        if ("com.codename1.charts.views.PointStyle".equals(name)) return com.codename1.charts.views.PointStyle.class;
-        if ("com.codename1.charts.views.RadarChart".equals(name)) return com.codename1.charts.views.RadarChart.class;
-        if ("com.codename1.charts.views.RangeBarChart".equals(name)) return com.codename1.charts.views.RangeBarChart.class;
-        if ("com.codename1.charts.views.RangeStackedBarChart".equals(name)) return com.codename1.charts.views.RangeStackedBarChart.class;
-        if ("com.codename1.charts.views.RoundChart".equals(name)) return com.codename1.charts.views.RoundChart.class;
-        if ("com.codename1.charts.views.ScatterChart".equals(name)) return com.codename1.charts.views.ScatterChart.class;
-        if ("com.codename1.charts.views.TimeChart".equals(name)) return com.codename1.charts.views.TimeChart.class;
-        if ("com.codename1.charts.views.XYChart".equals(name)) return com.codename1.charts.views.XYChart.class;
+        if ("com.codename1.charts.views.AbstractChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.AbstractChart");
+            }
+            return com.codename1.charts.views.AbstractChart.class;
+        }
+        if ("com.codename1.charts.views.BarChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.BarChart");
+            }
+            return com.codename1.charts.views.BarChart.class;
+        }
+        if ("com.codename1.charts.views.BubbleChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.BubbleChart");
+            }
+            return com.codename1.charts.views.BubbleChart.class;
+        }
+        if ("com.codename1.charts.views.ClickableArea".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.ClickableArea");
+            }
+            return com.codename1.charts.views.ClickableArea.class;
+        }
+        if ("com.codename1.charts.views.CombinedXYChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.CombinedXYChart");
+            }
+            return com.codename1.charts.views.CombinedXYChart.class;
+        }
+        if ("com.codename1.charts.views.CubicLineChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.CubicLineChart");
+            }
+            return com.codename1.charts.views.CubicLineChart.class;
+        }
+        if ("com.codename1.charts.views.DialChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.DialChart");
+            }
+            return com.codename1.charts.views.DialChart.class;
+        }
+        if ("com.codename1.charts.views.DoughnutChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.DoughnutChart");
+            }
+            return com.codename1.charts.views.DoughnutChart.class;
+        }
+        if ("com.codename1.charts.views.LineChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.LineChart");
+            }
+            return com.codename1.charts.views.LineChart.class;
+        }
+        if ("com.codename1.charts.views.PieChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.PieChart");
+            }
+            return com.codename1.charts.views.PieChart.class;
+        }
+        if ("com.codename1.charts.views.PieMapper".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.PieMapper");
+            }
+            return com.codename1.charts.views.PieMapper.class;
+        }
+        if ("com.codename1.charts.views.PieSegment".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.PieSegment");
+            }
+            return com.codename1.charts.views.PieSegment.class;
+        }
+        if ("com.codename1.charts.views.PointStyle".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.PointStyle");
+            }
+            return com.codename1.charts.views.PointStyle.class;
+        }
+        if ("com.codename1.charts.views.RadarChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.RadarChart");
+            }
+            return com.codename1.charts.views.RadarChart.class;
+        }
+        if ("com.codename1.charts.views.RangeBarChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.RangeBarChart");
+            }
+            return com.codename1.charts.views.RangeBarChart.class;
+        }
+        if ("com.codename1.charts.views.RangeStackedBarChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.RangeStackedBarChart");
+            }
+            return com.codename1.charts.views.RangeStackedBarChart.class;
+        }
+        if ("com.codename1.charts.views.RoundChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.RoundChart");
+            }
+            return com.codename1.charts.views.RoundChart.class;
+        }
+        if ("com.codename1.charts.views.ScatterChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.ScatterChart");
+            }
+            return com.codename1.charts.views.ScatterChart.class;
+        }
+        if ("com.codename1.charts.views.TimeChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.TimeChart");
+            }
+            return com.codename1.charts.views.TimeChart.class;
+        }
+        if ("com.codename1.charts.views.XYChart".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.views -> com.codename1.charts.views.XYChart");
+            }
+            return com.codename1.charts.views.XYChart.class;
+        }
         return null;
     }
 

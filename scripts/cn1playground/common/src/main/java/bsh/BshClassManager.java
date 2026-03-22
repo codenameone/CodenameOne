@@ -1,6 +1,7 @@
 package bsh;
 
 import bsh.cn1.CN1AccessRegistry;
+import com.codenameone.playground.PlaygroundContext;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.util.Collections;
@@ -47,14 +48,18 @@ public class BshClassManager {
     }
 
     public Class<?> classForName(String name) {
+        PlaygroundContext.debug("BshClassManager.classForName(" + name + ")");
         if (absoluteClassCache.containsKey(name)) {
+            PlaygroundContext.debug("BshClassManager cache hit " + name + " -> " + absoluteClassCache.get(name));
             return absoluteClassCache.get(name);
         }
         Class<?> found = CN1AccessRegistry.getInstance().findClass(name);
+        PlaygroundContext.debug("BshClassManager registry result " + name + " -> " + found);
         if (found == null) {
             try {
                 found = plainClassForName(name);
             } catch (ClassNotFoundException ex) {
+                PlaygroundContext.debug("BshClassManager plainClassForName miss " + name);
                 found = null;
             }
         }

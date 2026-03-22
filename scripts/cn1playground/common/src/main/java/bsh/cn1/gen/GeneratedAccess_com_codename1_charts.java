@@ -7,8 +7,18 @@ public final class GeneratedAccess_com_codename1_charts {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.charts.ChartComponent".equals(name)) return com.codename1.charts.ChartComponent.class;
-        if ("com.codename1.charts.ChartUtil".equals(name)) return com.codename1.charts.ChartUtil.class;
+        if ("com.codename1.charts.ChartComponent".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts -> com.codename1.charts.ChartComponent");
+            }
+            return com.codename1.charts.ChartComponent.class;
+        }
+        if ("com.codename1.charts.ChartUtil".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts -> com.codename1.charts.ChartUtil");
+            }
+            return com.codename1.charts.ChartUtil.class;
+        }
         return null;
     }
 

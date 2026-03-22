@@ -7,7 +7,12 @@ public final class GeneratedAccess_java_util_concurrent {
     }
 
     public static Class<?> findClass(String name) {
-        if ("java.util.concurrent.ThreadLocalRandom".equals(name)) return java.util.concurrent.ThreadLocalRandom.class;
+        if ("java.util.concurrent.ThreadLocalRandom".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util.concurrent -> java.util.concurrent.ThreadLocalRandom");
+            }
+            return java.util.concurrent.ThreadLocalRandom.class;
+        }
         return null;
     }
 

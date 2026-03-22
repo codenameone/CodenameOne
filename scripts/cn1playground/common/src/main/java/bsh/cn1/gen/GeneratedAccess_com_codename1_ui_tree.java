@@ -7,8 +7,18 @@ public final class GeneratedAccess_com_codename1_ui_tree {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.tree.Tree".equals(name)) return com.codename1.ui.tree.Tree.class;
-        if ("com.codename1.ui.tree.TreeModel".equals(name)) return com.codename1.ui.tree.TreeModel.class;
+        if ("com.codename1.ui.tree.Tree".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.tree -> com.codename1.ui.tree.Tree");
+            }
+            return com.codename1.ui.tree.Tree.class;
+        }
+        if ("com.codename1.ui.tree.TreeModel".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.tree -> com.codename1.ui.tree.TreeModel");
+            }
+            return com.codename1.ui.tree.TreeModel.class;
+        }
         return null;
     }
 

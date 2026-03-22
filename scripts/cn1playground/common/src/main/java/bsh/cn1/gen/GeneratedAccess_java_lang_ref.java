@@ -7,8 +7,18 @@ public final class GeneratedAccess_java_lang_ref {
     }
 
     public static Class<?> findClass(String name) {
-        if ("java.lang.ref.Reference".equals(name)) return java.lang.ref.Reference.class;
-        if ("java.lang.ref.WeakReference".equals(name)) return java.lang.ref.WeakReference.class;
+        if ("java.lang.ref.Reference".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.ref -> java.lang.ref.Reference");
+            }
+            return java.lang.ref.Reference.class;
+        }
+        if ("java.lang.ref.WeakReference".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.ref -> java.lang.ref.WeakReference");
+            }
+            return java.lang.ref.WeakReference.class;
+        }
         return null;
     }
 

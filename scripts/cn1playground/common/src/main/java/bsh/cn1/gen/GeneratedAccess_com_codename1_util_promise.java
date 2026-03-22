@@ -7,9 +7,24 @@ public final class GeneratedAccess_com_codename1_util_promise {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.util.promise.ExecutorFunction".equals(name)) return com.codename1.util.promise.ExecutorFunction.class;
-        if ("com.codename1.util.promise.Functor".equals(name)) return com.codename1.util.promise.Functor.class;
-        if ("com.codename1.util.promise.Promise".equals(name)) return com.codename1.util.promise.Promise.class;
+        if ("com.codename1.util.promise.ExecutorFunction".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.promise -> com.codename1.util.promise.ExecutorFunction");
+            }
+            return com.codename1.util.promise.ExecutorFunction.class;
+        }
+        if ("com.codename1.util.promise.Functor".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.promise -> com.codename1.util.promise.Functor");
+            }
+            return com.codename1.util.promise.Functor.class;
+        }
+        if ("com.codename1.util.promise.Promise".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.promise -> com.codename1.util.promise.Promise");
+            }
+            return com.codename1.util.promise.Promise.class;
+        }
         return null;
     }
 

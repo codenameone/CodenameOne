@@ -7,13 +7,48 @@ public final class GeneratedAccess_com_codename1_push {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.push.Push".equals(name)) return com.codename1.push.Push.class;
-        if ("com.codename1.push.PushAction".equals(name)) return com.codename1.push.PushAction.class;
-        if ("com.codename1.push.PushActionCategory".equals(name)) return com.codename1.push.PushActionCategory.class;
-        if ("com.codename1.push.PushActionsProvider".equals(name)) return com.codename1.push.PushActionsProvider.class;
-        if ("com.codename1.push.PushBuilder".equals(name)) return com.codename1.push.PushBuilder.class;
-        if ("com.codename1.push.PushCallback".equals(name)) return com.codename1.push.PushCallback.class;
-        if ("com.codename1.push.PushContent".equals(name)) return com.codename1.push.PushContent.class;
+        if ("com.codename1.push.Push".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.Push");
+            }
+            return com.codename1.push.Push.class;
+        }
+        if ("com.codename1.push.PushAction".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushAction");
+            }
+            return com.codename1.push.PushAction.class;
+        }
+        if ("com.codename1.push.PushActionCategory".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushActionCategory");
+            }
+            return com.codename1.push.PushActionCategory.class;
+        }
+        if ("com.codename1.push.PushActionsProvider".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushActionsProvider");
+            }
+            return com.codename1.push.PushActionsProvider.class;
+        }
+        if ("com.codename1.push.PushBuilder".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushBuilder");
+            }
+            return com.codename1.push.PushBuilder.class;
+        }
+        if ("com.codename1.push.PushCallback".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushCallback");
+            }
+            return com.codename1.push.PushCallback.class;
+        }
+        if ("com.codename1.push.PushContent".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushContent");
+            }
+            return com.codename1.push.PushContent.class;
+        }
         return null;
     }
 

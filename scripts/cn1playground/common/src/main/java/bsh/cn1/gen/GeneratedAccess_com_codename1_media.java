@@ -7,15 +7,60 @@ public final class GeneratedAccess_com_codename1_media {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.media.AbstractMedia".equals(name)) return com.codename1.media.AbstractMedia.class;
-        if ("com.codename1.media.AsyncMedia".equals(name)) return com.codename1.media.AsyncMedia.class;
-        if ("com.codename1.media.AudioBuffer".equals(name)) return com.codename1.media.AudioBuffer.class;
-        if ("com.codename1.media.Media".equals(name)) return com.codename1.media.Media.class;
-        if ("com.codename1.media.MediaManager".equals(name)) return com.codename1.media.MediaManager.class;
-        if ("com.codename1.media.MediaMetaData".equals(name)) return com.codename1.media.MediaMetaData.class;
-        if ("com.codename1.media.MediaRecorderBuilder".equals(name)) return com.codename1.media.MediaRecorderBuilder.class;
-        if ("com.codename1.media.RemoteControlListener".equals(name)) return com.codename1.media.RemoteControlListener.class;
-        if ("com.codename1.media.WAVWriter".equals(name)) return com.codename1.media.WAVWriter.class;
+        if ("com.codename1.media.AbstractMedia".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.AbstractMedia");
+            }
+            return com.codename1.media.AbstractMedia.class;
+        }
+        if ("com.codename1.media.AsyncMedia".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.AsyncMedia");
+            }
+            return com.codename1.media.AsyncMedia.class;
+        }
+        if ("com.codename1.media.AudioBuffer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.AudioBuffer");
+            }
+            return com.codename1.media.AudioBuffer.class;
+        }
+        if ("com.codename1.media.Media".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.Media");
+            }
+            return com.codename1.media.Media.class;
+        }
+        if ("com.codename1.media.MediaManager".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.MediaManager");
+            }
+            return com.codename1.media.MediaManager.class;
+        }
+        if ("com.codename1.media.MediaMetaData".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.MediaMetaData");
+            }
+            return com.codename1.media.MediaMetaData.class;
+        }
+        if ("com.codename1.media.MediaRecorderBuilder".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.MediaRecorderBuilder");
+            }
+            return com.codename1.media.MediaRecorderBuilder.class;
+        }
+        if ("com.codename1.media.RemoteControlListener".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.RemoteControlListener");
+            }
+            return com.codename1.media.RemoteControlListener.class;
+        }
+        if ("com.codename1.media.WAVWriter".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.WAVWriter");
+            }
+            return com.codename1.media.WAVWriter.class;
+        }
         return null;
     }
 

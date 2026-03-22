@@ -7,7 +7,12 @@ public final class GeneratedAccess_com_codename1_compat_java_util {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.compat.java.util.Objects".equals(name)) return com.codename1.compat.java.util.Objects.class;
+        if ("com.codename1.compat.java.util.Objects".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.compat.java.util -> com.codename1.compat.java.util.Objects");
+            }
+            return com.codename1.compat.java.util.Objects.class;
+        }
         return null;
     }
 

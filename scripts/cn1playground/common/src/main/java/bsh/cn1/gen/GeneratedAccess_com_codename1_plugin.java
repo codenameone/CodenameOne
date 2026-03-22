@@ -7,8 +7,18 @@ public final class GeneratedAccess_com_codename1_plugin {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.plugin.Plugin".equals(name)) return com.codename1.plugin.Plugin.class;
-        if ("com.codename1.plugin.PluginSupport".equals(name)) return com.codename1.plugin.PluginSupport.class;
+        if ("com.codename1.plugin.Plugin".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.plugin -> com.codename1.plugin.Plugin");
+            }
+            return com.codename1.plugin.Plugin.class;
+        }
+        if ("com.codename1.plugin.PluginSupport".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.plugin -> com.codename1.plugin.PluginSupport");
+            }
+            return com.codename1.plugin.PluginSupport.class;
+        }
         return null;
     }
 

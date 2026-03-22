@@ -7,69 +7,384 @@ public final class GeneratedAccess_java_lang {
     }
 
     public static Class<?> findClass(String name) {
-        if ("java.lang.Appendable".equals(name)) return java.lang.Appendable.class;
-        if ("java.lang.ArithmeticException".equals(name)) return java.lang.ArithmeticException.class;
-        if ("java.lang.ArrayIndexOutOfBoundsException".equals(name)) return java.lang.ArrayIndexOutOfBoundsException.class;
-        if ("java.lang.ArrayStoreException".equals(name)) return java.lang.ArrayStoreException.class;
-        if ("java.lang.AssertionError".equals(name)) return java.lang.AssertionError.class;
-        if ("java.lang.AutoCloseable".equals(name)) return java.lang.AutoCloseable.class;
-        if ("java.lang.Boolean".equals(name)) return java.lang.Boolean.class;
-        if ("java.lang.Byte".equals(name)) return java.lang.Byte.class;
-        if ("java.lang.CharSequence".equals(name)) return java.lang.CharSequence.class;
-        if ("java.lang.Character".equals(name)) return java.lang.Character.class;
-        if ("java.lang.Class".equals(name)) return java.lang.Class.class;
-        if ("java.lang.ClassCastException".equals(name)) return java.lang.ClassCastException.class;
-        if ("java.lang.ClassLoader".equals(name)) return java.lang.ClassLoader.class;
-        if ("java.lang.ClassNotFoundException".equals(name)) return java.lang.ClassNotFoundException.class;
-        if ("java.lang.CloneNotSupportedException".equals(name)) return java.lang.CloneNotSupportedException.class;
-        if ("java.lang.Cloneable".equals(name)) return java.lang.Cloneable.class;
-        if ("java.lang.Comparable".equals(name)) return java.lang.Comparable.class;
-        if ("java.lang.Deprecated".equals(name)) return java.lang.Deprecated.class;
-        if ("java.lang.Double".equals(name)) return java.lang.Double.class;
-        if ("java.lang.Enum".equals(name)) return java.lang.Enum.class;
-        if ("java.lang.Error".equals(name)) return java.lang.Error.class;
-        if ("java.lang.Exception".equals(name)) return java.lang.Exception.class;
-        if ("java.lang.Float".equals(name)) return java.lang.Float.class;
-        if ("java.lang.IllegalAccessException".equals(name)) return java.lang.IllegalAccessException.class;
-        if ("java.lang.IllegalArgumentException".equals(name)) return java.lang.IllegalArgumentException.class;
-        if ("java.lang.IllegalMonitorStateException".equals(name)) return java.lang.IllegalMonitorStateException.class;
-        if ("java.lang.IllegalStateException".equals(name)) return java.lang.IllegalStateException.class;
-        if ("java.lang.IncompatibleClassChangeError".equals(name)) return java.lang.IncompatibleClassChangeError.class;
-        if ("java.lang.IndexOutOfBoundsException".equals(name)) return java.lang.IndexOutOfBoundsException.class;
-        if ("java.lang.InstantiationException".equals(name)) return java.lang.InstantiationException.class;
-        if ("java.lang.Integer".equals(name)) return java.lang.Integer.class;
-        if ("java.lang.InterruptedException".equals(name)) return java.lang.InterruptedException.class;
-        if ("java.lang.Iterable".equals(name)) return java.lang.Iterable.class;
-        if ("java.lang.LinkageError".equals(name)) return java.lang.LinkageError.class;
-        if ("java.lang.Long".equals(name)) return java.lang.Long.class;
-        if ("java.lang.Math".equals(name)) return java.lang.Math.class;
-        if ("java.lang.NegativeArraySizeException".equals(name)) return java.lang.NegativeArraySizeException.class;
-        if ("java.lang.NoClassDefFoundError".equals(name)) return java.lang.NoClassDefFoundError.class;
-        if ("java.lang.NoSuchFieldError".equals(name)) return java.lang.NoSuchFieldError.class;
-        if ("java.lang.NullPointerException".equals(name)) return java.lang.NullPointerException.class;
-        if ("java.lang.Number".equals(name)) return java.lang.Number.class;
-        if ("java.lang.NumberFormatException".equals(name)) return java.lang.NumberFormatException.class;
-        if ("java.lang.Object".equals(name)) return java.lang.Object.class;
-        if ("java.lang.OutOfMemoryError".equals(name)) return java.lang.OutOfMemoryError.class;
-        if ("java.lang.Override".equals(name)) return java.lang.Override.class;
-        if ("java.lang.Runnable".equals(name)) return java.lang.Runnable.class;
-        if ("java.lang.Runtime".equals(name)) return java.lang.Runtime.class;
-        if ("java.lang.RuntimeException".equals(name)) return java.lang.RuntimeException.class;
-        if ("java.lang.SafeVarargs".equals(name)) return java.lang.SafeVarargs.class;
-        if ("java.lang.SecurityException".equals(name)) return java.lang.SecurityException.class;
-        if ("java.lang.Short".equals(name)) return java.lang.Short.class;
-        if ("java.lang.StackTraceElement".equals(name)) return java.lang.StackTraceElement.class;
-        if ("java.lang.String".equals(name)) return java.lang.String.class;
-        if ("java.lang.StringBuffer".equals(name)) return java.lang.StringBuffer.class;
-        if ("java.lang.StringBuilder".equals(name)) return java.lang.StringBuilder.class;
-        if ("java.lang.StringIndexOutOfBoundsException".equals(name)) return java.lang.StringIndexOutOfBoundsException.class;
-        if ("java.lang.System".equals(name)) return java.lang.System.class;
-        if ("java.lang.Thread".equals(name)) return java.lang.Thread.class;
-        if ("java.lang.ThreadLocal".equals(name)) return java.lang.ThreadLocal.class;
-        if ("java.lang.Throwable".equals(name)) return java.lang.Throwable.class;
-        if ("java.lang.UnsupportedOperationException".equals(name)) return java.lang.UnsupportedOperationException.class;
-        if ("java.lang.VirtualMachineError".equals(name)) return java.lang.VirtualMachineError.class;
-        if ("java.lang.Void".equals(name)) return java.lang.Void.class;
+        if ("java.lang.Appendable".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Appendable");
+            }
+            return java.lang.Appendable.class;
+        }
+        if ("java.lang.ArithmeticException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.ArithmeticException");
+            }
+            return java.lang.ArithmeticException.class;
+        }
+        if ("java.lang.ArrayIndexOutOfBoundsException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.ArrayIndexOutOfBoundsException");
+            }
+            return java.lang.ArrayIndexOutOfBoundsException.class;
+        }
+        if ("java.lang.ArrayStoreException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.ArrayStoreException");
+            }
+            return java.lang.ArrayStoreException.class;
+        }
+        if ("java.lang.AssertionError".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.AssertionError");
+            }
+            return java.lang.AssertionError.class;
+        }
+        if ("java.lang.AutoCloseable".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.AutoCloseable");
+            }
+            return java.lang.AutoCloseable.class;
+        }
+        if ("java.lang.Boolean".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Boolean");
+            }
+            return java.lang.Boolean.class;
+        }
+        if ("java.lang.Byte".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Byte");
+            }
+            return java.lang.Byte.class;
+        }
+        if ("java.lang.CharSequence".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.CharSequence");
+            }
+            return java.lang.CharSequence.class;
+        }
+        if ("java.lang.Character".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Character");
+            }
+            return java.lang.Character.class;
+        }
+        if ("java.lang.Class".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Class");
+            }
+            return java.lang.Class.class;
+        }
+        if ("java.lang.ClassCastException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.ClassCastException");
+            }
+            return java.lang.ClassCastException.class;
+        }
+        if ("java.lang.ClassLoader".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.ClassLoader");
+            }
+            return java.lang.ClassLoader.class;
+        }
+        if ("java.lang.ClassNotFoundException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.ClassNotFoundException");
+            }
+            return java.lang.ClassNotFoundException.class;
+        }
+        if ("java.lang.CloneNotSupportedException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.CloneNotSupportedException");
+            }
+            return java.lang.CloneNotSupportedException.class;
+        }
+        if ("java.lang.Cloneable".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Cloneable");
+            }
+            return java.lang.Cloneable.class;
+        }
+        if ("java.lang.Comparable".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Comparable");
+            }
+            return java.lang.Comparable.class;
+        }
+        if ("java.lang.Deprecated".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Deprecated");
+            }
+            return java.lang.Deprecated.class;
+        }
+        if ("java.lang.Double".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Double");
+            }
+            return java.lang.Double.class;
+        }
+        if ("java.lang.Enum".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Enum");
+            }
+            return java.lang.Enum.class;
+        }
+        if ("java.lang.Error".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Error");
+            }
+            return java.lang.Error.class;
+        }
+        if ("java.lang.Exception".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Exception");
+            }
+            return java.lang.Exception.class;
+        }
+        if ("java.lang.Float".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Float");
+            }
+            return java.lang.Float.class;
+        }
+        if ("java.lang.IllegalAccessException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.IllegalAccessException");
+            }
+            return java.lang.IllegalAccessException.class;
+        }
+        if ("java.lang.IllegalArgumentException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.IllegalArgumentException");
+            }
+            return java.lang.IllegalArgumentException.class;
+        }
+        if ("java.lang.IllegalMonitorStateException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.IllegalMonitorStateException");
+            }
+            return java.lang.IllegalMonitorStateException.class;
+        }
+        if ("java.lang.IllegalStateException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.IllegalStateException");
+            }
+            return java.lang.IllegalStateException.class;
+        }
+        if ("java.lang.IncompatibleClassChangeError".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.IncompatibleClassChangeError");
+            }
+            return java.lang.IncompatibleClassChangeError.class;
+        }
+        if ("java.lang.IndexOutOfBoundsException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.IndexOutOfBoundsException");
+            }
+            return java.lang.IndexOutOfBoundsException.class;
+        }
+        if ("java.lang.InstantiationException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.InstantiationException");
+            }
+            return java.lang.InstantiationException.class;
+        }
+        if ("java.lang.Integer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Integer");
+            }
+            return java.lang.Integer.class;
+        }
+        if ("java.lang.InterruptedException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.InterruptedException");
+            }
+            return java.lang.InterruptedException.class;
+        }
+        if ("java.lang.Iterable".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Iterable");
+            }
+            return java.lang.Iterable.class;
+        }
+        if ("java.lang.LinkageError".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.LinkageError");
+            }
+            return java.lang.LinkageError.class;
+        }
+        if ("java.lang.Long".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Long");
+            }
+            return java.lang.Long.class;
+        }
+        if ("java.lang.Math".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Math");
+            }
+            return java.lang.Math.class;
+        }
+        if ("java.lang.NegativeArraySizeException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.NegativeArraySizeException");
+            }
+            return java.lang.NegativeArraySizeException.class;
+        }
+        if ("java.lang.NoClassDefFoundError".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.NoClassDefFoundError");
+            }
+            return java.lang.NoClassDefFoundError.class;
+        }
+        if ("java.lang.NoSuchFieldError".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.NoSuchFieldError");
+            }
+            return java.lang.NoSuchFieldError.class;
+        }
+        if ("java.lang.NullPointerException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.NullPointerException");
+            }
+            return java.lang.NullPointerException.class;
+        }
+        if ("java.lang.Number".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Number");
+            }
+            return java.lang.Number.class;
+        }
+        if ("java.lang.NumberFormatException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.NumberFormatException");
+            }
+            return java.lang.NumberFormatException.class;
+        }
+        if ("java.lang.Object".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Object");
+            }
+            return java.lang.Object.class;
+        }
+        if ("java.lang.OutOfMemoryError".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.OutOfMemoryError");
+            }
+            return java.lang.OutOfMemoryError.class;
+        }
+        if ("java.lang.Override".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Override");
+            }
+            return java.lang.Override.class;
+        }
+        if ("java.lang.Runnable".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Runnable");
+            }
+            return java.lang.Runnable.class;
+        }
+        if ("java.lang.Runtime".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Runtime");
+            }
+            return java.lang.Runtime.class;
+        }
+        if ("java.lang.RuntimeException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.RuntimeException");
+            }
+            return java.lang.RuntimeException.class;
+        }
+        if ("java.lang.SafeVarargs".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.SafeVarargs");
+            }
+            return java.lang.SafeVarargs.class;
+        }
+        if ("java.lang.SecurityException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.SecurityException");
+            }
+            return java.lang.SecurityException.class;
+        }
+        if ("java.lang.Short".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Short");
+            }
+            return java.lang.Short.class;
+        }
+        if ("java.lang.StackTraceElement".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.StackTraceElement");
+            }
+            return java.lang.StackTraceElement.class;
+        }
+        if ("java.lang.String".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.String");
+            }
+            return java.lang.String.class;
+        }
+        if ("java.lang.StringBuffer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.StringBuffer");
+            }
+            return java.lang.StringBuffer.class;
+        }
+        if ("java.lang.StringBuilder".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.StringBuilder");
+            }
+            return java.lang.StringBuilder.class;
+        }
+        if ("java.lang.StringIndexOutOfBoundsException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.StringIndexOutOfBoundsException");
+            }
+            return java.lang.StringIndexOutOfBoundsException.class;
+        }
+        if ("java.lang.System".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.System");
+            }
+            return java.lang.System.class;
+        }
+        if ("java.lang.Thread".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Thread");
+            }
+            return java.lang.Thread.class;
+        }
+        if ("java.lang.ThreadLocal".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.ThreadLocal");
+            }
+            return java.lang.ThreadLocal.class;
+        }
+        if ("java.lang.Throwable".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Throwable");
+            }
+            return java.lang.Throwable.class;
+        }
+        if ("java.lang.UnsupportedOperationException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.UnsupportedOperationException");
+            }
+            return java.lang.UnsupportedOperationException.class;
+        }
+        if ("java.lang.VirtualMachineError".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.VirtualMachineError");
+            }
+            return java.lang.VirtualMachineError.class;
+        }
+        if ("java.lang.Void".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang -> java.lang.Void");
+            }
+            return java.lang.Void.class;
+        }
         return null;
     }
 

@@ -7,10 +7,30 @@ public final class GeneratedAccess_com_codename1_maps_providers {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.maps.providers.GoogleMapsProvider".equals(name)) return com.codename1.maps.providers.GoogleMapsProvider.class;
-        if ("com.codename1.maps.providers.MapProvider".equals(name)) return com.codename1.maps.providers.MapProvider.class;
-        if ("com.codename1.maps.providers.OpenStreetMapProvider".equals(name)) return com.codename1.maps.providers.OpenStreetMapProvider.class;
-        if ("com.codename1.maps.providers.TiledProvider".equals(name)) return com.codename1.maps.providers.TiledProvider.class;
+        if ("com.codename1.maps.providers.GoogleMapsProvider".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.providers -> com.codename1.maps.providers.GoogleMapsProvider");
+            }
+            return com.codename1.maps.providers.GoogleMapsProvider.class;
+        }
+        if ("com.codename1.maps.providers.MapProvider".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.providers -> com.codename1.maps.providers.MapProvider");
+            }
+            return com.codename1.maps.providers.MapProvider.class;
+        }
+        if ("com.codename1.maps.providers.OpenStreetMapProvider".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.providers -> com.codename1.maps.providers.OpenStreetMapProvider");
+            }
+            return com.codename1.maps.providers.OpenStreetMapProvider.class;
+        }
+        if ("com.codename1.maps.providers.TiledProvider".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.providers -> com.codename1.maps.providers.TiledProvider");
+            }
+            return com.codename1.maps.providers.TiledProvider.class;
+        }
         return null;
     }
 

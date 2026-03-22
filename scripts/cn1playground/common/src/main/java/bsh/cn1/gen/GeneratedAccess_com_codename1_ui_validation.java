@@ -7,14 +7,54 @@ public final class GeneratedAccess_com_codename1_ui_validation {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.validation.Constraint".equals(name)) return com.codename1.ui.validation.Constraint.class;
-        if ("com.codename1.ui.validation.ExistInConstraint".equals(name)) return com.codename1.ui.validation.ExistInConstraint.class;
-        if ("com.codename1.ui.validation.GroupConstraint".equals(name)) return com.codename1.ui.validation.GroupConstraint.class;
-        if ("com.codename1.ui.validation.LengthConstraint".equals(name)) return com.codename1.ui.validation.LengthConstraint.class;
-        if ("com.codename1.ui.validation.NotConstraint".equals(name)) return com.codename1.ui.validation.NotConstraint.class;
-        if ("com.codename1.ui.validation.NumericConstraint".equals(name)) return com.codename1.ui.validation.NumericConstraint.class;
-        if ("com.codename1.ui.validation.RegexConstraint".equals(name)) return com.codename1.ui.validation.RegexConstraint.class;
-        if ("com.codename1.ui.validation.Validator".equals(name)) return com.codename1.ui.validation.Validator.class;
+        if ("com.codename1.ui.validation.Constraint".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.validation -> com.codename1.ui.validation.Constraint");
+            }
+            return com.codename1.ui.validation.Constraint.class;
+        }
+        if ("com.codename1.ui.validation.ExistInConstraint".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.validation -> com.codename1.ui.validation.ExistInConstraint");
+            }
+            return com.codename1.ui.validation.ExistInConstraint.class;
+        }
+        if ("com.codename1.ui.validation.GroupConstraint".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.validation -> com.codename1.ui.validation.GroupConstraint");
+            }
+            return com.codename1.ui.validation.GroupConstraint.class;
+        }
+        if ("com.codename1.ui.validation.LengthConstraint".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.validation -> com.codename1.ui.validation.LengthConstraint");
+            }
+            return com.codename1.ui.validation.LengthConstraint.class;
+        }
+        if ("com.codename1.ui.validation.NotConstraint".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.validation -> com.codename1.ui.validation.NotConstraint");
+            }
+            return com.codename1.ui.validation.NotConstraint.class;
+        }
+        if ("com.codename1.ui.validation.NumericConstraint".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.validation -> com.codename1.ui.validation.NumericConstraint");
+            }
+            return com.codename1.ui.validation.NumericConstraint.class;
+        }
+        if ("com.codename1.ui.validation.RegexConstraint".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.validation -> com.codename1.ui.validation.RegexConstraint");
+            }
+            return com.codename1.ui.validation.RegexConstraint.class;
+        }
+        if ("com.codename1.ui.validation.Validator".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.validation -> com.codename1.ui.validation.Validator");
+            }
+            return com.codename1.ui.validation.Validator.class;
+        }
         return null;
     }
 

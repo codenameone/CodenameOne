@@ -7,7 +7,12 @@ public final class GeneratedAccess_com_codename1_facebook_ui {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.facebook.ui.LikeButton".equals(name)) return com.codename1.facebook.ui.LikeButton.class;
+        if ("com.codename1.facebook.ui.LikeButton".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook.ui -> com.codename1.facebook.ui.LikeButton");
+            }
+            return com.codename1.facebook.ui.LikeButton.class;
+        }
         return null;
     }
 

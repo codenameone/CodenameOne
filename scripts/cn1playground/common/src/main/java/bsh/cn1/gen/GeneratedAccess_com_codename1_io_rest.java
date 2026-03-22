@@ -7,10 +7,30 @@ public final class GeneratedAccess_com_codename1_io_rest {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.io.rest.ErrorCodeHandler".equals(name)) return com.codename1.io.rest.ErrorCodeHandler.class;
-        if ("com.codename1.io.rest.RequestBuilder".equals(name)) return com.codename1.io.rest.RequestBuilder.class;
-        if ("com.codename1.io.rest.Response".equals(name)) return com.codename1.io.rest.Response.class;
-        if ("com.codename1.io.rest.Rest".equals(name)) return com.codename1.io.rest.Rest.class;
+        if ("com.codename1.io.rest.ErrorCodeHandler".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.rest -> com.codename1.io.rest.ErrorCodeHandler");
+            }
+            return com.codename1.io.rest.ErrorCodeHandler.class;
+        }
+        if ("com.codename1.io.rest.RequestBuilder".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.rest -> com.codename1.io.rest.RequestBuilder");
+            }
+            return com.codename1.io.rest.RequestBuilder.class;
+        }
+        if ("com.codename1.io.rest.Response".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.rest -> com.codename1.io.rest.Response");
+            }
+            return com.codename1.io.rest.Response.class;
+        }
+        if ("com.codename1.io.rest.Rest".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.rest -> com.codename1.io.rest.Rest");
+            }
+            return com.codename1.io.rest.Rest.class;
+        }
         return null;
     }
 

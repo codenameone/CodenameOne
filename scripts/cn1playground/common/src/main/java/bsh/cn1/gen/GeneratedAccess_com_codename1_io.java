@@ -7,36 +7,186 @@ public final class GeneratedAccess_com_codename1_io {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.io.AccessToken".equals(name)) return com.codename1.io.AccessToken.class;
-        if ("com.codename1.io.BufferedInputStream".equals(name)) return com.codename1.io.BufferedInputStream.class;
-        if ("com.codename1.io.BufferedOutputStream".equals(name)) return com.codename1.io.BufferedOutputStream.class;
-        if ("com.codename1.io.CSVParser".equals(name)) return com.codename1.io.CSVParser.class;
-        if ("com.codename1.io.CacheMap".equals(name)) return com.codename1.io.CacheMap.class;
-        if ("com.codename1.io.CharArrayReader".equals(name)) return com.codename1.io.CharArrayReader.class;
-        if ("com.codename1.io.ConnectionRequest".equals(name)) return com.codename1.io.ConnectionRequest.class;
-        if ("com.codename1.io.Cookie".equals(name)) return com.codename1.io.Cookie.class;
-        if ("com.codename1.io.Data".equals(name)) return com.codename1.io.Data.class;
-        if ("com.codename1.io.Externalizable".equals(name)) return com.codename1.io.Externalizable.class;
-        if ("com.codename1.io.File".equals(name)) return com.codename1.io.File.class;
-        if ("com.codename1.io.FileSystemStorage".equals(name)) return com.codename1.io.FileSystemStorage.class;
-        if ("com.codename1.io.IOProgressListener".equals(name)) return com.codename1.io.IOProgressListener.class;
-        if ("com.codename1.io.JSONParseCallback".equals(name)) return com.codename1.io.JSONParseCallback.class;
-        if ("com.codename1.io.JSONParser".equals(name)) return com.codename1.io.JSONParser.class;
-        if ("com.codename1.io.Log".equals(name)) return com.codename1.io.Log.class;
-        if ("com.codename1.io.MalformedURLException".equals(name)) return com.codename1.io.MalformedURLException.class;
-        if ("com.codename1.io.MultipartRequest".equals(name)) return com.codename1.io.MultipartRequest.class;
-        if ("com.codename1.io.NetworkEvent".equals(name)) return com.codename1.io.NetworkEvent.class;
-        if ("com.codename1.io.NetworkManager".equals(name)) return com.codename1.io.NetworkManager.class;
-        if ("com.codename1.io.Oauth2".equals(name)) return com.codename1.io.Oauth2.class;
-        if ("com.codename1.io.PreferenceListener".equals(name)) return com.codename1.io.PreferenceListener.class;
-        if ("com.codename1.io.Preferences".equals(name)) return com.codename1.io.Preferences.class;
-        if ("com.codename1.io.Properties".equals(name)) return com.codename1.io.Properties.class;
-        if ("com.codename1.io.Socket".equals(name)) return com.codename1.io.Socket.class;
-        if ("com.codename1.io.SocketConnection".equals(name)) return com.codename1.io.SocketConnection.class;
-        if ("com.codename1.io.Storage".equals(name)) return com.codename1.io.Storage.class;
-        if ("com.codename1.io.URL".equals(name)) return com.codename1.io.URL.class;
-        if ("com.codename1.io.Util".equals(name)) return com.codename1.io.Util.class;
-        if ("com.codename1.io.WebServiceProxyCall".equals(name)) return com.codename1.io.WebServiceProxyCall.class;
+        if ("com.codename1.io.AccessToken".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.AccessToken");
+            }
+            return com.codename1.io.AccessToken.class;
+        }
+        if ("com.codename1.io.BufferedInputStream".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.BufferedInputStream");
+            }
+            return com.codename1.io.BufferedInputStream.class;
+        }
+        if ("com.codename1.io.BufferedOutputStream".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.BufferedOutputStream");
+            }
+            return com.codename1.io.BufferedOutputStream.class;
+        }
+        if ("com.codename1.io.CSVParser".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.CSVParser");
+            }
+            return com.codename1.io.CSVParser.class;
+        }
+        if ("com.codename1.io.CacheMap".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.CacheMap");
+            }
+            return com.codename1.io.CacheMap.class;
+        }
+        if ("com.codename1.io.CharArrayReader".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.CharArrayReader");
+            }
+            return com.codename1.io.CharArrayReader.class;
+        }
+        if ("com.codename1.io.ConnectionRequest".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.ConnectionRequest");
+            }
+            return com.codename1.io.ConnectionRequest.class;
+        }
+        if ("com.codename1.io.Cookie".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Cookie");
+            }
+            return com.codename1.io.Cookie.class;
+        }
+        if ("com.codename1.io.Data".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Data");
+            }
+            return com.codename1.io.Data.class;
+        }
+        if ("com.codename1.io.Externalizable".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Externalizable");
+            }
+            return com.codename1.io.Externalizable.class;
+        }
+        if ("com.codename1.io.File".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.File");
+            }
+            return com.codename1.io.File.class;
+        }
+        if ("com.codename1.io.FileSystemStorage".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.FileSystemStorage");
+            }
+            return com.codename1.io.FileSystemStorage.class;
+        }
+        if ("com.codename1.io.IOProgressListener".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.IOProgressListener");
+            }
+            return com.codename1.io.IOProgressListener.class;
+        }
+        if ("com.codename1.io.JSONParseCallback".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.JSONParseCallback");
+            }
+            return com.codename1.io.JSONParseCallback.class;
+        }
+        if ("com.codename1.io.JSONParser".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.JSONParser");
+            }
+            return com.codename1.io.JSONParser.class;
+        }
+        if ("com.codename1.io.Log".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Log");
+            }
+            return com.codename1.io.Log.class;
+        }
+        if ("com.codename1.io.MalformedURLException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.MalformedURLException");
+            }
+            return com.codename1.io.MalformedURLException.class;
+        }
+        if ("com.codename1.io.MultipartRequest".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.MultipartRequest");
+            }
+            return com.codename1.io.MultipartRequest.class;
+        }
+        if ("com.codename1.io.NetworkEvent".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.NetworkEvent");
+            }
+            return com.codename1.io.NetworkEvent.class;
+        }
+        if ("com.codename1.io.NetworkManager".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.NetworkManager");
+            }
+            return com.codename1.io.NetworkManager.class;
+        }
+        if ("com.codename1.io.Oauth2".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Oauth2");
+            }
+            return com.codename1.io.Oauth2.class;
+        }
+        if ("com.codename1.io.PreferenceListener".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.PreferenceListener");
+            }
+            return com.codename1.io.PreferenceListener.class;
+        }
+        if ("com.codename1.io.Preferences".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Preferences");
+            }
+            return com.codename1.io.Preferences.class;
+        }
+        if ("com.codename1.io.Properties".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Properties");
+            }
+            return com.codename1.io.Properties.class;
+        }
+        if ("com.codename1.io.Socket".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Socket");
+            }
+            return com.codename1.io.Socket.class;
+        }
+        if ("com.codename1.io.SocketConnection".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.SocketConnection");
+            }
+            return com.codename1.io.SocketConnection.class;
+        }
+        if ("com.codename1.io.Storage".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Storage");
+            }
+            return com.codename1.io.Storage.class;
+        }
+        if ("com.codename1.io.URL".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.URL");
+            }
+            return com.codename1.io.URL.class;
+        }
+        if ("com.codename1.io.Util".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Util");
+            }
+            return com.codename1.io.Util.class;
+        }
+        if ("com.codename1.io.WebServiceProxyCall".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.WebServiceProxyCall");
+            }
+            return com.codename1.io.WebServiceProxyCall.class;
+        }
         return null;
     }
 

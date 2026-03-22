@@ -7,10 +7,30 @@ public final class GeneratedAccess_com_codename1_social {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.social.FacebookConnect".equals(name)) return com.codename1.social.FacebookConnect.class;
-        if ("com.codename1.social.GoogleConnect".equals(name)) return com.codename1.social.GoogleConnect.class;
-        if ("com.codename1.social.Login".equals(name)) return com.codename1.social.Login.class;
-        if ("com.codename1.social.LoginCallback".equals(name)) return com.codename1.social.LoginCallback.class;
+        if ("com.codename1.social.FacebookConnect".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.social -> com.codename1.social.FacebookConnect");
+            }
+            return com.codename1.social.FacebookConnect.class;
+        }
+        if ("com.codename1.social.GoogleConnect".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.social -> com.codename1.social.GoogleConnect");
+            }
+            return com.codename1.social.GoogleConnect.class;
+        }
+        if ("com.codename1.social.Login".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.social -> com.codename1.social.Login");
+            }
+            return com.codename1.social.Login.class;
+        }
+        if ("com.codename1.social.LoginCallback".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.social -> com.codename1.social.LoginCallback");
+            }
+            return com.codename1.social.LoginCallback.class;
+        }
         return null;
     }
 

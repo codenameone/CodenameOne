@@ -7,8 +7,18 @@ public final class GeneratedAccess_com_codenameone_playground {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codenameone.playground.CN1Playground".equals(name)) return com.codenameone.playground.CN1Playground.class;
-        if ("com.codenameone.playground.PlaygroundContext".equals(name)) return com.codenameone.playground.PlaygroundContext.class;
+        if ("com.codenameone.playground.CN1Playground".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codenameone.playground -> com.codenameone.playground.CN1Playground");
+            }
+            return com.codenameone.playground.CN1Playground.class;
+        }
+        if ("com.codenameone.playground.PlaygroundContext".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codenameone.playground -> com.codenameone.playground.PlaygroundContext");
+            }
+            return com.codenameone.playground.PlaygroundContext.class;
+        }
         return null;
     }
 
@@ -29,6 +39,11 @@ public final class GeneratedAccess_com_codenameone_playground {
     }
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
+        if ("debug".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                com.codenameone.playground.PlaygroundContext.debug((java.lang.String) safeArgs[0]); return null;
+            }
+        }
         if ("getCurrent".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
                 return com.codenameone.playground.PlaygroundContext.getCurrent();

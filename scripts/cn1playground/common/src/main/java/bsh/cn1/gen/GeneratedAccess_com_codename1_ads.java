@@ -7,8 +7,18 @@ public final class GeneratedAccess_com_codename1_ads {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ads.AdsService".equals(name)) return com.codename1.ads.AdsService.class;
-        if ("com.codename1.ads.InnerActive".equals(name)) return com.codename1.ads.InnerActive.class;
+        if ("com.codename1.ads.AdsService".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ads -> com.codename1.ads.AdsService");
+            }
+            return com.codename1.ads.AdsService.class;
+        }
+        if ("com.codename1.ads.InnerActive".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ads -> com.codename1.ads.InnerActive");
+            }
+            return com.codename1.ads.InnerActive.class;
+        }
         return null;
     }
 

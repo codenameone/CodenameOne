@@ -7,8 +7,18 @@ public final class GeneratedAccess_com_codename1_notifications {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.notifications.LocalNotification".equals(name)) return com.codename1.notifications.LocalNotification.class;
-        if ("com.codename1.notifications.LocalNotificationCallback".equals(name)) return com.codename1.notifications.LocalNotificationCallback.class;
+        if ("com.codename1.notifications.LocalNotification".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.notifications -> com.codename1.notifications.LocalNotification");
+            }
+            return com.codename1.notifications.LocalNotification.class;
+        }
+        if ("com.codename1.notifications.LocalNotificationCallback".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.notifications -> com.codename1.notifications.LocalNotificationCallback");
+            }
+            return com.codename1.notifications.LocalNotificationCallback.class;
+        }
         return null;
     }
 

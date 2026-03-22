@@ -7,16 +7,66 @@ public final class GeneratedAccess_com_codename1_ui_list {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.list.CellRenderer".equals(name)) return com.codename1.ui.list.CellRenderer.class;
-        if ("com.codename1.ui.list.ContainerList".equals(name)) return com.codename1.ui.list.ContainerList.class;
-        if ("com.codename1.ui.list.DefaultListCellRenderer".equals(name)) return com.codename1.ui.list.DefaultListCellRenderer.class;
-        if ("com.codename1.ui.list.DefaultListModel".equals(name)) return com.codename1.ui.list.DefaultListModel.class;
-        if ("com.codename1.ui.list.FilterProxyListModel".equals(name)) return com.codename1.ui.list.FilterProxyListModel.class;
-        if ("com.codename1.ui.list.GenericListCellRenderer".equals(name)) return com.codename1.ui.list.GenericListCellRenderer.class;
-        if ("com.codename1.ui.list.ListCellRenderer".equals(name)) return com.codename1.ui.list.ListCellRenderer.class;
-        if ("com.codename1.ui.list.ListModel".equals(name)) return com.codename1.ui.list.ListModel.class;
-        if ("com.codename1.ui.list.MultiList".equals(name)) return com.codename1.ui.list.MultiList.class;
-        if ("com.codename1.ui.list.MultipleSelectionListModel".equals(name)) return com.codename1.ui.list.MultipleSelectionListModel.class;
+        if ("com.codename1.ui.list.CellRenderer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.CellRenderer");
+            }
+            return com.codename1.ui.list.CellRenderer.class;
+        }
+        if ("com.codename1.ui.list.ContainerList".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.ContainerList");
+            }
+            return com.codename1.ui.list.ContainerList.class;
+        }
+        if ("com.codename1.ui.list.DefaultListCellRenderer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.DefaultListCellRenderer");
+            }
+            return com.codename1.ui.list.DefaultListCellRenderer.class;
+        }
+        if ("com.codename1.ui.list.DefaultListModel".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.DefaultListModel");
+            }
+            return com.codename1.ui.list.DefaultListModel.class;
+        }
+        if ("com.codename1.ui.list.FilterProxyListModel".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.FilterProxyListModel");
+            }
+            return com.codename1.ui.list.FilterProxyListModel.class;
+        }
+        if ("com.codename1.ui.list.GenericListCellRenderer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.GenericListCellRenderer");
+            }
+            return com.codename1.ui.list.GenericListCellRenderer.class;
+        }
+        if ("com.codename1.ui.list.ListCellRenderer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.ListCellRenderer");
+            }
+            return com.codename1.ui.list.ListCellRenderer.class;
+        }
+        if ("com.codename1.ui.list.ListModel".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.ListModel");
+            }
+            return com.codename1.ui.list.ListModel.class;
+        }
+        if ("com.codename1.ui.list.MultiList".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.MultiList");
+            }
+            return com.codename1.ui.list.MultiList.class;
+        }
+        if ("com.codename1.ui.list.MultipleSelectionListModel".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.MultipleSelectionListModel");
+            }
+            return com.codename1.ui.list.MultipleSelectionListModel.class;
+        }
         return null;
     }
 

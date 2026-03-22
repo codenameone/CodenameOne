@@ -7,11 +7,36 @@ public final class GeneratedAccess_com_codename1_db {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.db.Cursor".equals(name)) return com.codename1.db.Cursor.class;
-        if ("com.codename1.db.Database".equals(name)) return com.codename1.db.Database.class;
-        if ("com.codename1.db.Row".equals(name)) return com.codename1.db.Row.class;
-        if ("com.codename1.db.RowExt".equals(name)) return com.codename1.db.RowExt.class;
-        if ("com.codename1.db.ThreadSafeDatabase".equals(name)) return com.codename1.db.ThreadSafeDatabase.class;
+        if ("com.codename1.db.Cursor".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.db -> com.codename1.db.Cursor");
+            }
+            return com.codename1.db.Cursor.class;
+        }
+        if ("com.codename1.db.Database".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.db -> com.codename1.db.Database");
+            }
+            return com.codename1.db.Database.class;
+        }
+        if ("com.codename1.db.Row".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.db -> com.codename1.db.Row");
+            }
+            return com.codename1.db.Row.class;
+        }
+        if ("com.codename1.db.RowExt".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.db -> com.codename1.db.RowExt");
+            }
+            return com.codename1.db.RowExt.class;
+        }
+        if ("com.codename1.db.ThreadSafeDatabase".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.db -> com.codename1.db.ThreadSafeDatabase");
+            }
+            return com.codename1.db.ThreadSafeDatabase.class;
+        }
         return null;
     }
 

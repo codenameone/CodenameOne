@@ -7,10 +7,30 @@ public final class GeneratedAccess_com_codename1_contacts {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.contacts.Address".equals(name)) return com.codename1.contacts.Address.class;
-        if ("com.codename1.contacts.Contact".equals(name)) return com.codename1.contacts.Contact.class;
-        if ("com.codename1.contacts.ContactsManager".equals(name)) return com.codename1.contacts.ContactsManager.class;
-        if ("com.codename1.contacts.ContactsModel".equals(name)) return com.codename1.contacts.ContactsModel.class;
+        if ("com.codename1.contacts.Address".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.contacts -> com.codename1.contacts.Address");
+            }
+            return com.codename1.contacts.Address.class;
+        }
+        if ("com.codename1.contacts.Contact".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.contacts -> com.codename1.contacts.Contact");
+            }
+            return com.codename1.contacts.Contact.class;
+        }
+        if ("com.codename1.contacts.ContactsManager".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.contacts -> com.codename1.contacts.ContactsManager");
+            }
+            return com.codename1.contacts.ContactsManager.class;
+        }
+        if ("com.codename1.contacts.ContactsModel".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.contacts -> com.codename1.contacts.ContactsModel");
+            }
+            return com.codename1.contacts.ContactsModel.class;
+        }
         return null;
     }
 

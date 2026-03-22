@@ -7,27 +7,132 @@ public final class GeneratedAccess_com_codename1_util {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.util.AsyncResource".equals(name)) return com.codename1.util.AsyncResource.class;
-        if ("com.codename1.util.AsyncResult".equals(name)) return com.codename1.util.AsyncResult.class;
-        if ("com.codename1.util.Base64".equals(name)) return com.codename1.util.Base64.class;
-        if ("com.codename1.util.BigDecimal".equals(name)) return com.codename1.util.BigDecimal.class;
-        if ("com.codename1.util.BigInteger".equals(name)) return com.codename1.util.BigInteger.class;
-        if ("com.codename1.util.CStringBuilder".equals(name)) return com.codename1.util.CStringBuilder.class;
-        if ("com.codename1.util.Callback".equals(name)) return com.codename1.util.Callback.class;
-        if ("com.codename1.util.CallbackAdapter".equals(name)) return com.codename1.util.CallbackAdapter.class;
-        if ("com.codename1.util.CallbackDispatcher".equals(name)) return com.codename1.util.CallbackDispatcher.class;
-        if ("com.codename1.util.CaseInsensitiveOrder".equals(name)) return com.codename1.util.CaseInsensitiveOrder.class;
-        if ("com.codename1.util.DateUtil".equals(name)) return com.codename1.util.DateUtil.class;
-        if ("com.codename1.util.EasyThread".equals(name)) return com.codename1.util.EasyThread.class;
-        if ("com.codename1.util.FailureCallback".equals(name)) return com.codename1.util.FailureCallback.class;
-        if ("com.codename1.util.LazyValue".equals(name)) return com.codename1.util.LazyValue.class;
-        if ("com.codename1.util.MathUtil".equals(name)) return com.codename1.util.MathUtil.class;
-        if ("com.codename1.util.OnComplete".equals(name)) return com.codename1.util.OnComplete.class;
-        if ("com.codename1.util.RunnableWithResult".equals(name)) return com.codename1.util.RunnableWithResult.class;
-        if ("com.codename1.util.RunnableWithResultSync".equals(name)) return com.codename1.util.RunnableWithResultSync.class;
-        if ("com.codename1.util.StringUtil".equals(name)) return com.codename1.util.StringUtil.class;
-        if ("com.codename1.util.SuccessCallback".equals(name)) return com.codename1.util.SuccessCallback.class;
-        if ("com.codename1.util.Wrapper".equals(name)) return com.codename1.util.Wrapper.class;
+        if ("com.codename1.util.AsyncResource".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.AsyncResource");
+            }
+            return com.codename1.util.AsyncResource.class;
+        }
+        if ("com.codename1.util.AsyncResult".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.AsyncResult");
+            }
+            return com.codename1.util.AsyncResult.class;
+        }
+        if ("com.codename1.util.Base64".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.Base64");
+            }
+            return com.codename1.util.Base64.class;
+        }
+        if ("com.codename1.util.BigDecimal".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.BigDecimal");
+            }
+            return com.codename1.util.BigDecimal.class;
+        }
+        if ("com.codename1.util.BigInteger".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.BigInteger");
+            }
+            return com.codename1.util.BigInteger.class;
+        }
+        if ("com.codename1.util.CStringBuilder".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.CStringBuilder");
+            }
+            return com.codename1.util.CStringBuilder.class;
+        }
+        if ("com.codename1.util.Callback".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.Callback");
+            }
+            return com.codename1.util.Callback.class;
+        }
+        if ("com.codename1.util.CallbackAdapter".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.CallbackAdapter");
+            }
+            return com.codename1.util.CallbackAdapter.class;
+        }
+        if ("com.codename1.util.CallbackDispatcher".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.CallbackDispatcher");
+            }
+            return com.codename1.util.CallbackDispatcher.class;
+        }
+        if ("com.codename1.util.CaseInsensitiveOrder".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.CaseInsensitiveOrder");
+            }
+            return com.codename1.util.CaseInsensitiveOrder.class;
+        }
+        if ("com.codename1.util.DateUtil".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.DateUtil");
+            }
+            return com.codename1.util.DateUtil.class;
+        }
+        if ("com.codename1.util.EasyThread".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.EasyThread");
+            }
+            return com.codename1.util.EasyThread.class;
+        }
+        if ("com.codename1.util.FailureCallback".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.FailureCallback");
+            }
+            return com.codename1.util.FailureCallback.class;
+        }
+        if ("com.codename1.util.LazyValue".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.LazyValue");
+            }
+            return com.codename1.util.LazyValue.class;
+        }
+        if ("com.codename1.util.MathUtil".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.MathUtil");
+            }
+            return com.codename1.util.MathUtil.class;
+        }
+        if ("com.codename1.util.OnComplete".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.OnComplete");
+            }
+            return com.codename1.util.OnComplete.class;
+        }
+        if ("com.codename1.util.RunnableWithResult".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.RunnableWithResult");
+            }
+            return com.codename1.util.RunnableWithResult.class;
+        }
+        if ("com.codename1.util.RunnableWithResultSync".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.RunnableWithResultSync");
+            }
+            return com.codename1.util.RunnableWithResultSync.class;
+        }
+        if ("com.codename1.util.StringUtil".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.StringUtil");
+            }
+            return com.codename1.util.StringUtil.class;
+        }
+        if ("com.codename1.util.SuccessCallback".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.SuccessCallback");
+            }
+            return com.codename1.util.SuccessCallback.class;
+        }
+        if ("com.codename1.util.Wrapper".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util -> com.codename1.util.Wrapper");
+            }
+            return com.codename1.util.Wrapper.class;
+        }
         return null;
     }
 

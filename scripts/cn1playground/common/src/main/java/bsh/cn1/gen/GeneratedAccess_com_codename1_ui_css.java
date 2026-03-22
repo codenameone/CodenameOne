@@ -7,7 +7,12 @@ public final class GeneratedAccess_com_codename1_ui_css {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.css.CSSThemeCompiler".equals(name)) return com.codename1.ui.css.CSSThemeCompiler.class;
+        if ("com.codename1.ui.css.CSSThemeCompiler".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.css -> com.codename1.ui.css.CSSThemeCompiler");
+            }
+            return com.codename1.ui.css.CSSThemeCompiler.class;
+        }
         return null;
     }
 

@@ -7,12 +7,42 @@ public final class GeneratedAccess_com_codename1_ui_table {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.table.AbstractTableModel".equals(name)) return com.codename1.ui.table.AbstractTableModel.class;
-        if ("com.codename1.ui.table.DefaultTableModel".equals(name)) return com.codename1.ui.table.DefaultTableModel.class;
-        if ("com.codename1.ui.table.SortableTableModel".equals(name)) return com.codename1.ui.table.SortableTableModel.class;
-        if ("com.codename1.ui.table.Table".equals(name)) return com.codename1.ui.table.Table.class;
-        if ("com.codename1.ui.table.TableLayout".equals(name)) return com.codename1.ui.table.TableLayout.class;
-        if ("com.codename1.ui.table.TableModel".equals(name)) return com.codename1.ui.table.TableModel.class;
+        if ("com.codename1.ui.table.AbstractTableModel".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.AbstractTableModel");
+            }
+            return com.codename1.ui.table.AbstractTableModel.class;
+        }
+        if ("com.codename1.ui.table.DefaultTableModel".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.DefaultTableModel");
+            }
+            return com.codename1.ui.table.DefaultTableModel.class;
+        }
+        if ("com.codename1.ui.table.SortableTableModel".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.SortableTableModel");
+            }
+            return com.codename1.ui.table.SortableTableModel.class;
+        }
+        if ("com.codename1.ui.table.Table".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.Table");
+            }
+            return com.codename1.ui.table.Table.class;
+        }
+        if ("com.codename1.ui.table.TableLayout".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.TableLayout");
+            }
+            return com.codename1.ui.table.TableLayout.class;
+        }
+        if ("com.codename1.ui.table.TableModel".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.TableModel");
+            }
+            return com.codename1.ui.table.TableModel.class;
+        }
         return null;
     }
 

@@ -7,15 +7,60 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.plaf.Border".equals(name)) return com.codename1.ui.plaf.Border.class;
-        if ("com.codename1.ui.plaf.CSSBorder".equals(name)) return com.codename1.ui.plaf.CSSBorder.class;
-        if ("com.codename1.ui.plaf.DefaultLookAndFeel".equals(name)) return com.codename1.ui.plaf.DefaultLookAndFeel.class;
-        if ("com.codename1.ui.plaf.LookAndFeel".equals(name)) return com.codename1.ui.plaf.LookAndFeel.class;
-        if ("com.codename1.ui.plaf.RoundBorder".equals(name)) return com.codename1.ui.plaf.RoundBorder.class;
-        if ("com.codename1.ui.plaf.RoundRectBorder".equals(name)) return com.codename1.ui.plaf.RoundRectBorder.class;
-        if ("com.codename1.ui.plaf.Style".equals(name)) return com.codename1.ui.plaf.Style.class;
-        if ("com.codename1.ui.plaf.StyleParser".equals(name)) return com.codename1.ui.plaf.StyleParser.class;
-        if ("com.codename1.ui.plaf.UIManager".equals(name)) return com.codename1.ui.plaf.UIManager.class;
+        if ("com.codename1.ui.plaf.Border".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.Border");
+            }
+            return com.codename1.ui.plaf.Border.class;
+        }
+        if ("com.codename1.ui.plaf.CSSBorder".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.CSSBorder");
+            }
+            return com.codename1.ui.plaf.CSSBorder.class;
+        }
+        if ("com.codename1.ui.plaf.DefaultLookAndFeel".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.DefaultLookAndFeel");
+            }
+            return com.codename1.ui.plaf.DefaultLookAndFeel.class;
+        }
+        if ("com.codename1.ui.plaf.LookAndFeel".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.LookAndFeel");
+            }
+            return com.codename1.ui.plaf.LookAndFeel.class;
+        }
+        if ("com.codename1.ui.plaf.RoundBorder".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.RoundBorder");
+            }
+            return com.codename1.ui.plaf.RoundBorder.class;
+        }
+        if ("com.codename1.ui.plaf.RoundRectBorder".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.RoundRectBorder");
+            }
+            return com.codename1.ui.plaf.RoundRectBorder.class;
+        }
+        if ("com.codename1.ui.plaf.Style".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.Style");
+            }
+            return com.codename1.ui.plaf.Style.class;
+        }
+        if ("com.codename1.ui.plaf.StyleParser".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.StyleParser");
+            }
+            return com.codename1.ui.plaf.StyleParser.class;
+        }
+        if ("com.codename1.ui.plaf.UIManager".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.UIManager");
+            }
+            return com.codename1.ui.plaf.UIManager.class;
+        }
         return null;
     }
 

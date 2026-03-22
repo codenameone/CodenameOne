@@ -7,10 +7,30 @@ public final class GeneratedAccess_com_codename1_charts_compat {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.charts.compat.Canvas".equals(name)) return com.codename1.charts.compat.Canvas.class;
-        if ("com.codename1.charts.compat.GradientDrawable".equals(name)) return com.codename1.charts.compat.GradientDrawable.class;
-        if ("com.codename1.charts.compat.Paint".equals(name)) return com.codename1.charts.compat.Paint.class;
-        if ("com.codename1.charts.compat.PathMeasure".equals(name)) return com.codename1.charts.compat.PathMeasure.class;
+        if ("com.codename1.charts.compat.Canvas".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.compat -> com.codename1.charts.compat.Canvas");
+            }
+            return com.codename1.charts.compat.Canvas.class;
+        }
+        if ("com.codename1.charts.compat.GradientDrawable".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.compat -> com.codename1.charts.compat.GradientDrawable");
+            }
+            return com.codename1.charts.compat.GradientDrawable.class;
+        }
+        if ("com.codename1.charts.compat.Paint".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.compat -> com.codename1.charts.compat.Paint");
+            }
+            return com.codename1.charts.compat.Paint.class;
+        }
+        if ("com.codename1.charts.compat.PathMeasure".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.compat -> com.codename1.charts.compat.PathMeasure");
+            }
+            return com.codename1.charts.compat.PathMeasure.class;
+        }
         return null;
     }
 

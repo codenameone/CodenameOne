@@ -7,10 +7,30 @@ public final class GeneratedAccess_com_codename1_charts_transitions {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.charts.transitions.SeriesTransition".equals(name)) return com.codename1.charts.transitions.SeriesTransition.class;
-        if ("com.codename1.charts.transitions.XYMultiSeriesTransition".equals(name)) return com.codename1.charts.transitions.XYMultiSeriesTransition.class;
-        if ("com.codename1.charts.transitions.XYSeriesTransition".equals(name)) return com.codename1.charts.transitions.XYSeriesTransition.class;
-        if ("com.codename1.charts.transitions.XYValueSeriesTransition".equals(name)) return com.codename1.charts.transitions.XYValueSeriesTransition.class;
+        if ("com.codename1.charts.transitions.SeriesTransition".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.transitions -> com.codename1.charts.transitions.SeriesTransition");
+            }
+            return com.codename1.charts.transitions.SeriesTransition.class;
+        }
+        if ("com.codename1.charts.transitions.XYMultiSeriesTransition".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.transitions -> com.codename1.charts.transitions.XYMultiSeriesTransition");
+            }
+            return com.codename1.charts.transitions.XYMultiSeriesTransition.class;
+        }
+        if ("com.codename1.charts.transitions.XYSeriesTransition".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.transitions -> com.codename1.charts.transitions.XYSeriesTransition");
+            }
+            return com.codename1.charts.transitions.XYSeriesTransition.class;
+        }
+        if ("com.codename1.charts.transitions.XYValueSeriesTransition".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.transitions -> com.codename1.charts.transitions.XYValueSeriesTransition");
+            }
+            return com.codename1.charts.transitions.XYValueSeriesTransition.class;
+        }
         return null;
     }
 

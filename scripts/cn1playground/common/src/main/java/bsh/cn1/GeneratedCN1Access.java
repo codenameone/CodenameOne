@@ -90,310 +90,544 @@ public final class GeneratedCN1Access implements CN1Access {
 
     @Override
     public Class<?> findClass(String name) {
+        if (shouldDebugFindClass(name)) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass(" + name + ")");
+        }
         Class<?> found;
         found = GeneratedAccess_com_codename1_ads.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ads -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_analytics.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.analytics -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_annotations.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.annotations -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_background.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.background -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_capture.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.capture -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_charts.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.charts -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_charts_compat.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.charts.compat -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_charts_models.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.charts.models -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_charts_renderers.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.charts.renderers -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_charts_transitions.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.charts.transitions -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_charts_util.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.charts.util -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_charts_views.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.charts.views -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_cloud.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.cloud -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_codescan.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.codescan -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_compat_java_util.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.compat.java.util -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_components.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.components -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_contacts.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.contacts -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_db.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.db -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_facebook.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.facebook -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_facebook_ui.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.facebook.ui -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_impl.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.impl -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_io.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.io -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_io_gzip.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.io.gzip -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_io_rest.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.io.rest -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_io_services.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.io.services -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_io_tar.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.io.tar -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_javascript.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.javascript -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_l10n.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.l10n -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_location.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.location -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_maps.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.maps -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_maps_layers.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.maps.layers -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_maps_providers.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.maps.providers -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_media.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.media -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_messaging.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.messaging -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_notifications.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.notifications -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_payment.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.payment -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_plugin.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.plugin -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_plugin_event.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.plugin.event -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_processing.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.processing -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_properties.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.properties -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_push.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.push -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_share.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.share -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_social.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.social -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_system.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.system -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_testing.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.testing -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_animations.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.animations -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_css.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.css -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_events.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.events -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_geom.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.geom -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_html.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.html -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_layouts.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.layouts -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_layouts_mig.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.layouts.mig -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_list.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.list -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_painter.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.painter -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_plaf.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.plaf -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_scene.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.scene -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_spinner.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.spinner -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_table.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.table -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_tree.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.tree -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_util.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.util -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_ui_validation.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.ui.validation -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_util.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.util -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_util_promise.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.util.promise -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_util_regex.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.util.regex -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codename1_xml.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codename1.xml -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_com_codenameone_playground.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit com.codenameone.playground -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_java_io.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit java.io -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_java_lang.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit java.lang -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_java_lang_ref.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit java.lang.ref -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_java_lang_reflect.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit java.lang.reflect -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_java_net.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit java.net -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_java_nio_charset.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit java.nio.charset -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_java_text.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit java.text -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_java_util.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit java.util -> " + found);
+        }
         if (found != null) {
             return found;
         }
         found = GeneratedAccess_java_util_concurrent.findClass(name);
+        if (shouldDebugFindClass(name) && found != null) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass hit java.util.concurrent -> " + found);
+        }
         if (found != null) {
             return found;
+        }
+        if (shouldDebugFindClass(name)) {
+            com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access.findClass miss " + name);
         }
         return null;
     }
@@ -2700,6 +2934,10 @@ public final class GeneratedCN1Access implements CN1Access {
 
     private static CN1AccessException unsupportedFieldWrite(Object target, String name, Object value) {
         return new CN1AccessException("Generated field write not implemented for " + target.getClass().getName() + "." + name + " value=" + describeValue(value));
+    }
+
+    private static boolean shouldDebugFindClass(String name) {
+        return name != null && (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components."));
     }
 
     private static String describeArgs(Object[] args) {

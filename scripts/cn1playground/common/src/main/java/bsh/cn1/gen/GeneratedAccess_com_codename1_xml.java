@@ -7,10 +7,30 @@ public final class GeneratedAccess_com_codename1_xml {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.xml.Element".equals(name)) return com.codename1.xml.Element.class;
-        if ("com.codename1.xml.ParserCallback".equals(name)) return com.codename1.xml.ParserCallback.class;
-        if ("com.codename1.xml.XMLParser".equals(name)) return com.codename1.xml.XMLParser.class;
-        if ("com.codename1.xml.XMLWriter".equals(name)) return com.codename1.xml.XMLWriter.class;
+        if ("com.codename1.xml.Element".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.xml -> com.codename1.xml.Element");
+            }
+            return com.codename1.xml.Element.class;
+        }
+        if ("com.codename1.xml.ParserCallback".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.xml -> com.codename1.xml.ParserCallback");
+            }
+            return com.codename1.xml.ParserCallback.class;
+        }
+        if ("com.codename1.xml.XMLParser".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.xml -> com.codename1.xml.XMLParser");
+            }
+            return com.codename1.xml.XMLParser.class;
+        }
+        if ("com.codename1.xml.XMLWriter".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.xml -> com.codename1.xml.XMLWriter");
+            }
+            return com.codename1.xml.XMLWriter.class;
+        }
         return null;
     }
 

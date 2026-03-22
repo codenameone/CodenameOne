@@ -7,7 +7,12 @@ public final class GeneratedAccess_java_nio_charset {
     }
 
     public static Class<?> findClass(String name) {
-        if ("java.nio.charset.Charset".equals(name)) return java.nio.charset.Charset.class;
+        if ("java.nio.charset.Charset".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.nio.charset -> java.nio.charset.Charset");
+            }
+            return java.nio.charset.Charset.class;
+        }
         return null;
     }
 

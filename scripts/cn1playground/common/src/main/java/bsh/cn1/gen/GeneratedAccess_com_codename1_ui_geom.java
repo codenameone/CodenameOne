@@ -7,16 +7,66 @@ public final class GeneratedAccess_com_codename1_ui_geom {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.geom.AffineTransform".equals(name)) return com.codename1.ui.geom.AffineTransform.class;
-        if ("com.codename1.ui.geom.Dimension".equals(name)) return com.codename1.ui.geom.Dimension.class;
-        if ("com.codename1.ui.geom.Dimension2D".equals(name)) return com.codename1.ui.geom.Dimension2D.class;
-        if ("com.codename1.ui.geom.GeneralPath".equals(name)) return com.codename1.ui.geom.GeneralPath.class;
-        if ("com.codename1.ui.geom.PathIterator".equals(name)) return com.codename1.ui.geom.PathIterator.class;
-        if ("com.codename1.ui.geom.Point".equals(name)) return com.codename1.ui.geom.Point.class;
-        if ("com.codename1.ui.geom.Point2D".equals(name)) return com.codename1.ui.geom.Point2D.class;
-        if ("com.codename1.ui.geom.Rectangle".equals(name)) return com.codename1.ui.geom.Rectangle.class;
-        if ("com.codename1.ui.geom.Rectangle2D".equals(name)) return com.codename1.ui.geom.Rectangle2D.class;
-        if ("com.codename1.ui.geom.Shape".equals(name)) return com.codename1.ui.geom.Shape.class;
+        if ("com.codename1.ui.geom.AffineTransform".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.AffineTransform");
+            }
+            return com.codename1.ui.geom.AffineTransform.class;
+        }
+        if ("com.codename1.ui.geom.Dimension".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.Dimension");
+            }
+            return com.codename1.ui.geom.Dimension.class;
+        }
+        if ("com.codename1.ui.geom.Dimension2D".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.Dimension2D");
+            }
+            return com.codename1.ui.geom.Dimension2D.class;
+        }
+        if ("com.codename1.ui.geom.GeneralPath".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.GeneralPath");
+            }
+            return com.codename1.ui.geom.GeneralPath.class;
+        }
+        if ("com.codename1.ui.geom.PathIterator".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.PathIterator");
+            }
+            return com.codename1.ui.geom.PathIterator.class;
+        }
+        if ("com.codename1.ui.geom.Point".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.Point");
+            }
+            return com.codename1.ui.geom.Point.class;
+        }
+        if ("com.codename1.ui.geom.Point2D".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.Point2D");
+            }
+            return com.codename1.ui.geom.Point2D.class;
+        }
+        if ("com.codename1.ui.geom.Rectangle".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.Rectangle");
+            }
+            return com.codename1.ui.geom.Rectangle.class;
+        }
+        if ("com.codename1.ui.geom.Rectangle2D".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.Rectangle2D");
+            }
+            return com.codename1.ui.geom.Rectangle2D.class;
+        }
+        if ("com.codename1.ui.geom.Shape".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.geom -> com.codename1.ui.geom.Shape");
+            }
+            return com.codename1.ui.geom.Shape.class;
+        }
         return null;
     }
 

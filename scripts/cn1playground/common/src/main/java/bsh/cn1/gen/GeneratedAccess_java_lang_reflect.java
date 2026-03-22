@@ -7,10 +7,30 @@ public final class GeneratedAccess_java_lang_reflect {
     }
 
     public static Class<?> findClass(String name) {
-        if ("java.lang.reflect.Array".equals(name)) return java.lang.reflect.Array.class;
-        if ("java.lang.reflect.Constructor".equals(name)) return java.lang.reflect.Constructor.class;
-        if ("java.lang.reflect.Method".equals(name)) return java.lang.reflect.Method.class;
-        if ("java.lang.reflect.Type".equals(name)) return java.lang.reflect.Type.class;
+        if ("java.lang.reflect.Array".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.reflect -> java.lang.reflect.Array");
+            }
+            return java.lang.reflect.Array.class;
+        }
+        if ("java.lang.reflect.Constructor".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.reflect -> java.lang.reflect.Constructor");
+            }
+            return java.lang.reflect.Constructor.class;
+        }
+        if ("java.lang.reflect.Method".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.reflect -> java.lang.reflect.Method");
+            }
+            return java.lang.reflect.Method.class;
+        }
+        if ("java.lang.reflect.Type".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.reflect -> java.lang.reflect.Type");
+            }
+            return java.lang.reflect.Type.class;
+        }
         return null;
     }
 

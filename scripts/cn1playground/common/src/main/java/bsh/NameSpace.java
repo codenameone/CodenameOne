@@ -25,6 +25,7 @@
  *****************************************************************************/
 package bsh;
 
+import com.codenameone.playground.PlaygroundContext;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -814,6 +815,7 @@ public class NameSpace
      * @param name the name */
     public void importClass(final String name) {
         this.importedClasses.put(Name.suffix(name, 1), name);
+        PlaygroundContext.debug("NameSpace[" + getName() + "] importClass " + name);
         this.nameSpaceChanged();
     }
 
@@ -822,6 +824,7 @@ public class NameSpace
     public void importPackage(final String name) {
         this.importedPackages.remove(name);
         this.importedPackages.add(0, name);
+        PlaygroundContext.debug("NameSpace[" + getName() + "] importPackage " + name);
         this.nameSpaceChanged();
     }
 
@@ -982,9 +985,12 @@ public class NameSpace
      * @throws UtilEvalError the util eval error */
     private Class<?> getClassImpl(final String name) throws UtilEvalError {
         Class<?> c = null;
+        PlaygroundContext.debug("NameSpace[" + getName() + "] getClassImpl " + name);
         // Check the cache
-        if (this.classCache.containsKey(name))
+        if (this.classCache.containsKey(name)) {
+            PlaygroundContext.debug("NameSpace[" + getName() + "] class cache hit " + name + " -> " + this.classCache.get(name));
             return this.classCache.get(name);
+        }
         // Unqualified (simple, non-compound) name
         final boolean unqualifiedName = !Name.isCompound(name);
         // Unqualified name check imported
@@ -994,15 +1000,19 @@ public class NameSpace
             if (c == null)
                 c = this.classForName(name);
             if (c != null) {
+                PlaygroundContext.debug("NameSpace[" + getName() + "] resolved unqualified " + name + " -> " + c);
                 this.cacheClass(name, c);
                 return c;
             }
         }
         // Try absolute
         c = this.classForName(name);
-        if (c != null)
+        if (c != null) {
+            PlaygroundContext.debug("NameSpace[" + getName() + "] resolved absolute " + name + " -> " + c);
             return c;
+        }
         // Not found
+        PlaygroundContext.debug("NameSpace[" + getName() + "] failed to resolve " + name);
         Interpreter.debug("getClass(): ", name, " not found in ", this);
         return null;
     }
@@ -1014,6 +1024,9 @@ public class NameSpace
      * @return the imported class impl
      * @throws UtilEvalError the util eval error */
     private Class<?> getImportedClassImpl(final String name) throws UtilEvalError {
+        PlaygroundContext.debug("NameSpace[" + getName() + "] getImportedClassImpl " + name
+                + " importedClasses=" + this.importedClasses
+                + " importedPackages=" + this.importedPackages);
         // Try explicitly imported class, e.g. import foo.Bar;
         String fullname = this.importedClasses.get(name);
         // not sure if we should really recurse here for explicitly imported
@@ -1050,6 +1063,7 @@ public class NameSpace
          * import... (give later imports precedence...) */
         for (final String s: this.importedPackages) {
             final Class<?> c = this.classForName(s + "." + name);
+            PlaygroundContext.debug("NameSpace[" + getName() + "] try package " + s + "." + name + " -> " + c);
             if (c != null)
                 return c;
         }

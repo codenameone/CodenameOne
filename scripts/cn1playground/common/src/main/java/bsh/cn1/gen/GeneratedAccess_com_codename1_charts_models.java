@@ -7,16 +7,66 @@ public final class GeneratedAccess_com_codename1_charts_models {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.charts.models.AreaSeries".equals(name)) return com.codename1.charts.models.AreaSeries.class;
-        if ("com.codename1.charts.models.CategorySeries".equals(name)) return com.codename1.charts.models.CategorySeries.class;
-        if ("com.codename1.charts.models.MultipleCategorySeries".equals(name)) return com.codename1.charts.models.MultipleCategorySeries.class;
-        if ("com.codename1.charts.models.Point".equals(name)) return com.codename1.charts.models.Point.class;
-        if ("com.codename1.charts.models.RangeCategorySeries".equals(name)) return com.codename1.charts.models.RangeCategorySeries.class;
-        if ("com.codename1.charts.models.SeriesSelection".equals(name)) return com.codename1.charts.models.SeriesSelection.class;
-        if ("com.codename1.charts.models.TimeSeries".equals(name)) return com.codename1.charts.models.TimeSeries.class;
-        if ("com.codename1.charts.models.XYMultipleSeriesDataset".equals(name)) return com.codename1.charts.models.XYMultipleSeriesDataset.class;
-        if ("com.codename1.charts.models.XYSeries".equals(name)) return com.codename1.charts.models.XYSeries.class;
-        if ("com.codename1.charts.models.XYValueSeries".equals(name)) return com.codename1.charts.models.XYValueSeries.class;
+        if ("com.codename1.charts.models.AreaSeries".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.AreaSeries");
+            }
+            return com.codename1.charts.models.AreaSeries.class;
+        }
+        if ("com.codename1.charts.models.CategorySeries".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.CategorySeries");
+            }
+            return com.codename1.charts.models.CategorySeries.class;
+        }
+        if ("com.codename1.charts.models.MultipleCategorySeries".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.MultipleCategorySeries");
+            }
+            return com.codename1.charts.models.MultipleCategorySeries.class;
+        }
+        if ("com.codename1.charts.models.Point".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.Point");
+            }
+            return com.codename1.charts.models.Point.class;
+        }
+        if ("com.codename1.charts.models.RangeCategorySeries".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.RangeCategorySeries");
+            }
+            return com.codename1.charts.models.RangeCategorySeries.class;
+        }
+        if ("com.codename1.charts.models.SeriesSelection".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.SeriesSelection");
+            }
+            return com.codename1.charts.models.SeriesSelection.class;
+        }
+        if ("com.codename1.charts.models.TimeSeries".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.TimeSeries");
+            }
+            return com.codename1.charts.models.TimeSeries.class;
+        }
+        if ("com.codename1.charts.models.XYMultipleSeriesDataset".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.XYMultipleSeriesDataset");
+            }
+            return com.codename1.charts.models.XYMultipleSeriesDataset.class;
+        }
+        if ("com.codename1.charts.models.XYSeries".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.XYSeries");
+            }
+            return com.codename1.charts.models.XYSeries.class;
+        }
+        if ("com.codename1.charts.models.XYValueSeries".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.models -> com.codename1.charts.models.XYValueSeries");
+            }
+            return com.codename1.charts.models.XYValueSeries.class;
+        }
         return null;
     }
 

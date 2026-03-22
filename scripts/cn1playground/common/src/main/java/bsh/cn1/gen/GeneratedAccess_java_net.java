@@ -7,8 +7,18 @@ public final class GeneratedAccess_java_net {
     }
 
     public static Class<?> findClass(String name) {
-        if ("java.net.URI".equals(name)) return java.net.URI.class;
-        if ("java.net.URISyntaxException".equals(name)) return java.net.URISyntaxException.class;
+        if ("java.net.URI".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.net -> java.net.URI");
+            }
+            return java.net.URI.class;
+        }
+        if ("java.net.URISyntaxException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.net -> java.net.URISyntaxException");
+            }
+            return java.net.URISyntaxException.class;
+        }
         return null;
     }
 

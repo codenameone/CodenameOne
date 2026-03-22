@@ -7,18 +7,78 @@ public final class GeneratedAccess_com_codename1_ui_util {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.util.Effects".equals(name)) return com.codename1.ui.util.Effects.class;
-        if ("com.codename1.ui.util.EmbeddedContainer".equals(name)) return com.codename1.ui.util.EmbeddedContainer.class;
-        if ("com.codename1.ui.util.EventDispatcher".equals(name)) return com.codename1.ui.util.EventDispatcher.class;
-        if ("com.codename1.ui.util.GlassTutorial".equals(name)) return com.codename1.ui.util.GlassTutorial.class;
-        if ("com.codename1.ui.util.ImageIO".equals(name)) return com.codename1.ui.util.ImageIO.class;
-        if ("com.codename1.ui.util.MutableResouce".equals(name)) return com.codename1.ui.util.MutableResouce.class;
-        if ("com.codename1.ui.util.MutableResource".equals(name)) return com.codename1.ui.util.MutableResource.class;
-        if ("com.codename1.ui.util.Resources".equals(name)) return com.codename1.ui.util.Resources.class;
-        if ("com.codename1.ui.util.SwipeBackSupport".equals(name)) return com.codename1.ui.util.SwipeBackSupport.class;
-        if ("com.codename1.ui.util.UIBuilder".equals(name)) return com.codename1.ui.util.UIBuilder.class;
-        if ("com.codename1.ui.util.UITimer".equals(name)) return com.codename1.ui.util.UITimer.class;
-        if ("com.codename1.ui.util.WeakHashMap".equals(name)) return com.codename1.ui.util.WeakHashMap.class;
+        if ("com.codename1.ui.util.Effects".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.Effects");
+            }
+            return com.codename1.ui.util.Effects.class;
+        }
+        if ("com.codename1.ui.util.EmbeddedContainer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.EmbeddedContainer");
+            }
+            return com.codename1.ui.util.EmbeddedContainer.class;
+        }
+        if ("com.codename1.ui.util.EventDispatcher".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.EventDispatcher");
+            }
+            return com.codename1.ui.util.EventDispatcher.class;
+        }
+        if ("com.codename1.ui.util.GlassTutorial".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.GlassTutorial");
+            }
+            return com.codename1.ui.util.GlassTutorial.class;
+        }
+        if ("com.codename1.ui.util.ImageIO".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.ImageIO");
+            }
+            return com.codename1.ui.util.ImageIO.class;
+        }
+        if ("com.codename1.ui.util.MutableResouce".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.MutableResouce");
+            }
+            return com.codename1.ui.util.MutableResouce.class;
+        }
+        if ("com.codename1.ui.util.MutableResource".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.MutableResource");
+            }
+            return com.codename1.ui.util.MutableResource.class;
+        }
+        if ("com.codename1.ui.util.Resources".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.Resources");
+            }
+            return com.codename1.ui.util.Resources.class;
+        }
+        if ("com.codename1.ui.util.SwipeBackSupport".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.SwipeBackSupport");
+            }
+            return com.codename1.ui.util.SwipeBackSupport.class;
+        }
+        if ("com.codename1.ui.util.UIBuilder".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.UIBuilder");
+            }
+            return com.codename1.ui.util.UIBuilder.class;
+        }
+        if ("com.codename1.ui.util.UITimer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.UITimer");
+            }
+            return com.codename1.ui.util.UITimer.class;
+        }
+        if ("com.codename1.ui.util.WeakHashMap".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.WeakHashMap");
+            }
+            return com.codename1.ui.util.WeakHashMap.class;
+        }
         return null;
     }
 

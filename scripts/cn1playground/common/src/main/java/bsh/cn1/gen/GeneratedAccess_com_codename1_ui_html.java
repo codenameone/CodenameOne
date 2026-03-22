@@ -7,18 +7,78 @@ public final class GeneratedAccess_com_codename1_ui_html {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.html.AsyncDocumentRequestHandler".equals(name)) return com.codename1.ui.html.AsyncDocumentRequestHandler.class;
-        if ("com.codename1.ui.html.AsyncDocumentRequestHandlerImpl".equals(name)) return com.codename1.ui.html.AsyncDocumentRequestHandlerImpl.class;
-        if ("com.codename1.ui.html.DefaultDocumentRequestHandler".equals(name)) return com.codename1.ui.html.DefaultDocumentRequestHandler.class;
-        if ("com.codename1.ui.html.DefaultHTMLCallback".equals(name)) return com.codename1.ui.html.DefaultHTMLCallback.class;
-        if ("com.codename1.ui.html.DocumentInfo".equals(name)) return com.codename1.ui.html.DocumentInfo.class;
-        if ("com.codename1.ui.html.DocumentRequestHandler".equals(name)) return com.codename1.ui.html.DocumentRequestHandler.class;
-        if ("com.codename1.ui.html.HTMLCallback".equals(name)) return com.codename1.ui.html.HTMLCallback.class;
-        if ("com.codename1.ui.html.HTMLComponent".equals(name)) return com.codename1.ui.html.HTMLComponent.class;
-        if ("com.codename1.ui.html.HTMLElement".equals(name)) return com.codename1.ui.html.HTMLElement.class;
-        if ("com.codename1.ui.html.HTMLParser".equals(name)) return com.codename1.ui.html.HTMLParser.class;
-        if ("com.codename1.ui.html.HTMLUtils".equals(name)) return com.codename1.ui.html.HTMLUtils.class;
-        if ("com.codename1.ui.html.IOCallback".equals(name)) return com.codename1.ui.html.IOCallback.class;
+        if ("com.codename1.ui.html.AsyncDocumentRequestHandler".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.AsyncDocumentRequestHandler");
+            }
+            return com.codename1.ui.html.AsyncDocumentRequestHandler.class;
+        }
+        if ("com.codename1.ui.html.AsyncDocumentRequestHandlerImpl".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.AsyncDocumentRequestHandlerImpl");
+            }
+            return com.codename1.ui.html.AsyncDocumentRequestHandlerImpl.class;
+        }
+        if ("com.codename1.ui.html.DefaultDocumentRequestHandler".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.DefaultDocumentRequestHandler");
+            }
+            return com.codename1.ui.html.DefaultDocumentRequestHandler.class;
+        }
+        if ("com.codename1.ui.html.DefaultHTMLCallback".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.DefaultHTMLCallback");
+            }
+            return com.codename1.ui.html.DefaultHTMLCallback.class;
+        }
+        if ("com.codename1.ui.html.DocumentInfo".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.DocumentInfo");
+            }
+            return com.codename1.ui.html.DocumentInfo.class;
+        }
+        if ("com.codename1.ui.html.DocumentRequestHandler".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.DocumentRequestHandler");
+            }
+            return com.codename1.ui.html.DocumentRequestHandler.class;
+        }
+        if ("com.codename1.ui.html.HTMLCallback".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.HTMLCallback");
+            }
+            return com.codename1.ui.html.HTMLCallback.class;
+        }
+        if ("com.codename1.ui.html.HTMLComponent".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.HTMLComponent");
+            }
+            return com.codename1.ui.html.HTMLComponent.class;
+        }
+        if ("com.codename1.ui.html.HTMLElement".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.HTMLElement");
+            }
+            return com.codename1.ui.html.HTMLElement.class;
+        }
+        if ("com.codename1.ui.html.HTMLParser".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.HTMLParser");
+            }
+            return com.codename1.ui.html.HTMLParser.class;
+        }
+        if ("com.codename1.ui.html.HTMLUtils".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.HTMLUtils");
+            }
+            return com.codename1.ui.html.HTMLUtils.class;
+        }
+        if ("com.codename1.ui.html.IOCallback".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.html -> com.codename1.ui.html.IOCallback");
+            }
+            return com.codename1.ui.html.IOCallback.class;
+        }
         return null;
     }
 

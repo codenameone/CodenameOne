@@ -7,12 +7,42 @@ public final class GeneratedAccess_com_codename1_maps_layers {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.maps.layers.AbstractLayer".equals(name)) return com.codename1.maps.layers.AbstractLayer.class;
-        if ("com.codename1.maps.layers.ArrowLinesLayer".equals(name)) return com.codename1.maps.layers.ArrowLinesLayer.class;
-        if ("com.codename1.maps.layers.Layer".equals(name)) return com.codename1.maps.layers.Layer.class;
-        if ("com.codename1.maps.layers.LinesLayer".equals(name)) return com.codename1.maps.layers.LinesLayer.class;
-        if ("com.codename1.maps.layers.PointLayer".equals(name)) return com.codename1.maps.layers.PointLayer.class;
-        if ("com.codename1.maps.layers.PointsLayer".equals(name)) return com.codename1.maps.layers.PointsLayer.class;
+        if ("com.codename1.maps.layers.AbstractLayer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.AbstractLayer");
+            }
+            return com.codename1.maps.layers.AbstractLayer.class;
+        }
+        if ("com.codename1.maps.layers.ArrowLinesLayer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.ArrowLinesLayer");
+            }
+            return com.codename1.maps.layers.ArrowLinesLayer.class;
+        }
+        if ("com.codename1.maps.layers.Layer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.Layer");
+            }
+            return com.codename1.maps.layers.Layer.class;
+        }
+        if ("com.codename1.maps.layers.LinesLayer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.LinesLayer");
+            }
+            return com.codename1.maps.layers.LinesLayer.class;
+        }
+        if ("com.codename1.maps.layers.PointLayer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.PointLayer");
+            }
+            return com.codename1.maps.layers.PointLayer.class;
+        }
+        if ("com.codename1.maps.layers.PointsLayer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.PointsLayer");
+            }
+            return com.codename1.maps.layers.PointsLayer.class;
+        }
         return null;
     }
 

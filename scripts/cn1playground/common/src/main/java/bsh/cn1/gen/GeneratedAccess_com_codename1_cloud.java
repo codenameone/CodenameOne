@@ -7,7 +7,12 @@ public final class GeneratedAccess_com_codename1_cloud {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.cloud.BindTarget".equals(name)) return com.codename1.cloud.BindTarget.class;
+        if ("com.codename1.cloud.BindTarget".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.cloud -> com.codename1.cloud.BindTarget");
+            }
+            return com.codename1.cloud.BindTarget.class;
+        }
         return null;
     }
 

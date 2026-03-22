@@ -7,8 +7,18 @@ public final class GeneratedAccess_com_codename1_codescan {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.codescan.CodeScanner".equals(name)) return com.codename1.codescan.CodeScanner.class;
-        if ("com.codename1.codescan.ScanResult".equals(name)) return com.codename1.codescan.ScanResult.class;
+        if ("com.codename1.codescan.CodeScanner".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.codescan -> com.codename1.codescan.CodeScanner");
+            }
+            return com.codename1.codescan.CodeScanner.class;
+        }
+        if ("com.codename1.codescan.ScanResult".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.codescan -> com.codename1.codescan.ScanResult");
+            }
+            return com.codename1.codescan.ScanResult.class;
+        }
         return null;
     }
 

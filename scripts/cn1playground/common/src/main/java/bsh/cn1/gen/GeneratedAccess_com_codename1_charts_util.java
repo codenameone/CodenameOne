@@ -7,9 +7,24 @@ public final class GeneratedAccess_com_codename1_charts_util {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.charts.util.ColorUtil".equals(name)) return com.codename1.charts.util.ColorUtil.class;
-        if ("com.codename1.charts.util.MathHelper".equals(name)) return com.codename1.charts.util.MathHelper.class;
-        if ("com.codename1.charts.util.NumberFormat".equals(name)) return com.codename1.charts.util.NumberFormat.class;
+        if ("com.codename1.charts.util.ColorUtil".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.util -> com.codename1.charts.util.ColorUtil");
+            }
+            return com.codename1.charts.util.ColorUtil.class;
+        }
+        if ("com.codename1.charts.util.MathHelper".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.util -> com.codename1.charts.util.MathHelper");
+            }
+            return com.codename1.charts.util.MathHelper.class;
+        }
+        if ("com.codename1.charts.util.NumberFormat".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.util -> com.codename1.charts.util.NumberFormat");
+            }
+            return com.codename1.charts.util.NumberFormat.class;
+        }
         return null;
     }
 

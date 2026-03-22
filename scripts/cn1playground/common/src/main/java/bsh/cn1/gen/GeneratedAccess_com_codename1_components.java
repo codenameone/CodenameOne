@@ -7,45 +7,240 @@ public final class GeneratedAccess_com_codename1_components {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.components.Accordion".equals(name)) return com.codename1.components.Accordion.class;
-        if ("com.codename1.components.Ads".equals(name)) return com.codename1.components.Ads.class;
-        if ("com.codename1.components.AudioRecorderComponent".equals(name)) return com.codename1.components.AudioRecorderComponent.class;
-        if ("com.codename1.components.ButtonList".equals(name)) return com.codename1.components.ButtonList.class;
-        if ("com.codename1.components.CheckBoxList".equals(name)) return com.codename1.components.CheckBoxList.class;
-        if ("com.codename1.components.ClearableTextField".equals(name)) return com.codename1.components.ClearableTextField.class;
-        if ("com.codename1.components.FileEncodedImage".equals(name)) return com.codename1.components.FileEncodedImage.class;
-        if ("com.codename1.components.FileEncodedImageAsync".equals(name)) return com.codename1.components.FileEncodedImageAsync.class;
-        if ("com.codename1.components.FileTree".equals(name)) return com.codename1.components.FileTree.class;
-        if ("com.codename1.components.FileTreeModel".equals(name)) return com.codename1.components.FileTreeModel.class;
-        if ("com.codename1.components.FloatingActionButton".equals(name)) return com.codename1.components.FloatingActionButton.class;
-        if ("com.codename1.components.FloatingHint".equals(name)) return com.codename1.components.FloatingHint.class;
-        if ("com.codename1.components.ImageViewer".equals(name)) return com.codename1.components.ImageViewer.class;
-        if ("com.codename1.components.InfiniteProgress".equals(name)) return com.codename1.components.InfiniteProgress.class;
-        if ("com.codename1.components.InfiniteScrollAdapter".equals(name)) return com.codename1.components.InfiniteScrollAdapter.class;
-        if ("com.codename1.components.InteractionDialog".equals(name)) return com.codename1.components.InteractionDialog.class;
-        if ("com.codename1.components.MasterDetail".equals(name)) return com.codename1.components.MasterDetail.class;
-        if ("com.codename1.components.MediaPlayer".equals(name)) return com.codename1.components.MediaPlayer.class;
-        if ("com.codename1.components.MultiButton".equals(name)) return com.codename1.components.MultiButton.class;
-        if ("com.codename1.components.OnOffSwitch".equals(name)) return com.codename1.components.OnOffSwitch.class;
-        if ("com.codename1.components.Progress".equals(name)) return com.codename1.components.Progress.class;
-        if ("com.codename1.components.RSSReader".equals(name)) return com.codename1.components.RSSReader.class;
-        if ("com.codename1.components.RadioButtonList".equals(name)) return com.codename1.components.RadioButtonList.class;
-        if ("com.codename1.components.ReplaceableImage".equals(name)) return com.codename1.components.ReplaceableImage.class;
-        if ("com.codename1.components.ScaleImageButton".equals(name)) return com.codename1.components.ScaleImageButton.class;
-        if ("com.codename1.components.ScaleImageLabel".equals(name)) return com.codename1.components.ScaleImageLabel.class;
-        if ("com.codename1.components.ShareButton".equals(name)) return com.codename1.components.ShareButton.class;
-        if ("com.codename1.components.SignatureComponent".equals(name)) return com.codename1.components.SignatureComponent.class;
-        if ("com.codename1.components.SliderBridge".equals(name)) return com.codename1.components.SliderBridge.class;
-        if ("com.codename1.components.SpanButton".equals(name)) return com.codename1.components.SpanButton.class;
-        if ("com.codename1.components.SpanLabel".equals(name)) return com.codename1.components.SpanLabel.class;
-        if ("com.codename1.components.SpanMultiButton".equals(name)) return com.codename1.components.SpanMultiButton.class;
-        if ("com.codename1.components.SplitPane".equals(name)) return com.codename1.components.SplitPane.class;
-        if ("com.codename1.components.StorageImage".equals(name)) return com.codename1.components.StorageImage.class;
-        if ("com.codename1.components.StorageImageAsync".equals(name)) return com.codename1.components.StorageImageAsync.class;
-        if ("com.codename1.components.Switch".equals(name)) return com.codename1.components.Switch.class;
-        if ("com.codename1.components.SwitchList".equals(name)) return com.codename1.components.SwitchList.class;
-        if ("com.codename1.components.ToastBar".equals(name)) return com.codename1.components.ToastBar.class;
-        if ("com.codename1.components.WebBrowser".equals(name)) return com.codename1.components.WebBrowser.class;
+        if ("com.codename1.components.Accordion".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.Accordion");
+            }
+            return com.codename1.components.Accordion.class;
+        }
+        if ("com.codename1.components.Ads".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.Ads");
+            }
+            return com.codename1.components.Ads.class;
+        }
+        if ("com.codename1.components.AudioRecorderComponent".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.AudioRecorderComponent");
+            }
+            return com.codename1.components.AudioRecorderComponent.class;
+        }
+        if ("com.codename1.components.ButtonList".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ButtonList");
+            }
+            return com.codename1.components.ButtonList.class;
+        }
+        if ("com.codename1.components.CheckBoxList".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.CheckBoxList");
+            }
+            return com.codename1.components.CheckBoxList.class;
+        }
+        if ("com.codename1.components.ClearableTextField".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ClearableTextField");
+            }
+            return com.codename1.components.ClearableTextField.class;
+        }
+        if ("com.codename1.components.FileEncodedImage".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.FileEncodedImage");
+            }
+            return com.codename1.components.FileEncodedImage.class;
+        }
+        if ("com.codename1.components.FileEncodedImageAsync".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.FileEncodedImageAsync");
+            }
+            return com.codename1.components.FileEncodedImageAsync.class;
+        }
+        if ("com.codename1.components.FileTree".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.FileTree");
+            }
+            return com.codename1.components.FileTree.class;
+        }
+        if ("com.codename1.components.FileTreeModel".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.FileTreeModel");
+            }
+            return com.codename1.components.FileTreeModel.class;
+        }
+        if ("com.codename1.components.FloatingActionButton".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.FloatingActionButton");
+            }
+            return com.codename1.components.FloatingActionButton.class;
+        }
+        if ("com.codename1.components.FloatingHint".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.FloatingHint");
+            }
+            return com.codename1.components.FloatingHint.class;
+        }
+        if ("com.codename1.components.ImageViewer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ImageViewer");
+            }
+            return com.codename1.components.ImageViewer.class;
+        }
+        if ("com.codename1.components.InfiniteProgress".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.InfiniteProgress");
+            }
+            return com.codename1.components.InfiniteProgress.class;
+        }
+        if ("com.codename1.components.InfiniteScrollAdapter".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.InfiniteScrollAdapter");
+            }
+            return com.codename1.components.InfiniteScrollAdapter.class;
+        }
+        if ("com.codename1.components.InteractionDialog".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.InteractionDialog");
+            }
+            return com.codename1.components.InteractionDialog.class;
+        }
+        if ("com.codename1.components.MasterDetail".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.MasterDetail");
+            }
+            return com.codename1.components.MasterDetail.class;
+        }
+        if ("com.codename1.components.MediaPlayer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.MediaPlayer");
+            }
+            return com.codename1.components.MediaPlayer.class;
+        }
+        if ("com.codename1.components.MultiButton".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.MultiButton");
+            }
+            return com.codename1.components.MultiButton.class;
+        }
+        if ("com.codename1.components.OnOffSwitch".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.OnOffSwitch");
+            }
+            return com.codename1.components.OnOffSwitch.class;
+        }
+        if ("com.codename1.components.Progress".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.Progress");
+            }
+            return com.codename1.components.Progress.class;
+        }
+        if ("com.codename1.components.RSSReader".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.RSSReader");
+            }
+            return com.codename1.components.RSSReader.class;
+        }
+        if ("com.codename1.components.RadioButtonList".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.RadioButtonList");
+            }
+            return com.codename1.components.RadioButtonList.class;
+        }
+        if ("com.codename1.components.ReplaceableImage".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ReplaceableImage");
+            }
+            return com.codename1.components.ReplaceableImage.class;
+        }
+        if ("com.codename1.components.ScaleImageButton".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ScaleImageButton");
+            }
+            return com.codename1.components.ScaleImageButton.class;
+        }
+        if ("com.codename1.components.ScaleImageLabel".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ScaleImageLabel");
+            }
+            return com.codename1.components.ScaleImageLabel.class;
+        }
+        if ("com.codename1.components.ShareButton".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ShareButton");
+            }
+            return com.codename1.components.ShareButton.class;
+        }
+        if ("com.codename1.components.SignatureComponent".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.SignatureComponent");
+            }
+            return com.codename1.components.SignatureComponent.class;
+        }
+        if ("com.codename1.components.SliderBridge".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.SliderBridge");
+            }
+            return com.codename1.components.SliderBridge.class;
+        }
+        if ("com.codename1.components.SpanButton".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.SpanButton");
+            }
+            return com.codename1.components.SpanButton.class;
+        }
+        if ("com.codename1.components.SpanLabel".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.SpanLabel");
+            }
+            return com.codename1.components.SpanLabel.class;
+        }
+        if ("com.codename1.components.SpanMultiButton".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.SpanMultiButton");
+            }
+            return com.codename1.components.SpanMultiButton.class;
+        }
+        if ("com.codename1.components.SplitPane".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.SplitPane");
+            }
+            return com.codename1.components.SplitPane.class;
+        }
+        if ("com.codename1.components.StorageImage".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.StorageImage");
+            }
+            return com.codename1.components.StorageImage.class;
+        }
+        if ("com.codename1.components.StorageImageAsync".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.StorageImageAsync");
+            }
+            return com.codename1.components.StorageImageAsync.class;
+        }
+        if ("com.codename1.components.Switch".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.Switch");
+            }
+            return com.codename1.components.Switch.class;
+        }
+        if ("com.codename1.components.SwitchList".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.SwitchList");
+            }
+            return com.codename1.components.SwitchList.class;
+        }
+        if ("com.codename1.components.ToastBar".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.ToastBar");
+            }
+            return com.codename1.components.ToastBar.class;
+        }
+        if ("com.codename1.components.WebBrowser".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.components -> com.codename1.components.WebBrowser");
+            }
+            return com.codename1.components.WebBrowser.class;
+        }
         return null;
     }
 

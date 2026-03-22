@@ -7,9 +7,24 @@ public final class GeneratedAccess_com_codename1_plugin_event {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.plugin.event.IsGalleryTypeSupportedEvent".equals(name)) return com.codename1.plugin.event.IsGalleryTypeSupportedEvent.class;
-        if ("com.codename1.plugin.event.OpenGalleryEvent".equals(name)) return com.codename1.plugin.event.OpenGalleryEvent.class;
-        if ("com.codename1.plugin.event.PluginEvent".equals(name)) return com.codename1.plugin.event.PluginEvent.class;
+        if ("com.codename1.plugin.event.IsGalleryTypeSupportedEvent".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.plugin.event -> com.codename1.plugin.event.IsGalleryTypeSupportedEvent");
+            }
+            return com.codename1.plugin.event.IsGalleryTypeSupportedEvent.class;
+        }
+        if ("com.codename1.plugin.event.OpenGalleryEvent".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.plugin.event -> com.codename1.plugin.event.OpenGalleryEvent");
+            }
+            return com.codename1.plugin.event.OpenGalleryEvent.class;
+        }
+        if ("com.codename1.plugin.event.PluginEvent".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.plugin.event -> com.codename1.plugin.event.PluginEvent");
+            }
+            return com.codename1.plugin.event.PluginEvent.class;
+        }
         return null;
     }
 

@@ -7,7 +7,12 @@ public final class GeneratedAccess_com_codename1_annotations {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.annotations.Async".equals(name)) return com.codename1.annotations.Async.class;
+        if ("com.codename1.annotations.Async".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.annotations -> com.codename1.annotations.Async");
+            }
+            return com.codename1.annotations.Async.class;
+        }
         return null;
     }
 

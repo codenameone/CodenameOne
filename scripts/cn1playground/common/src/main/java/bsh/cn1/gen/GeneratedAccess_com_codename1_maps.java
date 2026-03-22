@@ -7,14 +7,54 @@ public final class GeneratedAccess_com_codename1_maps {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.maps.BoundingBox".equals(name)) return com.codename1.maps.BoundingBox.class;
-        if ("com.codename1.maps.Coord".equals(name)) return com.codename1.maps.Coord.class;
-        if ("com.codename1.maps.MapComponent".equals(name)) return com.codename1.maps.MapComponent.class;
-        if ("com.codename1.maps.MapListener".equals(name)) return com.codename1.maps.MapListener.class;
-        if ("com.codename1.maps.Mercator".equals(name)) return com.codename1.maps.Mercator.class;
-        if ("com.codename1.maps.Projection".equals(name)) return com.codename1.maps.Projection.class;
-        if ("com.codename1.maps.ProxyHttpTile".equals(name)) return com.codename1.maps.ProxyHttpTile.class;
-        if ("com.codename1.maps.Tile".equals(name)) return com.codename1.maps.Tile.class;
+        if ("com.codename1.maps.BoundingBox".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.BoundingBox");
+            }
+            return com.codename1.maps.BoundingBox.class;
+        }
+        if ("com.codename1.maps.Coord".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.Coord");
+            }
+            return com.codename1.maps.Coord.class;
+        }
+        if ("com.codename1.maps.MapComponent".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.MapComponent");
+            }
+            return com.codename1.maps.MapComponent.class;
+        }
+        if ("com.codename1.maps.MapListener".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.MapListener");
+            }
+            return com.codename1.maps.MapListener.class;
+        }
+        if ("com.codename1.maps.Mercator".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.Mercator");
+            }
+            return com.codename1.maps.Mercator.class;
+        }
+        if ("com.codename1.maps.Projection".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.Projection");
+            }
+            return com.codename1.maps.Projection.class;
+        }
+        if ("com.codename1.maps.ProxyHttpTile".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.ProxyHttpTile");
+            }
+            return com.codename1.maps.ProxyHttpTile.class;
+        }
+        if ("com.codename1.maps.Tile".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.Tile");
+            }
+            return com.codename1.maps.Tile.class;
+        }
         return null;
     }
 

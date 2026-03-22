@@ -7,10 +7,30 @@ public final class GeneratedAccess_com_codename1_share {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.share.EmailShare".equals(name)) return com.codename1.share.EmailShare.class;
-        if ("com.codename1.share.FacebookShare".equals(name)) return com.codename1.share.FacebookShare.class;
-        if ("com.codename1.share.SMSShare".equals(name)) return com.codename1.share.SMSShare.class;
-        if ("com.codename1.share.ShareService".equals(name)) return com.codename1.share.ShareService.class;
+        if ("com.codename1.share.EmailShare".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.share -> com.codename1.share.EmailShare");
+            }
+            return com.codename1.share.EmailShare.class;
+        }
+        if ("com.codename1.share.FacebookShare".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.share -> com.codename1.share.FacebookShare");
+            }
+            return com.codename1.share.FacebookShare.class;
+        }
+        if ("com.codename1.share.SMSShare".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.share -> com.codename1.share.SMSShare");
+            }
+            return com.codename1.share.SMSShare.class;
+        }
+        if ("com.codename1.share.ShareService".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.share -> com.codename1.share.ShareService");
+            }
+            return com.codename1.share.ShareService.class;
+        }
         return null;
     }
 

@@ -7,8 +7,18 @@ public final class GeneratedAccess_com_codename1_ui_painter {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.painter.BackgroundPainter".equals(name)) return com.codename1.ui.painter.BackgroundPainter.class;
-        if ("com.codename1.ui.painter.PainterChain".equals(name)) return com.codename1.ui.painter.PainterChain.class;
+        if ("com.codename1.ui.painter.BackgroundPainter".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.painter -> com.codename1.ui.painter.BackgroundPainter");
+            }
+            return com.codename1.ui.painter.BackgroundPainter.class;
+        }
+        if ("com.codename1.ui.painter.PainterChain".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.painter -> com.codename1.ui.painter.PainterChain");
+            }
+            return com.codename1.ui.painter.PainterChain.class;
+        }
         return null;
     }
 

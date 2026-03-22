@@ -7,14 +7,54 @@ public final class GeneratedAccess_com_codename1_ui_scene {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.scene.Bounds".equals(name)) return com.codename1.ui.scene.Bounds.class;
-        if ("com.codename1.ui.scene.Camera".equals(name)) return com.codename1.ui.scene.Camera.class;
-        if ("com.codename1.ui.scene.Node".equals(name)) return com.codename1.ui.scene.Node.class;
-        if ("com.codename1.ui.scene.NodePainter".equals(name)) return com.codename1.ui.scene.NodePainter.class;
-        if ("com.codename1.ui.scene.PerspectiveCamera".equals(name)) return com.codename1.ui.scene.PerspectiveCamera.class;
-        if ("com.codename1.ui.scene.Point3D".equals(name)) return com.codename1.ui.scene.Point3D.class;
-        if ("com.codename1.ui.scene.Scene".equals(name)) return com.codename1.ui.scene.Scene.class;
-        if ("com.codename1.ui.scene.TextPainter".equals(name)) return com.codename1.ui.scene.TextPainter.class;
+        if ("com.codename1.ui.scene.Bounds".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.Bounds");
+            }
+            return com.codename1.ui.scene.Bounds.class;
+        }
+        if ("com.codename1.ui.scene.Camera".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.Camera");
+            }
+            return com.codename1.ui.scene.Camera.class;
+        }
+        if ("com.codename1.ui.scene.Node".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.Node");
+            }
+            return com.codename1.ui.scene.Node.class;
+        }
+        if ("com.codename1.ui.scene.NodePainter".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.NodePainter");
+            }
+            return com.codename1.ui.scene.NodePainter.class;
+        }
+        if ("com.codename1.ui.scene.PerspectiveCamera".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.PerspectiveCamera");
+            }
+            return com.codename1.ui.scene.PerspectiveCamera.class;
+        }
+        if ("com.codename1.ui.scene.Point3D".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.Point3D");
+            }
+            return com.codename1.ui.scene.Point3D.class;
+        }
+        if ("com.codename1.ui.scene.Scene".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.Scene");
+            }
+            return com.codename1.ui.scene.Scene.class;
+        }
+        if ("com.codename1.ui.scene.TextPainter".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.TextPainter");
+            }
+            return com.codename1.ui.scene.TextPainter.class;
+        }
         return null;
     }
 

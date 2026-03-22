@@ -7,13 +7,48 @@ public final class GeneratedAccess_com_codename1_io_tar {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.io.tar.Octal".equals(name)) return com.codename1.io.tar.Octal.class;
-        if ("com.codename1.io.tar.TarConstants".equals(name)) return com.codename1.io.tar.TarConstants.class;
-        if ("com.codename1.io.tar.TarEntry".equals(name)) return com.codename1.io.tar.TarEntry.class;
-        if ("com.codename1.io.tar.TarHeader".equals(name)) return com.codename1.io.tar.TarHeader.class;
-        if ("com.codename1.io.tar.TarInputStream".equals(name)) return com.codename1.io.tar.TarInputStream.class;
-        if ("com.codename1.io.tar.TarOutputStream".equals(name)) return com.codename1.io.tar.TarOutputStream.class;
-        if ("com.codename1.io.tar.TarUtils".equals(name)) return com.codename1.io.tar.TarUtils.class;
+        if ("com.codename1.io.tar.Octal".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.Octal");
+            }
+            return com.codename1.io.tar.Octal.class;
+        }
+        if ("com.codename1.io.tar.TarConstants".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarConstants");
+            }
+            return com.codename1.io.tar.TarConstants.class;
+        }
+        if ("com.codename1.io.tar.TarEntry".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarEntry");
+            }
+            return com.codename1.io.tar.TarEntry.class;
+        }
+        if ("com.codename1.io.tar.TarHeader".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarHeader");
+            }
+            return com.codename1.io.tar.TarHeader.class;
+        }
+        if ("com.codename1.io.tar.TarInputStream".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarInputStream");
+            }
+            return com.codename1.io.tar.TarInputStream.class;
+        }
+        if ("com.codename1.io.tar.TarOutputStream".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarOutputStream");
+            }
+            return com.codename1.io.tar.TarOutputStream.class;
+        }
+        if ("com.codename1.io.tar.TarUtils".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarUtils");
+            }
+            return com.codename1.io.tar.TarUtils.class;
+        }
         return null;
     }
 

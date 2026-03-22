@@ -7,11 +7,36 @@ public final class GeneratedAccess_java_text {
     }
 
     public static Class<?> findClass(String name) {
-        if ("java.text.DateFormat".equals(name)) return java.text.DateFormat.class;
-        if ("java.text.DateFormatSymbols".equals(name)) return java.text.DateFormatSymbols.class;
-        if ("java.text.Format".equals(name)) return java.text.Format.class;
-        if ("java.text.ParseException".equals(name)) return java.text.ParseException.class;
-        if ("java.text.SimpleDateFormat".equals(name)) return java.text.SimpleDateFormat.class;
+        if ("java.text.DateFormat".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.text -> java.text.DateFormat");
+            }
+            return java.text.DateFormat.class;
+        }
+        if ("java.text.DateFormatSymbols".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.text -> java.text.DateFormatSymbols");
+            }
+            return java.text.DateFormatSymbols.class;
+        }
+        if ("java.text.Format".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.text -> java.text.Format");
+            }
+            return java.text.Format.class;
+        }
+        if ("java.text.ParseException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.text -> java.text.ParseException");
+            }
+            return java.text.ParseException.class;
+        }
+        if ("java.text.SimpleDateFormat".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.text -> java.text.SimpleDateFormat");
+            }
+            return java.text.SimpleDateFormat.class;
+        }
         return null;
     }
 

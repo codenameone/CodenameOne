@@ -7,16 +7,66 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.animations.Animation".equals(name)) return com.codename1.ui.animations.Animation.class;
-        if ("com.codename1.ui.animations.AnimationObject".equals(name)) return com.codename1.ui.animations.AnimationObject.class;
-        if ("com.codename1.ui.animations.BubbleTransition".equals(name)) return com.codename1.ui.animations.BubbleTransition.class;
-        if ("com.codename1.ui.animations.CommonTransitions".equals(name)) return com.codename1.ui.animations.CommonTransitions.class;
-        if ("com.codename1.ui.animations.ComponentAnimation".equals(name)) return com.codename1.ui.animations.ComponentAnimation.class;
-        if ("com.codename1.ui.animations.FlipTransition".equals(name)) return com.codename1.ui.animations.FlipTransition.class;
-        if ("com.codename1.ui.animations.MorphTransition".equals(name)) return com.codename1.ui.animations.MorphTransition.class;
-        if ("com.codename1.ui.animations.Motion".equals(name)) return com.codename1.ui.animations.Motion.class;
-        if ("com.codename1.ui.animations.Timeline".equals(name)) return com.codename1.ui.animations.Timeline.class;
-        if ("com.codename1.ui.animations.Transition".equals(name)) return com.codename1.ui.animations.Transition.class;
+        if ("com.codename1.ui.animations.Animation".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.Animation");
+            }
+            return com.codename1.ui.animations.Animation.class;
+        }
+        if ("com.codename1.ui.animations.AnimationObject".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.AnimationObject");
+            }
+            return com.codename1.ui.animations.AnimationObject.class;
+        }
+        if ("com.codename1.ui.animations.BubbleTransition".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.BubbleTransition");
+            }
+            return com.codename1.ui.animations.BubbleTransition.class;
+        }
+        if ("com.codename1.ui.animations.CommonTransitions".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.CommonTransitions");
+            }
+            return com.codename1.ui.animations.CommonTransitions.class;
+        }
+        if ("com.codename1.ui.animations.ComponentAnimation".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.ComponentAnimation");
+            }
+            return com.codename1.ui.animations.ComponentAnimation.class;
+        }
+        if ("com.codename1.ui.animations.FlipTransition".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.FlipTransition");
+            }
+            return com.codename1.ui.animations.FlipTransition.class;
+        }
+        if ("com.codename1.ui.animations.MorphTransition".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.MorphTransition");
+            }
+            return com.codename1.ui.animations.MorphTransition.class;
+        }
+        if ("com.codename1.ui.animations.Motion".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.Motion");
+            }
+            return com.codename1.ui.animations.Motion.class;
+        }
+        if ("com.codename1.ui.animations.Timeline".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.Timeline");
+            }
+            return com.codename1.ui.animations.Timeline.class;
+        }
+        if ("com.codename1.ui.animations.Transition".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.Transition");
+            }
+            return com.codename1.ui.animations.Transition.class;
+        }
         return null;
     }
 

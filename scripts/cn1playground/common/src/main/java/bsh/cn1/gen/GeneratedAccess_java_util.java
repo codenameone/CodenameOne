@@ -7,60 +7,330 @@ public final class GeneratedAccess_java_util {
     }
 
     public static Class<?> findClass(String name) {
-        if ("java.util.AbstractCollection".equals(name)) return java.util.AbstractCollection.class;
-        if ("java.util.AbstractList".equals(name)) return java.util.AbstractList.class;
-        if ("java.util.AbstractMap".equals(name)) return java.util.AbstractMap.class;
-        if ("java.util.AbstractQueue".equals(name)) return java.util.AbstractQueue.class;
-        if ("java.util.AbstractSequentialList".equals(name)) return java.util.AbstractSequentialList.class;
-        if ("java.util.AbstractSet".equals(name)) return java.util.AbstractSet.class;
-        if ("java.util.ArrayDeque".equals(name)) return java.util.ArrayDeque.class;
-        if ("java.util.ArrayList".equals(name)) return java.util.ArrayList.class;
-        if ("java.util.Arrays".equals(name)) return java.util.Arrays.class;
-        if ("java.util.BitSet".equals(name)) return java.util.BitSet.class;
-        if ("java.util.Calendar".equals(name)) return java.util.Calendar.class;
-        if ("java.util.Collection".equals(name)) return java.util.Collection.class;
-        if ("java.util.Collections".equals(name)) return java.util.Collections.class;
-        if ("java.util.Comparator".equals(name)) return java.util.Comparator.class;
-        if ("java.util.ConcurrentModificationException".equals(name)) return java.util.ConcurrentModificationException.class;
-        if ("java.util.Date".equals(name)) return java.util.Date.class;
-        if ("java.util.Deque".equals(name)) return java.util.Deque.class;
-        if ("java.util.Dictionary".equals(name)) return java.util.Dictionary.class;
-        if ("java.util.EmptyStackException".equals(name)) return java.util.EmptyStackException.class;
-        if ("java.util.Enumeration".equals(name)) return java.util.Enumeration.class;
-        if ("java.util.EventListener".equals(name)) return java.util.EventListener.class;
-        if ("java.util.HashMap".equals(name)) return java.util.HashMap.class;
-        if ("java.util.HashSet".equals(name)) return java.util.HashSet.class;
-        if ("java.util.Hashtable".equals(name)) return java.util.Hashtable.class;
-        if ("java.util.IdentityHashMap".equals(name)) return java.util.IdentityHashMap.class;
-        if ("java.util.Iterator".equals(name)) return java.util.Iterator.class;
-        if ("java.util.LinkedHashMap".equals(name)) return java.util.LinkedHashMap.class;
-        if ("java.util.LinkedHashSet".equals(name)) return java.util.LinkedHashSet.class;
-        if ("java.util.LinkedList".equals(name)) return java.util.LinkedList.class;
-        if ("java.util.List".equals(name)) return java.util.List.class;
-        if ("java.util.ListIterator".equals(name)) return java.util.ListIterator.class;
-        if ("java.util.Locale".equals(name)) return java.util.Locale.class;
-        if ("java.util.Map".equals(name)) return java.util.Map.class;
-        if ("java.util.NavigableMap".equals(name)) return java.util.NavigableMap.class;
-        if ("java.util.NavigableSet".equals(name)) return java.util.NavigableSet.class;
-        if ("java.util.NoSuchElementException".equals(name)) return java.util.NoSuchElementException.class;
-        if ("java.util.Objects".equals(name)) return java.util.Objects.class;
-        if ("java.util.Observable".equals(name)) return java.util.Observable.class;
-        if ("java.util.Observer".equals(name)) return java.util.Observer.class;
-        if ("java.util.PriorityQueue".equals(name)) return java.util.PriorityQueue.class;
-        if ("java.util.Queue".equals(name)) return java.util.Queue.class;
-        if ("java.util.Random".equals(name)) return java.util.Random.class;
-        if ("java.util.RandomAccess".equals(name)) return java.util.RandomAccess.class;
-        if ("java.util.Set".equals(name)) return java.util.Set.class;
-        if ("java.util.SortedMap".equals(name)) return java.util.SortedMap.class;
-        if ("java.util.SortedSet".equals(name)) return java.util.SortedSet.class;
-        if ("java.util.Stack".equals(name)) return java.util.Stack.class;
-        if ("java.util.StringTokenizer".equals(name)) return java.util.StringTokenizer.class;
-        if ("java.util.TimeZone".equals(name)) return java.util.TimeZone.class;
-        if ("java.util.Timer".equals(name)) return java.util.Timer.class;
-        if ("java.util.TimerTask".equals(name)) return java.util.TimerTask.class;
-        if ("java.util.TreeMap".equals(name)) return java.util.TreeMap.class;
-        if ("java.util.TreeSet".equals(name)) return java.util.TreeSet.class;
-        if ("java.util.Vector".equals(name)) return java.util.Vector.class;
+        if ("java.util.AbstractCollection".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.AbstractCollection");
+            }
+            return java.util.AbstractCollection.class;
+        }
+        if ("java.util.AbstractList".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.AbstractList");
+            }
+            return java.util.AbstractList.class;
+        }
+        if ("java.util.AbstractMap".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.AbstractMap");
+            }
+            return java.util.AbstractMap.class;
+        }
+        if ("java.util.AbstractQueue".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.AbstractQueue");
+            }
+            return java.util.AbstractQueue.class;
+        }
+        if ("java.util.AbstractSequentialList".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.AbstractSequentialList");
+            }
+            return java.util.AbstractSequentialList.class;
+        }
+        if ("java.util.AbstractSet".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.AbstractSet");
+            }
+            return java.util.AbstractSet.class;
+        }
+        if ("java.util.ArrayDeque".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.ArrayDeque");
+            }
+            return java.util.ArrayDeque.class;
+        }
+        if ("java.util.ArrayList".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.ArrayList");
+            }
+            return java.util.ArrayList.class;
+        }
+        if ("java.util.Arrays".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Arrays");
+            }
+            return java.util.Arrays.class;
+        }
+        if ("java.util.BitSet".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.BitSet");
+            }
+            return java.util.BitSet.class;
+        }
+        if ("java.util.Calendar".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Calendar");
+            }
+            return java.util.Calendar.class;
+        }
+        if ("java.util.Collection".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Collection");
+            }
+            return java.util.Collection.class;
+        }
+        if ("java.util.Collections".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Collections");
+            }
+            return java.util.Collections.class;
+        }
+        if ("java.util.Comparator".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Comparator");
+            }
+            return java.util.Comparator.class;
+        }
+        if ("java.util.ConcurrentModificationException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.ConcurrentModificationException");
+            }
+            return java.util.ConcurrentModificationException.class;
+        }
+        if ("java.util.Date".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Date");
+            }
+            return java.util.Date.class;
+        }
+        if ("java.util.Deque".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Deque");
+            }
+            return java.util.Deque.class;
+        }
+        if ("java.util.Dictionary".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Dictionary");
+            }
+            return java.util.Dictionary.class;
+        }
+        if ("java.util.EmptyStackException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.EmptyStackException");
+            }
+            return java.util.EmptyStackException.class;
+        }
+        if ("java.util.Enumeration".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Enumeration");
+            }
+            return java.util.Enumeration.class;
+        }
+        if ("java.util.EventListener".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.EventListener");
+            }
+            return java.util.EventListener.class;
+        }
+        if ("java.util.HashMap".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.HashMap");
+            }
+            return java.util.HashMap.class;
+        }
+        if ("java.util.HashSet".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.HashSet");
+            }
+            return java.util.HashSet.class;
+        }
+        if ("java.util.Hashtable".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Hashtable");
+            }
+            return java.util.Hashtable.class;
+        }
+        if ("java.util.IdentityHashMap".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.IdentityHashMap");
+            }
+            return java.util.IdentityHashMap.class;
+        }
+        if ("java.util.Iterator".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Iterator");
+            }
+            return java.util.Iterator.class;
+        }
+        if ("java.util.LinkedHashMap".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.LinkedHashMap");
+            }
+            return java.util.LinkedHashMap.class;
+        }
+        if ("java.util.LinkedHashSet".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.LinkedHashSet");
+            }
+            return java.util.LinkedHashSet.class;
+        }
+        if ("java.util.LinkedList".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.LinkedList");
+            }
+            return java.util.LinkedList.class;
+        }
+        if ("java.util.List".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.List");
+            }
+            return java.util.List.class;
+        }
+        if ("java.util.ListIterator".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.ListIterator");
+            }
+            return java.util.ListIterator.class;
+        }
+        if ("java.util.Locale".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Locale");
+            }
+            return java.util.Locale.class;
+        }
+        if ("java.util.Map".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Map");
+            }
+            return java.util.Map.class;
+        }
+        if ("java.util.NavigableMap".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.NavigableMap");
+            }
+            return java.util.NavigableMap.class;
+        }
+        if ("java.util.NavigableSet".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.NavigableSet");
+            }
+            return java.util.NavigableSet.class;
+        }
+        if ("java.util.NoSuchElementException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.NoSuchElementException");
+            }
+            return java.util.NoSuchElementException.class;
+        }
+        if ("java.util.Objects".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Objects");
+            }
+            return java.util.Objects.class;
+        }
+        if ("java.util.Observable".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Observable");
+            }
+            return java.util.Observable.class;
+        }
+        if ("java.util.Observer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Observer");
+            }
+            return java.util.Observer.class;
+        }
+        if ("java.util.PriorityQueue".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.PriorityQueue");
+            }
+            return java.util.PriorityQueue.class;
+        }
+        if ("java.util.Queue".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Queue");
+            }
+            return java.util.Queue.class;
+        }
+        if ("java.util.Random".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Random");
+            }
+            return java.util.Random.class;
+        }
+        if ("java.util.RandomAccess".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.RandomAccess");
+            }
+            return java.util.RandomAccess.class;
+        }
+        if ("java.util.Set".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Set");
+            }
+            return java.util.Set.class;
+        }
+        if ("java.util.SortedMap".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.SortedMap");
+            }
+            return java.util.SortedMap.class;
+        }
+        if ("java.util.SortedSet".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.SortedSet");
+            }
+            return java.util.SortedSet.class;
+        }
+        if ("java.util.Stack".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Stack");
+            }
+            return java.util.Stack.class;
+        }
+        if ("java.util.StringTokenizer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.StringTokenizer");
+            }
+            return java.util.StringTokenizer.class;
+        }
+        if ("java.util.TimeZone".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.TimeZone");
+            }
+            return java.util.TimeZone.class;
+        }
+        if ("java.util.Timer".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Timer");
+            }
+            return java.util.Timer.class;
+        }
+        if ("java.util.TimerTask".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.TimerTask");
+            }
+            return java.util.TimerTask.class;
+        }
+        if ("java.util.TreeMap".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.TreeMap");
+            }
+            return java.util.TreeMap.class;
+        }
+        if ("java.util.TreeSet".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.TreeSet");
+            }
+            return java.util.TreeSet.class;
+        }
+        if ("java.util.Vector".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.util -> java.util.Vector");
+            }
+            return java.util.Vector.class;
+        }
         return null;
     }
 

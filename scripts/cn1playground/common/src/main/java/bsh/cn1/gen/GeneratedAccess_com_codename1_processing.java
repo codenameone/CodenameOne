@@ -7,7 +7,12 @@ public final class GeneratedAccess_com_codename1_processing {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.processing.Result".equals(name)) return com.codename1.processing.Result.class;
+        if ("com.codename1.processing.Result".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.processing -> com.codename1.processing.Result");
+            }
+            return com.codename1.processing.Result.class;
+        }
         return null;
     }
 

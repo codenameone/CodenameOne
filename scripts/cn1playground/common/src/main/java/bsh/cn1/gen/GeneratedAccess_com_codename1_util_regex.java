@@ -7,19 +7,84 @@ public final class GeneratedAccess_com_codename1_util_regex {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.util.regex.CharacterArrayCharacterIterator".equals(name)) return com.codename1.util.regex.CharacterArrayCharacterIterator.class;
-        if ("com.codename1.util.regex.CharacterIterator".equals(name)) return com.codename1.util.regex.CharacterIterator.class;
-        if ("com.codename1.util.regex.RE".equals(name)) return com.codename1.util.regex.RE.class;
-        if ("com.codename1.util.regex.RECharacter".equals(name)) return com.codename1.util.regex.RECharacter.class;
-        if ("com.codename1.util.regex.RECompiler".equals(name)) return com.codename1.util.regex.RECompiler.class;
-        if ("com.codename1.util.regex.REDebugCompiler".equals(name)) return com.codename1.util.regex.REDebugCompiler.class;
-        if ("com.codename1.util.regex.REProgram".equals(name)) return com.codename1.util.regex.REProgram.class;
-        if ("com.codename1.util.regex.RESyntaxException".equals(name)) return com.codename1.util.regex.RESyntaxException.class;
-        if ("com.codename1.util.regex.REUtil".equals(name)) return com.codename1.util.regex.REUtil.class;
-        if ("com.codename1.util.regex.ReaderCharacterIterator".equals(name)) return com.codename1.util.regex.ReaderCharacterIterator.class;
-        if ("com.codename1.util.regex.StreamCharacterIterator".equals(name)) return com.codename1.util.regex.StreamCharacterIterator.class;
-        if ("com.codename1.util.regex.StringCharacterIterator".equals(name)) return com.codename1.util.regex.StringCharacterIterator.class;
-        if ("com.codename1.util.regex.StringReader".equals(name)) return com.codename1.util.regex.StringReader.class;
+        if ("com.codename1.util.regex.CharacterArrayCharacterIterator".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.regex -> com.codename1.util.regex.CharacterArrayCharacterIterator");
+            }
+            return com.codename1.util.regex.CharacterArrayCharacterIterator.class;
+        }
+        if ("com.codename1.util.regex.CharacterIterator".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.regex -> com.codename1.util.regex.CharacterIterator");
+            }
+            return com.codename1.util.regex.CharacterIterator.class;
+        }
+        if ("com.codename1.util.regex.RE".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.regex -> com.codename1.util.regex.RE");
+            }
+            return com.codename1.util.regex.RE.class;
+        }
+        if ("com.codename1.util.regex.RECharacter".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.regex -> com.codename1.util.regex.RECharacter");
+            }
+            return com.codename1.util.regex.RECharacter.class;
+        }
+        if ("com.codename1.util.regex.RECompiler".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.regex -> com.codename1.util.regex.RECompiler");
+            }
+            return com.codename1.util.regex.RECompiler.class;
+        }
+        if ("com.codename1.util.regex.REDebugCompiler".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.regex -> com.codename1.util.regex.REDebugCompiler");
+            }
+            return com.codename1.util.regex.REDebugCompiler.class;
+        }
+        if ("com.codename1.util.regex.REProgram".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.regex -> com.codename1.util.regex.REProgram");
+            }
+            return com.codename1.util.regex.REProgram.class;
+        }
+        if ("com.codename1.util.regex.RESyntaxException".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.regex -> com.codename1.util.regex.RESyntaxException");
+            }
+            return com.codename1.util.regex.RESyntaxException.class;
+        }
+        if ("com.codename1.util.regex.REUtil".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.regex -> com.codename1.util.regex.REUtil");
+            }
+            return com.codename1.util.regex.REUtil.class;
+        }
+        if ("com.codename1.util.regex.ReaderCharacterIterator".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.regex -> com.codename1.util.regex.ReaderCharacterIterator");
+            }
+            return com.codename1.util.regex.ReaderCharacterIterator.class;
+        }
+        if ("com.codename1.util.regex.StreamCharacterIterator".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.regex -> com.codename1.util.regex.StreamCharacterIterator");
+            }
+            return com.codename1.util.regex.StreamCharacterIterator.class;
+        }
+        if ("com.codename1.util.regex.StringCharacterIterator".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.regex -> com.codename1.util.regex.StringCharacterIterator");
+            }
+            return com.codename1.util.regex.StringCharacterIterator.class;
+        }
+        if ("com.codename1.util.regex.StringReader".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.regex -> com.codename1.util.regex.StringReader");
+            }
+            return com.codename1.util.regex.StringReader.class;
+        }
         return null;
     }
 

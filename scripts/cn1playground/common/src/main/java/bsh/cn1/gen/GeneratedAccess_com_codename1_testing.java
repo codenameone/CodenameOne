@@ -7,12 +7,42 @@ public final class GeneratedAccess_com_codename1_testing {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.testing.AbstractTest".equals(name)) return com.codename1.testing.AbstractTest.class;
-        if ("com.codename1.testing.DeviceRunner".equals(name)) return com.codename1.testing.DeviceRunner.class;
-        if ("com.codename1.testing.TestReporting".equals(name)) return com.codename1.testing.TestReporting.class;
-        if ("com.codename1.testing.TestRunnerComponent".equals(name)) return com.codename1.testing.TestRunnerComponent.class;
-        if ("com.codename1.testing.TestUtils".equals(name)) return com.codename1.testing.TestUtils.class;
-        if ("com.codename1.testing.UnitTest".equals(name)) return com.codename1.testing.UnitTest.class;
+        if ("com.codename1.testing.AbstractTest".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.testing -> com.codename1.testing.AbstractTest");
+            }
+            return com.codename1.testing.AbstractTest.class;
+        }
+        if ("com.codename1.testing.DeviceRunner".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.testing -> com.codename1.testing.DeviceRunner");
+            }
+            return com.codename1.testing.DeviceRunner.class;
+        }
+        if ("com.codename1.testing.TestReporting".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.testing -> com.codename1.testing.TestReporting");
+            }
+            return com.codename1.testing.TestReporting.class;
+        }
+        if ("com.codename1.testing.TestRunnerComponent".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.testing -> com.codename1.testing.TestRunnerComponent");
+            }
+            return com.codename1.testing.TestRunnerComponent.class;
+        }
+        if ("com.codename1.testing.TestUtils".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.testing -> com.codename1.testing.TestUtils");
+            }
+            return com.codename1.testing.TestUtils.class;
+        }
+        if ("com.codename1.testing.UnitTest".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.testing -> com.codename1.testing.UnitTest");
+            }
+            return com.codename1.testing.UnitTest.class;
+        }
         return null;
     }
 

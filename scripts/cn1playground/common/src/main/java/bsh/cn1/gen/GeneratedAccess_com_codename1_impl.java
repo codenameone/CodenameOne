@@ -7,11 +7,36 @@ public final class GeneratedAccess_com_codename1_impl {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.impl.CodenameOneImplementation".equals(name)) return com.codename1.impl.CodenameOneImplementation.class;
-        if ("com.codename1.impl.CodenameOneThread".equals(name)) return com.codename1.impl.CodenameOneThread.class;
-        if ("com.codename1.impl.FullScreenAdService".equals(name)) return com.codename1.impl.FullScreenAdService.class;
-        if ("com.codename1.impl.VServAds".equals(name)) return com.codename1.impl.VServAds.class;
-        if ("com.codename1.impl.VirtualKeyboardInterface".equals(name)) return com.codename1.impl.VirtualKeyboardInterface.class;
+        if ("com.codename1.impl.CodenameOneImplementation".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.impl -> com.codename1.impl.CodenameOneImplementation");
+            }
+            return com.codename1.impl.CodenameOneImplementation.class;
+        }
+        if ("com.codename1.impl.CodenameOneThread".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.impl -> com.codename1.impl.CodenameOneThread");
+            }
+            return com.codename1.impl.CodenameOneThread.class;
+        }
+        if ("com.codename1.impl.FullScreenAdService".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.impl -> com.codename1.impl.FullScreenAdService");
+            }
+            return com.codename1.impl.FullScreenAdService.class;
+        }
+        if ("com.codename1.impl.VServAds".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.impl -> com.codename1.impl.VServAds");
+            }
+            return com.codename1.impl.VServAds.class;
+        }
+        if ("com.codename1.impl.VirtualKeyboardInterface".equals(name)) {
+            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+                com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.impl -> com.codename1.impl.VirtualKeyboardInterface");
+            }
+            return com.codename1.impl.VirtualKeyboardInterface.class;
+        }
         return null;
     }
 
