@@ -7,63 +7,79 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.plaf.Border".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("Border".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.Border");
             }
             return com.codename1.ui.plaf.Border.class;
         }
-        if ("com.codename1.ui.plaf.CSSBorder".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("CSSBorder".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.CSSBorder");
             }
             return com.codename1.ui.plaf.CSSBorder.class;
         }
-        if ("com.codename1.ui.plaf.DefaultLookAndFeel".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("DefaultLookAndFeel".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.DefaultLookAndFeel");
             }
             return com.codename1.ui.plaf.DefaultLookAndFeel.class;
         }
-        if ("com.codename1.ui.plaf.LookAndFeel".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("LookAndFeel".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.LookAndFeel");
             }
             return com.codename1.ui.plaf.LookAndFeel.class;
         }
-        if ("com.codename1.ui.plaf.RoundBorder".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("RoundBorder".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.RoundBorder");
             }
             return com.codename1.ui.plaf.RoundBorder.class;
         }
-        if ("com.codename1.ui.plaf.RoundRectBorder".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("RoundRectBorder".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.RoundRectBorder");
             }
             return com.codename1.ui.plaf.RoundRectBorder.class;
         }
-        if ("com.codename1.ui.plaf.Style".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Style".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.Style");
             }
             return com.codename1.ui.plaf.Style.class;
         }
-        if ("com.codename1.ui.plaf.StyleParser".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("StyleParser".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.StyleParser");
             }
             return com.codename1.ui.plaf.StyleParser.class;
         }
-        if ("com.codename1.ui.plaf.UIManager".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("UIManager".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.plaf -> com.codename1.ui.plaf.UIManager");
             }
             return com.codename1.ui.plaf.UIManager.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.ui.plaf.CSSBorder.class) {

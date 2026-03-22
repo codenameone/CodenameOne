@@ -7,189 +7,205 @@ public final class GeneratedAccess_com_codename1_io {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.io.AccessToken".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("AccessToken".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.AccessToken");
             }
             return com.codename1.io.AccessToken.class;
         }
-        if ("com.codename1.io.BufferedInputStream".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("BufferedInputStream".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.BufferedInputStream");
             }
             return com.codename1.io.BufferedInputStream.class;
         }
-        if ("com.codename1.io.BufferedOutputStream".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("BufferedOutputStream".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.BufferedOutputStream");
             }
             return com.codename1.io.BufferedOutputStream.class;
         }
-        if ("com.codename1.io.CSVParser".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("CSVParser".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.CSVParser");
             }
             return com.codename1.io.CSVParser.class;
         }
-        if ("com.codename1.io.CacheMap".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("CacheMap".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.CacheMap");
             }
             return com.codename1.io.CacheMap.class;
         }
-        if ("com.codename1.io.CharArrayReader".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("CharArrayReader".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.CharArrayReader");
             }
             return com.codename1.io.CharArrayReader.class;
         }
-        if ("com.codename1.io.ConnectionRequest".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ConnectionRequest".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.ConnectionRequest");
             }
             return com.codename1.io.ConnectionRequest.class;
         }
-        if ("com.codename1.io.Cookie".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Cookie".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Cookie");
             }
             return com.codename1.io.Cookie.class;
         }
-        if ("com.codename1.io.Data".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Data".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Data");
             }
             return com.codename1.io.Data.class;
         }
-        if ("com.codename1.io.Externalizable".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Externalizable".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Externalizable");
             }
             return com.codename1.io.Externalizable.class;
         }
-        if ("com.codename1.io.File".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("File".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.File");
             }
             return com.codename1.io.File.class;
         }
-        if ("com.codename1.io.FileSystemStorage".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("FileSystemStorage".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.FileSystemStorage");
             }
             return com.codename1.io.FileSystemStorage.class;
         }
-        if ("com.codename1.io.IOProgressListener".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("IOProgressListener".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.IOProgressListener");
             }
             return com.codename1.io.IOProgressListener.class;
         }
-        if ("com.codename1.io.JSONParseCallback".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("JSONParseCallback".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.JSONParseCallback");
             }
             return com.codename1.io.JSONParseCallback.class;
         }
-        if ("com.codename1.io.JSONParser".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("JSONParser".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.JSONParser");
             }
             return com.codename1.io.JSONParser.class;
         }
-        if ("com.codename1.io.Log".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Log".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Log");
             }
             return com.codename1.io.Log.class;
         }
-        if ("com.codename1.io.MalformedURLException".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MalformedURLException".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.MalformedURLException");
             }
             return com.codename1.io.MalformedURLException.class;
         }
-        if ("com.codename1.io.MultipartRequest".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MultipartRequest".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.MultipartRequest");
             }
             return com.codename1.io.MultipartRequest.class;
         }
-        if ("com.codename1.io.NetworkEvent".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("NetworkEvent".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.NetworkEvent");
             }
             return com.codename1.io.NetworkEvent.class;
         }
-        if ("com.codename1.io.NetworkManager".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("NetworkManager".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.NetworkManager");
             }
             return com.codename1.io.NetworkManager.class;
         }
-        if ("com.codename1.io.Oauth2".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Oauth2".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Oauth2");
             }
             return com.codename1.io.Oauth2.class;
         }
-        if ("com.codename1.io.PreferenceListener".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PreferenceListener".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.PreferenceListener");
             }
             return com.codename1.io.PreferenceListener.class;
         }
-        if ("com.codename1.io.Preferences".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Preferences".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Preferences");
             }
             return com.codename1.io.Preferences.class;
         }
-        if ("com.codename1.io.Properties".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Properties".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Properties");
             }
             return com.codename1.io.Properties.class;
         }
-        if ("com.codename1.io.Socket".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Socket".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Socket");
             }
             return com.codename1.io.Socket.class;
         }
-        if ("com.codename1.io.SocketConnection".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("SocketConnection".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.SocketConnection");
             }
             return com.codename1.io.SocketConnection.class;
         }
-        if ("com.codename1.io.Storage".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Storage".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Storage");
             }
             return com.codename1.io.Storage.class;
         }
-        if ("com.codename1.io.URL".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("URL".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.URL");
             }
             return com.codename1.io.URL.class;
         }
-        if ("com.codename1.io.Util".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Util".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.Util");
             }
             return com.codename1.io.Util.class;
         }
-        if ("com.codename1.io.WebServiceProxyCall".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("WebServiceProxyCall".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io -> com.codename1.io.WebServiceProxyCall");
             }
             return com.codename1.io.WebServiceProxyCall.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.io.AccessToken.class) {

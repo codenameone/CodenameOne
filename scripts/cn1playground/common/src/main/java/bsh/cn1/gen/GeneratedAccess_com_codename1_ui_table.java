@@ -7,45 +7,61 @@ public final class GeneratedAccess_com_codename1_ui_table {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.table.AbstractTableModel".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("AbstractTableModel".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.AbstractTableModel");
             }
             return com.codename1.ui.table.AbstractTableModel.class;
         }
-        if ("com.codename1.ui.table.DefaultTableModel".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("DefaultTableModel".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.DefaultTableModel");
             }
             return com.codename1.ui.table.DefaultTableModel.class;
         }
-        if ("com.codename1.ui.table.SortableTableModel".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("SortableTableModel".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.SortableTableModel");
             }
             return com.codename1.ui.table.SortableTableModel.class;
         }
-        if ("com.codename1.ui.table.Table".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Table".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.Table");
             }
             return com.codename1.ui.table.Table.class;
         }
-        if ("com.codename1.ui.table.TableLayout".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("TableLayout".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.TableLayout");
             }
             return com.codename1.ui.table.TableLayout.class;
         }
-        if ("com.codename1.ui.table.TableModel".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("TableModel".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.table -> com.codename1.ui.table.TableModel");
             }
             return com.codename1.ui.table.TableModel.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.ui.table.DefaultTableModel.class) {

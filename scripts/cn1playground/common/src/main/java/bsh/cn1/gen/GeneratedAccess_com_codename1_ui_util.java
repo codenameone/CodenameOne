@@ -7,81 +7,97 @@ public final class GeneratedAccess_com_codename1_ui_util {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.util.Effects".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("Effects".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.Effects");
             }
             return com.codename1.ui.util.Effects.class;
         }
-        if ("com.codename1.ui.util.EmbeddedContainer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("EmbeddedContainer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.EmbeddedContainer");
             }
             return com.codename1.ui.util.EmbeddedContainer.class;
         }
-        if ("com.codename1.ui.util.EventDispatcher".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("EventDispatcher".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.EventDispatcher");
             }
             return com.codename1.ui.util.EventDispatcher.class;
         }
-        if ("com.codename1.ui.util.GlassTutorial".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("GlassTutorial".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.GlassTutorial");
             }
             return com.codename1.ui.util.GlassTutorial.class;
         }
-        if ("com.codename1.ui.util.ImageIO".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ImageIO".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.ImageIO");
             }
             return com.codename1.ui.util.ImageIO.class;
         }
-        if ("com.codename1.ui.util.MutableResouce".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MutableResouce".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.MutableResouce");
             }
             return com.codename1.ui.util.MutableResouce.class;
         }
-        if ("com.codename1.ui.util.MutableResource".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MutableResource".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.MutableResource");
             }
             return com.codename1.ui.util.MutableResource.class;
         }
-        if ("com.codename1.ui.util.Resources".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Resources".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.Resources");
             }
             return com.codename1.ui.util.Resources.class;
         }
-        if ("com.codename1.ui.util.SwipeBackSupport".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("SwipeBackSupport".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.SwipeBackSupport");
             }
             return com.codename1.ui.util.SwipeBackSupport.class;
         }
-        if ("com.codename1.ui.util.UIBuilder".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("UIBuilder".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.UIBuilder");
             }
             return com.codename1.ui.util.UIBuilder.class;
         }
-        if ("com.codename1.ui.util.UITimer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("UITimer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.UITimer");
             }
             return com.codename1.ui.util.UITimer.class;
         }
-        if ("com.codename1.ui.util.WeakHashMap".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("WeakHashMap".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.util -> com.codename1.ui.util.WeakHashMap");
             }
             return com.codename1.ui.util.WeakHashMap.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.ui.util.EmbeddedContainer.class) {

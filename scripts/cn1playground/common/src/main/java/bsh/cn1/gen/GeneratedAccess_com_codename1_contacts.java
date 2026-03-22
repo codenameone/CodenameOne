@@ -7,33 +7,49 @@ public final class GeneratedAccess_com_codename1_contacts {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.contacts.Address".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("Address".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.contacts -> com.codename1.contacts.Address");
             }
             return com.codename1.contacts.Address.class;
         }
-        if ("com.codename1.contacts.Contact".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Contact".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.contacts -> com.codename1.contacts.Contact");
             }
             return com.codename1.contacts.Contact.class;
         }
-        if ("com.codename1.contacts.ContactsManager".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ContactsManager".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.contacts -> com.codename1.contacts.ContactsManager");
             }
             return com.codename1.contacts.ContactsManager.class;
         }
-        if ("com.codename1.contacts.ContactsModel".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ContactsModel".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.contacts -> com.codename1.contacts.ContactsModel");
             }
             return com.codename1.contacts.ContactsModel.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.contacts.ContactsModel.class) {

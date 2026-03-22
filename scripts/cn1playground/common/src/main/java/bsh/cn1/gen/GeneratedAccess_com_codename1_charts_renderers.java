@@ -7,45 +7,61 @@ public final class GeneratedAccess_com_codename1_charts_renderers {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.charts.renderers.BasicStroke".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("BasicStroke".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.BasicStroke");
             }
             return com.codename1.charts.renderers.BasicStroke.class;
         }
-        if ("com.codename1.charts.renderers.DefaultRenderer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("DefaultRenderer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.DefaultRenderer");
             }
             return com.codename1.charts.renderers.DefaultRenderer.class;
         }
-        if ("com.codename1.charts.renderers.DialRenderer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("DialRenderer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.DialRenderer");
             }
             return com.codename1.charts.renderers.DialRenderer.class;
         }
-        if ("com.codename1.charts.renderers.SimpleSeriesRenderer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("SimpleSeriesRenderer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.SimpleSeriesRenderer");
             }
             return com.codename1.charts.renderers.SimpleSeriesRenderer.class;
         }
-        if ("com.codename1.charts.renderers.XYMultipleSeriesRenderer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("XYMultipleSeriesRenderer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.XYMultipleSeriesRenderer");
             }
             return com.codename1.charts.renderers.XYMultipleSeriesRenderer.class;
         }
-        if ("com.codename1.charts.renderers.XYSeriesRenderer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("XYSeriesRenderer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.renderers -> com.codename1.charts.renderers.XYSeriesRenderer");
             }
             return com.codename1.charts.renderers.XYSeriesRenderer.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.charts.renderers.BasicStroke.class) {

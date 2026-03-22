@@ -7,27 +7,43 @@ public final class GeneratedAccess_com_codename1_util_promise {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.util.promise.ExecutorFunction".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("ExecutorFunction".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.promise -> com.codename1.util.promise.ExecutorFunction");
             }
             return com.codename1.util.promise.ExecutorFunction.class;
         }
-        if ("com.codename1.util.promise.Functor".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Functor".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.promise -> com.codename1.util.promise.Functor");
             }
             return com.codename1.util.promise.Functor.class;
         }
-        if ("com.codename1.util.promise.Promise".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Promise".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.util.promise -> com.codename1.util.promise.Promise");
             }
             return com.codename1.util.promise.Promise.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.util.promise.Promise.class) {

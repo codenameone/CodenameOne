@@ -7,51 +7,67 @@ public final class GeneratedAccess_com_codename1_location {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.location.Geofence".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("Geofence".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.location -> com.codename1.location.Geofence");
             }
             return com.codename1.location.Geofence.class;
         }
-        if ("com.codename1.location.GeofenceListener".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("GeofenceListener".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.location -> com.codename1.location.GeofenceListener");
             }
             return com.codename1.location.GeofenceListener.class;
         }
-        if ("com.codename1.location.GeofenceManager".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("GeofenceManager".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.location -> com.codename1.location.GeofenceManager");
             }
             return com.codename1.location.GeofenceManager.class;
         }
-        if ("com.codename1.location.Location".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Location".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.location -> com.codename1.location.Location");
             }
             return com.codename1.location.Location.class;
         }
-        if ("com.codename1.location.LocationListener".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("LocationListener".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.location -> com.codename1.location.LocationListener");
             }
             return com.codename1.location.LocationListener.class;
         }
-        if ("com.codename1.location.LocationManager".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("LocationManager".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.location -> com.codename1.location.LocationManager");
             }
             return com.codename1.location.LocationManager.class;
         }
-        if ("com.codename1.location.LocationRequest".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("LocationRequest".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.location -> com.codename1.location.LocationRequest");
             }
             return com.codename1.location.LocationRequest.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.location.Geofence.class) {

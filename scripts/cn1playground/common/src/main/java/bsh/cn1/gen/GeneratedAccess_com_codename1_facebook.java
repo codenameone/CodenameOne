@@ -7,51 +7,67 @@ public final class GeneratedAccess_com_codename1_facebook {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.facebook.Album".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("Album".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook -> com.codename1.facebook.Album");
             }
             return com.codename1.facebook.Album.class;
         }
-        if ("com.codename1.facebook.FBObject".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("FBObject".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook -> com.codename1.facebook.FBObject");
             }
             return com.codename1.facebook.FBObject.class;
         }
-        if ("com.codename1.facebook.FaceBookAccess".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("FaceBookAccess".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook -> com.codename1.facebook.FaceBookAccess");
             }
             return com.codename1.facebook.FaceBookAccess.class;
         }
-        if ("com.codename1.facebook.Page".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Page".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook -> com.codename1.facebook.Page");
             }
             return com.codename1.facebook.Page.class;
         }
-        if ("com.codename1.facebook.Photo".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Photo".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook -> com.codename1.facebook.Photo");
             }
             return com.codename1.facebook.Photo.class;
         }
-        if ("com.codename1.facebook.Post".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Post".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook -> com.codename1.facebook.Post");
             }
             return com.codename1.facebook.Post.class;
         }
-        if ("com.codename1.facebook.User".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("User".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.facebook -> com.codename1.facebook.User");
             }
             return com.codename1.facebook.User.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.facebook.Album.class) {

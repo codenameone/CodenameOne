@@ -7,27 +7,43 @@ public final class GeneratedAccess_com_codename1_charts_util {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.charts.util.ColorUtil".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("ColorUtil".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.util -> com.codename1.charts.util.ColorUtil");
             }
             return com.codename1.charts.util.ColorUtil.class;
         }
-        if ("com.codename1.charts.util.MathHelper".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MathHelper".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.util -> com.codename1.charts.util.MathHelper");
             }
             return com.codename1.charts.util.MathHelper.class;
         }
-        if ("com.codename1.charts.util.NumberFormat".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("NumberFormat".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.util -> com.codename1.charts.util.NumberFormat");
             }
             return com.codename1.charts.util.NumberFormat.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         throw unsupportedConstruct(type, safeArgs);

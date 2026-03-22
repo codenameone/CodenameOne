@@ -7,27 +7,43 @@ public final class GeneratedAccess_com_codename1_plugin_event {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.plugin.event.IsGalleryTypeSupportedEvent".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("IsGalleryTypeSupportedEvent".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.plugin.event -> com.codename1.plugin.event.IsGalleryTypeSupportedEvent");
             }
             return com.codename1.plugin.event.IsGalleryTypeSupportedEvent.class;
         }
-        if ("com.codename1.plugin.event.OpenGalleryEvent".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("OpenGalleryEvent".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.plugin.event -> com.codename1.plugin.event.OpenGalleryEvent");
             }
             return com.codename1.plugin.event.OpenGalleryEvent.class;
         }
-        if ("com.codename1.plugin.event.PluginEvent".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PluginEvent".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.plugin.event -> com.codename1.plugin.event.PluginEvent");
             }
             return com.codename1.plugin.event.PluginEvent.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.plugin.event.IsGalleryTypeSupportedEvent.class) {

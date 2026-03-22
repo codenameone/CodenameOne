@@ -7,33 +7,49 @@ public final class GeneratedAccess_com_codename1_charts_transitions {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.charts.transitions.SeriesTransition".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("SeriesTransition".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.transitions -> com.codename1.charts.transitions.SeriesTransition");
             }
             return com.codename1.charts.transitions.SeriesTransition.class;
         }
-        if ("com.codename1.charts.transitions.XYMultiSeriesTransition".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("XYMultiSeriesTransition".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.transitions -> com.codename1.charts.transitions.XYMultiSeriesTransition");
             }
             return com.codename1.charts.transitions.XYMultiSeriesTransition.class;
         }
-        if ("com.codename1.charts.transitions.XYSeriesTransition".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("XYSeriesTransition".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.transitions -> com.codename1.charts.transitions.XYSeriesTransition");
             }
             return com.codename1.charts.transitions.XYSeriesTransition.class;
         }
-        if ("com.codename1.charts.transitions.XYValueSeriesTransition".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("XYValueSeriesTransition".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.transitions -> com.codename1.charts.transitions.XYValueSeriesTransition");
             }
             return com.codename1.charts.transitions.XYValueSeriesTransition.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.charts.transitions.XYMultiSeriesTransition.class) {

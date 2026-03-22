@@ -7,45 +7,61 @@ public final class GeneratedAccess_com_codename1_system {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.system.CrashReport".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("CrashReport".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.system -> com.codename1.system.CrashReport");
             }
             return com.codename1.system.CrashReport.class;
         }
-        if ("com.codename1.system.DefaultCrashReporter".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("DefaultCrashReporter".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.system -> com.codename1.system.DefaultCrashReporter");
             }
             return com.codename1.system.DefaultCrashReporter.class;
         }
-        if ("com.codename1.system.Lifecycle".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Lifecycle".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.system -> com.codename1.system.Lifecycle");
             }
             return com.codename1.system.Lifecycle.class;
         }
-        if ("com.codename1.system.NativeInterface".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("NativeInterface".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.system -> com.codename1.system.NativeInterface");
             }
             return com.codename1.system.NativeInterface.class;
         }
-        if ("com.codename1.system.NativeLookup".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("NativeLookup".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.system -> com.codename1.system.NativeLookup");
             }
             return com.codename1.system.NativeLookup.class;
         }
-        if ("com.codename1.system.URLCallback".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("URLCallback".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.system -> com.codename1.system.URLCallback");
             }
             return com.codename1.system.URLCallback.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         throw unsupportedConstruct(type, safeArgs);

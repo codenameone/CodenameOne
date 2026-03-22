@@ -7,57 +7,73 @@ public final class GeneratedAccess_com_codename1_maps {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.maps.BoundingBox".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("BoundingBox".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.BoundingBox");
             }
             return com.codename1.maps.BoundingBox.class;
         }
-        if ("com.codename1.maps.Coord".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Coord".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.Coord");
             }
             return com.codename1.maps.Coord.class;
         }
-        if ("com.codename1.maps.MapComponent".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MapComponent".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.MapComponent");
             }
             return com.codename1.maps.MapComponent.class;
         }
-        if ("com.codename1.maps.MapListener".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MapListener".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.MapListener");
             }
             return com.codename1.maps.MapListener.class;
         }
-        if ("com.codename1.maps.Mercator".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Mercator".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.Mercator");
             }
             return com.codename1.maps.Mercator.class;
         }
-        if ("com.codename1.maps.Projection".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Projection".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.Projection");
             }
             return com.codename1.maps.Projection.class;
         }
-        if ("com.codename1.maps.ProxyHttpTile".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ProxyHttpTile".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.ProxyHttpTile");
             }
             return com.codename1.maps.ProxyHttpTile.class;
         }
-        if ("com.codename1.maps.Tile".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Tile".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps -> com.codename1.maps.Tile");
             }
             return com.codename1.maps.Tile.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.maps.BoundingBox.class) {

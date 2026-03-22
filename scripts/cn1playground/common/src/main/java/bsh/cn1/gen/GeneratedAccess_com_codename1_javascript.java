@@ -7,27 +7,43 @@ public final class GeneratedAccess_com_codename1_javascript {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.javascript.JSFunction".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("JSFunction".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.javascript -> com.codename1.javascript.JSFunction");
             }
             return com.codename1.javascript.JSFunction.class;
         }
-        if ("com.codename1.javascript.JSObject".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("JSObject".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.javascript -> com.codename1.javascript.JSObject");
             }
             return com.codename1.javascript.JSObject.class;
         }
-        if ("com.codename1.javascript.JavascriptContext".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("JavascriptContext".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.javascript -> com.codename1.javascript.JavascriptContext");
             }
             return com.codename1.javascript.JavascriptContext.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.javascript.JSObject.class) {

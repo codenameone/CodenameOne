@@ -7,51 +7,67 @@ public final class GeneratedAccess_com_codename1_io_tar {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.io.tar.Octal".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("Octal".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.Octal");
             }
             return com.codename1.io.tar.Octal.class;
         }
-        if ("com.codename1.io.tar.TarConstants".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("TarConstants".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarConstants");
             }
             return com.codename1.io.tar.TarConstants.class;
         }
-        if ("com.codename1.io.tar.TarEntry".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("TarEntry".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarEntry");
             }
             return com.codename1.io.tar.TarEntry.class;
         }
-        if ("com.codename1.io.tar.TarHeader".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("TarHeader".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarHeader");
             }
             return com.codename1.io.tar.TarHeader.class;
         }
-        if ("com.codename1.io.tar.TarInputStream".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("TarInputStream".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarInputStream");
             }
             return com.codename1.io.tar.TarInputStream.class;
         }
-        if ("com.codename1.io.tar.TarOutputStream".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("TarOutputStream".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarOutputStream");
             }
             return com.codename1.io.tar.TarOutputStream.class;
         }
-        if ("com.codename1.io.tar.TarUtils".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("TarUtils".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.tar -> com.codename1.io.tar.TarUtils");
             }
             return com.codename1.io.tar.TarUtils.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.io.tar.TarEntry.class) {

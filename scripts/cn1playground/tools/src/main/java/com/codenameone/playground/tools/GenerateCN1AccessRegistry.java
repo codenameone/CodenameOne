@@ -43,6 +43,7 @@ public final class GenerateCN1AccessRegistry {
     private static final String HELPER_PACKAGE = "bsh.cn1.gen";
     private static final String ROOT_CLASS_NAME = "GeneratedCN1Access";
     private static final String HELPER_CLASS_PREFIX = "GeneratedAccess_";
+    private static final int FIND_CLASS_CHUNK_SIZE = 64;
 
     private static final String[] INDEX_PACKAGE_PREFIXES = new String[]{
             "com.codename1.",
@@ -889,6 +890,8 @@ public final class GenerateCN1AccessRegistry {
             writer.write("package " + ROOT_PACKAGE + ";\n\n");
             writer.write("import com.codename1.ui.Form;\n");
             writer.write("import com.codenameone.playground.PlaygroundContext;\n");
+            writer.write("import java.util.LinkedHashMap;\n");
+            writer.write("import java.util.Map;\n");
             for (GeneratedPackage generatedPackage : discovery.packages) {
                 writer.write("import " + HELPER_PACKAGE + "." + generatedPackage.helperClassName + ";\n");
             }
@@ -900,6 +903,7 @@ public final class GenerateCN1AccessRegistry {
             writer.write(" */\n");
             writer.write("public final class " + ROOT_CLASS_NAME + " implements CN1Access {\n");
             writer.write("    public static final " + ROOT_CLASS_NAME + " INSTANCE = new " + ROOT_CLASS_NAME + "();\n\n");
+            writeRootClassIndex(writer, discovery.packages);
             writer.write("    private " + ROOT_CLASS_NAME + "() {\n");
             writer.write("    }\n\n");
             writeRootFindClass(writer, discovery.packages);
@@ -942,24 +946,60 @@ public final class GenerateCN1AccessRegistry {
         writer.write("    @Override\n");
         writer.write("    public Class<?> findClass(String name) {\n");
         writer.write("        if (shouldDebugFindClass(name)) {\n");
-        writer.write("            com.codenameone.playground.PlaygroundContext.debug(\"GeneratedCN1Access.findClass(\" + name + \")\");\n");
+        writer.write("            com.codenameone.playground.PlaygroundContext.debug(\"GeneratedCN1Access.findClass(\" + name + \") size=\" + CLASS_INDEX.size() + \" contains=\" + CLASS_INDEX.containsKey(name));\n");
         writer.write("        }\n");
-        writer.write("        Class<?> found;\n");
-        for (GeneratedPackage generatedPackage : packages) {
-            writer.write("        found = " + generatedPackage.helperClassName + ".findClass(name);\n");
-            writer.write("        if (shouldDebugFindClass(name) && found != null) {\n");
-            writer.write("            com.codenameone.playground.PlaygroundContext.debug(\"GeneratedCN1Access.findClass hit "
-                    + generatedPackage.packageName + " -> \" + found);\n");
-            writer.write("        }\n");
-            writer.write("        if (found != null) {\n");
-            writer.write("            return found;\n");
-            writer.write("        }\n");
-        }
+        writer.write("        if (name == null) {\n");
+        writer.write("            if (shouldDebugFindClass(name)) {\n");
+                writer.write("                com.codenameone.playground.PlaygroundContext.debug(\"GeneratedCN1Access.findClass miss \" + name);\n");
+        writer.write("            }\n");
+        writer.write("            return null;\n");
+        writer.write("        }\n");
+        writer.write("        Class<?> found = CLASS_INDEX.get(name);\n");
+        writer.write("        if (shouldDebugFindClass(name) && found != null) {\n");
+        writer.write("            com.codenameone.playground.PlaygroundContext.debug(\"GeneratedCN1Access.findClass hit \" + name + \" -> \" + found);\n");
+        writer.write("        }\n");
+        writer.write("        if (found != null) {\n");
+        writer.write("            return found;\n");
+        writer.write("        }\n");
         writer.write("        if (shouldDebugFindClass(name)) {\n");
         writer.write("            com.codenameone.playground.PlaygroundContext.debug(\"GeneratedCN1Access.findClass miss \" + name);\n");
         writer.write("        }\n");
         writer.write("        return null;\n");
         writer.write("    }\n\n");
+        writer.write("    public static int debugClassIndexSize() {\n");
+        writer.write("        return CLASS_INDEX.size();\n");
+        writer.write("    }\n\n");
+        writer.write("    public static boolean debugClassIndexContains(String name) {\n");
+        writer.write("        return CLASS_INDEX.containsKey(name);\n");
+        writer.write("    }\n\n");
+    }
+
+    private static void writeRootClassIndex(Writer writer, List<GeneratedPackage> packages) throws IOException {
+        List<ApiClass> classes = new ArrayList<ApiClass>();
+        for (GeneratedPackage generatedPackage : packages) {
+            classes.addAll(generatedPackage.classes);
+        }
+        writer.write("    private static final Map<String, Class<?>> CLASS_INDEX = buildClassIndex();\n\n");
+        writer.write("    private static Map<String, Class<?>> buildClassIndex() {\n");
+        writer.write("        Map<String, Class<?>> index = new LinkedHashMap<String, Class<?>>();\n");
+        int chunkCount = (classes.size() + FIND_CLASS_CHUNK_SIZE - 1) / FIND_CLASS_CHUNK_SIZE;
+        for (int i = 0; i < chunkCount; i++) {
+            writer.write("        fillClassIndex" + i + "(index);\n");
+        }
+        writer.write("        return index;\n");
+        writer.write("    }\n");
+        for (int i = 0; i < chunkCount; i++) {
+            int fromIndex = i * FIND_CLASS_CHUNK_SIZE;
+            int toIndex = Math.min(classes.size(), fromIndex + FIND_CLASS_CHUNK_SIZE);
+            writer.write("\n");
+            writer.write("    private static void fillClassIndex" + i + "(Map<String, Class<?>> index) {\n");
+            for (int j = fromIndex; j < toIndex; j++) {
+                ApiClass apiClass = classes.get(j);
+                writer.write("        index.put(\"" + apiClass.qualifiedName + "\", " + typeLiteral(apiClass.qualifiedName) + ");\n");
+            }
+            writer.write("    }\n");
+        }
+        writer.write("\n");
     }
 
     private static void writeRootConstruct(Writer writer, List<GeneratedPackage> packages) throws IOException {
@@ -1090,6 +1130,20 @@ public final class GenerateCN1AccessRegistry {
         writer.write("        int lastDot = name.lastIndexOf('.');\n");
         writer.write("        return lastDot < 0 ? \"\" : name.substring(0, lastDot);\n");
         writer.write("    }\n\n");
+        writer.write("    private static String packageName(String name) {\n");
+        writer.write("        if (name == null) {\n");
+        writer.write("            return null;\n");
+        writer.write("        }\n");
+        writer.write("        int lastDot = name.lastIndexOf('.');\n");
+        writer.write("        return lastDot < 0 ? null : name.substring(0, lastDot);\n");
+        writer.write("    }\n\n");
+        writer.write("    private static String simpleName(String name) {\n");
+        writer.write("        if (name == null) {\n");
+        writer.write("            return null;\n");
+        writer.write("        }\n");
+        writer.write("        int lastDot = name.lastIndexOf('.');\n");
+        writer.write("        return lastDot < 0 || lastDot == name.length() - 1 ? null : name.substring(lastDot + 1);\n");
+        writer.write("    }\n\n");
         writer.write("    private static CN1AccessException unsupportedConstruct(Class<?> type, Object[] args) {\n");
         writer.write("        return new CN1AccessException(\"Generated constructor dispatch not implemented for \" + type.getName() + describeArgs(args));\n");
         writer.write("    }\n\n");
@@ -1119,17 +1173,51 @@ public final class GenerateCN1AccessRegistry {
 
     private static void writeFindClass(Writer writer, List<ApiClass> classes) throws IOException {
         writer.write("    public static Class<?> findClass(String name) {\n");
-        for (ApiClass apiClass : classes) {
-            writer.write("        if (\"" + apiClass.qualifiedName + "\".equals(name)) {\n");
-            writer.write("            if (name.startsWith(\"com.codename1.ui.\") || name.startsWith(\"com.codename1.components.\")) {\n");
-            writer.write("                com.codenameone.playground.PlaygroundContext.debug(\""
-                    + ROOT_CLASS_NAME + " helper hit " + apiClass.packageName + " -> " + apiClass.qualifiedName + "\");\n");
-            writer.write("            }\n");
-            writer.write("            return " + typeLiteral(apiClass.qualifiedName) + ";\n");
-            writer.write("        }\n");
-        }
+        writer.write("        int lastDot = name == null ? -1 : name.lastIndexOf('.');\n");
+        writer.write("        if (lastDot < 0 || lastDot == name.length() - 1) {\n");
+        writer.write("            return null;\n");
+        writer.write("        }\n");
+        writer.write("        return findClassBySimpleName(name.substring(lastDot + 1));\n");
+        writer.write("    }\n\n");
+        writer.write("    public static Class<?> findClassBySimpleName(String simpleName) {\n");
+        writeFindClassStatements(writer, classes, "findClassChunk", "        ", "simpleName");
         writer.write("        return null;\n");
         writer.write("    }\n\n");
+        writeFindClassChunkMethods(writer, classes, "findClassChunk", "    ");
+    }
+
+    private static void writeFindClassStatements(Writer writer, List<ApiClass> classes, String methodPrefix, String indent, String nameVar)
+            throws IOException {
+        int chunkCount = (classes.size() + FIND_CLASS_CHUNK_SIZE - 1) / FIND_CLASS_CHUNK_SIZE;
+        for (int i = 0; i < chunkCount; i++) {
+            writer.write(indent + "Class<?> found" + i + " = " + methodPrefix + i + "(" + nameVar + ");\n");
+            writer.write(indent + "if (found" + i + " != null) {\n");
+            writer.write(indent + "    return found" + i + ";\n");
+            writer.write(indent + "}\n");
+        }
+    }
+
+    private static void writeFindClassChunkMethods(Writer writer, List<ApiClass> classes, String methodPrefix, String indent)
+            throws IOException {
+        int chunkCount = (classes.size() + FIND_CLASS_CHUNK_SIZE - 1) / FIND_CLASS_CHUNK_SIZE;
+        for (int i = 0; i < chunkCount; i++) {
+            int fromIndex = i * FIND_CLASS_CHUNK_SIZE;
+            int toIndex = Math.min(classes.size(), fromIndex + FIND_CLASS_CHUNK_SIZE);
+            writer.write("\n");
+            writer.write(indent + "private static Class<?> " + methodPrefix + i + "(String simpleName) {\n");
+            for (int j = fromIndex; j < toIndex; j++) {
+                ApiClass apiClass = classes.get(j);
+                writer.write(indent + "    if (\"" + apiClass.simpleName + "\".equals(simpleName)) {\n");
+                writer.write(indent + "        if (simpleName != null) {\n");
+                writer.write(indent + "            com.codenameone.playground.PlaygroundContext.debug(\""
+                        + ROOT_CLASS_NAME + " helper hit " + apiClass.packageName + " -> " + apiClass.qualifiedName + "\");\n");
+                writer.write(indent + "        }\n");
+                writer.write(indent + "        return " + typeLiteral(apiClass.qualifiedName) + ";\n");
+                writer.write(indent + "    }\n");
+            }
+            writer.write(indent + "    return null;\n");
+            writer.write(indent + "}\n");
+        }
     }
 
     private static void writeConstruct(Writer writer, List<ApiClass> classes) throws IOException {

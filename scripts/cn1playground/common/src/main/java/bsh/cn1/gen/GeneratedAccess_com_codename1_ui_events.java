@@ -7,81 +7,97 @@ public final class GeneratedAccess_com_codename1_ui_events {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.events.ActionEvent".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("ActionEvent".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.ActionEvent");
             }
             return com.codename1.ui.events.ActionEvent.class;
         }
-        if ("com.codename1.ui.events.ActionListener".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ActionListener".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.ActionListener");
             }
             return com.codename1.ui.events.ActionListener.class;
         }
-        if ("com.codename1.ui.events.ActionSource".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ActionSource".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.ActionSource");
             }
             return com.codename1.ui.events.ActionSource.class;
         }
-        if ("com.codename1.ui.events.BrowserNavigationCallback".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("BrowserNavigationCallback".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.BrowserNavigationCallback");
             }
             return com.codename1.ui.events.BrowserNavigationCallback.class;
         }
-        if ("com.codename1.ui.events.ComponentStateChangeEvent".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ComponentStateChangeEvent".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.ComponentStateChangeEvent");
             }
             return com.codename1.ui.events.ComponentStateChangeEvent.class;
         }
-        if ("com.codename1.ui.events.DataChangedListener".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("DataChangedListener".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.DataChangedListener");
             }
             return com.codename1.ui.events.DataChangedListener.class;
         }
-        if ("com.codename1.ui.events.FocusListener".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("FocusListener".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.FocusListener");
             }
             return com.codename1.ui.events.FocusListener.class;
         }
-        if ("com.codename1.ui.events.MessageEvent".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MessageEvent".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.MessageEvent");
             }
             return com.codename1.ui.events.MessageEvent.class;
         }
-        if ("com.codename1.ui.events.ScrollListener".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ScrollListener".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.ScrollListener");
             }
             return com.codename1.ui.events.ScrollListener.class;
         }
-        if ("com.codename1.ui.events.SelectionListener".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("SelectionListener".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.SelectionListener");
             }
             return com.codename1.ui.events.SelectionListener.class;
         }
-        if ("com.codename1.ui.events.StyleListener".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("StyleListener".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.StyleListener");
             }
             return com.codename1.ui.events.StyleListener.class;
         }
-        if ("com.codename1.ui.events.WindowEvent".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("WindowEvent".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.events -> com.codename1.ui.events.WindowEvent");
             }
             return com.codename1.ui.events.WindowEvent.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.ui.events.ActionEvent.class) {

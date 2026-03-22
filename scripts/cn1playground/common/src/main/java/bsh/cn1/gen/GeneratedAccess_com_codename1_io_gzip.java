@@ -7,105 +7,121 @@ public final class GeneratedAccess_com_codename1_io_gzip {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.io.gzip.Adler32".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("Adler32".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.Adler32");
             }
             return com.codename1.io.gzip.Adler32.class;
         }
-        if ("com.codename1.io.gzip.CRC32".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("CRC32".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.CRC32");
             }
             return com.codename1.io.gzip.CRC32.class;
         }
-        if ("com.codename1.io.gzip.Deflate".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Deflate".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.Deflate");
             }
             return com.codename1.io.gzip.Deflate.class;
         }
-        if ("com.codename1.io.gzip.Deflater".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Deflater".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.Deflater");
             }
             return com.codename1.io.gzip.Deflater.class;
         }
-        if ("com.codename1.io.gzip.DeflaterOutputStream".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("DeflaterOutputStream".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.DeflaterOutputStream");
             }
             return com.codename1.io.gzip.DeflaterOutputStream.class;
         }
-        if ("com.codename1.io.gzip.FilterInputStream".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("FilterInputStream".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.FilterInputStream");
             }
             return com.codename1.io.gzip.FilterInputStream.class;
         }
-        if ("com.codename1.io.gzip.FilterOutputStream".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("FilterOutputStream".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.FilterOutputStream");
             }
             return com.codename1.io.gzip.FilterOutputStream.class;
         }
-        if ("com.codename1.io.gzip.GZConnectionRequest".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("GZConnectionRequest".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.GZConnectionRequest");
             }
             return com.codename1.io.gzip.GZConnectionRequest.class;
         }
-        if ("com.codename1.io.gzip.GZIPException".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("GZIPException".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.GZIPException");
             }
             return com.codename1.io.gzip.GZIPException.class;
         }
-        if ("com.codename1.io.gzip.GZIPHeader".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("GZIPHeader".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.GZIPHeader");
             }
             return com.codename1.io.gzip.GZIPHeader.class;
         }
-        if ("com.codename1.io.gzip.GZIPInputStream".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("GZIPInputStream".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.GZIPInputStream");
             }
             return com.codename1.io.gzip.GZIPInputStream.class;
         }
-        if ("com.codename1.io.gzip.GZIPOutputStream".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("GZIPOutputStream".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.GZIPOutputStream");
             }
             return com.codename1.io.gzip.GZIPOutputStream.class;
         }
-        if ("com.codename1.io.gzip.Inflater".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Inflater".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.Inflater");
             }
             return com.codename1.io.gzip.Inflater.class;
         }
-        if ("com.codename1.io.gzip.InflaterInputStream".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("InflaterInputStream".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.InflaterInputStream");
             }
             return com.codename1.io.gzip.InflaterInputStream.class;
         }
-        if ("com.codename1.io.gzip.JZlib".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("JZlib".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.JZlib");
             }
             return com.codename1.io.gzip.JZlib.class;
         }
-        if ("com.codename1.io.gzip.ZStream".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ZStream".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.gzip -> com.codename1.io.gzip.ZStream");
             }
             return com.codename1.io.gzip.ZStream.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.io.gzip.Deflater.class) {

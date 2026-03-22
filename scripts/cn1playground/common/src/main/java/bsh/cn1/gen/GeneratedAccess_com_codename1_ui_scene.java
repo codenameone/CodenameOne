@@ -7,57 +7,73 @@ public final class GeneratedAccess_com_codename1_ui_scene {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.scene.Bounds".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("Bounds".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.Bounds");
             }
             return com.codename1.ui.scene.Bounds.class;
         }
-        if ("com.codename1.ui.scene.Camera".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Camera".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.Camera");
             }
             return com.codename1.ui.scene.Camera.class;
         }
-        if ("com.codename1.ui.scene.Node".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Node".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.Node");
             }
             return com.codename1.ui.scene.Node.class;
         }
-        if ("com.codename1.ui.scene.NodePainter".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("NodePainter".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.NodePainter");
             }
             return com.codename1.ui.scene.NodePainter.class;
         }
-        if ("com.codename1.ui.scene.PerspectiveCamera".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PerspectiveCamera".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.PerspectiveCamera");
             }
             return com.codename1.ui.scene.PerspectiveCamera.class;
         }
-        if ("com.codename1.ui.scene.Point3D".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Point3D".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.Point3D");
             }
             return com.codename1.ui.scene.Point3D.class;
         }
-        if ("com.codename1.ui.scene.Scene".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Scene".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.Scene");
             }
             return com.codename1.ui.scene.Scene.class;
         }
-        if ("com.codename1.ui.scene.TextPainter".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("TextPainter".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.scene -> com.codename1.ui.scene.TextPainter");
             }
             return com.codename1.ui.scene.TextPainter.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.ui.scene.Bounds.class) {

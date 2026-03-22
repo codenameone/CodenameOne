@@ -7,141 +7,157 @@ public final class GeneratedAccess_com_codename1_properties {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.properties.BooleanProperty".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("BooleanProperty".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.BooleanProperty");
             }
             return com.codename1.properties.BooleanProperty.class;
         }
-        if ("com.codename1.properties.ByteProperty".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ByteProperty".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.ByteProperty");
             }
             return com.codename1.properties.ByteProperty.class;
         }
-        if ("com.codename1.properties.CharProperty".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("CharProperty".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.CharProperty");
             }
             return com.codename1.properties.CharProperty.class;
         }
-        if ("com.codename1.properties.CollectionProperty".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("CollectionProperty".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.CollectionProperty");
             }
             return com.codename1.properties.CollectionProperty.class;
         }
-        if ("com.codename1.properties.DoubleProperty".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("DoubleProperty".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.DoubleProperty");
             }
             return com.codename1.properties.DoubleProperty.class;
         }
-        if ("com.codename1.properties.FloatProperty".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("FloatProperty".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.FloatProperty");
             }
             return com.codename1.properties.FloatProperty.class;
         }
-        if ("com.codename1.properties.InstantUI".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("InstantUI".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.InstantUI");
             }
             return com.codename1.properties.InstantUI.class;
         }
-        if ("com.codename1.properties.IntProperty".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("IntProperty".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.IntProperty");
             }
             return com.codename1.properties.IntProperty.class;
         }
-        if ("com.codename1.properties.ListProperty".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ListProperty".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.ListProperty");
             }
             return com.codename1.properties.ListProperty.class;
         }
-        if ("com.codename1.properties.LongProperty".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("LongProperty".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.LongProperty");
             }
             return com.codename1.properties.LongProperty.class;
         }
-        if ("com.codename1.properties.MapAdapter".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MapAdapter".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.MapAdapter");
             }
             return com.codename1.properties.MapAdapter.class;
         }
-        if ("com.codename1.properties.MapProperty".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MapProperty".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.MapProperty");
             }
             return com.codename1.properties.MapProperty.class;
         }
-        if ("com.codename1.properties.NumericProperty".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("NumericProperty".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.NumericProperty");
             }
             return com.codename1.properties.NumericProperty.class;
         }
-        if ("com.codename1.properties.PreferencesObject".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PreferencesObject".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.PreferencesObject");
             }
             return com.codename1.properties.PreferencesObject.class;
         }
-        if ("com.codename1.properties.Property".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Property".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.Property");
             }
             return com.codename1.properties.Property.class;
         }
-        if ("com.codename1.properties.PropertyBase".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PropertyBase".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.PropertyBase");
             }
             return com.codename1.properties.PropertyBase.class;
         }
-        if ("com.codename1.properties.PropertyBusinessObject".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PropertyBusinessObject".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.PropertyBusinessObject");
             }
             return com.codename1.properties.PropertyBusinessObject.class;
         }
-        if ("com.codename1.properties.PropertyChangeListener".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PropertyChangeListener".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.PropertyChangeListener");
             }
             return com.codename1.properties.PropertyChangeListener.class;
         }
-        if ("com.codename1.properties.PropertyIndex".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PropertyIndex".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.PropertyIndex");
             }
             return com.codename1.properties.PropertyIndex.class;
         }
-        if ("com.codename1.properties.SQLMap".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("SQLMap".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.SQLMap");
             }
             return com.codename1.properties.SQLMap.class;
         }
-        if ("com.codename1.properties.SetProperty".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("SetProperty".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.SetProperty");
             }
             return com.codename1.properties.SetProperty.class;
         }
-        if ("com.codename1.properties.UiBinding".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("UiBinding".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.properties -> com.codename1.properties.UiBinding");
             }
             return com.codename1.properties.UiBinding.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.properties.BooleanProperty.class) {

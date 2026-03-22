@@ -7,69 +7,85 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.animations.Animation".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("Animation".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.Animation");
             }
             return com.codename1.ui.animations.Animation.class;
         }
-        if ("com.codename1.ui.animations.AnimationObject".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("AnimationObject".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.AnimationObject");
             }
             return com.codename1.ui.animations.AnimationObject.class;
         }
-        if ("com.codename1.ui.animations.BubbleTransition".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("BubbleTransition".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.BubbleTransition");
             }
             return com.codename1.ui.animations.BubbleTransition.class;
         }
-        if ("com.codename1.ui.animations.CommonTransitions".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("CommonTransitions".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.CommonTransitions");
             }
             return com.codename1.ui.animations.CommonTransitions.class;
         }
-        if ("com.codename1.ui.animations.ComponentAnimation".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ComponentAnimation".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.ComponentAnimation");
             }
             return com.codename1.ui.animations.ComponentAnimation.class;
         }
-        if ("com.codename1.ui.animations.FlipTransition".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("FlipTransition".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.FlipTransition");
             }
             return com.codename1.ui.animations.FlipTransition.class;
         }
-        if ("com.codename1.ui.animations.MorphTransition".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MorphTransition".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.MorphTransition");
             }
             return com.codename1.ui.animations.MorphTransition.class;
         }
-        if ("com.codename1.ui.animations.Motion".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Motion".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.Motion");
             }
             return com.codename1.ui.animations.Motion.class;
         }
-        if ("com.codename1.ui.animations.Timeline".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Timeline".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.Timeline");
             }
             return com.codename1.ui.animations.Timeline.class;
         }
-        if ("com.codename1.ui.animations.Transition".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Transition".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.animations -> com.codename1.ui.animations.Transition");
             }
             return com.codename1.ui.animations.Transition.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.ui.animations.BubbleTransition.class) {

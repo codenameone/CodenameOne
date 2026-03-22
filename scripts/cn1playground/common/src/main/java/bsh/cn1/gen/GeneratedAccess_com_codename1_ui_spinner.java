@@ -7,51 +7,67 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.spinner.BaseSpinner".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("BaseSpinner".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.spinner -> com.codename1.ui.spinner.BaseSpinner");
             }
             return com.codename1.ui.spinner.BaseSpinner.class;
         }
-        if ("com.codename1.ui.spinner.DateSpinner".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("DateSpinner".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.spinner -> com.codename1.ui.spinner.DateSpinner");
             }
             return com.codename1.ui.spinner.DateSpinner.class;
         }
-        if ("com.codename1.ui.spinner.DateTimeSpinner".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("DateTimeSpinner".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.spinner -> com.codename1.ui.spinner.DateTimeSpinner");
             }
             return com.codename1.ui.spinner.DateTimeSpinner.class;
         }
-        if ("com.codename1.ui.spinner.GenericSpinner".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("GenericSpinner".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.spinner -> com.codename1.ui.spinner.GenericSpinner");
             }
             return com.codename1.ui.spinner.GenericSpinner.class;
         }
-        if ("com.codename1.ui.spinner.NumericSpinner".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("NumericSpinner".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.spinner -> com.codename1.ui.spinner.NumericSpinner");
             }
             return com.codename1.ui.spinner.NumericSpinner.class;
         }
-        if ("com.codename1.ui.spinner.Picker".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Picker".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.spinner -> com.codename1.ui.spinner.Picker");
             }
             return com.codename1.ui.spinner.Picker.class;
         }
-        if ("com.codename1.ui.spinner.TimeSpinner".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("TimeSpinner".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.spinner -> com.codename1.ui.spinner.TimeSpinner");
             }
             return com.codename1.ui.spinner.TimeSpinner.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.ui.spinner.DateSpinner.class) {

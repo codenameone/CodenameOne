@@ -1,5 +1,6 @@
 package com.codenameone.playground;
 
+import bsh.cn1.GeneratedCN1Access;
 import com.codename1.system.Lifecycle;
 import com.codename1.components.SplitPane;
 import com.codename1.ui.Button;
@@ -118,10 +119,66 @@ public class CN1Playground extends Lifecycle {
         previewRoot.removeAll();
         output.setText("");
         appendOutput("Running script...");
+        appendRuntimeSmoke();
         PlaygroundContext context = new PlaygroundContext(form, previewRoot, theme, this::appendOutput);
         PlaygroundRunner.RunResult result = runner.run(editor.getText(), context);
         replacePreview(result.getComponent());
         appendOutput(result.getMessage());
+    }
+
+    private void appendRuntimeSmoke() {
+        appendOutput("Smoke platform=" + com.codename1.ui.CN.getPlatformName());
+        appendOutput("Smoke registry size=" + GeneratedCN1Access.debugClassIndexSize());
+        appendSmokeLiteral("Container", new ClassSupplier() {
+            public Class<?> get() {
+                return Container.class;
+            }
+        });
+        appendSmokeLiteral("BoxLayout", new ClassSupplier() {
+            public Class<?> get() {
+                return BoxLayout.class;
+            }
+        });
+        appendSmokeLiteral("SpanLabel", new ClassSupplier() {
+            public Class<?> get() {
+                return com.codename1.components.SpanLabel.class;
+            }
+        });
+        appendSmokeContains("com.codename1.ui.Container");
+        appendSmokeContains("com.codename1.ui.layouts.BoxLayout");
+        appendSmokeContains("com.codename1.components.SpanLabel");
+        appendSmokeLookup("com.codename1.ui.Container");
+        appendSmokeLookup("com.codename1.ui.layouts.BoxLayout");
+        appendSmokeLookup("com.codename1.components.SpanLabel");
+    }
+
+    private void appendSmokeLiteral(String label, ClassSupplier supplier) {
+        try {
+            Class<?> type = supplier.get();
+            appendOutput("Smoke literal " + label + "=" + describeClass(type));
+        } catch (Throwable t) {
+            appendOutput("Smoke literal " + label + " failed: " + t);
+        }
+    }
+
+    private void appendSmokeLookup(String name) {
+        try {
+            appendOutput("Smoke registry " + name + "=" + describeClass(GeneratedCN1Access.INSTANCE.findClass(name)));
+        } catch (Throwable t) {
+            appendOutput("Smoke registry " + name + " failed: " + t);
+        }
+    }
+
+    private void appendSmokeContains(String name) {
+        try {
+            appendOutput("Smoke registry contains " + name + "=" + GeneratedCN1Access.debugClassIndexContains(name));
+        } catch (Throwable t) {
+            appendOutput("Smoke registry contains " + name + " failed: " + t);
+        }
+    }
+
+    private String describeClass(Class<?> type) {
+        return type == null ? "null" : type.getName();
     }
 
     private void replacePreview(Component component) {
@@ -161,6 +218,10 @@ public class CN1Playground extends Lifecycle {
         } else {
             output.setText(current + "\n" + message);
         }
+    }
+
+    private interface ClassSupplier {
+        Class<?> get();
     }
 
 }

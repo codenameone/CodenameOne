@@ -7,39 +7,55 @@ public final class GeneratedAccess_com_codename1_io_services {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.io.services.CachedData".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("CachedData".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.services -> com.codename1.io.services.CachedData");
             }
             return com.codename1.io.services.CachedData.class;
         }
-        if ("com.codename1.io.services.CachedDataService".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("CachedDataService".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.services -> com.codename1.io.services.CachedDataService");
             }
             return com.codename1.io.services.CachedDataService.class;
         }
-        if ("com.codename1.io.services.ImageDownloadService".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ImageDownloadService".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.services -> com.codename1.io.services.ImageDownloadService");
             }
             return com.codename1.io.services.ImageDownloadService.class;
         }
-        if ("com.codename1.io.services.RSSService".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("RSSService".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.services -> com.codename1.io.services.RSSService");
             }
             return com.codename1.io.services.RSSService.class;
         }
-        if ("com.codename1.io.services.TwitterRESTService".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("TwitterRESTService".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.services -> com.codename1.io.services.TwitterRESTService");
             }
             return com.codename1.io.services.TwitterRESTService.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.io.services.ImageDownloadService.class) {

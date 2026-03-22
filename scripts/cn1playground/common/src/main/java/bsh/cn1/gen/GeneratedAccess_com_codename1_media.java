@@ -7,63 +7,79 @@ public final class GeneratedAccess_com_codename1_media {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.media.AbstractMedia".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("AbstractMedia".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.AbstractMedia");
             }
             return com.codename1.media.AbstractMedia.class;
         }
-        if ("com.codename1.media.AsyncMedia".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("AsyncMedia".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.AsyncMedia");
             }
             return com.codename1.media.AsyncMedia.class;
         }
-        if ("com.codename1.media.AudioBuffer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("AudioBuffer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.AudioBuffer");
             }
             return com.codename1.media.AudioBuffer.class;
         }
-        if ("com.codename1.media.Media".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Media".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.Media");
             }
             return com.codename1.media.Media.class;
         }
-        if ("com.codename1.media.MediaManager".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MediaManager".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.MediaManager");
             }
             return com.codename1.media.MediaManager.class;
         }
-        if ("com.codename1.media.MediaMetaData".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MediaMetaData".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.MediaMetaData");
             }
             return com.codename1.media.MediaMetaData.class;
         }
-        if ("com.codename1.media.MediaRecorderBuilder".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MediaRecorderBuilder".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.MediaRecorderBuilder");
             }
             return com.codename1.media.MediaRecorderBuilder.class;
         }
-        if ("com.codename1.media.RemoteControlListener".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("RemoteControlListener".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.RemoteControlListener");
             }
             return com.codename1.media.RemoteControlListener.class;
         }
-        if ("com.codename1.media.WAVWriter".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("WAVWriter".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.media -> com.codename1.media.WAVWriter");
             }
             return com.codename1.media.WAVWriter.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.media.AudioBuffer.class) {

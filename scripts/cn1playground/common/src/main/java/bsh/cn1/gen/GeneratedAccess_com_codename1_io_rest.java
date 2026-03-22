@@ -7,33 +7,49 @@ public final class GeneratedAccess_com_codename1_io_rest {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.io.rest.ErrorCodeHandler".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("ErrorCodeHandler".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.rest -> com.codename1.io.rest.ErrorCodeHandler");
             }
             return com.codename1.io.rest.ErrorCodeHandler.class;
         }
-        if ("com.codename1.io.rest.RequestBuilder".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("RequestBuilder".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.rest -> com.codename1.io.rest.RequestBuilder");
             }
             return com.codename1.io.rest.RequestBuilder.class;
         }
-        if ("com.codename1.io.rest.Response".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Response".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.rest -> com.codename1.io.rest.Response");
             }
             return com.codename1.io.rest.Response.class;
         }
-        if ("com.codename1.io.rest.Rest".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Rest".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.io.rest -> com.codename1.io.rest.Rest");
             }
             return com.codename1.io.rest.Rest.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         throw unsupportedConstruct(type, safeArgs);

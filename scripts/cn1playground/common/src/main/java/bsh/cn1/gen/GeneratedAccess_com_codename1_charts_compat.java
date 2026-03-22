@@ -7,33 +7,49 @@ public final class GeneratedAccess_com_codename1_charts_compat {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.charts.compat.Canvas".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("Canvas".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.compat -> com.codename1.charts.compat.Canvas");
             }
             return com.codename1.charts.compat.Canvas.class;
         }
-        if ("com.codename1.charts.compat.GradientDrawable".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("GradientDrawable".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.compat -> com.codename1.charts.compat.GradientDrawable");
             }
             return com.codename1.charts.compat.GradientDrawable.class;
         }
-        if ("com.codename1.charts.compat.Paint".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Paint".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.compat -> com.codename1.charts.compat.Paint");
             }
             return com.codename1.charts.compat.Paint.class;
         }
-        if ("com.codename1.charts.compat.PathMeasure".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PathMeasure".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.charts.compat -> com.codename1.charts.compat.PathMeasure");
             }
             return com.codename1.charts.compat.PathMeasure.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.charts.compat.Canvas.class) {

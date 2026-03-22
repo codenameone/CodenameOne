@@ -7,33 +7,49 @@ public final class GeneratedAccess_java_lang_reflect {
     }
 
     public static Class<?> findClass(String name) {
-        if ("java.lang.reflect.Array".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("Array".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.reflect -> java.lang.reflect.Array");
             }
             return java.lang.reflect.Array.class;
         }
-        if ("java.lang.reflect.Constructor".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Constructor".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.reflect -> java.lang.reflect.Constructor");
             }
             return java.lang.reflect.Constructor.class;
         }
-        if ("java.lang.reflect.Method".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Method".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.reflect -> java.lang.reflect.Method");
             }
             return java.lang.reflect.Method.class;
         }
-        if ("java.lang.reflect.Type".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Type".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit java.lang.reflect -> java.lang.reflect.Type");
             }
             return java.lang.reflect.Type.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         throw unsupportedConstruct(type, safeArgs);

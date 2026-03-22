@@ -7,51 +7,67 @@ public final class GeneratedAccess_com_codename1_l10n {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.l10n.DateFormat".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("DateFormat".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.l10n -> com.codename1.l10n.DateFormat");
             }
             return com.codename1.l10n.DateFormat.class;
         }
-        if ("com.codename1.l10n.DateFormatPatterns".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("DateFormatPatterns".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.l10n -> com.codename1.l10n.DateFormatPatterns");
             }
             return com.codename1.l10n.DateFormatPatterns.class;
         }
-        if ("com.codename1.l10n.DateFormatSymbols".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("DateFormatSymbols".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.l10n -> com.codename1.l10n.DateFormatSymbols");
             }
             return com.codename1.l10n.DateFormatSymbols.class;
         }
-        if ("com.codename1.l10n.Format".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Format".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.l10n -> com.codename1.l10n.Format");
             }
             return com.codename1.l10n.Format.class;
         }
-        if ("com.codename1.l10n.L10NManager".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("L10NManager".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.l10n -> com.codename1.l10n.L10NManager");
             }
             return com.codename1.l10n.L10NManager.class;
         }
-        if ("com.codename1.l10n.ParseException".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ParseException".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.l10n -> com.codename1.l10n.ParseException");
             }
             return com.codename1.l10n.ParseException.class;
         }
-        if ("com.codename1.l10n.SimpleDateFormat".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("SimpleDateFormat".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.l10n -> com.codename1.l10n.SimpleDateFormat");
             }
             return com.codename1.l10n.SimpleDateFormat.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.l10n.ParseException.class) {

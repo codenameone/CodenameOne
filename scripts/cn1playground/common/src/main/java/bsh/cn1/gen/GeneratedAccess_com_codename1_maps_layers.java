@@ -7,45 +7,61 @@ public final class GeneratedAccess_com_codename1_maps_layers {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.maps.layers.AbstractLayer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("AbstractLayer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.AbstractLayer");
             }
             return com.codename1.maps.layers.AbstractLayer.class;
         }
-        if ("com.codename1.maps.layers.ArrowLinesLayer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ArrowLinesLayer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.ArrowLinesLayer");
             }
             return com.codename1.maps.layers.ArrowLinesLayer.class;
         }
-        if ("com.codename1.maps.layers.Layer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("Layer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.Layer");
             }
             return com.codename1.maps.layers.Layer.class;
         }
-        if ("com.codename1.maps.layers.LinesLayer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("LinesLayer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.LinesLayer");
             }
             return com.codename1.maps.layers.LinesLayer.class;
         }
-        if ("com.codename1.maps.layers.PointLayer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PointLayer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.PointLayer");
             }
             return com.codename1.maps.layers.PointLayer.class;
         }
-        if ("com.codename1.maps.layers.PointsLayer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PointsLayer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.maps.layers -> com.codename1.maps.layers.PointsLayer");
             }
             return com.codename1.maps.layers.PointsLayer.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.maps.layers.ArrowLinesLayer.class) {

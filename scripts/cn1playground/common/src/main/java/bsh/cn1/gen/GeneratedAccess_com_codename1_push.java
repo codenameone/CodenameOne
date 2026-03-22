@@ -7,51 +7,67 @@ public final class GeneratedAccess_com_codename1_push {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.push.Push".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("Push".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.Push");
             }
             return com.codename1.push.Push.class;
         }
-        if ("com.codename1.push.PushAction".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PushAction".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushAction");
             }
             return com.codename1.push.PushAction.class;
         }
-        if ("com.codename1.push.PushActionCategory".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PushActionCategory".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushActionCategory");
             }
             return com.codename1.push.PushActionCategory.class;
         }
-        if ("com.codename1.push.PushActionsProvider".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PushActionsProvider".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushActionsProvider");
             }
             return com.codename1.push.PushActionsProvider.class;
         }
-        if ("com.codename1.push.PushBuilder".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PushBuilder".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushBuilder");
             }
             return com.codename1.push.PushBuilder.class;
         }
-        if ("com.codename1.push.PushCallback".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PushCallback".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushCallback");
             }
             return com.codename1.push.PushCallback.class;
         }
-        if ("com.codename1.push.PushContent".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("PushContent".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.push -> com.codename1.push.PushContent");
             }
             return com.codename1.push.PushContent.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.push.Push.class) {

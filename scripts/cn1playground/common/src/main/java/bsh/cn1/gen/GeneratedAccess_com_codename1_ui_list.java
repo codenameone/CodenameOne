@@ -7,69 +7,85 @@ public final class GeneratedAccess_com_codename1_ui_list {
     }
 
     public static Class<?> findClass(String name) {
-        if ("com.codename1.ui.list.CellRenderer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        int lastDot = name == null ? -1 : name.lastIndexOf('.');
+        if (lastDot < 0 || lastDot == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(lastDot + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("CellRenderer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.CellRenderer");
             }
             return com.codename1.ui.list.CellRenderer.class;
         }
-        if ("com.codename1.ui.list.ContainerList".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ContainerList".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.ContainerList");
             }
             return com.codename1.ui.list.ContainerList.class;
         }
-        if ("com.codename1.ui.list.DefaultListCellRenderer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("DefaultListCellRenderer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.DefaultListCellRenderer");
             }
             return com.codename1.ui.list.DefaultListCellRenderer.class;
         }
-        if ("com.codename1.ui.list.DefaultListModel".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("DefaultListModel".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.DefaultListModel");
             }
             return com.codename1.ui.list.DefaultListModel.class;
         }
-        if ("com.codename1.ui.list.FilterProxyListModel".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("FilterProxyListModel".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.FilterProxyListModel");
             }
             return com.codename1.ui.list.FilterProxyListModel.class;
         }
-        if ("com.codename1.ui.list.GenericListCellRenderer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("GenericListCellRenderer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.GenericListCellRenderer");
             }
             return com.codename1.ui.list.GenericListCellRenderer.class;
         }
-        if ("com.codename1.ui.list.ListCellRenderer".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ListCellRenderer".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.ListCellRenderer");
             }
             return com.codename1.ui.list.ListCellRenderer.class;
         }
-        if ("com.codename1.ui.list.ListModel".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("ListModel".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.ListModel");
             }
             return com.codename1.ui.list.ListModel.class;
         }
-        if ("com.codename1.ui.list.MultiList".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MultiList".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.MultiList");
             }
             return com.codename1.ui.list.MultiList.class;
         }
-        if ("com.codename1.ui.list.MultipleSelectionListModel".equals(name)) {
-            if (name.startsWith("com.codename1.ui.") || name.startsWith("com.codename1.components.")) {
+        if ("MultipleSelectionListModel".equals(simpleName)) {
+            if (simpleName != null) {
                 com.codenameone.playground.PlaygroundContext.debug("GeneratedCN1Access helper hit com.codename1.ui.list -> com.codename1.ui.list.MultipleSelectionListModel");
             }
             return com.codename1.ui.list.MultipleSelectionListModel.class;
         }
         return null;
     }
-
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.ui.list.ContainerList.class) {
