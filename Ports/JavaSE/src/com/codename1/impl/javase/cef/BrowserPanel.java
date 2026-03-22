@@ -270,8 +270,8 @@ public abstract class BrowserPanel extends CN1JPanel {
         // and converting pixels to dips
         CN1CefBrowser.setUIPlatform(new CEFUIPlatform());
         
-        CefBrowser browser = client_.createBrowser(
-                startingURL, osrEnabled, transparentPaintingEnabled, null);
+        CefBrowser browser = new CN1CefBrowser(
+                client_, startingURL, transparentPaintingEnabled, null);
         ((CN1CefBrowser)browser).setPeerComponentBuffer(buffer);
 
         setBrowser(browser);

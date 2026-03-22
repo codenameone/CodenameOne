@@ -1,0 +1,81 @@
+name: JavaSE CEF/FFmpeg Smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/javase-cef-ffmpeg-smoke.yml'
+      - 'Ports/JavaSE/**'
+      - 'maven/javase/**'
+      - 'maven/cn1-binaries/**'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/tests/javase-cef-ffmpeg-smoke/**'
+      - 'maven/pom.xml'
+      - 'scripts/run-javase-cef-ffmpeg-smoke.py'
+      - 'scripts/javase-cef-ffmpeg-smoke/**'
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/javase-cef-ffmpeg-smoke.yml'
+      - 'Ports/JavaSE/**'
+      - 'maven/javase/**'
+      - 'maven/cn1-binaries/**'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/tests/javase-cef-ffmpeg-smoke/**'
+      - 'maven/pom.xml'
+      - 'scripts/run-javase-cef-ffmpeg-smoke.py'
+      - 'scripts/javase-cef-ffmpeg-smoke/**'
+
+jobs:
+  javase-smoke:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '8'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: .m2/repository
+          key: ${{ runner.os }}-javase-smoke-m2-${{ hashFiles('maven/**/*.xml', 'maven/**/*.pom', 'maven/tests/javase-cef-ffmpeg-smoke/**') }}
+          restore-keys: |
+            ${{ runner.os }}-javase-smoke-m2-
+
+      - name: Install ffmpeg and display deps on Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg xvfb libgtk-3-0 libnss3 libxss1 libgbm1 libasound2t64
+
+      - name: Install ffmpeg on macOS
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+
+      - name: Install ffmpeg on Windows
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: choco install ffmpeg -y
+
+      - name: Run JavaSE CEF/FFmpeg smoke test
+        env:
+          MAVEN_REPO_LOCAL: ${{ github.workspace }}/.m2/repository
+        run: python scripts/run-javase-cef-ffmpeg-smoke.py
+
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: javase-cef-ffmpeg-smoke-${{ runner.os }}
+          path: artifacts/javase-cef-ffmpeg-smoke
+          if-no-files-found: warn

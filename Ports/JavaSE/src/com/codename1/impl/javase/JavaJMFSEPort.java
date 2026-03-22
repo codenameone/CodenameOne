@@ -6,6 +6,7 @@
 package com.codename1.impl.javase;
 
 import com.codename1.io.Log;
+import com.codename1.impl.javase.ffmpeg.FFMPEGMedia;
 import com.codename1.media.AbstractMedia;
 import com.codename1.media.AsyncMedia;
 import com.codename1.media.Media;
@@ -51,6 +52,9 @@ public class JavaJMFSEPort extends JavaSEPort {
 
     @Override
     public AsyncResource<Media> createMediaAsync(final InputStream stream, final String mimeType, final Runnable onCompletion) {
+        if ("ffmpeg".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", "")) && FFMPEGMedia.isConfigured()) {
+            return super.createMediaAsync(stream, mimeType, onCompletion);
+        }
         final AsyncResource<Media> out = new AsyncResource<Media>();
         java.awt.Container cnt = canvas.getParent();
         while (!(cnt instanceof JFrame)) {
@@ -75,6 +79,9 @@ public class JavaJMFSEPort extends JavaSEPort {
 
     @Override
     public AsyncResource<Media> createMediaAsync(final String uriAddress, final boolean isVideo, final Runnable onCompletion) {
+        if ("ffmpeg".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", "")) && FFMPEGMedia.isConfigured()) {
+            return super.createMediaAsync(uriAddress, isVideo, onCompletion);
+        }
         final AsyncResource<Media> out = new AsyncResource<Media>();
         java.awt.Container cnt = canvas.getParent();
         while (!(cnt instanceof JFrame)) {

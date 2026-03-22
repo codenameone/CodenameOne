@@ -49,6 +49,7 @@ import java.io.File;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
+import java.util.concurrent.CompletableFuture;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 
@@ -73,7 +74,7 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
     private byte[] buf_;
     
 
-    CN1CefBrowser(CefClient client, String url, boolean transparent, CefRequestContext context) {
+    public CN1CefBrowser(CefClient client, String url, boolean transparent, CefRequestContext context) {
         this(client, url, transparent, context, null, null);
     }
 
@@ -117,6 +118,11 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
             CefRequestContext context, CefBrowser_N parent, Point inspectAt) {
         return new CN1CefBrowser(
                 client, url, isTransparent_, context, (CN1CefBrowser) this, inspectAt);
+    }
+
+    @Override
+    public CompletableFuture<BufferedImage> createScreenshot(boolean nativeResolution) {
+        return CompletableFuture.completedFuture(null);
     }
     
     private synchronized long getWindowHandle() {
@@ -489,12 +495,13 @@ public class CN1CefBrowser extends CefBrowser_N implements CefRenderHandler {
     }
 
     @Override
-    public void onCursorChange(CefBrowser browser, final int cursorType) {
+    public boolean onCursorChange(CefBrowser browser, final int cursorType) {
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 component_.setCursor(new Cursor(cursorType));
             }
         });
+        return true;
     }
 
     @Override

@@ -47,6 +47,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
         <java-tests.version>11</java-tests.version>
+        <jcef.version>jcef-544024e+cef-95.7.14+g9f72f35+chromium-95.0.4638.69</jcef.version>
+        <ffmpeg.version>7.1-1.5.11</ffmpeg.version>
         <rhino.version>1.7.11</rhino.version>
         <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
         <cn1.binaries>${maven.multiModuleProjectDirectory}/target/cn1-binaries</cn1.binaries>
@@ -57,6 +59,7 @@
     </properties>
     <modules>
         <!--<module>codenameone-maven-goals</module>-->
+        <module>cn1-binaries</module>
         <module>java-runtime</module>
         <module>core</module>
         <module>factory</module>
@@ -85,8 +88,24 @@
             </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>
+                <artifactId>cn1-binaries-javase</artifactId>
+                <version>${project.version}</version>
+                <type>pom</type>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-javase-svg</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>me.friwi</groupId>
+                <artifactId>jcef-api</artifactId>
+                <version>${jcef.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bytedeco</groupId>
+                <artifactId>ffmpeg-platform</artifactId>
+                <version>${ffmpeg.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>

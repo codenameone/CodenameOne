@@ -24,6 +24,7 @@ package com.codename1.impl.javase.cef;
 
 import com.codename1.impl.javase.AbstractBrowserWindowSE;
 import com.codename1.impl.javase.BrowserWindowFactory;
+import com.codename1.impl.javase.ffmpeg.FFMPEGMedia;
 import com.codename1.impl.javase.fx.FXBrowserWindowSE;
 import com.codename1.impl.javase.JavaSEPort;
 import static com.codename1.impl.javase.JavaSEPort.checkForPermission;
@@ -592,6 +593,9 @@ public class JavaCEFSEPort extends JavaSEPort {
 
     @Override
     public AsyncResource<Media> createMediaAsync(InputStream inputStream, String mimeType, Runnable onCompletion) {
+        if ("ffmpeg".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", "")) && FFMPEGMedia.isConfigured()) {
+            return super.createMediaAsync(inputStream, mimeType, onCompletion);
+        }
         final AsyncResource<Media> out = new AsyncResource<Media>();
 
         if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
@@ -629,6 +633,9 @@ public class JavaCEFSEPort extends JavaSEPort {
 
     @Override
     public AsyncResource<Media> createMediaAsync(String uriAddress, boolean isVideo, Runnable onCompletion) {
+        if ("ffmpeg".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", "")) && FFMPEGMedia.isConfigured()) {
+            return super.createMediaAsync(uriAddress, isVideo, onCompletion);
+        }
         final AsyncResource<Media> out = new AsyncResource<Media>();
 
         if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){

@@ -43,6 +43,16 @@ public class Simulator {
     
     private static final String DEFAULT_SKIN="/iPhoneX.skin";
     private static ClassPathLoader rootClassLoader;
+    
+    private static boolean hasFFmpeg() {
+        String path = System.getProperty("ffmpeg.dir");
+        if (path == null || path.isEmpty()) {
+            return false;
+        }
+        File dir = new File(path);
+        String suffix = isWindows ? ".exe" : "";
+        return new File(dir, "ffmpeg" + suffix).exists() && new File(dir, "ffprobe" + suffix).exists();
+    }
 
 
     /**
@@ -225,6 +235,16 @@ public class Simulator {
                 System.setProperty("cn1.javase.implementation", "fx");
             } else {
                 System.setProperty("cn1.javase.implementation", "jmf");
+            }
+        }
+        String mediaImplementation = System.getProperty("cn1.javase.mediaImplementation", "");
+        if ("".equals(mediaImplementation)) {
+            if (hasFFmpeg()) {
+                System.setProperty("cn1.javase.mediaImplementation", "ffmpeg");
+            } else if (fxSupported) {
+                System.setProperty("cn1.javase.mediaImplementation", "fx");
+            } else {
+                System.setProperty("cn1.javase.mediaImplementation", "jmf");
             }
         }
         
