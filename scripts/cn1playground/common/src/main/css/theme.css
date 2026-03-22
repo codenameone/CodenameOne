@@ -52,3 +52,26 @@ SideCommand {
     font-size: 4mm;
     border-bottom: 2px solid #cccccc;
 }
+
+PlaygroundMenuSection {
+    padding: 2mm 1mm 0.5mm 1mm;
+    margin: 1mm 0 0 0;
+    border: none;
+    border-bottom: 1px solid #d1d5db;
+    background: white;
+}
+
+PlaygroundMenuSectionTitle {
+    color: #6b7280;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-decoration: none;
+    padding: 0 0 1mm 0;
+}
+
+PlaygroundMenuEmpty {
+    color: #6b7280;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+    padding: 1mm;
+}

@@ -1,6 +1,7 @@
 package com.codenameone.playground;
 
 import com.codename1.components.SplitPane;
+import com.codename1.components.MultiButton;
 import com.codename1.system.Lifecycle;
 import com.codename1.system.NativeLookup;
 import com.codename1.ui.Button;
@@ -11,34 +12,42 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.Toolbar;
-import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
 import com.codename1.ui.util.Resources;
 
+import java.util.List;
+
 public class CN1Playground extends Lifecycle {
     private static final String THEME_ROLE = "playgroundThemeRole";
 
     private final PlaygroundRunner runner = new PlaygroundRunner();
+    private Form appForm;
     private TextArea editor;
     private TextArea output;
     private Container previewRoot;
+    private Container historyMenu;
     private Resources theme;
     private boolean websiteDarkMode;
+    private int editSequence;
 
     @Override
     public void runApp() {
+        com.codename1.ui.CN.setProperty("platformHint.javascript.beforeUnloadMessage", null);
         theme = Resources.getGlobalResources();
         Form form = new Form("CN1 Playground", new BorderLayout());
+        appForm = form;
         Toolbar toolbar = form.getToolbar();
         toolbar.setTitleCentered(false);
         setThemeRole(form.getContentPane(), "form");
 
-        editor = createEditor();
-        output = createOutput();
+        editor = createEditor(PlaygroundStateStore.loadCurrentScript());
+        output = createOutput(PlaygroundStateStore.loadCurrentOutput());
         previewRoot = createPreviewRoot();
+        historyMenu = new Container(BoxLayout.y());
 
         Container editorPanel = new Container(new BorderLayout());
         setThemeRole(editorPanel, "panel");
@@ -60,6 +69,11 @@ public class CN1Playground extends Lifecycle {
         toolbar.addCommandToRightBar(runCommand);
         toolbar.addCommandToRightBar(resetCommand);
         toolbar.addCommandToOverflowMenu(exampleCommand);
+        installSideMenu(toolbar, form);
+        editor.addDataChangedListener((type, index) -> {
+            persistCurrentState();
+            scheduleHistorySnapshot();
+        });
 
         runScript(form);
         initWebsiteThemeSync(form);
@@ -67,8 +81,8 @@ public class CN1Playground extends Lifecycle {
         notifyWebsiteUiReady();
     }
 
-    private TextArea createEditor() {
-        TextArea area = new TextArea(PlaygroundExamples.DEFAULT_SCRIPT, 16, 80);
+    private TextArea createEditor(String initialText) {
+        TextArea area = new TextArea(initialText, 16, 80);
         area.setHint("Write BeanShell playground code here");
         area.setGrowByContent(false);
         area.setRows(18);
@@ -77,8 +91,8 @@ public class CN1Playground extends Lifecycle {
         return area;
     }
 
-    private TextArea createOutput() {
-        TextArea area = new TextArea("", 5, 80);
+    private TextArea createOutput(String initialText) {
+        TextArea area = new TextArea(initialText, 5, 80);
         area.setConstraint(TextArea.ANY | TextArea.UNEDITABLE);
         area.setFocusable(true);
         area.setActAsLabel(false);
@@ -132,6 +146,8 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void runScript(Form form) {
+        List<PlaygroundStateStore.HistoryEntry> history = PlaygroundStateStore.pushHistory(editor.getText());
+        refreshHistoryMenu(form.getToolbar(), history);
         previewRoot.removeAll();
         output.setText("");
         appendOutput("Running script...");
@@ -139,6 +155,7 @@ public class CN1Playground extends Lifecycle {
         PlaygroundRunner.RunResult result = runner.run(editor.getText(), context);
         replacePreview(result.getComponent());
         appendOutput(result.getMessage());
+        persistCurrentState();
     }
 
     private void replacePreview(Component component) {
@@ -164,11 +181,13 @@ public class CN1Playground extends Lifecycle {
         output.setText("");
         previewRoot.removeAll();
         previewRoot.revalidate();
+        persistCurrentState();
     }
 
     private void loadBuildMethodExample() {
         editor.setText(PlaygroundExamples.BUILD_METHOD_SCRIPT);
         output.setText("");
+        persistCurrentState();
     }
 
     private void appendOutput(String message) {
@@ -178,6 +197,81 @@ public class CN1Playground extends Lifecycle {
         } else {
             output.setText(current + "\n" + message);
         }
+        persistCurrentState();
+    }
+
+    private void installSideMenu(Toolbar toolbar, Form form) {
+        toolbar.addComponentToSideMenu(new PlaygroundMenuSection("Samples"));
+        for (PlaygroundExamples.Sample sample : PlaygroundExamples.SAMPLES) {
+            toolbar.addComponentToSideMenu(createSideMenuButton(sample.title, () -> {
+                editor.setText(sample.script);
+                persistCurrentState();
+                runScript(form);
+                toolbar.closeSideMenu();
+            }));
+        }
+        toolbar.addComponentToSideMenu(new PlaygroundMenuSection("History"));
+        toolbar.addComponentToSideMenu(historyMenu);
+        refreshHistoryMenu(toolbar, PlaygroundStateStore.loadHistory());
+    }
+
+    private void refreshHistoryMenu(Toolbar toolbar, List<PlaygroundStateStore.HistoryEntry> history) {
+        historyMenu.removeAll();
+        if (history.isEmpty()) {
+            Label empty = new Label("No saved runs yet");
+            empty.setUIID("PlaygroundMenuEmpty");
+            historyMenu.add(empty);
+        } else {
+            for (int i = 0; i < history.size(); i++) {
+                PlaygroundStateStore.HistoryEntry entry = history.get(i);
+                historyMenu.add(createHistoryButton(entry, history, toolbar));
+            }
+        }
+        historyMenu.revalidate();
+    }
+
+    private MultiButton createHistoryButton(PlaygroundStateStore.HistoryEntry entry,
+            List<PlaygroundStateStore.HistoryEntry> history, Toolbar toolbar) {
+        MultiButton button = new MultiButton(entry.title());
+        button.setTextLine2(entry.detail(history));
+        button.setUIID("SideCommand");
+        button.addActionListener(e -> {
+            editor.setText(entry.script);
+            persistCurrentState();
+            Form current = editor.getComponentForm();
+            if (current != null) {
+                runScript(current);
+            }
+            toolbar.closeSideMenu();
+        });
+        return button;
+    }
+
+    private Button createSideMenuButton(String text, Runnable action) {
+        Button button = new Button(text);
+        button.setUIID("SideCommand");
+        button.addActionListener(e -> action.run());
+        return button;
+    }
+
+    private void persistCurrentState() {
+        if (editor == null || output == null) {
+            return;
+        }
+        PlaygroundStateStore.saveCurrentState(editor.getText(), output.getText());
+    }
+
+    private void scheduleHistorySnapshot() {
+        if (appForm == null) {
+            return;
+        }
+        final int snapshot = ++editSequence;
+        UITimer.timer(1200, false, appForm, () -> {
+            if (snapshot != editSequence || editor == null) {
+                return;
+            }
+            refreshHistoryMenu(appForm.getToolbar(), PlaygroundStateStore.pushHistory(editor.getText()));
+        });
     }
 
     private void initWebsiteThemeSync(Form form) {
