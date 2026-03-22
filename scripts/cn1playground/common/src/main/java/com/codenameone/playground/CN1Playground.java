@@ -3,9 +3,8 @@ package com.codenameone.playground;
 import com.codename1.components.SplitPane;
 import com.codename1.components.MultiButton;
 import com.codename1.system.Lifecycle;
-import com.codename1.system.NativeLookup;
 import com.codename1.ui.Button;
-import com.codename1.ui.Command;
+import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
@@ -33,6 +32,7 @@ public class CN1Playground extends Lifecycle {
     private Resources theme;
     private boolean websiteDarkMode;
     private int editSequence;
+    private int autoRunSequence;
 
     @Override
     public void runApp() {
@@ -63,16 +63,11 @@ public class CN1Playground extends Lifecycle {
         setThemeRole(content, "content");
         form.add(BorderLayout.CENTER, content);
 
-        Command runCommand = Command.create("Run", null, e -> runScript(form));
-        Command resetCommand = Command.create("Reset", null, e -> resetEditor());
-        Command exampleCommand = Command.create("Load Example", null, e -> loadBuildMethodExample());
-        toolbar.addCommandToRightBar(runCommand);
-        toolbar.addCommandToRightBar(resetCommand);
-        toolbar.addCommandToOverflowMenu(exampleCommand);
         installSideMenu(toolbar, form);
         editor.addDataChangedListener((type, index) -> {
             persistCurrentState();
             scheduleHistorySnapshot();
+            scheduleAutoRun();
         });
 
         runScript(form);
@@ -124,15 +119,7 @@ public class CN1Playground extends Lifecycle {
         setThemeRole(header, "header");
         Label title = new Label("Live Preview");
         setThemeRole(title, "headerTitle");
-        Button reload = new Button("Run");
-        setThemeRole(reload, "headerButton");
-        reload.addActionListener(e -> {
-            Form current = reload.getComponentForm();
-            if (current != null) {
-                runScript(current);
-            }
-        });
-        header.addAll(title, reload);
+        header.add(title);
         return header;
     }
 
@@ -174,20 +161,6 @@ public class CN1Playground extends Lifecycle {
         if (parent != null) {
             parent.removeComponent(component);
         }
-    }
-
-    private void resetEditor() {
-        editor.setText(PlaygroundExamples.DEFAULT_SCRIPT);
-        output.setText("");
-        previewRoot.removeAll();
-        previewRoot.revalidate();
-        persistCurrentState();
-    }
-
-    private void loadBuildMethodExample() {
-        editor.setText(PlaygroundExamples.BUILD_METHOD_SCRIPT);
-        output.setText("");
-        persistCurrentState();
     }
 
     private void appendOutput(String message) {
@@ -274,29 +247,77 @@ public class CN1Playground extends Lifecycle {
         });
     }
 
-    private void initWebsiteThemeSync(Form form) {
-        WebsiteThemeNative websiteThemeNative = NativeLookup.create(WebsiteThemeNative.class);
-        if (websiteThemeNative == null || !websiteThemeNative.isSupported()) {
+    private void scheduleAutoRun() {
+        if (appForm == null) {
             return;
         }
-        websiteDarkMode = websiteThemeNative.isDarkMode();
-        applyWebsiteTheme(form, websiteDarkMode);
-        form.refreshTheme();
-        UITimer.timer(900, true, form, () -> {
-            boolean dark = websiteThemeNative.isDarkMode();
-            if (dark != websiteDarkMode) {
-                websiteDarkMode = dark;
-                applyWebsiteTheme(form, dark);
-                form.refreshTheme();
+        final int runTicket = ++autoRunSequence;
+        UITimer.timer(900, false, appForm, () -> {
+            if (runTicket != autoRunSequence || editor == null) {
+                return;
             }
+            runScript(appForm);
+        });
+    }
+
+    private void initWebsiteThemeSync(Form form) {
+        refreshWebsiteTheme(form);
+        UITimer.timer(900, true, form, () -> {
+            refreshWebsiteTheme(form);
         });
     }
 
     private void notifyWebsiteUiReady() {
-        WebsiteThemeNative nativeBridge = NativeLookup.create(WebsiteThemeNative.class);
-        if (nativeBridge != null && nativeBridge.isSupported()) {
-            nativeBridge.notifyUiReady();
+        BrowserComponent js = com.codename1.ui.CN.getSharedJavascriptContext();
+        if (js == null) {
+            return;
         }
+        js.execute(
+                "callback.onSuccess((function(){"
+                        + "try {"
+                        + "if (window.parent && window.parent !== window && window.parent.postMessage) {"
+                        + "window.parent.postMessage({ type: 'cn1-playground-ui-ready' }, '*');"
+                        + "}"
+                        + "} catch (e) {}"
+                        + "return true;"
+                        + "})())",
+                res -> {
+                });
+    }
+
+    private void refreshWebsiteTheme(Form form) {
+        BrowserComponent js = com.codename1.ui.CN.getSharedJavascriptContext();
+        if (js == null) {
+            return;
+        }
+        js.execute(
+                "callback.onSuccess((function(){"
+                        + "var dark = false;"
+                        + "var explicit = false;"
+                        + "try {"
+                        + "var parentDoc = (window.parent && window.parent.document) ? window.parent.document : null;"
+                        + "if (parentDoc && parentDoc.body && parentDoc.body.classList) {"
+                        + "dark = parentDoc.body.classList.contains('dark') || parentDoc.body.classList.contains('cn1-initializr-dark');"
+                        + "}"
+                        + "if (!dark && window.parent && window.parent.localStorage) {"
+                        + "var pref = window.parent.localStorage.getItem('pref-theme');"
+                        + "if (pref === 'dark') { dark = true; explicit = true; }"
+                        + "else if (pref === 'light') { dark = false; explicit = true; }"
+                        + "}"
+                        + "} catch (e) {}"
+                        + "if (!explicit && !dark && window.matchMedia) {"
+                        + "dark = window.matchMedia('(prefers-color-scheme: dark)').matches;"
+                        + "}"
+                        + "return dark ? 'true' : 'false';"
+                        + "})())",
+                res -> {
+                    boolean dark = "true".equals(String.valueOf(res));
+                    if (dark != websiteDarkMode) {
+                        websiteDarkMode = dark;
+                        applyWebsiteTheme(form, dark);
+                        form.refreshTheme();
+                    }
+                });
     }
 
     private void applyWebsiteTheme(Component component, boolean dark) {

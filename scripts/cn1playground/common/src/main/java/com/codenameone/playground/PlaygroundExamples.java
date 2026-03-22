@@ -81,9 +81,18 @@ final class PlaygroundExamples {
             "import com.codename1.ui.layouts.*;\n" +
             "\n" +
             "Tabs tabs = new Tabs();\n" +
+            "tabs.setTabPlacement(Component.TOP);\n" +
             "tabs.addTab(\"News\", BoxLayout.encloseY(new Label(\"Latest updates\"), new Label(\"Deployment is green\")));\n" +
             "tabs.addTab(\"Stats\", BoxLayout.encloseY(new Label(\"Users: 42\"), new Label(\"Build time: 3m\")));\n" +
             "tabs.addTab(\"Notes\", BoxLayout.encloseY(new Label(\"Dark mode follows the website theme\")));\n" +
+            "tabs.getTabsContainer().getAllStyles().setBgTransparency(255);\n" +
+            "tabs.getTabsContainer().getAllStyles().setBgColor(0xe2e8f0);\n" +
+            "for (int i = 0; i < tabs.getTabCount(); i++) {\n" +
+            "    Component tab = tabs.getTabsContainer().getComponentAt(i);\n" +
+            "    tab.getAllStyles().setBgTransparency(255);\n" +
+            "    tab.getAllStyles().setBgColor(0xe2e8f0);\n" +
+            "    tab.getAllStyles().setFgColor(0x0f172a);\n" +
+            "}\n" +
             "tabs;";
 
     static final Sample[] SAMPLES = new Sample[]{

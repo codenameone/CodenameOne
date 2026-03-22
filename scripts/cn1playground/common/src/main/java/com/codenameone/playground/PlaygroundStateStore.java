@@ -21,7 +21,7 @@ final class PlaygroundStateStore {
 
         String title() {
             if (timestamp <= 0) {
-                return "Saved Draft";
+                return "Earlier save";
             }
             return L10NManager.getInstance().formatDateTimeShort(new Date(timestamp));
         }
