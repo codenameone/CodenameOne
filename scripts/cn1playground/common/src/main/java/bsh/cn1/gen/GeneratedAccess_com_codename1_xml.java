@@ -42,15 +42,18 @@ public final class GeneratedAccess_com_codename1_xml {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.xml.Element.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new com.codename1.xml.Element((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new com.codename1.xml.Element((java.lang.String) adaptedArgs[0]);
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
-                return new com.codename1.xml.Element((java.lang.String) safeArgs[0], ((Boolean) safeArgs[1]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
+                return new com.codename1.xml.Element((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
             }
         }
         if (type == com.codename1.xml.XMLWriter.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                return new com.codename1.xml.XMLWriter(((Boolean) safeArgs[0]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return new com.codename1.xml.XMLWriter(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -101,162 +104,194 @@ public final class GeneratedAccess_com_codename1_xml {
     private static Object invoke0(com.codename1.xml.Element typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addChild".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false)) {
-                typedTarget.addChild((com.codename1.xml.Element) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false);
+                typedTarget.addChild((com.codename1.xml.Element) adaptedArgs[0]); return null;
             }
         }
         if ("contains".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false)) {
-                return typedTarget.contains((com.codename1.xml.Element) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false);
+                return typedTarget.contains((com.codename1.xml.Element) adaptedArgs[0]);
             }
         }
         if ("getAttribute".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.getAttribute((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getAttribute((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("getAttributeAsInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
-                return typedTarget.getAttributeAsInt((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
+                return typedTarget.getAttributeAsInt((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("getAttributes".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getAttributes();
             }
         }
         if ("getChildAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getChildAt(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getChildAt(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getChildIndex".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false)) {
-                return typedTarget.getChildIndex((com.codename1.xml.Element) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false);
+                return typedTarget.getChildIndex((com.codename1.xml.Element) adaptedArgs[0]);
             }
         }
         if ("getChildrenByTagName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.getChildrenByTagName((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getChildrenByTagName((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("getDescendantsByTagName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.getDescendantsByTagName((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getDescendantsByTagName((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("getDescendantsByTagName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
-                return typedTarget.getDescendantsByTagName((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
+                return typedTarget.getDescendantsByTagName((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("getDescendantsByTagNameAndAttribute".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Integer.class}, false)) {
-                return typedTarget.getDescendantsByTagNameAndAttribute((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1], ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Integer.class}, false);
+                return typedTarget.getDescendantsByTagNameAndAttribute((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("getElementById".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.getElementById((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getElementById((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("getFirstChildByTagName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.getFirstChildByTagName((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getFirstChildByTagName((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("getNumChildren".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getNumChildren();
             }
         }
         if ("getParent".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getParent();
             }
         }
         if ("getTagName".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getTagName();
             }
         }
         if ("getText".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getText();
             }
         }
         if ("getTextChildren".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
-                return typedTarget.getTextChildren((java.lang.String) safeArgs[0], ((Boolean) safeArgs[1]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
+                return typedTarget.getTextChildren((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
             }
         }
         if ("getTextDescendants".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
-                return typedTarget.getTextDescendants((java.lang.String) safeArgs[0], ((Boolean) safeArgs[1]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
+                return typedTarget.getTextDescendants((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
             }
         }
         if ("getTextDescendants".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
-                return typedTarget.getTextDescendants((java.lang.String) safeArgs[0], ((Boolean) safeArgs[1]).booleanValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
+                return typedTarget.getTextDescendants((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("hasTextChild".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.hasTextChild();
             }
         }
         if ("insertChildAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class, java.lang.Integer.class}, false)) {
-                typedTarget.insertChildAt((com.codename1.xml.Element) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class, java.lang.Integer.class}, false);
+                typedTarget.insertChildAt((com.codename1.xml.Element) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
         }
         if ("isEmpty".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isEmpty();
             }
         }
         if ("isTextElement".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isTextElement();
             }
         }
         if ("iterator".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.iterator();
             }
         }
         if ("removeAttribute".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.removeAttribute((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.removeAttribute((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("removeChildAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.removeChildAt(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.removeChildAt(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("replaceChild".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class, com.codename1.xml.Element.class}, false)) {
-                typedTarget.replaceChild((com.codename1.xml.Element) safeArgs[0], (com.codename1.xml.Element) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class, com.codename1.xml.Element.class}, false);
+                typedTarget.replaceChild((com.codename1.xml.Element) adaptedArgs[0], (com.codename1.xml.Element) adaptedArgs[1]); return null;
             }
         }
         if ("setAttribute".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                return typedTarget.setAttribute((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.setAttribute((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
         }
         if ("setText".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setText((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setText((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toString();
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.toString((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.toString((java.lang.String) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -265,32 +300,38 @@ public final class GeneratedAccess_com_codename1_xml {
     private static Object invoke1(com.codename1.xml.XMLParser typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addCharEntitiesRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.Integer.class}, false)) {
-                typedTarget.addCharEntitiesRange((java.lang.String[]) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.Integer.class}, false);
+                typedTarget.addCharEntitiesRange((java.lang.String[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
         }
         if ("addCharEntity".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
-                typedTarget.addCharEntity((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
+                typedTarget.addCharEntity((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
         }
         if ("isCaseSensitive".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isCaseSensitive();
             }
         }
         if ("setCaseSensitive".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setCaseSensitive(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setCaseSensitive(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setIncludeWhitespacesBetweenTags".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setIncludeWhitespacesBetweenTags(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setIncludeWhitespacesBetweenTags(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setParserCallback".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.xml.ParserCallback.class}, false)) {
-                typedTarget.setParserCallback((com.codename1.xml.ParserCallback) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.ParserCallback.class}, false);
+                typedTarget.setParserCallback((com.codename1.xml.ParserCallback) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -299,7 +340,8 @@ public final class GeneratedAccess_com_codename1_xml {
     private static Object invoke2(com.codename1.xml.XMLWriter typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("toXML".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false)) {
-                return typedTarget.toXML((com.codename1.xml.Element) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false);
+                return typedTarget.toXML((com.codename1.xml.Element) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -308,7 +350,8 @@ public final class GeneratedAccess_com_codename1_xml {
     private static Object invoke3(com.codename1.xml.ParserCallback typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("parsingError".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
-                return typedTarget.parsingError(((Number) safeArgs[0]).intValue(), (java.lang.String) safeArgs[1], (java.lang.String) safeArgs[2], (java.lang.String) safeArgs[3], (java.lang.String) safeArgs[4]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.parsingError(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -347,6 +390,88 @@ public final class GeneratedAccess_com_codename1_xml {
 
     private static Object[] safeArgs(Object[] args) {
         return args == null ? new Object[0] : args;
+    }
+
+    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (args == null || args.length == 0) {
+            return args == null ? new Object[0] : args;
+        }
+        Object[] adapted = args.clone();
+        if (!varArgs) {
+            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {
+                adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+            }
+            return adapted;
+        }
+        if (paramTypes.length == 0) {
+            return adapted;
+        }
+        int fixedCount = paramTypes.length - 1;
+        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {
+            adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < adapted.length; i++) {
+            adapted[i] = adaptValue(adapted[i], componentType);
+        }
+        return adapted;
+    }
+
+    private static boolean isSamInterface(Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == java.util.Observer.class) {
+            return true;
+        }
+        if (type == java.lang.Iterable.class) {
+            return true;
+        }
+        return false;
+    }
+
+    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.util.Observer.class) {
+            return new java.util.Observer() {
+                public void update(java.util.Observable arg0, java.lang.Object arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Iterable.class) {
+            return new java.lang.Iterable() {
+                public java.util.Iterator iterator() {
+                    try {
+                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        return lambda;
+    }
+
+    private static Object adaptValue(Object value, Class<?> type) {
+        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
+            return value;
+        }
+        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -402,6 +527,9 @@ public final class GeneratedAccess_com_codename1_xml {
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
             return value instanceof Number;
+        }
+        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+            return isSamInterface(type);
         }
         return type.isInstance(value);
     }

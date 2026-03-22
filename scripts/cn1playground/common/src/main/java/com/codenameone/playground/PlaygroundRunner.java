@@ -9,6 +9,7 @@ import bsh.Primitive;
 import bsh.TargetError;
 import bsh.TokenMgrException;
 import bsh.UtilEvalError;
+import bsh.cn1.CN1LambdaSupport;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
@@ -85,12 +86,14 @@ final class PlaygroundRunner {
             Interpreter interpreter = new Interpreter();
             bindGlobals(interpreter, context);
             PlaygroundContext.pushCurrent(context);
+            CN1LambdaSupport.pushInterpreter(interpreter);
             try {
                 Object result = interpreter.eval(adaptScript(script));
                 Component component = resolveComponent(interpreter, result, context);
                 inlineMessages.add(new InlineMessage(0, "Preview updated.", "success"));
                 return new RunResult(component, Collections.<Diagnostic>emptyList(), inlineMessages);
             } finally {
+                CN1LambdaSupport.clearInterpreter();
                 PlaygroundContext.clearCurrent();
             }
         } catch (ParseException ex) {
@@ -109,6 +112,7 @@ final class PlaygroundRunner {
     private void bindGlobals(Interpreter interpreter, PlaygroundContext context) throws EvalError {
         NameSpace namespace = interpreter.getNameSpace();
         interpreter.set("ctx", context);
+        interpreter.set("__lambdaSupport", new LambdaBridge());
         interpreter.set("theme", context.getTheme());
         interpreter.set("hostForm", context.getHostForm());
         interpreter.set("previewRoot", context.getPreviewRoot());
@@ -131,7 +135,10 @@ final class PlaygroundRunner {
 
     private String adaptScript(String script) {
         String adapted = unwrapSingleTopLevelClass(script);
-        return adapted == null ? script : adapted;
+        String normalized = adapted == null ? script : adapted;
+        normalized = rewriteLambdaArguments(normalized);
+        String wrapped = wrapLooseScript(normalized);
+        return wrapped == null ? normalized : wrapped;
     }
 
     private RunResult failure(String message, int line, int column, List<InlineMessage> inlineMessages) {
@@ -462,6 +469,653 @@ final class PlaygroundRunner {
                 || (ch >= '0' && ch <= '9')
                 || ch == '_'
                 || ch == '$';
+    }
+
+    private String wrapLooseScript(String script) {
+        int packageEnd = skipPackageDeclaration(script, 0);
+        int bodyStart = skipImports(script, packageEnd);
+        if (findSingleTopLevelClass(script, bodyStart) != null || containsTopLevelCallableDeclaration(script, bodyStart)) {
+            return null;
+        }
+        String prefix = script.substring(0, bodyStart);
+        String body = script.substring(bodyStart);
+        String rewrittenBody = rewriteLooseScriptBody(body);
+        return prefix
+                + "com.codename1.ui.Component build(com.codenameone.playground.PlaygroundContext ctx) {\n"
+                + rewrittenBody
+                + "\n}\n"
+                + "build(ctx);";
+    }
+
+    private boolean containsTopLevelCallableDeclaration(String script, int start) {
+        int depth = 0;
+        for (int i = start; i < script.length(); i++) {
+            char ch = script.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(script, i);
+                continue;
+            }
+            if (startsLineComment(script, i)) {
+                i = skipLineComment(script, i);
+                continue;
+            }
+            if (startsBlockComment(script, i)) {
+                i = skipBlockComment(script, i);
+                continue;
+            }
+            if (ch == '{') {
+                depth++;
+                continue;
+            }
+            if (ch == '}') {
+                depth--;
+                continue;
+            }
+            if (depth != 0 || !isIdentifierStart(ch)) {
+                continue;
+            }
+            int openParen = findNextNonWhitespace(script, i);
+            while (openParen < script.length() && script.charAt(openParen) != '(' && script.charAt(openParen) != ';'
+                    && script.charAt(openParen) != '{' && script.charAt(openParen) != '}') {
+                if (script.charAt(openParen) == '"' || script.charAt(openParen) == '\'') {
+                    openParen = skipQuoted(script, openParen) + 1;
+                    continue;
+                }
+                openParen++;
+            }
+            if (openParen >= script.length() || script.charAt(openParen) != '(') {
+                continue;
+            }
+            int closeParen = findMatchingParen(script, openParen);
+            if (closeParen < 0) {
+                return false;
+            }
+            int next = skipWhitespace(script, closeParen + 1);
+            if (next < script.length() && script.charAt(next) == '{') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String rewriteLooseScriptBody(String body) {
+        int lastSemi = findLastTopLevelSemicolon(body);
+        if (lastSemi < 0) {
+            String trimmed = body.trim();
+            if (trimmed.length() == 0) {
+                return "return null;";
+            }
+            if (looksLikeReturnStatement(trimmed)) {
+                return body;
+            }
+            return "return " + trimmed + ";";
+        }
+        int statementStart = findStatementStart(body, lastSemi);
+        String leading = body.substring(0, statementStart);
+        String statement = body.substring(statementStart, lastSemi).trim();
+        String trailing = body.substring(lastSemi + 1);
+        if (statement.length() == 0) {
+            return body + "\nreturn null;";
+        }
+        if (looksLikeReturnStatement(statement)) {
+            return body;
+        }
+        if (looksLikeReturnableExpression(statement)) {
+            return leading + "return " + statement + ";" + trailing;
+        }
+        return body + "\nreturn null;";
+    }
+
+    private int findLastTopLevelSemicolon(String text) {
+        int depth = 0;
+        int last = -1;
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(text, i);
+                continue;
+            }
+            if (startsLineComment(text, i)) {
+                i = skipLineComment(text, i);
+                continue;
+            }
+            if (startsBlockComment(text, i)) {
+                i = skipBlockComment(text, i);
+                continue;
+            }
+            if (ch == '{') {
+                depth++;
+            } else if (ch == '}') {
+                depth--;
+            } else if (ch == ';' && depth == 0) {
+                last = i;
+            }
+        }
+        return last;
+    }
+
+    private int findStatementStart(String text, int endExclusive) {
+        int depth = 0;
+        int last = 0;
+        for (int i = 0; i < endExclusive; i++) {
+            char ch = text.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(text, i);
+                continue;
+            }
+            if (startsLineComment(text, i)) {
+                i = skipLineComment(text, i);
+                continue;
+            }
+            if (startsBlockComment(text, i)) {
+                i = skipBlockComment(text, i);
+                continue;
+            }
+            if (ch == '{') {
+                depth++;
+            } else if (ch == '}') {
+                depth--;
+            } else if (ch == ';' && depth == 0) {
+                last = i + 1;
+            }
+        }
+        return last;
+    }
+
+    private boolean looksLikeReturnStatement(String statement) {
+        return startsWithWord(statement, skipWhitespace(statement, 0), "return");
+    }
+
+    private boolean looksLikeReturnableExpression(String statement) {
+        int start = skipWhitespace(statement, 0);
+        if (start >= statement.length()) {
+            return false;
+        }
+        if (startsWithAnyWord(statement, start, "if", "for", "while", "switch", "try", "catch", "finally",
+                "do", "class", "interface", "enum", "throw", "break", "continue", "public", "private",
+                "protected", "static", "final", "abstract", "synchronized")) {
+            return false;
+        }
+        return !containsTopLevelAssignment(statement);
+    }
+
+    private boolean containsTopLevelAssignment(String text) {
+        int depth = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(text, i);
+                continue;
+            }
+            if (startsLineComment(text, i)) {
+                i = skipLineComment(text, i);
+                continue;
+            }
+            if (startsBlockComment(text, i)) {
+                i = skipBlockComment(text, i);
+                continue;
+            }
+            if (ch == '(' || ch == '[' || ch == '{') {
+                depth++;
+                continue;
+            }
+            if (ch == ')' || ch == ']' || ch == '}') {
+                depth--;
+                continue;
+            }
+            if (depth == 0 && ch == '=') {
+                char before = i > 0 ? text.charAt(i - 1) : 0;
+                char after = i + 1 < text.length() ? text.charAt(i + 1) : 0;
+                if (before != '=' && before != '!' && before != '<' && before != '>' && after != '=') {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean startsWithAnyWord(String text, int index, String... words) {
+        for (int i = 0; i < words.length; i++) {
+            if (startsWithWord(text, index, words[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String rewriteLambdaArguments(String script) {
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        for (int i = 0; i < script.length(); i++) {
+            char ch = script.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(script, i);
+                continue;
+            }
+            if (startsLineComment(script, i)) {
+                i = skipLineComment(script, i);
+                continue;
+            }
+            if (startsBlockComment(script, i)) {
+                i = skipBlockComment(script, i);
+                continue;
+            }
+            if (ch != '(') {
+                continue;
+            }
+            int close = findMatchingParen(script, i);
+            if (close < 0) {
+                break;
+            }
+            String inner = script.substring(i + 1, close);
+            String rewrittenInner = rewriteLambdaSegments(rewriteLambdaArguments(inner));
+            out.append(script, last, i + 1);
+            out.append(rewrittenInner);
+            last = close;
+            i = close;
+        }
+        out.append(script.substring(last));
+        return out.toString();
+    }
+
+    private String rewriteLambdaSegments(String text) {
+        StringBuilder out = new StringBuilder();
+        int start = 0;
+        int depth = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(text, i);
+                continue;
+            }
+            if (startsLineComment(text, i)) {
+                i = skipLineComment(text, i);
+                continue;
+            }
+            if (startsBlockComment(text, i)) {
+                i = skipBlockComment(text, i);
+                continue;
+            }
+            if (ch == '(' || ch == '[' || ch == '{') {
+                depth++;
+            } else if (ch == ')' || ch == ']' || ch == '}') {
+                depth--;
+            } else if (ch == ',' && depth == 0) {
+                appendLambdaSegment(out, text.substring(start, i));
+                out.append(',');
+                start = i + 1;
+            }
+        }
+        appendLambdaSegment(out, text.substring(start));
+        return out.toString();
+    }
+
+    private void appendLambdaSegment(StringBuilder out, String segment) {
+        String rewritten = rewriteLambdaExpression(segment);
+        out.append(rewritten == null ? segment : rewritten);
+    }
+
+    private String rewriteLambdaExpression(String segment) {
+        int arrow = findTopLevelArrow(segment);
+        if (arrow < 0) {
+            return rewriteAnonymousSamExpression(segment);
+        }
+        String[] params = parseLambdaParameters(segment.substring(0, arrow));
+        if (params == null) {
+            return null;
+        }
+        String body = normalizeLambdaBody(segment.substring(arrow + 2));
+        if (body == null) {
+            return null;
+        }
+        return lambdaPlaceholder(params, body);
+    }
+
+    private String rewriteAnonymousSamExpression(String segment) {
+        String trimmed = segment.trim();
+        if (!trimmed.startsWith("new ")) {
+            return null;
+        }
+        int typeStart = 4;
+        int openParen = findTopLevelChar(trimmed, '(', typeStart);
+        if (openParen < 0) {
+            return null;
+        }
+        int closeParen = findMatchingParen(trimmed, openParen);
+        if (closeParen < 0 || containsNonWhitespace(trimmed.substring(openParen + 1, closeParen))) {
+            return null;
+        }
+        int bodyStart = skipWhitespace(trimmed, closeParen + 1);
+        if (bodyStart >= trimmed.length() || trimmed.charAt(bodyStart) != '{') {
+            return null;
+        }
+        int bodyEnd = findMatchingBrace(trimmed, bodyStart);
+        if (bodyEnd != trimmed.length() - 1) {
+            return null;
+        }
+        AnonymousSam anonymousSam = parseAnonymousSamBody(trimmed.substring(bodyStart + 1, bodyEnd));
+        if (anonymousSam == null) {
+            return null;
+        }
+        return lambdaPlaceholder(anonymousSam.parameterNames, anonymousSam.bodySource);
+    }
+
+    private AnonymousSam parseAnonymousSamBody(String body) {
+        int i = skipWhitespace(body, 0);
+        if (!startsWithWord(body, i, "public")) {
+            return null;
+        }
+        i = skipWhitespace(body, i + "public".length());
+        int openParen = findTopLevelChar(body, '(', i);
+        if (openParen < 0) {
+            return null;
+        }
+        int closeParen = findMatchingParen(body, openParen);
+        if (closeParen < 0) {
+            return null;
+        }
+        int nameEnd = openParen;
+        int nameStart = nameEnd - 1;
+        while (nameStart >= i && isIdentifierPart(body.charAt(nameStart))) {
+            nameStart--;
+        }
+        nameStart++;
+        if (nameStart >= nameEnd) {
+            return null;
+        }
+        int methodBodyStart = skipWhitespace(body, closeParen + 1);
+        if (methodBodyStart >= body.length() || body.charAt(methodBodyStart) != '{') {
+            return null;
+        }
+        int methodBodyEnd = findMatchingBrace(body, methodBodyStart);
+        if (methodBodyEnd < 0 || containsNonWhitespace(body.substring(methodBodyEnd + 1))) {
+            return null;
+        }
+        String[] params = parseAnonymousMethodParameters(body.substring(openParen + 1, closeParen));
+        if (params == null) {
+            return null;
+        }
+        return new AnonymousSam(params, body.substring(methodBodyStart + 1, methodBodyEnd).trim());
+    }
+
+    private String[] parseAnonymousMethodParameters(String raw) {
+        String parameterList = raw.trim();
+        if (parameterList.length() == 0) {
+            return new String[0];
+        }
+        String[] rawParts = splitTopLevel(parameterList, ',');
+        String[] out = new String[rawParts.length];
+        for (int i = 0; i < rawParts.length; i++) {
+            String candidate = rawParts[i].trim();
+            if (candidate.length() == 0) {
+                return null;
+            }
+            int end = candidate.length() - 1;
+            while (end >= 0 && Character.isWhitespace(candidate.charAt(end))) {
+                end--;
+            }
+            int start = end;
+            while (start >= 0 && isIdentifierPart(candidate.charAt(start))) {
+                start--;
+            }
+            start++;
+            if (start > end || !isIdentifierStart(candidate.charAt(start))) {
+                return null;
+            }
+            out[i] = candidate.substring(start, end + 1);
+        }
+        return out;
+    }
+
+    private String lambdaPlaceholder(String[] params, String body) {
+        return "__lambdaSupport.lambda(" + toStringArrayLiteral(params) + ", " + toJavaStringLiteral(body) + ")";
+    }
+
+    private int findTopLevelArrow(String text) {
+        int depth = 0;
+        for (int i = 0; i + 1 < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(text, i);
+                continue;
+            }
+            if (startsLineComment(text, i)) {
+                i = skipLineComment(text, i);
+                continue;
+            }
+            if (startsBlockComment(text, i)) {
+                i = skipBlockComment(text, i);
+                continue;
+            }
+            if (ch == '(' || ch == '[' || ch == '{') {
+                depth++;
+                continue;
+            }
+            if (ch == ')' || ch == ']' || ch == '}') {
+                depth--;
+                continue;
+            }
+            if (depth == 0 && ch == '-' && text.charAt(i + 1) == '>') {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private int findTopLevelChar(String text, char expected, int start) {
+        int depth = 0;
+        for (int i = start; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(text, i);
+                continue;
+            }
+            if (startsLineComment(text, i)) {
+                i = skipLineComment(text, i);
+                continue;
+            }
+            if (startsBlockComment(text, i)) {
+                i = skipBlockComment(text, i);
+                continue;
+            }
+            if (depth == 0 && ch == expected) {
+                return i;
+            }
+            if (ch == '(' || ch == '[' || ch == '{') {
+                depth++;
+            } else if (ch == ')' || ch == ']' || ch == '}') {
+                depth--;
+            }
+        }
+        return -1;
+    }
+
+    private String[] parseLambdaParameters(String raw) {
+        String parameterList = raw.trim();
+        if (parameterList.length() == 0) {
+            return new String[0];
+        }
+        if (parameterList.startsWith("(") && parameterList.endsWith(")")) {
+            parameterList = parameterList.substring(1, parameterList.length() - 1).trim();
+        }
+        if (parameterList.length() == 0) {
+            return new String[0];
+        }
+        String[] rawParts = splitTopLevel(parameterList, ',');
+        String[] out = new String[rawParts.length];
+        for (int i = 0; i < rawParts.length; i++) {
+            String candidate = rawParts[i].trim();
+            if (candidate.length() == 0 || containsWhitespace(candidate) || !isIdentifierStart(candidate.charAt(0))) {
+                return null;
+            }
+            for (int j = 1; j < candidate.length(); j++) {
+                if (!isIdentifierPart(candidate.charAt(j))) {
+                    return null;
+                }
+            }
+            out[i] = candidate;
+        }
+        return out;
+    }
+
+    private String normalizeLambdaBody(String rawBody) {
+        String body = rawBody.trim();
+        if (body.length() == 0) {
+            return null;
+        }
+        if (body.startsWith("{") && body.endsWith("}")) {
+            return body.substring(1, body.length() - 1).trim();
+        }
+        return "return " + body + ";";
+    }
+
+    private String[] splitTopLevel(String text, char separator) {
+        int depth = 0;
+        int start = 0;
+        java.util.List<String> values = new java.util.ArrayList<String>();
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(text, i);
+                continue;
+            }
+            if (startsLineComment(text, i)) {
+                i = skipLineComment(text, i);
+                continue;
+            }
+            if (startsBlockComment(text, i)) {
+                i = skipBlockComment(text, i);
+                continue;
+            }
+            if (ch == '(' || ch == '[' || ch == '{') {
+                depth++;
+            } else if (ch == ')' || ch == ']' || ch == '}') {
+                depth--;
+            } else if (depth == 0 && ch == separator) {
+                values.add(text.substring(start, i));
+                start = i + 1;
+            }
+        }
+        values.add(text.substring(start));
+        return values.toArray(new String[values.size()]);
+    }
+
+    private String toStringArrayLiteral(String[] values) {
+        if (values == null || values.length == 0) {
+            return "new String[0]";
+        }
+        StringBuilder out = new StringBuilder("new String[]{");
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) {
+                out.append(", ");
+            }
+            out.append(toJavaStringLiteral(values[i]));
+        }
+        out.append('}');
+        return out.toString();
+    }
+
+    private String toJavaStringLiteral(String value) {
+        StringBuilder out = new StringBuilder("\"");
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            switch (ch) {
+                case '\\':
+                    out.append("\\\\");
+                    break;
+                case '"':
+                    out.append("\\\"");
+                    break;
+                case '\n':
+                    out.append("\\n");
+                    break;
+                case '\r':
+                    out.append("\\r");
+                    break;
+                case '\t':
+                    out.append("\\t");
+                    break;
+                default:
+                    out.append(ch);
+                    break;
+            }
+        }
+        out.append('"');
+        return out.toString();
+    }
+
+    private boolean containsWhitespace(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            if (Character.isWhitespace(text.charAt(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int findMatchingParen(String text, int openParen) {
+        int depth = 1;
+        for (int i = openParen + 1; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(text, i);
+                continue;
+            }
+            if (startsLineComment(text, i)) {
+                i = skipLineComment(text, i);
+                continue;
+            }
+            if (startsBlockComment(text, i)) {
+                i = skipBlockComment(text, i);
+                continue;
+            }
+            if (ch == '(') {
+                depth++;
+            } else if (ch == ')') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private int findNextNonWhitespace(String text, int index) {
+        int i = index;
+        while (i < text.length() && !Character.isWhitespace(text.charAt(i))) {
+            if (text.charAt(i) == '"' || text.charAt(i) == '\'') {
+                return i;
+            }
+            i++;
+        }
+        while (i < text.length() && Character.isWhitespace(text.charAt(i))) {
+            i++;
+        }
+        return i;
+    }
+
+    private boolean isIdentifierStart(char ch) {
+        return (ch >= 'a' && ch <= 'z')
+                || (ch >= 'A' && ch <= 'Z')
+                || ch == '_'
+                || ch == '$';
+    }
+
+    private static final class AnonymousSam {
+        final String[] parameterNames;
+        final String bodySource;
+
+        AnonymousSam(String[] parameterNames, String bodySource) {
+            this.parameterNames = parameterNames;
+            this.bodySource = bodySource;
+        }
+    }
+
+    public static final class LambdaBridge {
+        public CN1LambdaSupport.LambdaValue lambda(String[] parameterNames, String bodySource) {
+            return CN1LambdaSupport.lambda(parameterNames, bodySource);
+        }
     }
 
     private Component resolveComponent(Interpreter interpreter, Object value, PlaygroundContext context) throws EvalError {

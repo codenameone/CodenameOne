@@ -42,16 +42,19 @@ public final class GeneratedAccess_com_codename1_share {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.share.EmailShare.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.share.EmailShare();
             }
         }
         if (type == com.codename1.share.FacebookShare.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.share.FacebookShare();
             }
         }
         if (type == com.codename1.share.SMSShare.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.share.SMSShare();
             }
         }
@@ -103,186 +106,223 @@ public final class GeneratedAccess_com_codename1_share {
     private static Object invoke0(com.codename1.share.EmailShare typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("actionPerformed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false)) {
-                typedTarget.actionPerformed((com.codename1.ui.events.ActionEvent) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false);
+                typedTarget.actionPerformed((com.codename1.ui.events.ActionEvent) adaptedArgs[0]); return null;
             }
         }
         if ("canShareImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.canShareImage();
             }
         }
         if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.equals((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("finish".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.finish(); return null;
             }
         }
         if ("getClientProperty".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.getClientProperty((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getClientProperty((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("getCommandName".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCommandName();
             }
         }
         if ("getDisabledIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDisabledIcon();
             }
         }
         if ("getIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getIcon();
             }
         }
         if ("getIconFont".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getIconFont();
             }
         }
         if ("getIconGapMM".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getIconGapMM();
             }
         }
         if ("getId".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getId();
             }
         }
         if ("getMaterialIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaterialIcon();
             }
         }
         if ("getMaterialIconSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaterialIconSize();
             }
         }
         if ("getOriginal".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getOriginal();
             }
         }
         if ("getPressedIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPressedIcon();
             }
         }
         if ("getRolloverIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRolloverIcon();
             }
         }
         if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.hashCode();
             }
         }
         if ("isDisposesDialog".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isDisposesDialog();
             }
         }
         if ("isEnabled".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isEnabled();
             }
         }
         if ("putClientProperty".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false)) {
-                typedTarget.putClientProperty((java.lang.String) safeArgs[0], (java.lang.Object) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false);
+                typedTarget.putClientProperty((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
         }
         if ("setCommandName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setCommandName((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setCommandName((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("setDisabledIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setDisabledIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setDisabledIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("setDisposesDialog".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setDisposesDialog(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setDisposesDialog(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setEnabled".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setEnabled(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setEnabled(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("setIconFont".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Font.class}, false)) {
-                typedTarget.setIconFont((com.codename1.ui.Font) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Font.class}, false);
+                typedTarget.setIconFont((com.codename1.ui.Font) adaptedArgs[0]); return null;
             }
         }
         if ("setIconGapMM".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.setIconGapMM(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setIconGapMM(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("setImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                typedTarget.setImage((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.setImage((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
         }
         if ("setMaterialIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Character.class}, false)) {
-                typedTarget.setMaterialIcon(((Character) safeArgs[0]).charValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class}, false);
+                typedTarget.setMaterialIcon(((Character) adaptedArgs[0]).charValue()); return null;
             }
         }
         if ("setMaterialIconSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.setMaterialIconSize(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setMaterialIconSize(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("setMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setMessage((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setMessage((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("setOriginalForm".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Form.class}, false)) {
-                typedTarget.setOriginalForm((com.codename1.ui.Form) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Form.class}, false);
+                typedTarget.setOriginalForm((com.codename1.ui.Form) adaptedArgs[0]); return null;
             }
         }
         if ("setPressedIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setPressedIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setPressedIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("setRolloverIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setRolloverIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setRolloverIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("share".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.share((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.share((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("share".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
-                typedTarget.share((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1], (java.lang.String) safeArgs[2]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.share((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toString();
             }
         }
@@ -292,186 +332,223 @@ public final class GeneratedAccess_com_codename1_share {
     private static Object invoke1(com.codename1.share.FacebookShare typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("actionPerformed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false)) {
-                typedTarget.actionPerformed((com.codename1.ui.events.ActionEvent) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false);
+                typedTarget.actionPerformed((com.codename1.ui.events.ActionEvent) adaptedArgs[0]); return null;
             }
         }
         if ("canShareImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.canShareImage();
             }
         }
         if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.equals((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("finish".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.finish(); return null;
             }
         }
         if ("getClientProperty".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.getClientProperty((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getClientProperty((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("getCommandName".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCommandName();
             }
         }
         if ("getDisabledIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDisabledIcon();
             }
         }
         if ("getIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getIcon();
             }
         }
         if ("getIconFont".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getIconFont();
             }
         }
         if ("getIconGapMM".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getIconGapMM();
             }
         }
         if ("getId".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getId();
             }
         }
         if ("getMaterialIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaterialIcon();
             }
         }
         if ("getMaterialIconSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaterialIconSize();
             }
         }
         if ("getOriginal".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getOriginal();
             }
         }
         if ("getPressedIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPressedIcon();
             }
         }
         if ("getRolloverIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRolloverIcon();
             }
         }
         if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.hashCode();
             }
         }
         if ("isDisposesDialog".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isDisposesDialog();
             }
         }
         if ("isEnabled".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isEnabled();
             }
         }
         if ("putClientProperty".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false)) {
-                typedTarget.putClientProperty((java.lang.String) safeArgs[0], (java.lang.Object) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false);
+                typedTarget.putClientProperty((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
         }
         if ("setCommandName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setCommandName((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setCommandName((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("setDisabledIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setDisabledIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setDisabledIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("setDisposesDialog".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setDisposesDialog(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setDisposesDialog(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setEnabled".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setEnabled(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setEnabled(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("setIconFont".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Font.class}, false)) {
-                typedTarget.setIconFont((com.codename1.ui.Font) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Font.class}, false);
+                typedTarget.setIconFont((com.codename1.ui.Font) adaptedArgs[0]); return null;
             }
         }
         if ("setIconGapMM".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.setIconGapMM(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setIconGapMM(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("setImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                typedTarget.setImage((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.setImage((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
         }
         if ("setMaterialIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Character.class}, false)) {
-                typedTarget.setMaterialIcon(((Character) safeArgs[0]).charValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class}, false);
+                typedTarget.setMaterialIcon(((Character) adaptedArgs[0]).charValue()); return null;
             }
         }
         if ("setMaterialIconSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.setMaterialIconSize(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setMaterialIconSize(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("setMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setMessage((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setMessage((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("setOriginalForm".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Form.class}, false)) {
-                typedTarget.setOriginalForm((com.codename1.ui.Form) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Form.class}, false);
+                typedTarget.setOriginalForm((com.codename1.ui.Form) adaptedArgs[0]); return null;
             }
         }
         if ("setPressedIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setPressedIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setPressedIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("setRolloverIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setRolloverIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setRolloverIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("share".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.share((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.share((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("share".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
-                typedTarget.share((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1], (java.lang.String) safeArgs[2]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.share((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toString();
             }
         }
@@ -481,186 +558,223 @@ public final class GeneratedAccess_com_codename1_share {
     private static Object invoke2(com.codename1.share.SMSShare typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("actionPerformed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false)) {
-                typedTarget.actionPerformed((com.codename1.ui.events.ActionEvent) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false);
+                typedTarget.actionPerformed((com.codename1.ui.events.ActionEvent) adaptedArgs[0]); return null;
             }
         }
         if ("canShareImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.canShareImage();
             }
         }
         if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.equals((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("finish".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.finish(); return null;
             }
         }
         if ("getClientProperty".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.getClientProperty((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getClientProperty((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("getCommandName".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCommandName();
             }
         }
         if ("getDisabledIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDisabledIcon();
             }
         }
         if ("getIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getIcon();
             }
         }
         if ("getIconFont".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getIconFont();
             }
         }
         if ("getIconGapMM".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getIconGapMM();
             }
         }
         if ("getId".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getId();
             }
         }
         if ("getMaterialIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaterialIcon();
             }
         }
         if ("getMaterialIconSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaterialIconSize();
             }
         }
         if ("getOriginal".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getOriginal();
             }
         }
         if ("getPressedIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPressedIcon();
             }
         }
         if ("getRolloverIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRolloverIcon();
             }
         }
         if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.hashCode();
             }
         }
         if ("isDisposesDialog".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isDisposesDialog();
             }
         }
         if ("isEnabled".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isEnabled();
             }
         }
         if ("putClientProperty".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false)) {
-                typedTarget.putClientProperty((java.lang.String) safeArgs[0], (java.lang.Object) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false);
+                typedTarget.putClientProperty((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
         }
         if ("setCommandName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setCommandName((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setCommandName((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("setDisabledIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setDisabledIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setDisabledIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("setDisposesDialog".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setDisposesDialog(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setDisposesDialog(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setEnabled".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setEnabled(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setEnabled(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("setIconFont".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Font.class}, false)) {
-                typedTarget.setIconFont((com.codename1.ui.Font) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Font.class}, false);
+                typedTarget.setIconFont((com.codename1.ui.Font) adaptedArgs[0]); return null;
             }
         }
         if ("setIconGapMM".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.setIconGapMM(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setIconGapMM(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("setImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                typedTarget.setImage((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.setImage((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
         }
         if ("setMaterialIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Character.class}, false)) {
-                typedTarget.setMaterialIcon(((Character) safeArgs[0]).charValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class}, false);
+                typedTarget.setMaterialIcon(((Character) adaptedArgs[0]).charValue()); return null;
             }
         }
         if ("setMaterialIconSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.setMaterialIconSize(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setMaterialIconSize(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("setMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setMessage((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setMessage((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("setOriginalForm".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Form.class}, false)) {
-                typedTarget.setOriginalForm((com.codename1.ui.Form) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Form.class}, false);
+                typedTarget.setOriginalForm((com.codename1.ui.Form) adaptedArgs[0]); return null;
             }
         }
         if ("setPressedIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setPressedIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setPressedIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("setRolloverIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setRolloverIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setRolloverIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("share".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.share((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.share((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("share".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
-                typedTarget.share((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1], (java.lang.String) safeArgs[2]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.share((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toString();
             }
         }
@@ -670,186 +784,223 @@ public final class GeneratedAccess_com_codename1_share {
     private static Object invoke3(com.codename1.share.ShareService typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("actionPerformed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false)) {
-                typedTarget.actionPerformed((com.codename1.ui.events.ActionEvent) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false);
+                typedTarget.actionPerformed((com.codename1.ui.events.ActionEvent) adaptedArgs[0]); return null;
             }
         }
         if ("canShareImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.canShareImage();
             }
         }
         if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.equals((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("finish".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.finish(); return null;
             }
         }
         if ("getClientProperty".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.getClientProperty((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getClientProperty((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("getCommandName".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCommandName();
             }
         }
         if ("getDisabledIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDisabledIcon();
             }
         }
         if ("getIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getIcon();
             }
         }
         if ("getIconFont".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getIconFont();
             }
         }
         if ("getIconGapMM".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getIconGapMM();
             }
         }
         if ("getId".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getId();
             }
         }
         if ("getMaterialIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaterialIcon();
             }
         }
         if ("getMaterialIconSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaterialIconSize();
             }
         }
         if ("getOriginal".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getOriginal();
             }
         }
         if ("getPressedIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPressedIcon();
             }
         }
         if ("getRolloverIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRolloverIcon();
             }
         }
         if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.hashCode();
             }
         }
         if ("isDisposesDialog".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isDisposesDialog();
             }
         }
         if ("isEnabled".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isEnabled();
             }
         }
         if ("putClientProperty".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false)) {
-                typedTarget.putClientProperty((java.lang.String) safeArgs[0], (java.lang.Object) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false);
+                typedTarget.putClientProperty((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
         }
         if ("setCommandName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setCommandName((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setCommandName((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("setDisabledIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setDisabledIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setDisabledIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("setDisposesDialog".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setDisposesDialog(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setDisposesDialog(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setEnabled".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setEnabled(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setEnabled(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("setIconFont".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Font.class}, false)) {
-                typedTarget.setIconFont((com.codename1.ui.Font) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Font.class}, false);
+                typedTarget.setIconFont((com.codename1.ui.Font) adaptedArgs[0]); return null;
             }
         }
         if ("setIconGapMM".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.setIconGapMM(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setIconGapMM(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("setImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                typedTarget.setImage((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.setImage((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
         }
         if ("setMaterialIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Character.class}, false)) {
-                typedTarget.setMaterialIcon(((Character) safeArgs[0]).charValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class}, false);
+                typedTarget.setMaterialIcon(((Character) adaptedArgs[0]).charValue()); return null;
             }
         }
         if ("setMaterialIconSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.setMaterialIconSize(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setMaterialIconSize(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("setMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setMessage((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setMessage((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("setOriginalForm".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Form.class}, false)) {
-                typedTarget.setOriginalForm((com.codename1.ui.Form) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Form.class}, false);
+                typedTarget.setOriginalForm((com.codename1.ui.Form) adaptedArgs[0]); return null;
             }
         }
         if ("setPressedIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setPressedIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setPressedIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("setRolloverIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setRolloverIcon((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setRolloverIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("share".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.share((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.share((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("share".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
-                typedTarget.share((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1], (java.lang.String) safeArgs[2]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.share((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toString();
             }
         }
@@ -874,6 +1025,88 @@ public final class GeneratedAccess_com_codename1_share {
 
     private static Object[] safeArgs(Object[] args) {
         return args == null ? new Object[0] : args;
+    }
+
+    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (args == null || args.length == 0) {
+            return args == null ? new Object[0] : args;
+        }
+        Object[] adapted = args.clone();
+        if (!varArgs) {
+            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {
+                adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+            }
+            return adapted;
+        }
+        if (paramTypes.length == 0) {
+            return adapted;
+        }
+        int fixedCount = paramTypes.length - 1;
+        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {
+            adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < adapted.length; i++) {
+            adapted[i] = adaptValue(adapted[i], componentType);
+        }
+        return adapted;
+    }
+
+    private static boolean isSamInterface(Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == java.util.Observer.class) {
+            return true;
+        }
+        if (type == java.lang.Iterable.class) {
+            return true;
+        }
+        return false;
+    }
+
+    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.util.Observer.class) {
+            return new java.util.Observer() {
+                public void update(java.util.Observable arg0, java.lang.Object arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Iterable.class) {
+            return new java.lang.Iterable() {
+                public java.util.Iterator iterator() {
+                    try {
+                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        return lambda;
+    }
+
+    private static Object adaptValue(Object value, Class<?> type) {
+        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
+            return value;
+        }
+        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -929,6 +1162,9 @@ public final class GeneratedAccess_com_codename1_share {
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
             return value instanceof Number;
+        }
+        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+            return isSamInterface(type);
         }
         return type.isInstance(value);
     }

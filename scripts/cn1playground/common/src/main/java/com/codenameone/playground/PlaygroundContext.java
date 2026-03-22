@@ -1,7 +1,9 @@
 package com.codenameone.playground;
 
 import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Form;
+import com.codename1.ui.CN;
 import com.codename1.ui.util.Resources;
 
 /**
@@ -56,14 +58,23 @@ public class PlaygroundContext {
 
     public static boolean interceptMethodInvocation(Object target, String methodName, Object[] args) {
         PlaygroundContext context = CURRENT.get();
-        if (context == null || !(target instanceof Form) || !"show".equals(methodName)) {
+        if (context == null || !"show".equals(methodName)) {
             return false;
         }
         if (args != null && args.length != 0) {
             return false;
         }
-        context.captureShownForm((Form) target);
-        return true;
+        if (target instanceof Dialog) {
+            final Dialog dialog = (Dialog) target;
+            CN.callSerially(dialog::showModeless);
+            context.log("Dialog opened modelessly in the playground.");
+            return true;
+        }
+        if (target instanceof Form) {
+            context.captureShownForm((Form) target);
+            return true;
+        }
+        return false;
     }
 
     public void log(String message) {

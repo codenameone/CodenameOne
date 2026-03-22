@@ -96,77 +96,96 @@ public final class GeneratedAccess_java_io {
         Object[] safeArgs = safeArgs(args);
         if (type == java.io.ByteArrayInputStream.class) {
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
-                return new java.io.ByteArrayInputStream((byte[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                return new java.io.ByteArrayInputStream((byte[]) adaptedArgs[0]);
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return new java.io.ByteArrayInputStream((byte[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return new java.io.ByteArrayInputStream((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if (type == java.io.ByteArrayOutputStream.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new java.io.ByteArrayOutputStream();
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return new java.io.ByteArrayOutputStream(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return new java.io.ByteArrayOutputStream(((Number) adaptedArgs[0]).intValue());
             }
         }
         if (type == java.io.EOFException.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new java.io.EOFException();
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new java.io.EOFException((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new java.io.EOFException((java.lang.String) adaptedArgs[0]);
             }
         }
         if (type == java.io.IOException.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new java.io.IOException();
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new java.io.IOException((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new java.io.IOException((java.lang.String) adaptedArgs[0]);
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
-                return new java.io.IOException((java.lang.Throwable) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                return new java.io.IOException((java.lang.Throwable) adaptedArgs[0]);
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Throwable.class}, false)) {
-                return new java.io.IOException((java.lang.String) safeArgs[0], (java.lang.Throwable) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Throwable.class}, false);
+                return new java.io.IOException((java.lang.String) adaptedArgs[0], (java.lang.Throwable) adaptedArgs[1]);
             }
         }
         if (type == java.io.InterruptedIOException.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new java.io.InterruptedIOException();
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new java.io.InterruptedIOException((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new java.io.InterruptedIOException((java.lang.String) adaptedArgs[0]);
             }
         }
         if (type == java.io.StringReader.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new java.io.StringReader((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new java.io.StringReader((java.lang.String) adaptedArgs[0]);
             }
         }
         if (type == java.io.StringWriter.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new java.io.StringWriter();
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return new java.io.StringWriter(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return new java.io.StringWriter(((Number) adaptedArgs[0]).intValue());
             }
         }
         if (type == java.io.UTFDataFormatException.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new java.io.UTFDataFormatException();
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new java.io.UTFDataFormatException((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new java.io.UTFDataFormatException((java.lang.String) adaptedArgs[0]);
             }
         }
         if (type == java.io.UnsupportedEncodingException.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new java.io.UnsupportedEncodingException();
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new java.io.UnsupportedEncodingException((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new java.io.UnsupportedEncodingException((java.lang.String) adaptedArgs[0]);
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -336,47 +355,56 @@ public final class GeneratedAccess_java_io {
     private static Object invoke0(java.io.ByteArrayInputStream typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("available".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.available();
             }
         }
         if ("close".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.close(); return null;
             }
         }
         if ("mark".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.mark(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.mark(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("markSupported".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.markSupported();
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.read();
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
-                return typedTarget.read((byte[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                return typedTarget.read((byte[]) adaptedArgs[0]);
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.read((byte[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.read((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("reset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.reset(); return null;
             }
         }
         if ("skip".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                return typedTarget.skip(((Number) safeArgs[0]).longValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                return typedTarget.skip(((Number) adaptedArgs[0]).longValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -385,47 +413,56 @@ public final class GeneratedAccess_java_io {
     private static Object invoke1(java.io.ByteArrayOutputStream typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("close".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.close(); return null;
             }
         }
         if ("flush".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.flush(); return null;
             }
         }
         if ("reset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.reset(); return null;
             }
         }
         if ("size".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.size();
             }
         }
         if ("toByteArray".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toByteArray();
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toString();
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
-                typedTarget.write((byte[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                typedTarget.write((byte[]) adaptedArgs[0]); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.write(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.write(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.write((byte[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.write((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -434,117 +471,140 @@ public final class GeneratedAccess_java_io {
     private static Object invoke2(java.io.DataInputStream typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("available".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.available();
             }
         }
         if ("close".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.close(); return null;
             }
         }
         if ("mark".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.mark(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.mark(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("markSupported".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.markSupported();
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.read();
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
-                return typedTarget.read((byte[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                return typedTarget.read((byte[]) adaptedArgs[0]);
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.read((byte[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.read((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("readBoolean".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readBoolean();
             }
         }
         if ("readByte".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readByte();
             }
         }
         if ("readChar".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readChar();
             }
         }
         if ("readDouble".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readDouble();
             }
         }
         if ("readFloat".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readFloat();
             }
         }
         if ("readFully".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
-                typedTarget.readFully((byte[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                typedTarget.readFully((byte[]) adaptedArgs[0]); return null;
             }
         }
         if ("readFully".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.readFully((byte[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.readFully((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
         }
         if ("readInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readInt();
             }
         }
         if ("readLong".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readLong();
             }
         }
         if ("readShort".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readShort();
             }
         }
         if ("readUTF".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readUTF();
             }
         }
         if ("readUnsignedByte".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readUnsignedByte();
             }
         }
         if ("readUnsignedShort".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readUnsignedShort();
             }
         }
         if ("reset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.reset(); return null;
             }
         }
         if ("skip".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                return typedTarget.skip(((Number) safeArgs[0]).longValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                return typedTarget.skip(((Number) adaptedArgs[0]).longValue());
             }
         }
         if ("skipBytes".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.skipBytes(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.skipBytes(((Number) adaptedArgs[0]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -553,77 +613,92 @@ public final class GeneratedAccess_java_io {
     private static Object invoke3(java.io.DataOutputStream typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("close".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.close(); return null;
             }
         }
         if ("flush".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.flush(); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
-                typedTarget.write((byte[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                typedTarget.write((byte[]) adaptedArgs[0]); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.write(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.write(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.write((byte[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.write((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
         }
         if ("writeBoolean".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.writeBoolean(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.writeBoolean(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("writeByte".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.writeByte(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.writeByte(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("writeChar".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.writeChar(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.writeChar(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("writeChars".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.writeChars((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.writeChars((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("writeDouble".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                typedTarget.writeDouble(((Number) safeArgs[0]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                typedTarget.writeDouble(((Number) adaptedArgs[0]).doubleValue()); return null;
             }
         }
         if ("writeFloat".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.writeFloat(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.writeFloat(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("writeInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.writeInt(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.writeInt(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("writeLong".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                typedTarget.writeLong(((Number) safeArgs[0]).longValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                typedTarget.writeLong(((Number) adaptedArgs[0]).longValue()); return null;
             }
         }
         if ("writeShort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.writeShort(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.writeShort(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("writeUTF".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.writeUTF((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.writeUTF((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -632,51 +707,61 @@ public final class GeneratedAccess_java_io {
     private static Object invoke4(java.io.EOFException typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addSuppressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
-                typedTarget.addSuppressed((java.lang.Throwable) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                typedTarget.addSuppressed((java.lang.Throwable) adaptedArgs[0]); return null;
             }
         }
         if ("getCause".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCause();
             }
         }
         if ("getLocalizedMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getLocalizedMessage();
             }
         }
         if ("getMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMessage();
             }
         }
         if ("getStackTrace".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getStackTrace();
             }
         }
         if ("getSuppressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSuppressed();
             }
         }
         if ("initCause".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
-                return typedTarget.initCause((java.lang.Throwable) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                return typedTarget.initCause((java.lang.Throwable) adaptedArgs[0]);
             }
         }
         if ("printStackTrace".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.printStackTrace(); return null;
             }
         }
         if ("setStackTrace".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.StackTraceElement[].class}, false)) {
-                typedTarget.setStackTrace((java.lang.StackTraceElement[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.StackTraceElement[].class}, false);
+                typedTarget.setStackTrace((java.lang.StackTraceElement[]) adaptedArgs[0]); return null;
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toString();
             }
         }
@@ -686,47 +771,56 @@ public final class GeneratedAccess_java_io {
     private static Object invoke5(java.io.InputStreamReader typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("close".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.close(); return null;
             }
         }
         if ("mark".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.mark(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.mark(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("markSupported".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.markSupported();
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.read();
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class}, false)) {
-                return typedTarget.read((char[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class}, false);
+                return typedTarget.read((char[]) adaptedArgs[0]);
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.read((char[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.read((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("ready".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.ready();
             }
         }
         if ("reset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.reset(); return null;
             }
         }
         if ("skip".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                return typedTarget.skip(((Number) safeArgs[0]).longValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                return typedTarget.skip(((Number) adaptedArgs[0]).longValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -735,51 +829,61 @@ public final class GeneratedAccess_java_io {
     private static Object invoke6(java.io.InterruptedIOException typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addSuppressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
-                typedTarget.addSuppressed((java.lang.Throwable) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                typedTarget.addSuppressed((java.lang.Throwable) adaptedArgs[0]); return null;
             }
         }
         if ("getCause".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCause();
             }
         }
         if ("getLocalizedMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getLocalizedMessage();
             }
         }
         if ("getMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMessage();
             }
         }
         if ("getStackTrace".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getStackTrace();
             }
         }
         if ("getSuppressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSuppressed();
             }
         }
         if ("initCause".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
-                return typedTarget.initCause((java.lang.Throwable) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                return typedTarget.initCause((java.lang.Throwable) adaptedArgs[0]);
             }
         }
         if ("printStackTrace".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.printStackTrace(); return null;
             }
         }
         if ("setStackTrace".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.StackTraceElement[].class}, false)) {
-                typedTarget.setStackTrace((java.lang.StackTraceElement[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.StackTraceElement[].class}, false);
+                typedTarget.setStackTrace((java.lang.StackTraceElement[]) adaptedArgs[0]); return null;
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toString();
             }
         }
@@ -789,37 +893,44 @@ public final class GeneratedAccess_java_io {
     private static Object invoke7(java.io.OutputStreamWriter typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("close".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.close(); return null;
             }
         }
         if ("flush".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.flush(); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class}, false)) {
-                typedTarget.write((char[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class}, false);
+                typedTarget.write((char[]) adaptedArgs[0]); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.write(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.write(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.write((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.write((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.write((char[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.write((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.write((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.write((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -828,107 +939,128 @@ public final class GeneratedAccess_java_io {
     private static Object invoke8(java.io.PrintStream typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("checkError".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.checkError();
             }
         }
         if ("close".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.close(); return null;
             }
         }
         if ("flush".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.flush(); return null;
             }
         }
         if ("print".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Character.class}, false)) {
-                typedTarget.print(((Character) safeArgs[0]).charValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class}, false);
+                typedTarget.print(((Character) adaptedArgs[0]).charValue()); return null;
             }
         }
         if ("print".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                typedTarget.print(((Number) safeArgs[0]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                typedTarget.print(((Number) adaptedArgs[0]).doubleValue()); return null;
             }
         }
         if ("print".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.print(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.print(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("print".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                typedTarget.print((java.lang.Object) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.print((java.lang.Object) adaptedArgs[0]); return null;
             }
         }
         if ("print".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.print((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.print((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("print".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                typedTarget.print(((Number) safeArgs[0]).longValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                typedTarget.print(((Number) adaptedArgs[0]).longValue()); return null;
             }
         }
         if ("println".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.println(); return null;
             }
         }
         if ("println".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.println(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.println(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("println".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Character.class}, false)) {
-                typedTarget.println(((Character) safeArgs[0]).charValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class}, false);
+                typedTarget.println(((Character) adaptedArgs[0]).charValue()); return null;
             }
         }
         if ("println".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                typedTarget.println(((Number) safeArgs[0]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                typedTarget.println(((Number) adaptedArgs[0]).doubleValue()); return null;
             }
         }
         if ("println".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.println(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.println(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("println".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.println(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.println(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("println".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                typedTarget.println((java.lang.Object) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.println((java.lang.Object) adaptedArgs[0]); return null;
             }
         }
         if ("println".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.println((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.println((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("println".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                typedTarget.println(((Number) safeArgs[0]).longValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                typedTarget.println(((Number) adaptedArgs[0]).longValue()); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
-                typedTarget.write((byte[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                typedTarget.write((byte[]) adaptedArgs[0]); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.write(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.write(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.write((byte[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.write((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -937,47 +1069,56 @@ public final class GeneratedAccess_java_io {
     private static Object invoke9(java.io.StringReader typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("close".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.close(); return null;
             }
         }
         if ("mark".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.mark(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.mark(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("markSupported".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.markSupported();
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.read();
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class}, false)) {
-                return typedTarget.read((char[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class}, false);
+                return typedTarget.read((char[]) adaptedArgs[0]);
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.read((char[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.read((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("ready".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.ready();
             }
         }
         if ("reset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.reset(); return null;
             }
         }
         if ("skip".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                return typedTarget.skip(((Number) safeArgs[0]).longValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                return typedTarget.skip(((Number) adaptedArgs[0]).longValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -986,47 +1127,56 @@ public final class GeneratedAccess_java_io {
     private static Object invoke10(java.io.StringWriter typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("close".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.close(); return null;
             }
         }
         if ("flush".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.flush(); return null;
             }
         }
         if ("getBuffer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getBuffer();
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toString();
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class}, false)) {
-                typedTarget.write((char[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class}, false);
+                typedTarget.write((char[]) adaptedArgs[0]); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.write(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.write(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.write((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.write((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.write((char[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.write((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.write((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.write((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1035,51 +1185,61 @@ public final class GeneratedAccess_java_io {
     private static Object invoke11(java.io.UTFDataFormatException typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addSuppressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
-                typedTarget.addSuppressed((java.lang.Throwable) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                typedTarget.addSuppressed((java.lang.Throwable) adaptedArgs[0]); return null;
             }
         }
         if ("getCause".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCause();
             }
         }
         if ("getLocalizedMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getLocalizedMessage();
             }
         }
         if ("getMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMessage();
             }
         }
         if ("getStackTrace".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getStackTrace();
             }
         }
         if ("getSuppressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSuppressed();
             }
         }
         if ("initCause".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
-                return typedTarget.initCause((java.lang.Throwable) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                return typedTarget.initCause((java.lang.Throwable) adaptedArgs[0]);
             }
         }
         if ("printStackTrace".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.printStackTrace(); return null;
             }
         }
         if ("setStackTrace".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.StackTraceElement[].class}, false)) {
-                typedTarget.setStackTrace((java.lang.StackTraceElement[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.StackTraceElement[].class}, false);
+                typedTarget.setStackTrace((java.lang.StackTraceElement[]) adaptedArgs[0]); return null;
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toString();
             }
         }
@@ -1089,51 +1249,61 @@ public final class GeneratedAccess_java_io {
     private static Object invoke12(java.io.UnsupportedEncodingException typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addSuppressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
-                typedTarget.addSuppressed((java.lang.Throwable) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                typedTarget.addSuppressed((java.lang.Throwable) adaptedArgs[0]); return null;
             }
         }
         if ("getCause".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCause();
             }
         }
         if ("getLocalizedMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getLocalizedMessage();
             }
         }
         if ("getMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMessage();
             }
         }
         if ("getStackTrace".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getStackTrace();
             }
         }
         if ("getSuppressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSuppressed();
             }
         }
         if ("initCause".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
-                return typedTarget.initCause((java.lang.Throwable) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                return typedTarget.initCause((java.lang.Throwable) adaptedArgs[0]);
             }
         }
         if ("printStackTrace".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.printStackTrace(); return null;
             }
         }
         if ("setStackTrace".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.StackTraceElement[].class}, false)) {
-                typedTarget.setStackTrace((java.lang.StackTraceElement[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.StackTraceElement[].class}, false);
+                typedTarget.setStackTrace((java.lang.StackTraceElement[]) adaptedArgs[0]); return null;
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toString();
             }
         }
@@ -1143,51 +1313,61 @@ public final class GeneratedAccess_java_io {
     private static Object invoke13(java.io.IOException typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addSuppressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
-                typedTarget.addSuppressed((java.lang.Throwable) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                typedTarget.addSuppressed((java.lang.Throwable) adaptedArgs[0]); return null;
             }
         }
         if ("getCause".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCause();
             }
         }
         if ("getLocalizedMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getLocalizedMessage();
             }
         }
         if ("getMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMessage();
             }
         }
         if ("getStackTrace".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getStackTrace();
             }
         }
         if ("getSuppressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSuppressed();
             }
         }
         if ("initCause".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
-                return typedTarget.initCause((java.lang.Throwable) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                return typedTarget.initCause((java.lang.Throwable) adaptedArgs[0]);
             }
         }
         if ("printStackTrace".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.printStackTrace(); return null;
             }
         }
         if ("setStackTrace".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.StackTraceElement[].class}, false)) {
-                typedTarget.setStackTrace((java.lang.StackTraceElement[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.StackTraceElement[].class}, false);
+                typedTarget.setStackTrace((java.lang.StackTraceElement[]) adaptedArgs[0]); return null;
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toString();
             }
         }
@@ -1197,47 +1377,56 @@ public final class GeneratedAccess_java_io {
     private static Object invoke14(java.io.InputStream typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("available".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.available();
             }
         }
         if ("close".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.close(); return null;
             }
         }
         if ("mark".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.mark(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.mark(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("markSupported".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.markSupported();
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.read();
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
-                return typedTarget.read((byte[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                return typedTarget.read((byte[]) adaptedArgs[0]);
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.read((byte[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.read((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("reset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.reset(); return null;
             }
         }
         if ("skip".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                return typedTarget.skip(((Number) safeArgs[0]).longValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                return typedTarget.skip(((Number) adaptedArgs[0]).longValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1246,27 +1435,32 @@ public final class GeneratedAccess_java_io {
     private static Object invoke15(java.io.OutputStream typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("close".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.close(); return null;
             }
         }
         if ("flush".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.flush(); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
-                typedTarget.write((byte[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                typedTarget.write((byte[]) adaptedArgs[0]); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.write(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.write(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.write((byte[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.write((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1275,47 +1469,56 @@ public final class GeneratedAccess_java_io {
     private static Object invoke16(java.io.Reader typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("close".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.close(); return null;
             }
         }
         if ("mark".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.mark(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.mark(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("markSupported".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.markSupported();
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.read();
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class}, false)) {
-                return typedTarget.read((char[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class}, false);
+                return typedTarget.read((char[]) adaptedArgs[0]);
             }
         }
         if ("read".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.read((char[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.read((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("ready".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.ready();
             }
         }
         if ("reset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.reset(); return null;
             }
         }
         if ("skip".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                return typedTarget.skip(((Number) safeArgs[0]).longValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                return typedTarget.skip(((Number) adaptedArgs[0]).longValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1324,37 +1527,44 @@ public final class GeneratedAccess_java_io {
     private static Object invoke17(java.io.Writer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("close".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.close(); return null;
             }
         }
         if ("flush".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.flush(); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class}, false)) {
-                typedTarget.write((char[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class}, false);
+                typedTarget.write((char[]) adaptedArgs[0]); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.write(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.write(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.write((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.write((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.write((char[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.write((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.write((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.write((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1363,72 +1573,86 @@ public final class GeneratedAccess_java_io {
     private static Object invoke18(java.io.DataInput typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("readBoolean".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readBoolean();
             }
         }
         if ("readByte".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readByte();
             }
         }
         if ("readChar".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readChar();
             }
         }
         if ("readDouble".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readDouble();
             }
         }
         if ("readFloat".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readFloat();
             }
         }
         if ("readFully".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
-                typedTarget.readFully((byte[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                typedTarget.readFully((byte[]) adaptedArgs[0]); return null;
             }
         }
         if ("readFully".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.readFully((byte[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.readFully((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
         }
         if ("readInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readInt();
             }
         }
         if ("readLong".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readLong();
             }
         }
         if ("readShort".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readShort();
             }
         }
         if ("readUTF".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readUTF();
             }
         }
         if ("readUnsignedByte".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readUnsignedByte();
             }
         }
         if ("readUnsignedShort".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.readUnsignedShort();
             }
         }
         if ("skipBytes".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.skipBytes(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.skipBytes(((Number) adaptedArgs[0]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1437,67 +1661,80 @@ public final class GeneratedAccess_java_io {
     private static Object invoke19(java.io.DataOutput typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
-                typedTarget.write((byte[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                typedTarget.write((byte[]) adaptedArgs[0]); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.write(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.write(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("write".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.write((byte[]) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.write((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
         }
         if ("writeBoolean".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.writeBoolean(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.writeBoolean(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("writeByte".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.writeByte(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.writeByte(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("writeChar".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.writeChar(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.writeChar(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("writeChars".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.writeChars((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.writeChars((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("writeDouble".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                typedTarget.writeDouble(((Number) safeArgs[0]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                typedTarget.writeDouble(((Number) adaptedArgs[0]).doubleValue()); return null;
             }
         }
         if ("writeFloat".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.writeFloat(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.writeFloat(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("writeInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.writeInt(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.writeInt(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("writeLong".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                typedTarget.writeLong(((Number) safeArgs[0]).longValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                typedTarget.writeLong(((Number) adaptedArgs[0]).longValue()); return null;
             }
         }
         if ("writeShort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.writeShort(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.writeShort(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("writeUTF".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.writeUTF((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.writeUTF((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1506,6 +1743,7 @@ public final class GeneratedAccess_java_io {
     private static Object invoke20(java.io.Flushable typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("flush".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.flush(); return null;
             }
         }
@@ -1541,6 +1779,88 @@ public final class GeneratedAccess_java_io {
 
     private static Object[] safeArgs(Object[] args) {
         return args == null ? new Object[0] : args;
+    }
+
+    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (args == null || args.length == 0) {
+            return args == null ? new Object[0] : args;
+        }
+        Object[] adapted = args.clone();
+        if (!varArgs) {
+            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {
+                adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+            }
+            return adapted;
+        }
+        if (paramTypes.length == 0) {
+            return adapted;
+        }
+        int fixedCount = paramTypes.length - 1;
+        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {
+            adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < adapted.length; i++) {
+            adapted[i] = adaptValue(adapted[i], componentType);
+        }
+        return adapted;
+    }
+
+    private static boolean isSamInterface(Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == java.util.Observer.class) {
+            return true;
+        }
+        if (type == java.lang.Iterable.class) {
+            return true;
+        }
+        return false;
+    }
+
+    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.util.Observer.class) {
+            return new java.util.Observer() {
+                public void update(java.util.Observable arg0, java.lang.Object arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Iterable.class) {
+            return new java.lang.Iterable() {
+                public java.util.Iterator iterator() {
+                    try {
+                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        return lambda;
+    }
+
+    private static Object adaptValue(Object value, Class<?> type) {
+        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
+            return value;
+        }
+        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -1596,6 +1916,9 @@ public final class GeneratedAccess_java_io {
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
             return value instanceof Number;
+        }
+        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+            return isSamInterface(type);
         }
         return type.isInstance(value);
     }

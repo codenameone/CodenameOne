@@ -26,6 +26,7 @@ import java.util.List;
 
 public class CN1Playground extends Lifecycle {
     private static final String THEME_ROLE = "playgroundThemeRole";
+    private static final String SHARE_BUTTON_LABEL = "Copy Shareable Playground URL";
 
     private final PlaygroundRunner runner = new PlaygroundRunner();
     private Form appForm;
@@ -45,10 +46,14 @@ public class CN1Playground extends Lifecycle {
         theme = Resources.getGlobalResources();
         currentScript = resolveInitialScript();
 
-        Form form = new Form("CN1 Playground", new BorderLayout());
+        Form form = new Form("Playground", new BorderLayout());
         appForm = form;
+        form.setUIID("PlaygroundForm");
+        form.getContentPane().setUIID("PlaygroundContent");
         Toolbar toolbar = form.getToolbar();
+        toolbar.setUIID("PlaygroundToolbar");
         toolbar.setTitleCentered(false);
+        toolbar.getTitleComponent().setUIID("PlaygroundTitle");
         setThemeRole(form.getContentPane(), "form");
         setThemeRole(form.getTitleArea(), "header");
         setThemeRole(toolbar.getTitleComponent(), "headerTitle");
@@ -56,12 +61,16 @@ public class CN1Playground extends Lifecycle {
         editor = new PlaygroundBrowserEditor(currentScript, websiteDarkMode, this::handleSourceChanged);
         previewRoot = createPreviewRoot();
         historyMenu = new Container(BoxLayout.y());
+        historyMenu.setUIID("PlaygroundMenuContainer");
+        setThemeRole(historyMenu, "sideMenu");
 
         Container editorPanel = new Container(new BorderLayout());
+        editorPanel.setUIID("PlaygroundPanel");
         setThemeRole(editorPanel, "panel");
         editorPanel.add(BorderLayout.CENTER, editor.getComponent());
 
         Container previewPanel = new Container(new BorderLayout());
+        previewPanel.setUIID("PlaygroundPanel");
         setThemeRole(previewPanel, "panel");
         previewPanel.add(BorderLayout.CENTER, previewRoot);
 
@@ -90,6 +99,7 @@ public class CN1Playground extends Lifecycle {
         root.getAllStyles().setBgTransparency(255);
         root.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
         root.getAllStyles().setPadding(2, 2, 2, 2);
+        root.setUIID("PlaygroundPreview");
         setThemeRole(root, "preview");
         return root;
     }
@@ -104,7 +114,7 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void runScript(Form form) {
-        com.codename1.ui.CN.callSerially(() -> executeRunScript(form));
+        UITimer.timer(1, false, form, () -> executeRunScript(form));
     }
 
     private void executeRunScript(Form form) {
@@ -146,7 +156,7 @@ public class CN1Playground extends Lifecycle {
 
     private void installSideMenu(Toolbar toolbar, Form form) {
         toolbar.addComponentToSideMenu(new PlaygroundMenuSection("Share"));
-        toolbar.addComponentToSideMenu(createSideMenuButton("Copy Current URL", () -> {
+        toolbar.addComponentToSideMenu(createSideMenuButton(SHARE_BUTTON_LABEL, () -> {
             copyCurrentSourceUrl();
             toolbar.closeSideMenu();
         }));
@@ -181,7 +191,7 @@ public class CN1Playground extends Lifecycle {
             List<PlaygroundStateStore.HistoryEntry> history, Toolbar toolbar) {
         MultiButton button = new MultiButton(entry.title());
         button.setTextLine2(entry.detail(history));
-        button.setUIID("SideCommand");
+        button.setUIID("PlaygroundSideCommand");
         button.addActionListener(e -> {
             setScript(entry.script, true);
             toolbar.closeSideMenu();
@@ -191,7 +201,7 @@ public class CN1Playground extends Lifecycle {
 
     private Button createSideMenuButton(String text, Runnable action) {
         Button button = new Button(text);
-        button.setUIID("SideCommand");
+        button.setUIID("PlaygroundSideCommand");
         setThemeRole(button, "sideCommand");
         button.addActionListener(e -> action.run());
         return button;
@@ -413,6 +423,11 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void applyWebsiteTheme(Component component, boolean dark) {
+        String uiid = component.getUIID();
+        String themed = themedUiid(uiid, dark);
+        if (uiid != null && !uiid.equals(themed)) {
+            component.setUIID(themed);
+        }
         applyRoleStyle(component, getThemeRole(component), dark);
         if (component instanceof Container) {
             Container cnt = (Container) component;
@@ -460,19 +475,69 @@ public class CN1Playground extends Lifecycle {
                 style.setBgColor(dark ? 0x111827 : 0xffffff);
                 style.setFgColor(dark ? 0xe5e7eb : 0x111827);
                 break;
+            case "sideMenu":
+                style.setBgTransparency(255);
+                style.setBgColor(dark ? 0x0f172a : 0xffffff);
+                style.setFgColor(dark ? 0xe5e7eb : 0x111827);
+                break;
             default:
                 break;
         }
     }
 
     private void applyGlobalThemeStyles(boolean dark) {
-        tintUiid("TitleArea", dark ? 0x111827 : 0xe5e7eb, 0, true);
-        tintUiid("Title", dark ? 0x111827 : 0xe5e7eb, dark ? 0xf8fafc : 0x111827, true);
+        tintUiid("TitleArea", dark ? 0x1f2937 : 0xe5e7eb, dark ? 0xf8fafc : 0x111827, true);
+        tintUiid("Title", 0, dark ? 0xf8fafc : 0x111827, false);
         tintUiid("SideNavigationPanel", dark ? 0x0f172a : 0xffffff, dark ? 0xe5e7eb : 0x111827, true);
-        tintUiid("SideCommand", dark ? 0x0f172a : 0xffffff, dark ? 0xe5e7eb : 0x111827, false);
-        tintUiid("PlaygroundMenuSection", dark ? 0x0f172a : 0xffffff, 0, true);
-        tintUiid("PlaygroundMenuSectionTitle", dark ? 0x94a3b8 : 0x6b7280, dark ? 0x94a3b8 : 0x6b7280, false);
-        tintUiid("PlaygroundMenuEmpty", dark ? 0x0f172a : 0xffffff, dark ? 0x94a3b8 : 0x6b7280, false);
+        tintUiid("SideCommand", dark ? 0x0f172a : 0xffffff, dark ? 0xe5e7eb : 0x111827, true);
+        tintUiid("PlaygroundMenuContainer", dark ? 0x0f172a : 0xffffff, dark ? 0xe5e7eb : 0x111827, true);
+    }
+
+    private String themedUiid(String uiid, boolean dark) {
+        if (uiid == null || uiid.length() == 0) {
+            return uiid;
+        }
+        if (dark) {
+            if (uiid.endsWith("Dark")) {
+                return uiid;
+            }
+            switch (uiid) {
+                case "PlaygroundForm":
+                case "PlaygroundContent":
+                case "PlaygroundToolbar":
+                case "PlaygroundTitle":
+                case "PlaygroundPanel":
+                case "PlaygroundPreview":
+                case "PlaygroundSideCommand":
+                case "PlaygroundMenuSection":
+                case "PlaygroundMenuSectionTitle":
+                case "PlaygroundMenuEmpty":
+                case "PlaygroundMenuContainer":
+                    return uiid + "Dark";
+                default:
+                    return uiid;
+            }
+        }
+        if (!uiid.endsWith("Dark")) {
+            return uiid;
+        }
+        String base = uiid.substring(0, uiid.length() - "Dark".length());
+        switch (base) {
+            case "PlaygroundForm":
+            case "PlaygroundContent":
+            case "PlaygroundToolbar":
+            case "PlaygroundTitle":
+            case "PlaygroundPanel":
+            case "PlaygroundPreview":
+            case "PlaygroundSideCommand":
+            case "PlaygroundMenuSection":
+            case "PlaygroundMenuSectionTitle":
+            case "PlaygroundMenuEmpty":
+            case "PlaygroundMenuContainer":
+                return base;
+            default:
+                return uiid;
+        }
     }
 
     private void tintUiid(String uiid, int bgColor, int fgColor, boolean updateBackground) {

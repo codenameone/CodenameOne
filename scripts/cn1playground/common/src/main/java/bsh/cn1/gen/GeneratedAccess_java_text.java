@@ -45,15 +45,18 @@ public final class GeneratedAccess_java_text {
         Object[] safeArgs = safeArgs(args);
         if (type == java.text.ParseException.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
-                return new java.text.ParseException((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
+                return new java.text.ParseException((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         if (type == java.text.SimpleDateFormat.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new java.text.SimpleDateFormat();
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new java.text.SimpleDateFormat((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new java.text.SimpleDateFormat((java.lang.String) adaptedArgs[0]);
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -68,32 +71,38 @@ public final class GeneratedAccess_java_text {
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("getDateInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return java.text.DateFormat.getDateInstance();
             }
         }
         if ("getDateInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return java.text.DateFormat.getDateInstance(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return java.text.DateFormat.getDateInstance(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getDateTimeInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return java.text.DateFormat.getDateTimeInstance(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return java.text.DateFormat.getDateTimeInstance(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("getInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return java.text.DateFormat.getInstance();
             }
         }
         if ("getTimeInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return java.text.DateFormat.getTimeInstance();
             }
         }
         if ("getTimeInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return java.text.DateFormat.getTimeInstance(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return java.text.DateFormat.getTimeInstance(((Number) adaptedArgs[0]).intValue());
             }
         }
         throw unsupportedStatic(java.text.DateFormat.class, name, safeArgs);
@@ -146,51 +155,61 @@ public final class GeneratedAccess_java_text {
     private static Object invoke0(java.text.SimpleDateFormat typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("applyPattern".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.applyPattern((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.applyPattern((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.equals((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.format((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.format((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
-                return typedTarget.format((java.util.Date) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
+                return typedTarget.format((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("getDateFormatSymbols".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDateFormatSymbols();
             }
         }
         if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.hashCode();
             }
         }
         if ("parse".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.parse((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.parse((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("parseObject".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.parseObject((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.parseObject((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("setDateFormatSymbols".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.text.DateFormatSymbols.class}, false)) {
-                typedTarget.setDateFormatSymbols((java.text.DateFormatSymbols) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.text.DateFormatSymbols.class}, false);
+                typedTarget.setDateFormatSymbols((java.text.DateFormatSymbols) adaptedArgs[0]); return null;
             }
         }
         if ("toPattern".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toPattern();
             }
         }
@@ -200,32 +219,38 @@ public final class GeneratedAccess_java_text {
     private static Object invoke1(java.text.DateFormat typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.equals((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.format((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.format((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
-                return typedTarget.format((java.util.Date) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
+                return typedTarget.format((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.hashCode();
             }
         }
         if ("parse".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.parse((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.parse((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("parseObject".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.parseObject((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.parseObject((java.lang.String) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -234,72 +259,86 @@ public final class GeneratedAccess_java_text {
     private static Object invoke2(java.text.DateFormatSymbols typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getAmPmStrings".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getAmPmStrings();
             }
         }
         if ("getEras".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getEras();
             }
         }
         if ("getMonths".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMonths();
             }
         }
         if ("getShortMonths".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getShortMonths();
             }
         }
         if ("getShortWeekdays".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getShortWeekdays();
             }
         }
         if ("getWeekdays".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getWeekdays();
             }
         }
         if ("getZoneStrings".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getZoneStrings();
             }
         }
         if ("setAmPmStrings".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, false)) {
-                typedTarget.setAmPmStrings((java.lang.String[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, false);
+                typedTarget.setAmPmStrings((java.lang.String[]) adaptedArgs[0]); return null;
             }
         }
         if ("setEras".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, false)) {
-                typedTarget.setEras((java.lang.String[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, false);
+                typedTarget.setEras((java.lang.String[]) adaptedArgs[0]); return null;
             }
         }
         if ("setMonths".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, false)) {
-                typedTarget.setMonths((java.lang.String[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, false);
+                typedTarget.setMonths((java.lang.String[]) adaptedArgs[0]); return null;
             }
         }
         if ("setShortMonths".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, false)) {
-                typedTarget.setShortMonths((java.lang.String[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, false);
+                typedTarget.setShortMonths((java.lang.String[]) adaptedArgs[0]); return null;
             }
         }
         if ("setShortWeekdays".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, false)) {
-                typedTarget.setShortWeekdays((java.lang.String[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, false);
+                typedTarget.setShortWeekdays((java.lang.String[]) adaptedArgs[0]); return null;
             }
         }
         if ("setWeekdays".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, false)) {
-                typedTarget.setWeekdays((java.lang.String[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, false);
+                typedTarget.setWeekdays((java.lang.String[]) adaptedArgs[0]); return null;
             }
         }
         if ("setZoneStrings".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[][].class}, false)) {
-                typedTarget.setZoneStrings((java.lang.String[][]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[][].class}, false);
+                typedTarget.setZoneStrings((java.lang.String[][]) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -308,12 +347,14 @@ public final class GeneratedAccess_java_text {
     private static Object invoke3(java.text.Format typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.format((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.format((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("parseObject".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.parseObject((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.parseObject((java.lang.String) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -322,6 +363,7 @@ public final class GeneratedAccess_java_text {
     private static Object invoke4(java.text.ParseException typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getErrorOffset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getErrorOffset();
             }
         }
@@ -353,6 +395,88 @@ public final class GeneratedAccess_java_text {
 
     private static Object[] safeArgs(Object[] args) {
         return args == null ? new Object[0] : args;
+    }
+
+    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (args == null || args.length == 0) {
+            return args == null ? new Object[0] : args;
+        }
+        Object[] adapted = args.clone();
+        if (!varArgs) {
+            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {
+                adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+            }
+            return adapted;
+        }
+        if (paramTypes.length == 0) {
+            return adapted;
+        }
+        int fixedCount = paramTypes.length - 1;
+        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {
+            adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < adapted.length; i++) {
+            adapted[i] = adaptValue(adapted[i], componentType);
+        }
+        return adapted;
+    }
+
+    private static boolean isSamInterface(Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == java.util.Observer.class) {
+            return true;
+        }
+        if (type == java.lang.Iterable.class) {
+            return true;
+        }
+        return false;
+    }
+
+    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.util.Observer.class) {
+            return new java.util.Observer() {
+                public void update(java.util.Observable arg0, java.lang.Object arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Iterable.class) {
+            return new java.lang.Iterable() {
+                public java.util.Iterator iterator() {
+                    try {
+                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        return lambda;
+    }
+
+    private static Object adaptValue(Object value, Class<?> type) {
+        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
+            return value;
+        }
+        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -408,6 +532,9 @@ public final class GeneratedAccess_java_text {
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
             return value instanceof Number;
+        }
+        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+            return isSamInterface(type);
         }
         return type.isInstance(value);
     }

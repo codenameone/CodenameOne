@@ -54,72 +54,87 @@ public final class GeneratedAccess_com_codename1_ui_validation {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.ui.validation.ExistInConstraint.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, false)) {
-                return new com.codename1.ui.validation.ExistInConstraint((java.lang.String[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, false);
+                return new com.codename1.ui.validation.ExistInConstraint((java.lang.String[]) adaptedArgs[0]);
             }
             if (matches(safeArgs, new Class<?>[]{java.util.List.class}, false)) {
-                return new com.codename1.ui.validation.ExistInConstraint((java.util.List) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.List.class}, false);
+                return new com.codename1.ui.validation.ExistInConstraint((java.util.List) adaptedArgs[0]);
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.String.class}, false)) {
-                return new com.codename1.ui.validation.ExistInConstraint((java.lang.String[]) safeArgs[0], (java.lang.String) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.String.class}, false);
+                return new com.codename1.ui.validation.ExistInConstraint((java.lang.String[]) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
             if (matches(safeArgs, new Class<?>[]{java.util.List.class, java.lang.String.class}, false)) {
-                return new com.codename1.ui.validation.ExistInConstraint((java.util.List) safeArgs[0], (java.lang.String) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.List.class, java.lang.String.class}, false);
+                return new com.codename1.ui.validation.ExistInConstraint((java.util.List) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.Boolean.class, java.lang.String.class}, false)) {
-                return new com.codename1.ui.validation.ExistInConstraint((java.lang.String[]) safeArgs[0], ((Boolean) safeArgs[1]).booleanValue(), (java.lang.String) safeArgs[2]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.Boolean.class, java.lang.String.class}, false);
+                return new com.codename1.ui.validation.ExistInConstraint((java.lang.String[]) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue(), (java.lang.String) adaptedArgs[2]);
             }
             if (matches(safeArgs, new Class<?>[]{java.util.List.class, java.lang.Boolean.class, java.lang.String.class}, false)) {
-                return new com.codename1.ui.validation.ExistInConstraint((java.util.List) safeArgs[0], ((Boolean) safeArgs[1]).booleanValue(), (java.lang.String) safeArgs[2]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.List.class, java.lang.Boolean.class, java.lang.String.class}, false);
+                return new com.codename1.ui.validation.ExistInConstraint((java.util.List) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue(), (java.lang.String) adaptedArgs[2]);
             }
         }
         if (type == com.codename1.ui.validation.GroupConstraint.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.validation.Constraint[].class}, true)) {
-                com.codename1.ui.validation.Constraint[] varArgs = new com.codename1.ui.validation.Constraint[safeArgs.length - 0];
-                for (int i = 0; i < safeArgs.length; i++) {
-                    varArgs[i - 0] = (com.codename1.ui.validation.Constraint) safeArgs[i];
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.validation.Constraint[].class}, true);
+                com.codename1.ui.validation.Constraint[] varArgs = new com.codename1.ui.validation.Constraint[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (com.codename1.ui.validation.Constraint) adaptedArgs[i];
                 }
                 return new com.codename1.ui.validation.GroupConstraint(varArgs);
             }
         }
         if (type == com.codename1.ui.validation.LengthConstraint.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return new com.codename1.ui.validation.LengthConstraint(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return new com.codename1.ui.validation.LengthConstraint(((Number) adaptedArgs[0]).intValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
-                return new com.codename1.ui.validation.LengthConstraint(((Number) safeArgs[0]).intValue(), (java.lang.String) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
+                return new com.codename1.ui.validation.LengthConstraint(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1]);
             }
         }
         if (type == com.codename1.ui.validation.NotConstraint.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.validation.Constraint[].class}, true)) {
-                com.codename1.ui.validation.Constraint[] varArgs = new com.codename1.ui.validation.Constraint[safeArgs.length - 0];
-                for (int i = 0; i < safeArgs.length; i++) {
-                    varArgs[i - 0] = (com.codename1.ui.validation.Constraint) safeArgs[i];
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.validation.Constraint[].class}, true);
+                com.codename1.ui.validation.Constraint[] varArgs = new com.codename1.ui.validation.Constraint[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (com.codename1.ui.validation.Constraint) adaptedArgs[i];
                 }
                 return new com.codename1.ui.validation.NotConstraint(varArgs);
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.validation.Constraint[].class}, true)) {
-                com.codename1.ui.validation.Constraint[] varArgs = new com.codename1.ui.validation.Constraint[safeArgs.length - 1];
-                for (int i = 1; i < safeArgs.length; i++) {
-                    varArgs[i - 1] = (com.codename1.ui.validation.Constraint) safeArgs[i];
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.validation.Constraint[].class}, true);
+                com.codename1.ui.validation.Constraint[] varArgs = new com.codename1.ui.validation.Constraint[adaptedArgs.length - 1];
+                for (int i = 1; i < adaptedArgs.length; i++) {
+                    varArgs[i - 1] = (com.codename1.ui.validation.Constraint) adaptedArgs[i];
                 }
-                return new com.codename1.ui.validation.NotConstraint((java.lang.String) safeArgs[0], varArgs);
+                return new com.codename1.ui.validation.NotConstraint((java.lang.String) adaptedArgs[0], varArgs);
             }
         }
         if (type == com.codename1.ui.validation.NumericConstraint.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                return new com.codename1.ui.validation.NumericConstraint(((Boolean) safeArgs[0]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return new com.codename1.ui.validation.NumericConstraint(((Boolean) adaptedArgs[0]).booleanValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Double.class, java.lang.Double.class, java.lang.String.class}, false)) {
-                return new com.codename1.ui.validation.NumericConstraint(((Boolean) safeArgs[0]).booleanValue(), ((Number) safeArgs[1]).doubleValue(), ((Number) safeArgs[2]).doubleValue(), (java.lang.String) safeArgs[3]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Double.class, java.lang.Double.class, java.lang.String.class}, false);
+                return new com.codename1.ui.validation.NumericConstraint(((Boolean) adaptedArgs[0]).booleanValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]);
             }
         }
         if (type == com.codename1.ui.validation.RegexConstraint.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                return new com.codename1.ui.validation.RegexConstraint((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return new com.codename1.ui.validation.RegexConstraint((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
         }
         if (type == com.codename1.ui.validation.Validator.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.ui.validation.Validator();
             }
         }
@@ -136,22 +151,26 @@ public final class GeneratedAccess_com_codename1_ui_validation {
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("validEmail".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.ui.validation.RegexConstraint.validEmail();
             }
         }
         if ("validEmail".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return com.codename1.ui.validation.RegexConstraint.validEmail((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.ui.validation.RegexConstraint.validEmail((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("validURL".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.ui.validation.RegexConstraint.validURL();
             }
         }
         if ("validURL".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return com.codename1.ui.validation.RegexConstraint.validURL((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.ui.validation.RegexConstraint.validURL((java.lang.String) adaptedArgs[0]);
             }
         }
         throw unsupportedStatic(com.codename1.ui.validation.RegexConstraint.class, name, safeArgs);
@@ -160,52 +179,62 @@ public final class GeneratedAccess_com_codename1_ui_validation {
     private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
         if ("getDefaultValidationEmblemPositionX".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.ui.validation.Validator.getDefaultValidationEmblemPositionX();
             }
         }
         if ("getDefaultValidationEmblemPositionY".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.ui.validation.Validator.getDefaultValidationEmblemPositionY();
             }
         }
         if ("getDefaultValidationFailedEmblem".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.ui.validation.Validator.getDefaultValidationFailedEmblem();
             }
         }
         if ("getDefaultValidationFailureHighlightMode".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.ui.validation.Validator.getDefaultValidationFailureHighlightMode();
             }
         }
         if ("isValidateOnEveryKey".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.ui.validation.Validator.isValidateOnEveryKey();
             }
         }
         if ("setDefaultValidationEmblemPositionX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                com.codename1.ui.validation.Validator.setDefaultValidationEmblemPositionX(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                com.codename1.ui.validation.Validator.setDefaultValidationEmblemPositionX(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("setDefaultValidationEmblemPositionY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                com.codename1.ui.validation.Validator.setDefaultValidationEmblemPositionY(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                com.codename1.ui.validation.Validator.setDefaultValidationEmblemPositionY(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("setDefaultValidationFailedEmblem".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                com.codename1.ui.validation.Validator.setDefaultValidationFailedEmblem((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                com.codename1.ui.validation.Validator.setDefaultValidationFailedEmblem((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("setDefaultValidationFailureHighlightMode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.validation.Validator.HighlightMode.class}, false)) {
-                com.codename1.ui.validation.Validator.setDefaultValidationFailureHighlightMode((com.codename1.ui.validation.Validator.HighlightMode) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.validation.Validator.HighlightMode.class}, false);
+                com.codename1.ui.validation.Validator.setDefaultValidationFailureHighlightMode((com.codename1.ui.validation.Validator.HighlightMode) adaptedArgs[0]); return null;
             }
         }
         if ("setValidateOnEveryKey".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                com.codename1.ui.validation.Validator.setValidateOnEveryKey(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                com.codename1.ui.validation.Validator.setValidateOnEveryKey(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         throw unsupportedStatic(com.codename1.ui.validation.Validator.class, name, safeArgs);
@@ -279,12 +308,14 @@ public final class GeneratedAccess_com_codename1_ui_validation {
     private static Object invoke0(com.codename1.ui.validation.ExistInConstraint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDefaultFailMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultFailMessage();
             }
         }
         if ("isValid".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.isValid((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.isValid((java.lang.Object) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -293,12 +324,14 @@ public final class GeneratedAccess_com_codename1_ui_validation {
     private static Object invoke1(com.codename1.ui.validation.GroupConstraint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDefaultFailMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultFailMessage();
             }
         }
         if ("isValid".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.isValid((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.isValid((java.lang.Object) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -307,12 +340,14 @@ public final class GeneratedAccess_com_codename1_ui_validation {
     private static Object invoke2(com.codename1.ui.validation.LengthConstraint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDefaultFailMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultFailMessage();
             }
         }
         if ("isValid".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.isValid((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.isValid((java.lang.Object) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -321,12 +356,14 @@ public final class GeneratedAccess_com_codename1_ui_validation {
     private static Object invoke3(com.codename1.ui.validation.NotConstraint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDefaultFailMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultFailMessage();
             }
         }
         if ("isValid".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.isValid((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.isValid((java.lang.Object) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -335,12 +372,14 @@ public final class GeneratedAccess_com_codename1_ui_validation {
     private static Object invoke4(com.codename1.ui.validation.NumericConstraint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDefaultFailMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultFailMessage();
             }
         }
         if ("isValid".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.isValid((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.isValid((java.lang.Object) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -349,12 +388,14 @@ public final class GeneratedAccess_com_codename1_ui_validation {
     private static Object invoke5(com.codename1.ui.validation.RegexConstraint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDefaultFailMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultFailMessage();
             }
         }
         if ("isValid".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.isValid((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.isValid((java.lang.Object) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -363,95 +404,112 @@ public final class GeneratedAccess_com_codename1_ui_validation {
     private static Object invoke6(com.codename1.ui.validation.Validator typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addConstraint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.validation.Constraint[].class}, true)) {
-                com.codename1.ui.validation.Constraint[] varArgs = new com.codename1.ui.validation.Constraint[safeArgs.length - 1];
-                for (int i = 1; i < safeArgs.length; i++) {
-                    varArgs[i - 1] = (com.codename1.ui.validation.Constraint) safeArgs[i];
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.validation.Constraint[].class}, true);
+                com.codename1.ui.validation.Constraint[] varArgs = new com.codename1.ui.validation.Constraint[adaptedArgs.length - 1];
+                for (int i = 1; i < adaptedArgs.length; i++) {
+                    varArgs[i - 1] = (com.codename1.ui.validation.Constraint) adaptedArgs[i];
                 }
-                return typedTarget.addConstraint((com.codename1.ui.Component) safeArgs[0], varArgs);
+                return typedTarget.addConstraint((com.codename1.ui.Component) adaptedArgs[0], varArgs);
             }
         }
         if ("addSubmitButtons".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component[].class}, true)) {
-                com.codename1.ui.Component[] varArgs = new com.codename1.ui.Component[safeArgs.length - 0];
-                for (int i = 0; i < safeArgs.length; i++) {
-                    varArgs[i - 0] = (com.codename1.ui.Component) safeArgs[i];
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component[].class}, true);
+                com.codename1.ui.Component[] varArgs = new com.codename1.ui.Component[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (com.codename1.ui.Component) adaptedArgs[i];
                 }
                 return typedTarget.addSubmitButtons(varArgs);
             }
         }
         if ("bindDataListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
-                typedTarget.bindDataListener((com.codename1.ui.Component) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.bindDataListener((com.codename1.ui.Component) adaptedArgs[0]); return null;
             }
         }
         if ("getErrorMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
-                return typedTarget.getErrorMessage((com.codename1.ui.Component) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                return typedTarget.getErrorMessage((com.codename1.ui.Component) adaptedArgs[0]);
             }
         }
         if ("getErrorMessageUIID".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getErrorMessageUIID();
             }
         }
         if ("getValidationEmblemPositionX".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getValidationEmblemPositionX();
             }
         }
         if ("getValidationEmblemPositionY".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getValidationEmblemPositionY();
             }
         }
         if ("getValidationFailedEmblem".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getValidationFailedEmblem();
             }
         }
         if ("getValidationFailureHighlightMode".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getValidationFailureHighlightMode();
             }
         }
         if ("isShowErrorMessageForFocusedComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isShowErrorMessageForFocusedComponent();
             }
         }
         if ("isValid".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isValid();
             }
         }
         if ("setErrorMessageUIID".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setErrorMessageUIID((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setErrorMessageUIID((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("setShowErrorMessageForFocusedComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setShowErrorMessageForFocusedComponent(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setShowErrorMessageForFocusedComponent(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setValidationEmblemPositionX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.setValidationEmblemPositionX(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setValidationEmblemPositionX(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("setValidationEmblemPositionY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.setValidationEmblemPositionY(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setValidationEmblemPositionY(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("setValidationFailedEmblem".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.setValidationFailedEmblem((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setValidationFailedEmblem((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("setValidationFailureHighlightMode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.validation.Validator.HighlightMode.class}, false)) {
-                typedTarget.setValidationFailureHighlightMode((com.codename1.ui.validation.Validator.HighlightMode) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.validation.Validator.HighlightMode.class}, false);
+                typedTarget.setValidationFailureHighlightMode((com.codename1.ui.validation.Validator.HighlightMode) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -460,12 +518,14 @@ public final class GeneratedAccess_com_codename1_ui_validation {
     private static Object invoke7(com.codename1.ui.validation.Constraint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDefaultFailMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultFailMessage();
             }
         }
         if ("isValid".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.isValid((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.isValid((java.lang.Object) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -489,6 +549,88 @@ public final class GeneratedAccess_com_codename1_ui_validation {
 
     private static Object[] safeArgs(Object[] args) {
         return args == null ? new Object[0] : args;
+    }
+
+    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (args == null || args.length == 0) {
+            return args == null ? new Object[0] : args;
+        }
+        Object[] adapted = args.clone();
+        if (!varArgs) {
+            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {
+                adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+            }
+            return adapted;
+        }
+        if (paramTypes.length == 0) {
+            return adapted;
+        }
+        int fixedCount = paramTypes.length - 1;
+        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {
+            adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < adapted.length; i++) {
+            adapted[i] = adaptValue(adapted[i], componentType);
+        }
+        return adapted;
+    }
+
+    private static boolean isSamInterface(Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == java.util.Observer.class) {
+            return true;
+        }
+        if (type == java.lang.Iterable.class) {
+            return true;
+        }
+        return false;
+    }
+
+    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.util.Observer.class) {
+            return new java.util.Observer() {
+                public void update(java.util.Observable arg0, java.lang.Object arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Iterable.class) {
+            return new java.lang.Iterable() {
+                public java.util.Iterator iterator() {
+                    try {
+                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        return lambda;
+    }
+
+    private static Object adaptValue(Object value, Class<?> type) {
+        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
+            return value;
+        }
+        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -544,6 +686,9 @@ public final class GeneratedAccess_com_codename1_ui_validation {
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
             return value instanceof Number;
+        }
+        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+            return isSamInterface(type);
         }
         return type.isInstance(value);
     }

@@ -90,70 +90,84 @@ public final class GeneratedAccess_com_codename1_charts_views {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.charts.views.BarChart.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class, com.codename1.charts.views.BarChart.Type.class}, false)) {
-                return new com.codename1.charts.views.BarChart((com.codename1.charts.models.XYMultipleSeriesDataset) safeArgs[0], (com.codename1.charts.renderers.XYMultipleSeriesRenderer) safeArgs[1], (com.codename1.charts.views.BarChart.Type) safeArgs[2]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class, com.codename1.charts.views.BarChart.Type.class}, false);
+                return new com.codename1.charts.views.BarChart((com.codename1.charts.models.XYMultipleSeriesDataset) adaptedArgs[0], (com.codename1.charts.renderers.XYMultipleSeriesRenderer) adaptedArgs[1], (com.codename1.charts.views.BarChart.Type) adaptedArgs[2]);
             }
         }
         if (type == com.codename1.charts.views.BubbleChart.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class}, false)) {
-                return new com.codename1.charts.views.BubbleChart((com.codename1.charts.models.XYMultipleSeriesDataset) safeArgs[0], (com.codename1.charts.renderers.XYMultipleSeriesRenderer) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class}, false);
+                return new com.codename1.charts.views.BubbleChart((com.codename1.charts.models.XYMultipleSeriesDataset) adaptedArgs[0], (com.codename1.charts.renderers.XYMultipleSeriesRenderer) adaptedArgs[1]);
             }
         }
         if (type == com.codename1.charts.views.ClickableArea.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle2D.class, java.lang.Double.class, java.lang.Double.class}, false)) {
-                return new com.codename1.charts.views.ClickableArea((com.codename1.ui.geom.Rectangle2D) safeArgs[0], ((Number) safeArgs[1]).doubleValue(), ((Number) safeArgs[2]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle2D.class, java.lang.Double.class, java.lang.Double.class}, false);
+                return new com.codename1.charts.views.ClickableArea((com.codename1.ui.geom.Rectangle2D) adaptedArgs[0], ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue());
             }
         }
         if (type == com.codename1.charts.views.CombinedXYChart.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class, com.codename1.charts.views.CombinedXYChart.XYCombinedChartDef[].class}, false)) {
-                return new com.codename1.charts.views.CombinedXYChart((com.codename1.charts.models.XYMultipleSeriesDataset) safeArgs[0], (com.codename1.charts.renderers.XYMultipleSeriesRenderer) safeArgs[1], (com.codename1.charts.views.CombinedXYChart.XYCombinedChartDef[]) safeArgs[2]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class, com.codename1.charts.views.CombinedXYChart.XYCombinedChartDef[].class}, false);
+                return new com.codename1.charts.views.CombinedXYChart((com.codename1.charts.models.XYMultipleSeriesDataset) adaptedArgs[0], (com.codename1.charts.renderers.XYMultipleSeriesRenderer) adaptedArgs[1], (com.codename1.charts.views.CombinedXYChart.XYCombinedChartDef[]) adaptedArgs[2]);
             }
         }
         if (type == com.codename1.charts.views.CubicLineChart.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.charts.views.CubicLineChart();
             }
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class, java.lang.Float.class}, false)) {
-                return new com.codename1.charts.views.CubicLineChart((com.codename1.charts.models.XYMultipleSeriesDataset) safeArgs[0], (com.codename1.charts.renderers.XYMultipleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class, java.lang.Float.class}, false);
+                return new com.codename1.charts.views.CubicLineChart((com.codename1.charts.models.XYMultipleSeriesDataset) adaptedArgs[0], (com.codename1.charts.renderers.XYMultipleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue());
             }
         }
         if (type == com.codename1.charts.views.DialChart.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.CategorySeries.class, com.codename1.charts.renderers.DialRenderer.class}, false)) {
-                return new com.codename1.charts.views.DialChart((com.codename1.charts.models.CategorySeries) safeArgs[0], (com.codename1.charts.renderers.DialRenderer) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.CategorySeries.class, com.codename1.charts.renderers.DialRenderer.class}, false);
+                return new com.codename1.charts.views.DialChart((com.codename1.charts.models.CategorySeries) adaptedArgs[0], (com.codename1.charts.renderers.DialRenderer) adaptedArgs[1]);
             }
         }
         if (type == com.codename1.charts.views.DoughnutChart.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.MultipleCategorySeries.class, com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return new com.codename1.charts.views.DoughnutChart((com.codename1.charts.models.MultipleCategorySeries) safeArgs[0], (com.codename1.charts.renderers.DefaultRenderer) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.MultipleCategorySeries.class, com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return new com.codename1.charts.views.DoughnutChart((com.codename1.charts.models.MultipleCategorySeries) adaptedArgs[0], (com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[1]);
             }
         }
         if (type == com.codename1.charts.views.LineChart.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class}, false)) {
-                return new com.codename1.charts.views.LineChart((com.codename1.charts.models.XYMultipleSeriesDataset) safeArgs[0], (com.codename1.charts.renderers.XYMultipleSeriesRenderer) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class}, false);
+                return new com.codename1.charts.views.LineChart((com.codename1.charts.models.XYMultipleSeriesDataset) adaptedArgs[0], (com.codename1.charts.renderers.XYMultipleSeriesRenderer) adaptedArgs[1]);
             }
         }
         if (type == com.codename1.charts.views.PieChart.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.CategorySeries.class, com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return new com.codename1.charts.views.PieChart((com.codename1.charts.models.CategorySeries) safeArgs[0], (com.codename1.charts.renderers.DefaultRenderer) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.CategorySeries.class, com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return new com.codename1.charts.views.PieChart((com.codename1.charts.models.CategorySeries) adaptedArgs[0], (com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[1]);
             }
         }
         if (type == com.codename1.charts.views.PieSegment.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
-                return new com.codename1.charts.views.PieSegment(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).floatValue(), ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
+                return new com.codename1.charts.views.PieSegment(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue());
             }
         }
         if (type == com.codename1.charts.views.RadarChart.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.AreaSeries.class, com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return new com.codename1.charts.views.RadarChart((com.codename1.charts.models.AreaSeries) safeArgs[0], (com.codename1.charts.renderers.DefaultRenderer) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.AreaSeries.class, com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return new com.codename1.charts.views.RadarChart((com.codename1.charts.models.AreaSeries) adaptedArgs[0], (com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[1]);
             }
         }
         if (type == com.codename1.charts.views.ScatterChart.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class}, false)) {
-                return new com.codename1.charts.views.ScatterChart((com.codename1.charts.models.XYMultipleSeriesDataset) safeArgs[0], (com.codename1.charts.renderers.XYMultipleSeriesRenderer) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class}, false);
+                return new com.codename1.charts.views.ScatterChart((com.codename1.charts.models.XYMultipleSeriesDataset) adaptedArgs[0], (com.codename1.charts.renderers.XYMultipleSeriesRenderer) adaptedArgs[1]);
             }
         }
         if (type == com.codename1.charts.views.TimeChart.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class}, false)) {
-                return new com.codename1.charts.views.TimeChart((com.codename1.charts.models.XYMultipleSeriesDataset) safeArgs[0], (com.codename1.charts.renderers.XYMultipleSeriesRenderer) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.XYMultipleSeriesDataset.class, com.codename1.charts.renderers.XYMultipleSeriesRenderer.class}, false);
+                return new com.codename1.charts.views.TimeChart((com.codename1.charts.models.XYMultipleSeriesDataset) adaptedArgs[0], (com.codename1.charts.renderers.XYMultipleSeriesRenderer) adaptedArgs[1]);
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -168,12 +182,14 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("getIndexForName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return com.codename1.charts.views.PointStyle.getIndexForName((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.charts.views.PointStyle.getIndexForName((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("getPointStyleForName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return com.codename1.charts.views.PointStyle.getPointStyleForName((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.charts.views.PointStyle.getPointStyleForName((java.lang.String) adaptedArgs[0]);
             }
         }
         throw unsupportedStatic(com.codename1.charts.views.PointStyle.class, name, safeArgs);
@@ -331,97 +347,116 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke0(com.codename1.charts.views.RangeStackedBarChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.compat.Paint) safeArgs[1], (java.util.List) safeArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) safeArgs[3], ((Number) safeArgs[4]).floatValue(), ((Number) safeArgs[5]).intValue(), ((Number) safeArgs[6]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.compat.Paint) adaptedArgs[1], (java.util.List) adaptedArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) adaptedArgs[3], ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).intValue(), ((Number) adaptedArgs[6]).intValue()); return null;
             }
         }
         if ("getCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getCalcRange(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getCalcRange(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getChartType".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultMinimum();
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getPointsChart".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRenderer();
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isRenderPoints".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false)) {
-                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false);
+                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[0]);
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         if ("setCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                typedTarget.setCalcRange((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                typedTarget.setCalcRange((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -430,97 +465,116 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke1(com.codename1.charts.views.CubicLineChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.compat.Paint) safeArgs[1], (java.util.List) safeArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) safeArgs[3], ((Number) safeArgs[4]).floatValue(), ((Number) safeArgs[5]).intValue(), ((Number) safeArgs[6]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.compat.Paint) adaptedArgs[1], (java.util.List) adaptedArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) adaptedArgs[3], ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).intValue(), ((Number) adaptedArgs[6]).intValue()); return null;
             }
         }
         if ("getCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getCalcRange(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getCalcRange(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getChartType".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultMinimum();
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getPointsChart".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRenderer();
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isRenderPoints".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false)) {
-                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false);
+                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[0]);
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         if ("setCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                typedTarget.setCalcRange((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                typedTarget.setCalcRange((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -529,97 +583,116 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke2(com.codename1.charts.views.RangeBarChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.compat.Paint) safeArgs[1], (java.util.List) safeArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) safeArgs[3], ((Number) safeArgs[4]).floatValue(), ((Number) safeArgs[5]).intValue(), ((Number) safeArgs[6]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.compat.Paint) adaptedArgs[1], (java.util.List) adaptedArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) adaptedArgs[3], ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).intValue(), ((Number) adaptedArgs[6]).intValue()); return null;
             }
         }
         if ("getCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getCalcRange(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getCalcRange(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getChartType".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultMinimum();
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getPointsChart".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRenderer();
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isRenderPoints".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false)) {
-                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false);
+                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[0]);
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         if ("setCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                typedTarget.setCalcRange((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                typedTarget.setCalcRange((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -628,107 +701,128 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke3(com.codename1.charts.views.TimeChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.compat.Paint) safeArgs[1], (java.util.List) safeArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) safeArgs[3], ((Number) safeArgs[4]).floatValue(), ((Number) safeArgs[5]).intValue(), ((Number) safeArgs[6]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.compat.Paint) adaptedArgs[1], (java.util.List) adaptedArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) adaptedArgs[3], ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).intValue(), ((Number) adaptedArgs[6]).intValue()); return null;
             }
         }
         if ("getCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getCalcRange(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getCalcRange(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getChartType".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDataset();
             }
         }
         if ("getDateFormat".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDateFormat();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultMinimum();
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getPointsChart".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRenderer();
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isRenderPoints".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false)) {
-                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false);
+                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[0]);
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         if ("setCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                typedTarget.setCalcRange((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                typedTarget.setCalcRange((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
         }
         if ("setDateFormat".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setDateFormat((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setDateFormat((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -737,97 +831,116 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke4(com.codename1.charts.views.BarChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.compat.Paint) safeArgs[1], (java.util.List) safeArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) safeArgs[3], ((Number) safeArgs[4]).floatValue(), ((Number) safeArgs[5]).intValue(), ((Number) safeArgs[6]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.compat.Paint) adaptedArgs[1], (java.util.List) adaptedArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) adaptedArgs[3], ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).intValue(), ((Number) adaptedArgs[6]).intValue()); return null;
             }
         }
         if ("getCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getCalcRange(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getCalcRange(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getChartType".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultMinimum();
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getPointsChart".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRenderer();
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isRenderPoints".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false)) {
-                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false);
+                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[0]);
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         if ("setCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                typedTarget.setCalcRange((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                typedTarget.setCalcRange((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -836,97 +949,116 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke5(com.codename1.charts.views.BubbleChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.compat.Paint) safeArgs[1], (java.util.List) safeArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) safeArgs[3], ((Number) safeArgs[4]).floatValue(), ((Number) safeArgs[5]).intValue(), ((Number) safeArgs[6]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.compat.Paint) adaptedArgs[1], (java.util.List) adaptedArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) adaptedArgs[3], ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).intValue(), ((Number) adaptedArgs[6]).intValue()); return null;
             }
         }
         if ("getCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getCalcRange(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getCalcRange(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getChartType".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultMinimum();
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getPointsChart".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRenderer();
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isRenderPoints".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false)) {
-                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false);
+                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[0]);
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         if ("setCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                typedTarget.setCalcRange((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                typedTarget.setCalcRange((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -935,97 +1067,116 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke6(com.codename1.charts.views.CombinedXYChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.compat.Paint) safeArgs[1], (java.util.List) safeArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) safeArgs[3], ((Number) safeArgs[4]).floatValue(), ((Number) safeArgs[5]).intValue(), ((Number) safeArgs[6]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.compat.Paint) adaptedArgs[1], (java.util.List) adaptedArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) adaptedArgs[3], ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).intValue(), ((Number) adaptedArgs[6]).intValue()); return null;
             }
         }
         if ("getCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getCalcRange(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getCalcRange(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getChartType".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultMinimum();
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getPointsChart".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRenderer();
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isRenderPoints".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false)) {
-                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false);
+                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[0]);
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         if ("setCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                typedTarget.setCalcRange((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                typedTarget.setCalcRange((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1034,72 +1185,86 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke7(com.codename1.charts.views.DialChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawTitle((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[4]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawTitle((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[4]); return null;
             }
         }
         if ("getCenterX".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCenterX();
             }
         }
         if ("getCenterY".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCenterY();
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getRenderer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRenderer();
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isAutocalculateCenter".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isAutocalculateCenter();
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         if ("setAutocalculateCenter".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setAutocalculateCenter(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setAutocalculateCenter(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setCenterX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setCenterX(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setCenterX(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setCenterY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setCenterY(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setCenterY(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1108,72 +1273,86 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke8(com.codename1.charts.views.DoughnutChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawTitle((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[4]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawTitle((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[4]); return null;
             }
         }
         if ("getCenterX".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCenterX();
             }
         }
         if ("getCenterY".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCenterY();
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getRenderer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRenderer();
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isAutocalculateCenter".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isAutocalculateCenter();
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         if ("setAutocalculateCenter".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setAutocalculateCenter(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setAutocalculateCenter(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setCenterX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setCenterX(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setCenterX(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setCenterY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setCenterY(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setCenterY(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1182,97 +1361,116 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke9(com.codename1.charts.views.LineChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.compat.Paint) safeArgs[1], (java.util.List) safeArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) safeArgs[3], ((Number) safeArgs[4]).floatValue(), ((Number) safeArgs[5]).intValue(), ((Number) safeArgs[6]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.compat.Paint) adaptedArgs[1], (java.util.List) adaptedArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) adaptedArgs[3], ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).intValue(), ((Number) adaptedArgs[6]).intValue()); return null;
             }
         }
         if ("getCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getCalcRange(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getCalcRange(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getChartType".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultMinimum();
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getPointsChart".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRenderer();
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isRenderPoints".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false)) {
-                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false);
+                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[0]);
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         if ("setCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                typedTarget.setCalcRange((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                typedTarget.setCalcRange((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1281,77 +1479,92 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke10(com.codename1.charts.views.PieChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawTitle((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[4]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawTitle((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[4]); return null;
             }
         }
         if ("getCenterX".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCenterX();
             }
         }
         if ("getCenterY".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCenterY();
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getRenderer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRenderer();
             }
         }
         if ("getSegmentShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getSegmentShape(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getSegmentShape(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isAutocalculateCenter".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isAutocalculateCenter();
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         if ("setAutocalculateCenter".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setAutocalculateCenter(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setAutocalculateCenter(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setCenterX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setCenterX(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setCenterX(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setCenterY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setCenterY(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setCenterY(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1360,72 +1573,86 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke11(com.codename1.charts.views.RadarChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawTitle((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[4]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawTitle((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[4]); return null;
             }
         }
         if ("getCenterX".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCenterX();
             }
         }
         if ("getCenterY".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCenterY();
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getRenderer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRenderer();
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isAutocalculateCenter".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isAutocalculateCenter();
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         if ("setAutocalculateCenter".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setAutocalculateCenter(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setAutocalculateCenter(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setCenterX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setCenterX(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setCenterX(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setCenterY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setCenterY(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setCenterY(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1434,97 +1661,116 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke12(com.codename1.charts.views.ScatterChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.compat.Paint) safeArgs[1], (java.util.List) safeArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) safeArgs[3], ((Number) safeArgs[4]).floatValue(), ((Number) safeArgs[5]).intValue(), ((Number) safeArgs[6]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.compat.Paint) adaptedArgs[1], (java.util.List) adaptedArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) adaptedArgs[3], ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).intValue(), ((Number) adaptedArgs[6]).intValue()); return null;
             }
         }
         if ("getCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getCalcRange(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getCalcRange(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getChartType".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultMinimum();
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getPointsChart".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRenderer();
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isRenderPoints".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false)) {
-                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false);
+                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[0]);
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         if ("setCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                typedTarget.setCalcRange((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                typedTarget.setCalcRange((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1533,72 +1779,86 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke13(com.codename1.charts.views.RoundChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawTitle((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[4]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawTitle((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[4]); return null;
             }
         }
         if ("getCenterX".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCenterX();
             }
         }
         if ("getCenterY".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCenterY();
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getRenderer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRenderer();
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isAutocalculateCenter".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isAutocalculateCenter();
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         if ("setAutocalculateCenter".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setAutocalculateCenter(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setAutocalculateCenter(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setCenterX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setCenterX(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setCenterX(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setCenterY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setCenterY(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setCenterY(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1607,97 +1867,116 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke14(com.codename1.charts.views.XYChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.compat.Paint) safeArgs[1], (java.util.List) safeArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) safeArgs[3], ((Number) safeArgs[4]).floatValue(), ((Number) safeArgs[5]).intValue(), ((Number) safeArgs[6]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.compat.Paint.class, java.util.List.class, com.codename1.charts.renderers.XYSeriesRenderer.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.drawSeries((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.compat.Paint) adaptedArgs[1], (java.util.List) adaptedArgs[2], (com.codename1.charts.renderers.XYSeriesRenderer) adaptedArgs[3], ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).intValue(), ((Number) adaptedArgs[6]).intValue()); return null;
             }
         }
         if ("getCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getCalcRange(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getCalcRange(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getChartType".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDefaultMinimum();
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getPointsChart".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRenderer();
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isRenderPoints".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false)) {
-                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.SimpleSeriesRenderer.class}, false);
+                return typedTarget.isRenderPoints((com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[0]);
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         if ("setCalcRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                typedTarget.setCalcRange((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                typedTarget.setCalcRange((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
         }
         if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
-                return typedTarget.toRealPoint(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
+                return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
         }
         if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
-                return typedTarget.toScreenPoint((double[]) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
+                return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1706,32 +1985,38 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke15(com.codename1.charts.views.AbstractChart typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("draw".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.draw((com.codename1.charts.compat.Canvas) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.draw((com.codename1.charts.compat.Canvas) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("drawLegendShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false)) {
-                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) safeArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) safeArgs[1], ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).intValue(), (com.codename1.charts.compat.Paint) safeArgs[5]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.compat.Canvas.class, com.codename1.charts.renderers.SimpleSeriesRenderer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, com.codename1.charts.compat.Paint.class}, false);
+                typedTarget.drawLegendShape((com.codename1.charts.compat.Canvas) adaptedArgs[0], (com.codename1.charts.renderers.SimpleSeriesRenderer) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).intValue(), (com.codename1.charts.compat.Paint) adaptedArgs[5]); return null;
             }
         }
         if ("getLegendShapeWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getLegendShapeWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getLegendShapeWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isNullValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isNullValue(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isNullValue(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("isVertical".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false)) {
-                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.renderers.DefaultRenderer.class}, false);
+                return typedTarget.isVertical((com.codename1.charts.renderers.DefaultRenderer) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1740,16 +2025,19 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke16(com.codename1.charts.views.ClickableArea typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getRect".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRect();
             }
         }
         if ("getX".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getX();
             }
         }
         if ("getY".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getY();
             }
         }
@@ -1759,42 +2047,50 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke17(com.codename1.charts.views.PieMapper typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addPieSegment".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
-                typedTarget.addPieSegment(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).floatValue(), ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
+                typedTarget.addPieSegment(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue()); return null;
             }
         }
         if ("areAllSegmentPresent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.areAllSegmentPresent(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.areAllSegmentPresent(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("clearPieSegments".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clearPieSegments(); return null;
             }
         }
         if ("getAngle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getAngle((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getAngle((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("getSegmentShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getSegmentShape(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getSegmentShape(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getSeriesAndPointForScreenCoordinate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.getSeriesAndPointForScreenCoordinate((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("isOnPieChart".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false)) {
-                return typedTarget.isOnPieChart((com.codename1.charts.models.Point) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.Point.class}, false);
+                return typedTarget.isOnPieChart((com.codename1.charts.models.Point) adaptedArgs[0]);
             }
         }
         if ("setDimensions".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.setDimensions(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.setDimensions(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1803,16 +2099,19 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke18(com.codename1.charts.views.PieSegment typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getShape".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
-                return typedTarget.getShape(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue(), ((Number) safeArgs[2]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.getShape(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue());
             }
         }
         if ("isInSegment".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.isInSegment(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.isInSegment(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toString();
             }
         }
@@ -1822,11 +2121,13 @@ public final class GeneratedAccess_com_codename1_charts_views {
     private static Object invoke19(com.codename1.charts.views.PointStyle typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getName".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getName();
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toString();
             }
         }
@@ -1862,6 +2163,88 @@ public final class GeneratedAccess_com_codename1_charts_views {
 
     private static Object[] safeArgs(Object[] args) {
         return args == null ? new Object[0] : args;
+    }
+
+    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (args == null || args.length == 0) {
+            return args == null ? new Object[0] : args;
+        }
+        Object[] adapted = args.clone();
+        if (!varArgs) {
+            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {
+                adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+            }
+            return adapted;
+        }
+        if (paramTypes.length == 0) {
+            return adapted;
+        }
+        int fixedCount = paramTypes.length - 1;
+        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {
+            adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < adapted.length; i++) {
+            adapted[i] = adaptValue(adapted[i], componentType);
+        }
+        return adapted;
+    }
+
+    private static boolean isSamInterface(Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == java.util.Observer.class) {
+            return true;
+        }
+        if (type == java.lang.Iterable.class) {
+            return true;
+        }
+        return false;
+    }
+
+    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.util.Observer.class) {
+            return new java.util.Observer() {
+                public void update(java.util.Observable arg0, java.lang.Object arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Iterable.class) {
+            return new java.lang.Iterable() {
+                public java.util.Iterator iterator() {
+                    try {
+                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        return lambda;
+    }
+
+    private static Object adaptValue(Object value, Class<?> type) {
+        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
+            return value;
+        }
+        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -1917,6 +2300,9 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
             return value instanceof Number;
+        }
+        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+            return isSamInterface(type);
         }
         return type.isInstance(value);
     }

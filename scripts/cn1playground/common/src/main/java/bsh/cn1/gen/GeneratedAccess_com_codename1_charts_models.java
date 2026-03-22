@@ -60,48 +60,58 @@ public final class GeneratedAccess_com_codename1_charts_models {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.charts.models.CategorySeries.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new com.codename1.charts.models.CategorySeries((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new com.codename1.charts.models.CategorySeries((java.lang.String) adaptedArgs[0]);
             }
         }
         if (type == com.codename1.charts.models.MultipleCategorySeries.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new com.codename1.charts.models.MultipleCategorySeries((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new com.codename1.charts.models.MultipleCategorySeries((java.lang.String) adaptedArgs[0]);
             }
         }
         if (type == com.codename1.charts.models.Point.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.charts.models.Point();
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
-                return new com.codename1.charts.models.Point(((Number) safeArgs[0]).floatValue(), ((Number) safeArgs[1]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
+                return new com.codename1.charts.models.Point(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
         }
         if (type == com.codename1.charts.models.RangeCategorySeries.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new com.codename1.charts.models.RangeCategorySeries((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new com.codename1.charts.models.RangeCategorySeries((java.lang.String) adaptedArgs[0]);
             }
         }
         if (type == com.codename1.charts.models.SeriesSelection.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false)) {
-                return new com.codename1.charts.models.SeriesSelection(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).doubleValue(), ((Number) safeArgs[3]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false);
+                return new com.codename1.charts.models.SeriesSelection(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue());
             }
         }
         if (type == com.codename1.charts.models.TimeSeries.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new com.codename1.charts.models.TimeSeries((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new com.codename1.charts.models.TimeSeries((java.lang.String) adaptedArgs[0]);
             }
         }
         if (type == com.codename1.charts.models.XYSeries.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new com.codename1.charts.models.XYSeries((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new com.codename1.charts.models.XYSeries((java.lang.String) adaptedArgs[0]);
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
-                return new com.codename1.charts.models.XYSeries((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
+                return new com.codename1.charts.models.XYSeries((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         if (type == com.codename1.charts.models.XYValueSeries.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new com.codename1.charts.models.XYValueSeries((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new com.codename1.charts.models.XYValueSeries((java.lang.String) adaptedArgs[0]);
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -194,71 +204,85 @@ public final class GeneratedAccess_com_codename1_charts_models {
     private static Object invoke0(com.codename1.charts.models.RangeCategorySeries typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                typedTarget.add(((Number) safeArgs[0]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                typedTarget.add(((Number) adaptedArgs[0]).doubleValue()); return null;
             }
         }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false)) {
-                typedTarget.add(((Number) safeArgs[0]).doubleValue(), ((Number) safeArgs[1]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false);
+                typedTarget.add(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue()); return null;
             }
         }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class}, false)) {
-                typedTarget.add((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class}, false);
+                typedTarget.add((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).doubleValue()); return null;
             }
         }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class, java.lang.Double.class}, false)) {
-                typedTarget.add((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).doubleValue(), ((Number) safeArgs[2]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class, java.lang.Double.class}, false);
+                typedTarget.add((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
         }
         if ("clear".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clear(); return null;
             }
         }
         if ("getCategory".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getCategory(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getCategory(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getItemCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getItemCount();
             }
         }
         if ("getMaximumValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getMaximumValue(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getMaximumValue(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getMinimumValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getMinimumValue(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getMinimumValue(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getTitle();
             }
         }
         if ("getValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getValue(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getValue(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("remove".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.remove(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.remove(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("set".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.Double.class}, false)) {
-                typedTarget.set(((Number) safeArgs[0]).intValue(), (java.lang.String) safeArgs[1], ((Number) safeArgs[2]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.Double.class}, false);
+                typedTarget.set(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1], ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
         }
         if ("toXYSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toXYSeries();
             }
         }
@@ -268,132 +292,158 @@ public final class GeneratedAccess_com_codename1_charts_models {
     private static Object invoke1(com.codename1.charts.models.TimeSeries typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false)) {
-                typedTarget.add(((Number) safeArgs[0]).doubleValue(), ((Number) safeArgs[1]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false);
+                typedTarget.add(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue()); return null;
             }
         }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class, java.lang.Double.class}, false)) {
-                typedTarget.add((java.util.Date) safeArgs[0], ((Number) safeArgs[1]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class, java.lang.Double.class}, false);
+                typedTarget.add((java.util.Date) adaptedArgs[0], ((Number) adaptedArgs[1]).doubleValue()); return null;
             }
         }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false)) {
-                typedTarget.add(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).doubleValue(), ((Number) safeArgs[2]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false);
+                typedTarget.add(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
         }
         if ("addAnnotation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class, java.lang.Double.class}, false)) {
-                typedTarget.addAnnotation((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).doubleValue(), ((Number) safeArgs[2]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class, java.lang.Double.class}, false);
+                typedTarget.addAnnotation((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
         }
         if ("addAnnotation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false)) {
-                typedTarget.addAnnotation((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).doubleValue(), ((Number) safeArgs[3]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false);
+                typedTarget.addAnnotation((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue()); return null;
             }
         }
         if ("clear".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clear(); return null;
             }
         }
         if ("clearAnnotations".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clearAnnotations(); return null;
             }
         }
         if ("clearSeriesValues".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clearSeriesValues(); return null;
             }
         }
         if ("getAnnotationAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getAnnotationAt(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getAnnotationAt(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getAnnotationCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getAnnotationCount();
             }
         }
         if ("getAnnotationX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getAnnotationX(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getAnnotationX(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getAnnotationY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getAnnotationY(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getAnnotationY(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getIndexForKey".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.getIndexForKey(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.getIndexForKey(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("getItemCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getItemCount();
             }
         }
         if ("getMaxX".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaxX();
             }
         }
         if ("getMaxY".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaxY();
             }
         }
         if ("getMinX".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMinX();
             }
         }
         if ("getMinY".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMinY();
             }
         }
         if ("getRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Boolean.class}, false)) {
-                return typedTarget.getRange(((Number) safeArgs[0]).doubleValue(), ((Number) safeArgs[1]).doubleValue(), ((Boolean) safeArgs[2]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Boolean.class}, false);
+                return typedTarget.getRange(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Boolean) adaptedArgs[2]).booleanValue());
             }
         }
         if ("getScaleNumber".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getScaleNumber();
             }
         }
         if ("getTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getTitle();
             }
         }
         if ("getX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getX(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getX(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getY(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getY(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("remove".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.remove(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.remove(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("removeAnnotation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.removeAnnotation(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.removeAnnotation(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setTitle((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setTitle((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -402,147 +452,176 @@ public final class GeneratedAccess_com_codename1_charts_models {
     private static Object invoke2(com.codename1.charts.models.XYValueSeries typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false)) {
-                typedTarget.add(((Number) safeArgs[0]).doubleValue(), ((Number) safeArgs[1]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false);
+                typedTarget.add(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue()); return null;
             }
         }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false)) {
-                typedTarget.add(((Number) safeArgs[0]).doubleValue(), ((Number) safeArgs[1]).doubleValue(), ((Number) safeArgs[2]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
+                typedTarget.add(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
         }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false)) {
-                typedTarget.add(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).doubleValue(), ((Number) safeArgs[2]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false);
+                typedTarget.add(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
         }
         if ("addAnnotation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class, java.lang.Double.class}, false)) {
-                typedTarget.addAnnotation((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).doubleValue(), ((Number) safeArgs[2]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class, java.lang.Double.class}, false);
+                typedTarget.addAnnotation((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
         }
         if ("addAnnotation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false)) {
-                typedTarget.addAnnotation((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).doubleValue(), ((Number) safeArgs[3]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false);
+                typedTarget.addAnnotation((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue()); return null;
             }
         }
         if ("clear".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clear(); return null;
             }
         }
         if ("clearAnnotations".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clearAnnotations(); return null;
             }
         }
         if ("clearSeriesValues".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clearSeriesValues(); return null;
             }
         }
         if ("getAnnotationAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getAnnotationAt(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getAnnotationAt(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getAnnotationCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getAnnotationCount();
             }
         }
         if ("getAnnotationX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getAnnotationX(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getAnnotationX(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getAnnotationY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getAnnotationY(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getAnnotationY(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getIndexForKey".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.getIndexForKey(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.getIndexForKey(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("getItemCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getItemCount();
             }
         }
         if ("getMaxValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaxValue();
             }
         }
         if ("getMaxX".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaxX();
             }
         }
         if ("getMaxY".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaxY();
             }
         }
         if ("getMinValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMinValue();
             }
         }
         if ("getMinX".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMinX();
             }
         }
         if ("getMinY".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMinY();
             }
         }
         if ("getRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Boolean.class}, false)) {
-                return typedTarget.getRange(((Number) safeArgs[0]).doubleValue(), ((Number) safeArgs[1]).doubleValue(), ((Boolean) safeArgs[2]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Boolean.class}, false);
+                return typedTarget.getRange(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Boolean) adaptedArgs[2]).booleanValue());
             }
         }
         if ("getScaleNumber".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getScaleNumber();
             }
         }
         if ("getTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getTitle();
             }
         }
         if ("getValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getValue(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getValue(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getX(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getX(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getY(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getY(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("remove".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.remove(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.remove(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("removeAnnotation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.removeAnnotation(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.removeAnnotation(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setTitle((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setTitle((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -551,37 +630,44 @@ public final class GeneratedAccess_com_codename1_charts_models {
     private static Object invoke3(com.codename1.charts.models.AreaSeries typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.CategorySeries.class}, false)) {
-                typedTarget.addSeries((com.codename1.charts.models.CategorySeries) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.CategorySeries.class}, false);
+                typedTarget.addSeries((com.codename1.charts.models.CategorySeries) adaptedArgs[0]); return null;
             }
         }
         if ("clear".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clear(); return null;
             }
         }
         if ("getCategories".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCategories();
             }
         }
         if ("getCategoriesCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCategoriesCount();
             }
         }
         if ("getSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSeries();
             }
         }
         if ("getSeriesCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSeriesCount();
             }
         }
         if ("getValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
-                return typedTarget.getValue(((Number) safeArgs[0]).intValue(), (java.lang.String) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
+                return typedTarget.getValue(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -590,51 +676,61 @@ public final class GeneratedAccess_com_codename1_charts_models {
     private static Object invoke4(com.codename1.charts.models.CategorySeries typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                typedTarget.add(((Number) safeArgs[0]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                typedTarget.add(((Number) adaptedArgs[0]).doubleValue()); return null;
             }
         }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class}, false)) {
-                typedTarget.add((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class}, false);
+                typedTarget.add((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).doubleValue()); return null;
             }
         }
         if ("clear".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clear(); return null;
             }
         }
         if ("getCategory".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getCategory(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getCategory(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getItemCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getItemCount();
             }
         }
         if ("getTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getTitle();
             }
         }
         if ("getValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getValue(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getValue(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("remove".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.remove(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.remove(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("set".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.Double.class}, false)) {
-                typedTarget.set(((Number) safeArgs[0]).intValue(), (java.lang.String) safeArgs[1], ((Number) safeArgs[2]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.Double.class}, false);
+                typedTarget.set(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1], ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
         }
         if ("toXYSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toXYSeries();
             }
         }
@@ -644,51 +740,61 @@ public final class GeneratedAccess_com_codename1_charts_models {
     private static Object invoke5(com.codename1.charts.models.MultipleCategorySeries typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class, double[].class}, false)) {
-                typedTarget.add((java.lang.String[]) safeArgs[0], (double[]) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class, double[].class}, false);
+                typedTarget.add((java.lang.String[]) adaptedArgs[0], (double[]) adaptedArgs[1]); return null;
             }
         }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class, double[].class}, false)) {
-                typedTarget.add((java.lang.String) safeArgs[0], (java.lang.String[]) safeArgs[1], (double[]) safeArgs[2]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class, double[].class}, false);
+                typedTarget.add((java.lang.String) adaptedArgs[0], (java.lang.String[]) adaptedArgs[1], (double[]) adaptedArgs[2]); return null;
             }
         }
         if ("clear".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clear(); return null;
             }
         }
         if ("getCategoriesCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCategoriesCount();
             }
         }
         if ("getCategory".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getCategory(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getCategory(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getItemCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getItemCount(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getItemCount(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getTitles".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getTitles(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getTitles(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getValues".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getValues(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getValues(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("remove".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.remove(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.remove(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("toXYSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toXYSeries();
             }
         }
@@ -698,22 +804,26 @@ public final class GeneratedAccess_com_codename1_charts_models {
     private static Object invoke6(com.codename1.charts.models.Point typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getX".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getX();
             }
         }
         if ("getY".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getY();
             }
         }
         if ("setX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.setX(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setX(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("setY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.setY(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setY(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -722,21 +832,25 @@ public final class GeneratedAccess_com_codename1_charts_models {
     private static Object invoke7(com.codename1.charts.models.SeriesSelection typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getPointIndex".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPointIndex();
             }
         }
         if ("getSeriesIndex".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSeriesIndex();
             }
         }
         if ("getValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getValue();
             }
         }
         if ("getXValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getXValue();
             }
         }
@@ -746,47 +860,56 @@ public final class GeneratedAccess_com_codename1_charts_models {
     private static Object invoke8(com.codename1.charts.models.XYMultipleSeriesDataset typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addAllSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.List.class}, false)) {
-                typedTarget.addAllSeries((java.util.List) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.List.class}, false);
+                typedTarget.addAllSeries((java.util.List) adaptedArgs[0]); return null;
             }
         }
         if ("addSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.XYSeries.class}, false)) {
-                typedTarget.addSeries((com.codename1.charts.models.XYSeries) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.XYSeries.class}, false);
+                typedTarget.addSeries((com.codename1.charts.models.XYSeries) adaptedArgs[0]); return null;
             }
         }
         if ("addSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.charts.models.XYSeries.class}, false)) {
-                typedTarget.addSeries(((Number) safeArgs[0]).intValue(), (com.codename1.charts.models.XYSeries) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.charts.models.XYSeries.class}, false);
+                typedTarget.addSeries(((Number) adaptedArgs[0]).intValue(), (com.codename1.charts.models.XYSeries) adaptedArgs[1]); return null;
             }
         }
         if ("clear".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clear(); return null;
             }
         }
         if ("getSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSeries();
             }
         }
         if ("getSeriesAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getSeriesAt(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getSeriesAt(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getSeriesCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSeriesCount();
             }
         }
         if ("removeSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.XYSeries.class}, false)) {
-                typedTarget.removeSeries((com.codename1.charts.models.XYSeries) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.XYSeries.class}, false);
+                typedTarget.removeSeries((com.codename1.charts.models.XYSeries) adaptedArgs[0]); return null;
             }
         }
         if ("removeSeries".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.removeSeries(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.removeSeries(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -795,127 +918,152 @@ public final class GeneratedAccess_com_codename1_charts_models {
     private static Object invoke9(com.codename1.charts.models.XYSeries typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false)) {
-                typedTarget.add(((Number) safeArgs[0]).doubleValue(), ((Number) safeArgs[1]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false);
+                typedTarget.add(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue()); return null;
             }
         }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false)) {
-                typedTarget.add(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).doubleValue(), ((Number) safeArgs[2]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false);
+                typedTarget.add(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
         }
         if ("addAnnotation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class, java.lang.Double.class}, false)) {
-                typedTarget.addAnnotation((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).doubleValue(), ((Number) safeArgs[2]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class, java.lang.Double.class}, false);
+                typedTarget.addAnnotation((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
         }
         if ("addAnnotation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false)) {
-                typedTarget.addAnnotation((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).doubleValue(), ((Number) safeArgs[3]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false);
+                typedTarget.addAnnotation((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue()); return null;
             }
         }
         if ("clear".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clear(); return null;
             }
         }
         if ("clearAnnotations".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clearAnnotations(); return null;
             }
         }
         if ("clearSeriesValues".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clearSeriesValues(); return null;
             }
         }
         if ("getAnnotationAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getAnnotationAt(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getAnnotationAt(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getAnnotationCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getAnnotationCount();
             }
         }
         if ("getAnnotationX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getAnnotationX(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getAnnotationX(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getAnnotationY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getAnnotationY(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getAnnotationY(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getIndexForKey".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.getIndexForKey(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.getIndexForKey(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("getItemCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getItemCount();
             }
         }
         if ("getMaxX".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaxX();
             }
         }
         if ("getMaxY".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaxY();
             }
         }
         if ("getMinX".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMinX();
             }
         }
         if ("getMinY".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMinY();
             }
         }
         if ("getRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Boolean.class}, false)) {
-                return typedTarget.getRange(((Number) safeArgs[0]).doubleValue(), ((Number) safeArgs[1]).doubleValue(), ((Boolean) safeArgs[2]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Boolean.class}, false);
+                return typedTarget.getRange(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Boolean) adaptedArgs[2]).booleanValue());
             }
         }
         if ("getScaleNumber".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getScaleNumber();
             }
         }
         if ("getTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getTitle();
             }
         }
         if ("getX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getX(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getX(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getY(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getY(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("remove".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.remove(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.remove(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("removeAnnotation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.removeAnnotation(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.removeAnnotation(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setTitle((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setTitle((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -939,6 +1087,88 @@ public final class GeneratedAccess_com_codename1_charts_models {
 
     private static Object[] safeArgs(Object[] args) {
         return args == null ? new Object[0] : args;
+    }
+
+    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (args == null || args.length == 0) {
+            return args == null ? new Object[0] : args;
+        }
+        Object[] adapted = args.clone();
+        if (!varArgs) {
+            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {
+                adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+            }
+            return adapted;
+        }
+        if (paramTypes.length == 0) {
+            return adapted;
+        }
+        int fixedCount = paramTypes.length - 1;
+        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {
+            adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < adapted.length; i++) {
+            adapted[i] = adaptValue(adapted[i], componentType);
+        }
+        return adapted;
+    }
+
+    private static boolean isSamInterface(Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == java.util.Observer.class) {
+            return true;
+        }
+        if (type == java.lang.Iterable.class) {
+            return true;
+        }
+        return false;
+    }
+
+    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.util.Observer.class) {
+            return new java.util.Observer() {
+                public void update(java.util.Observable arg0, java.lang.Object arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Iterable.class) {
+            return new java.lang.Iterable() {
+                public java.util.Iterator iterator() {
+                    try {
+                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        return lambda;
+    }
+
+    private static Object adaptValue(Object value, Class<?> type) {
+        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
+            return value;
+        }
+        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -994,6 +1224,9 @@ public final class GeneratedAccess_com_codename1_charts_models {
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
             return value instanceof Number;
+        }
+        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+            return isSamInterface(type);
         }
         return type.isInstance(value);
     }

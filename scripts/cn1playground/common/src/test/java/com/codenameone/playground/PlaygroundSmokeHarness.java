@@ -17,6 +17,7 @@ public final class PlaygroundSmokeHarness {
     public static void main(String[] args) throws Exception {
         smokeGeneratedRegistry();
         smokeLifecycleWrapperScript();
+        smokeLooseScriptListeners();
         System.out.println("Playground smoke tests passed.");
     }
 
@@ -98,6 +99,47 @@ public final class PlaygroundSmokeHarness {
         require("Host".equals(host.getTitle()), "Lifecycle wrapper script should not replace the host form title");
         require("Test".equals(((Form) result.getComponent()).getTitle()),
                 "Lifecycle wrapper script should preserve the shown form");
+    }
+
+    private static void smokeLooseScriptListeners() {
+        Display.init(null);
+
+        Form host = new Form("Host", new BorderLayout());
+        Container preview = new Container(new BorderLayout());
+        host.add(BorderLayout.CENTER, preview);
+        host.show();
+
+        PlaygroundContext context = new PlaygroundContext(host, preview, null,
+                new PlaygroundContext.Logger() {
+                    public void log(String message) {
+                    }
+                });
+
+        PlaygroundRunner runner = new PlaygroundRunner();
+        PlaygroundRunner.RunResult lambdaResult = runner.run(
+                "import com.codename1.ui.*;\n"
+                        + "import com.codename1.ui.layouts.*;\n"
+                        + "Container root = new Container(BoxLayout.y());\n"
+                        + "Button save = new Button(\"Save\");\n"
+                        + "save.addActionListener(e -> {});\n"
+                        + "root.add(save);\n"
+                        + "root;\n",
+                context);
+        require(lambdaResult.getComponent() != null,
+                "Loose script lambda listener should compile: " + summarizeMessages(lambdaResult));
+
+        PlaygroundRunner.RunResult anonResult = runner.run(
+                "import com.codename1.ui.*;\n"
+                        + "import com.codename1.ui.events.*;\n"
+                        + "import com.codename1.ui.layouts.*;\n"
+                        + "Container root = new Container(BoxLayout.y());\n"
+                        + "Button save = new Button(\"Save\");\n"
+                        + "save.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent evt) {} });\n"
+                        + "root.add(save);\n"
+                        + "root;\n",
+                context);
+        require(anonResult.getComponent() != null,
+                "Loose script anonymous listener should compile: " + summarizeMessages(anonResult));
     }
 
     private static void require(boolean condition, String message) {

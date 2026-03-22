@@ -60,24 +60,30 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.ui.animations.BubbleTransition.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.ui.animations.BubbleTransition();
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return new com.codename1.ui.animations.BubbleTransition(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return new com.codename1.ui.animations.BubbleTransition(((Number) adaptedArgs[0]).intValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
-                return new com.codename1.ui.animations.BubbleTransition(((Number) safeArgs[0]).intValue(), (java.lang.String) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
+                return new com.codename1.ui.animations.BubbleTransition(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1]);
             }
         }
         if (type == com.codename1.ui.animations.FlipTransition.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.ui.animations.FlipTransition();
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return new com.codename1.ui.animations.FlipTransition(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return new com.codename1.ui.animations.FlipTransition(((Number) adaptedArgs[0]).intValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return new com.codename1.ui.animations.FlipTransition(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return new com.codename1.ui.animations.FlipTransition(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -97,12 +103,14 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("createAnimationImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.AnimationObject.createAnimationImage((com.codename1.ui.Image) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.AnimationObject.createAnimationImage((com.codename1.ui.Image) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("createAnimationImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.util.Resources.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.AnimationObject.createAnimationImage((java.lang.String) safeArgs[0], (com.codename1.ui.util.Resources) safeArgs[1], ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.util.Resources.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.AnimationObject.createAnimationImage((java.lang.String) adaptedArgs[0], (com.codename1.ui.util.Resources) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
             }
         }
         throw unsupportedStatic(com.codename1.ui.animations.AnimationObject.class, name, safeArgs);
@@ -111,67 +119,80 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
         if ("createCover".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.CommonTransitions.createCover(((Number) safeArgs[0]).intValue(), ((Boolean) safeArgs[1]).booleanValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.CommonTransitions.createCover(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("createDialogPulsate".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.ui.animations.CommonTransitions.createDialogPulsate();
             }
         }
         if ("createEmpty".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.ui.animations.CommonTransitions.createEmpty();
             }
         }
         if ("createFade".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.CommonTransitions.createFade(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.CommonTransitions.createFade(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("createFastSlide".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.CommonTransitions.createFastSlide(((Number) safeArgs[0]).intValue(), ((Boolean) safeArgs[1]).booleanValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.CommonTransitions.createFastSlide(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("createFastSlide".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
-                return com.codename1.ui.animations.CommonTransitions.createFastSlide(((Number) safeArgs[0]).intValue(), ((Boolean) safeArgs[1]).booleanValue(), ((Number) safeArgs[2]).intValue(), ((Boolean) safeArgs[3]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
+                return com.codename1.ui.animations.CommonTransitions.createFastSlide(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue());
             }
         }
         if ("createSlide".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.CommonTransitions.createSlide(((Number) safeArgs[0]).intValue(), ((Boolean) safeArgs[1]).booleanValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.CommonTransitions.createSlide(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("createSlide".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
-                return com.codename1.ui.animations.CommonTransitions.createSlide(((Number) safeArgs[0]).intValue(), ((Boolean) safeArgs[1]).booleanValue(), ((Number) safeArgs[2]).intValue(), ((Boolean) safeArgs[3]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
+                return com.codename1.ui.animations.CommonTransitions.createSlide(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue());
             }
         }
         if ("createSlideFadeTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.CommonTransitions.createSlideFadeTitle(((Boolean) safeArgs[0]).booleanValue(), ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.CommonTransitions.createSlideFadeTitle(((Boolean) adaptedArgs[0]).booleanValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("createTimeline".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                return com.codename1.ui.animations.CommonTransitions.createTimeline((com.codename1.ui.Image) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                return com.codename1.ui.animations.CommonTransitions.createTimeline((com.codename1.ui.Image) adaptedArgs[0]);
             }
         }
         if ("createUncover".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.CommonTransitions.createUncover(((Number) safeArgs[0]).intValue(), ((Boolean) safeArgs[1]).booleanValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.CommonTransitions.createUncover(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("isDefaultLinearMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.ui.animations.CommonTransitions.isDefaultLinearMotion();
             }
         }
         if ("setDefaultLinearMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                com.codename1.ui.animations.CommonTransitions.setDefaultLinearMotion(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                com.codename1.ui.animations.CommonTransitions.setDefaultLinearMotion(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         throw unsupportedStatic(com.codename1.ui.animations.CommonTransitions.class, name, safeArgs);
@@ -180,18 +201,20 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
         if ("compoundAnimation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.animations.ComponentAnimation[].class}, true)) {
-                com.codename1.ui.animations.ComponentAnimation[] varArgs = new com.codename1.ui.animations.ComponentAnimation[safeArgs.length - 0];
-                for (int i = 0; i < safeArgs.length; i++) {
-                    varArgs[i - 0] = (com.codename1.ui.animations.ComponentAnimation) safeArgs[i];
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.animations.ComponentAnimation[].class}, true);
+                com.codename1.ui.animations.ComponentAnimation[] varArgs = new com.codename1.ui.animations.ComponentAnimation[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (com.codename1.ui.animations.ComponentAnimation) adaptedArgs[i];
                 }
                 return com.codename1.ui.animations.ComponentAnimation.compoundAnimation(varArgs);
             }
         }
         if ("sequentialAnimation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.animations.ComponentAnimation[].class}, true)) {
-                com.codename1.ui.animations.ComponentAnimation[] varArgs = new com.codename1.ui.animations.ComponentAnimation[safeArgs.length - 0];
-                for (int i = 0; i < safeArgs.length; i++) {
-                    varArgs[i - 0] = (com.codename1.ui.animations.ComponentAnimation) safeArgs[i];
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.animations.ComponentAnimation[].class}, true);
+                com.codename1.ui.animations.ComponentAnimation[] varArgs = new com.codename1.ui.animations.ComponentAnimation[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (com.codename1.ui.animations.ComponentAnimation) adaptedArgs[i];
                 }
                 return com.codename1.ui.animations.ComponentAnimation.sequentialAnimation(varArgs);
             }
@@ -202,7 +225,8 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
         if ("create".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.MorphTransition.create(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.MorphTransition.create(((Number) adaptedArgs[0]).intValue());
             }
         }
         throw unsupportedStatic(com.codename1.ui.animations.MorphTransition.class, name, safeArgs);
@@ -211,72 +235,86 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
         if ("createCubicBezierMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
-                return com.codename1.ui.animations.Motion.createCubicBezierMotion(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).floatValue(), ((Number) safeArgs[4]).floatValue(), ((Number) safeArgs[5]).floatValue(), ((Number) safeArgs[6]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
+                return com.codename1.ui.animations.Motion.createCubicBezierMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).floatValue(), ((Number) adaptedArgs[6]).floatValue());
             }
         }
         if ("createDecelerationMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.Motion.createDecelerationMotion(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.Motion.createDecelerationMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("createDecelerationMotionFrom".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.animations.Motion.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.Motion.createDecelerationMotionFrom((com.codename1.ui.animations.Motion) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.animations.Motion.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.Motion.createDecelerationMotionFrom((com.codename1.ui.animations.Motion) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("createEaseInMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.Motion.createEaseInMotion(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.Motion.createEaseInMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("createEaseInOutMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.Motion.createEaseInOutMotion(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.Motion.createEaseInOutMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("createEaseMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.Motion.createEaseMotion(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.Motion.createEaseMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("createEaseOutMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.Motion.createEaseOutMotion(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.Motion.createEaseOutMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("createExponentialDecayMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false)) {
-                return com.codename1.ui.animations.Motion.createExponentialDecayMotion(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).doubleValue(), ((Number) safeArgs[3]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Double.class, java.lang.Double.class}, false);
+                return com.codename1.ui.animations.Motion.createExponentialDecayMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue());
             }
         }
         if ("createFrictionMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class}, false)) {
-                return com.codename1.ui.animations.Motion.createFrictionMotion(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).floatValue(), ((Number) safeArgs[3]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class}, false);
+                return com.codename1.ui.animations.Motion.createFrictionMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue());
             }
         }
         if ("createLinearColorMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.Motion.createLinearColorMotion(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.Motion.createLinearColorMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("createLinearMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.Motion.createLinearMotion(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.Motion.createLinearMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("createSplineMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return com.codename1.ui.animations.Motion.createSplineMotion(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return com.codename1.ui.animations.Motion.createSplineMotion(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("isSlowMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.ui.animations.Motion.isSlowMotion();
             }
         }
         if ("setSlowMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                com.codename1.ui.animations.Motion.setSlowMotion(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                com.codename1.ui.animations.Motion.setSlowMotion(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         throw unsupportedStatic(com.codename1.ui.animations.Motion.class, name, safeArgs);
@@ -285,7 +323,8 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
         if ("createTimeline".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.animations.AnimationObject[].class, com.codename1.ui.geom.Dimension.class}, false)) {
-                return com.codename1.ui.animations.Timeline.createTimeline(((Number) safeArgs[0]).intValue(), (com.codename1.ui.animations.AnimationObject[]) safeArgs[1], (com.codename1.ui.geom.Dimension) safeArgs[2]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.animations.AnimationObject[].class, com.codename1.ui.geom.Dimension.class}, false);
+                return com.codename1.ui.animations.Timeline.createTimeline(((Number) adaptedArgs[0]).intValue(), (com.codename1.ui.animations.AnimationObject[]) adaptedArgs[1], (com.codename1.ui.geom.Dimension) adaptedArgs[2]);
             }
         }
         throw unsupportedStatic(com.codename1.ui.animations.Timeline.class, name, safeArgs);
@@ -373,62 +412,74 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invoke0(com.codename1.ui.animations.BubbleTransition typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.animate();
             }
         }
         if ("cleanup".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.cleanup(); return null;
             }
         }
         if ("copy".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                return typedTarget.copy(((Boolean) safeArgs[0]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.copy(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
         if ("getDestination".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDestination();
             }
         }
         if ("getDuration".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDuration();
             }
         }
         if ("getSource".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSource();
             }
         }
         if ("init".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class}, false)) {
-                typedTarget.init((com.codename1.ui.Component) safeArgs[0], (com.codename1.ui.Component) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class}, false);
+                typedTarget.init((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1]); return null;
             }
         }
         if ("initTransition".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.initTransition(); return null;
             }
         }
         if ("paint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false)) {
-                typedTarget.paint((com.codename1.ui.Graphics) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
+                typedTarget.paint((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
             }
         }
         if ("setComponentName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setComponentName((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setComponentName((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("setDuration".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setDuration(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setDuration(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setRoundBubble".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setRoundBubble(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setRoundBubble(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -437,97 +488,116 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invoke1(com.codename1.ui.animations.CommonTransitions typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.animate();
             }
         }
         if ("cleanup".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.cleanup(); return null;
             }
         }
         if ("copy".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                return typedTarget.copy(((Boolean) safeArgs[0]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.copy(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
         if ("getDestination".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDestination();
             }
         }
         if ("getMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMotion();
             }
         }
         if ("getSource".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSource();
             }
         }
         if ("getTransitionSpeed".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getTransitionSpeed();
             }
         }
         if ("init".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class}, false)) {
-                typedTarget.init((com.codename1.ui.Component) safeArgs[0], (com.codename1.ui.Component) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class}, false);
+                typedTarget.init((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1]); return null;
             }
         }
         if ("initTransition".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.initTransition(); return null;
             }
         }
         if ("isForwardSlide".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isForwardSlide();
             }
         }
         if ("isHorizontalCover".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isHorizontalCover();
             }
         }
         if ("isHorizontalSlide".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isHorizontalSlide();
             }
         }
         if ("isLinearMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isLinearMotion();
             }
         }
         if ("isVerticalCover".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isVerticalCover();
             }
         }
         if ("isVerticalSlide".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isVerticalSlide();
             }
         }
         if ("paint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false)) {
-                typedTarget.paint((com.codename1.ui.Graphics) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
+                typedTarget.paint((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
             }
         }
         if ("setLinearMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setLinearMotion(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setLinearMotion(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.animations.Motion.class}, false)) {
-                typedTarget.setMotion((com.codename1.ui.animations.Motion) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.animations.Motion.class}, false);
+                typedTarget.setMotion((com.codename1.ui.animations.Motion) adaptedArgs[0]); return null;
             }
         }
         if ("setMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.LazyValue.class}, false)) {
-                typedTarget.setMotion((com.codename1.util.LazyValue) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.LazyValue.class}, false);
+                typedTarget.setMotion((com.codename1.util.LazyValue) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -536,62 +606,74 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invoke2(com.codename1.ui.animations.FlipTransition typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.animate();
             }
         }
         if ("cleanup".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.cleanup(); return null;
             }
         }
         if ("copy".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                return typedTarget.copy(((Boolean) safeArgs[0]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.copy(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
         if ("getBgColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getBgColor();
             }
         }
         if ("getDestination".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDestination();
             }
         }
         if ("getDuration".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDuration();
             }
         }
         if ("getSource".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSource();
             }
         }
         if ("init".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class}, false)) {
-                typedTarget.init((com.codename1.ui.Component) safeArgs[0], (com.codename1.ui.Component) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class}, false);
+                typedTarget.init((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1]); return null;
             }
         }
         if ("initTransition".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.initTransition(); return null;
             }
         }
         if ("paint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false)) {
-                typedTarget.paint((com.codename1.ui.Graphics) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
+                typedTarget.paint((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
             }
         }
         if ("setBgColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setBgColor(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setBgColor(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setDuration".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setDuration(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setDuration(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -600,52 +682,62 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invoke3(com.codename1.ui.animations.MorphTransition typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.animate();
             }
         }
         if ("cleanup".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.cleanup(); return null;
             }
         }
         if ("copy".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                return typedTarget.copy(((Boolean) safeArgs[0]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.copy(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
         if ("getDestination".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDestination();
             }
         }
         if ("getSource".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSource();
             }
         }
         if ("init".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class}, false)) {
-                typedTarget.init((com.codename1.ui.Component) safeArgs[0], (com.codename1.ui.Component) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class}, false);
+                typedTarget.init((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1]); return null;
             }
         }
         if ("initTransition".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.initTransition(); return null;
             }
         }
         if ("morph".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.morph((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.morph((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("morph".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                return typedTarget.morph((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.morph((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
         }
         if ("paint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false)) {
-                typedTarget.paint((com.codename1.ui.Graphics) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
+                typedTarget.paint((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -654,62 +746,74 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invoke4(com.codename1.ui.animations.AnimationObject typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("copy".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.copy();
             }
         }
         if ("defineFrames".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.defineFrames(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.defineFrames(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
         }
         if ("defineHeight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.defineHeight(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.defineHeight(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue()); return null;
             }
         }
         if ("defineMotionX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.defineMotionX(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.defineMotionX(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue()); return null;
             }
         }
         if ("defineMotionY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.defineMotionY(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.defineMotionY(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue()); return null;
             }
         }
         if ("defineOpacity".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.defineOpacity(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.defineOpacity(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue()); return null;
             }
         }
         if ("defineOrientation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.defineOrientation(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.defineOrientation(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue()); return null;
             }
         }
         if ("defineWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.defineWidth(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.defineWidth(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue()); return null;
             }
         }
         if ("getEndTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getEndTime();
             }
         }
         if ("getStartTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getStartTime();
             }
         }
         if ("setEndTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setEndTime(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setEndTime(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setStartTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setStartTime(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setStartTime(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -718,51 +822,61 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invoke5(com.codename1.ui.animations.ComponentAnimation typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addOnCompleteCall".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false)) {
-                typedTarget.addOnCompleteCall((java.lang.Runnable) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
+                typedTarget.addOnCompleteCall((java.lang.Runnable) adaptedArgs[0]); return null;
             }
         }
         if ("flush".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.flush(); return null;
             }
         }
         if ("getMaxSteps".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMaxSteps();
             }
         }
         if ("getStep".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getStep();
             }
         }
         if ("isInProgress".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isInProgress();
             }
         }
         if ("isStepModeSupported".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isStepModeSupported();
             }
         }
         if ("setNotifyLock".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                typedTarget.setNotifyLock((java.lang.Object) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.setNotifyLock((java.lang.Object) adaptedArgs[0]); return null;
             }
         }
         if ("setOnCompletion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false)) {
-                typedTarget.setOnCompletion((java.lang.Runnable) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
+                typedTarget.setOnCompletion((java.lang.Runnable) adaptedArgs[0]); return null;
             }
         }
         if ("setStep".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setStep(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setStep(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("updateAnimationState".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.updateAnimationState(); return null;
             }
         }
@@ -772,71 +886,85 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invoke6(com.codename1.ui.animations.Motion typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("countAvailableVelocitySamplingPoints".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.countAvailableVelocitySamplingPoints();
             }
         }
         if ("finish".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.finish(); return null;
             }
         }
         if ("getCurrentMotionTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCurrentMotionTime();
             }
         }
         if ("getDestinationValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDestinationValue();
             }
         }
         if ("getDuration".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDuration();
             }
         }
         if ("getSourceValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSourceValue();
             }
         }
         if ("getValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getValue();
             }
         }
         if ("getVelocity".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getVelocity();
             }
         }
         if ("isDecayMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isDecayMotion();
             }
         }
         if ("isFinished".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isFinished();
             }
         }
         if ("setCurrentMotionTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                typedTarget.setCurrentMotionTime(((Number) safeArgs[0]).longValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                typedTarget.setCurrentMotionTime(((Number) adaptedArgs[0]).longValue()); return null;
             }
         }
         if ("setSourceValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setSourceValue(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setSourceValue(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setStartTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                typedTarget.setStartTime(((Number) safeArgs[0]).longValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                typedTarget.setStartTime(((Number) adaptedArgs[0]).longValue()); return null;
             }
         }
         if ("start".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.start(); return null;
             }
         }
@@ -846,311 +974,373 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invoke7(com.codename1.ui.animations.Timeline typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addActionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
-                typedTarget.addActionListener((com.codename1.ui.events.ActionListener) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addActionListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
             }
         }
         if ("addAnimation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.animations.AnimationObject.class}, false)) {
-                typedTarget.addAnimation((com.codename1.ui.animations.AnimationObject) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.animations.AnimationObject.class}, false);
+                typedTarget.addAnimation((com.codename1.ui.animations.AnimationObject) adaptedArgs[0]); return null;
             }
         }
         if ("animate".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.animate();
             }
         }
         if ("applyMask".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.applyMask((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.applyMask((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("applyMask".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.applyMask((java.lang.Object) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.applyMask((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
         }
         if ("applyMaskAutoScale".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.applyMaskAutoScale((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.applyMaskAutoScale((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("asyncLock".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
-                typedTarget.asyncLock((com.codename1.ui.Image) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.asyncLock((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
         }
         if ("createMask".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.createMask();
             }
         }
         if ("dispose".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.dispose(); return null;
             }
         }
         if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.fill(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.fill(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("fireChangedEvent".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.fireChangedEvent(); return null;
             }
         }
         if ("flipHorizontally".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                return typedTarget.flipHorizontally(((Boolean) safeArgs[0]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.flipHorizontally(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
         if ("flipVertically".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                return typedTarget.flipVertically(((Boolean) safeArgs[0]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.flipVertically(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
         if ("getAnimation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.getAnimation(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getAnimation(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getAnimationAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.getAnimationAt(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.getAnimationAt(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("getAnimationCount".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getAnimationCount();
             }
         }
         if ("getAnimationDelay".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getAnimationDelay();
             }
         }
         if ("getDuration".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDuration();
             }
         }
         if ("getGraphics".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getGraphics();
             }
         }
         if ("getHeight".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getHeight();
             }
         }
         if ("getImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getImage();
             }
         }
         if ("getImageName".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getImageName();
             }
         }
         if ("getRGB".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRGB();
             }
         }
         if ("getRGB".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class}, false)) {
-                typedTarget.getRGB((int[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, false);
+                typedTarget.getRGB((int[]) adaptedArgs[0]); return null;
             }
         }
         if ("getRGBCached".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRGBCached();
             }
         }
         if ("getSVGDocument".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSVGDocument();
             }
         }
         if ("getSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSize();
             }
         }
         if ("getTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getTime();
             }
         }
         if ("getWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getWidth();
             }
         }
         if ("isAnimation".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isAnimation();
             }
         }
         if ("isLocked".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isLocked();
             }
         }
         if ("isLoop".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isLoop();
             }
         }
         if ("isOpaque".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isOpaque();
             }
         }
         if ("isPause".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isPause();
             }
         }
         if ("isSVG".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isSVG();
             }
         }
         if ("lock".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.lock(); return null;
             }
         }
         if ("mirror".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.mirror();
             }
         }
         if ("modifyAlpha".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
-                return typedTarget.modifyAlpha(((Number) safeArgs[0]).byteValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
+                return typedTarget.modifyAlpha(((Number) adaptedArgs[0]).byteValue());
             }
         }
         if ("modifyAlpha".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Integer.class}, false)) {
-                return typedTarget.modifyAlpha(((Number) safeArgs[0]).byteValue(), ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Integer.class}, false);
+                return typedTarget.modifyAlpha(((Number) adaptedArgs[0]).byteValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("modifyAlphaWithTranslucency".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
-                return typedTarget.modifyAlphaWithTranslucency(((Number) safeArgs[0]).byteValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
+                return typedTarget.modifyAlphaWithTranslucency(((Number) adaptedArgs[0]).byteValue());
             }
         }
         if ("paint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false)) {
-                typedTarget.paint((com.codename1.ui.Graphics) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
+                typedTarget.paint((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
             }
         }
         if ("paint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, com.codename1.ui.geom.Rectangle.class}, false)) {
-                typedTarget.paint((com.codename1.ui.Graphics) safeArgs[0], (com.codename1.ui.geom.Rectangle) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, com.codename1.ui.geom.Rectangle.class}, false);
+                typedTarget.paint((com.codename1.ui.Graphics) adaptedArgs[0], (com.codename1.ui.geom.Rectangle) adaptedArgs[1]); return null;
             }
         }
         if ("removeActionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
-                typedTarget.removeActionListener((com.codename1.ui.events.ActionListener) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeActionListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
             }
         }
         if ("requiresDrawImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.requiresDrawImage();
             }
         }
         if ("rotate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.rotate(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.rotate(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("rotate180Degrees".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                return typedTarget.rotate180Degrees(((Boolean) safeArgs[0]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.rotate180Degrees(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
         if ("rotate270Degrees".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                return typedTarget.rotate270Degrees(((Boolean) safeArgs[0]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.rotate270Degrees(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
         if ("rotate90Degrees".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                return typedTarget.rotate90Degrees(((Boolean) safeArgs[0]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.rotate90Degrees(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
         if ("scale".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.scale(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.scale(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
             }
         }
         if ("scaled".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.scaled(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.scaled(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("scaledHeight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.scaledHeight(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.scaledHeight(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("scaledLargerRatio".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.scaledLargerRatio(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.scaledLargerRatio(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("scaledSmallerRatio".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.scaledSmallerRatio(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.scaledSmallerRatio(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("scaledWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.scaledWidth(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.scaledWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("setAnimationDelay".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setAnimationDelay(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setAnimationDelay(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setImageName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setImageName((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setImageName((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("setLoop".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setLoop(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setLoop(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setPause".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setPause(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setPause(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setTime(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setTime(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("subImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
-                return typedTarget.subImage(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Boolean) safeArgs[4]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
+                return typedTarget.subImage(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Boolean) adaptedArgs[4]).booleanValue());
             }
         }
         if ("toRGB".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.RGBImage.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                typedTarget.toRGB((com.codename1.ui.RGBImage) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue(), ((Number) safeArgs[4]).intValue(), ((Number) safeArgs[5]).intValue(), ((Number) safeArgs[6]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.RGBImage.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.toRGB((com.codename1.ui.RGBImage) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue(), ((Number) adaptedArgs[4]).intValue(), ((Number) adaptedArgs[5]).intValue(), ((Number) adaptedArgs[6]).intValue()); return null;
             }
         }
         if ("unlock".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.unlock(); return null;
             }
         }
@@ -1160,42 +1350,50 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invoke8(com.codename1.ui.animations.Transition typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.animate();
             }
         }
         if ("cleanup".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.cleanup(); return null;
             }
         }
         if ("copy".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                return typedTarget.copy(((Boolean) safeArgs[0]).booleanValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.copy(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
         if ("getDestination".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDestination();
             }
         }
         if ("getSource".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getSource();
             }
         }
         if ("init".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class}, false)) {
-                typedTarget.init((com.codename1.ui.Component) safeArgs[0], (com.codename1.ui.Component) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class}, false);
+                typedTarget.init((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1]); return null;
             }
         }
         if ("initTransition".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.initTransition(); return null;
             }
         }
         if ("paint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false)) {
-                typedTarget.paint((com.codename1.ui.Graphics) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
+                typedTarget.paint((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1204,12 +1402,14 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     private static Object invoke9(com.codename1.ui.animations.Animation typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.animate();
             }
         }
         if ("paint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false)) {
-                typedTarget.paint((com.codename1.ui.Graphics) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
+                typedTarget.paint((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1241,6 +1441,88 @@ public final class GeneratedAccess_com_codename1_ui_animations {
 
     private static Object[] safeArgs(Object[] args) {
         return args == null ? new Object[0] : args;
+    }
+
+    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (args == null || args.length == 0) {
+            return args == null ? new Object[0] : args;
+        }
+        Object[] adapted = args.clone();
+        if (!varArgs) {
+            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {
+                adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+            }
+            return adapted;
+        }
+        if (paramTypes.length == 0) {
+            return adapted;
+        }
+        int fixedCount = paramTypes.length - 1;
+        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {
+            adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < adapted.length; i++) {
+            adapted[i] = adaptValue(adapted[i], componentType);
+        }
+        return adapted;
+    }
+
+    private static boolean isSamInterface(Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == java.util.Observer.class) {
+            return true;
+        }
+        if (type == java.lang.Iterable.class) {
+            return true;
+        }
+        return false;
+    }
+
+    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.util.Observer.class) {
+            return new java.util.Observer() {
+                public void update(java.util.Observable arg0, java.lang.Object arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Iterable.class) {
+            return new java.lang.Iterable() {
+                public java.util.Iterator iterator() {
+                    try {
+                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        return lambda;
+    }
+
+    private static Object adaptValue(Object value, Class<?> type) {
+        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
+            return value;
+        }
+        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -1296,6 +1578,9 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
             return value instanceof Number;
+        }
+        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+            return isSamInterface(type);
         }
         return type.isInstance(value);
     }

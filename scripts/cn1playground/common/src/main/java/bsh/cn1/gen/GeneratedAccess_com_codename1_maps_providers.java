@@ -42,11 +42,13 @@ public final class GeneratedAccess_com_codename1_maps_providers {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.maps.providers.GoogleMapsProvider.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new com.codename1.maps.providers.GoogleMapsProvider((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new com.codename1.maps.providers.GoogleMapsProvider((java.lang.String) adaptedArgs[0]);
             }
         }
         if (type == com.codename1.maps.providers.OpenStreetMapProvider.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.maps.providers.OpenStreetMapProvider();
             }
         }
@@ -62,12 +64,14 @@ public final class GeneratedAccess_com_codename1_maps_providers {
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("getTileSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.maps.providers.GoogleMapsProvider.getTileSize();
             }
         }
         if ("setTileSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                com.codename1.maps.providers.GoogleMapsProvider.setTileSize(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                com.codename1.maps.providers.GoogleMapsProvider.setTileSize(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         throw unsupportedStatic(com.codename1.maps.providers.GoogleMapsProvider.class, name, safeArgs);
@@ -113,82 +117,98 @@ public final class GeneratedAccess_com_codename1_maps_providers {
     private static Object invoke0(com.codename1.maps.providers.GoogleMapsProvider typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("attribution".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.attribution();
             }
         }
         if ("bboxFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false)) {
-                return typedTarget.bboxFor((com.codename1.maps.Coord) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false);
+                return typedTarget.bboxFor((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("getLanguage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getLanguage();
             }
         }
         if ("isSensor".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isSensor();
             }
         }
         if ("maxZoomFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Tile.class}, false)) {
-                return typedTarget.maxZoomFor((com.codename1.maps.Tile) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Tile.class}, false);
+                return typedTarget.maxZoomFor((com.codename1.maps.Tile) adaptedArgs[0]);
             }
         }
         if ("maxZoomLevel".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.maxZoomLevel();
             }
         }
         if ("minZoomLevel".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.minZoomLevel();
             }
         }
         if ("projection".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.projection();
             }
         }
         if ("scale".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.scale(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.scale(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("setLanguage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setLanguage((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setLanguage((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("setMapType".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setMapType(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setMapType(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setSensor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setSensor(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setSensor(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("tileFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.BoundingBox.class}, false)) {
-                return typedTarget.tileFor((com.codename1.maps.BoundingBox) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.BoundingBox.class}, false);
+                return typedTarget.tileFor((com.codename1.maps.BoundingBox) adaptedArgs[0]);
             }
         }
         if ("tileSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.tileSize();
             }
         }
         if ("tileSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false)) {
-                typedTarget.tileSize((com.codename1.ui.geom.Dimension) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false);
+                typedTarget.tileSize((com.codename1.ui.geom.Dimension) adaptedArgs[0]); return null;
             }
         }
         if ("translate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.translate((com.codename1.maps.Coord) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.translate((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -197,57 +217,68 @@ public final class GeneratedAccess_com_codename1_maps_providers {
     private static Object invoke1(com.codename1.maps.providers.OpenStreetMapProvider typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("attribution".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.attribution();
             }
         }
         if ("bboxFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false)) {
-                return typedTarget.bboxFor((com.codename1.maps.Coord) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false);
+                return typedTarget.bboxFor((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("maxZoomFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Tile.class}, false)) {
-                return typedTarget.maxZoomFor((com.codename1.maps.Tile) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Tile.class}, false);
+                return typedTarget.maxZoomFor((com.codename1.maps.Tile) adaptedArgs[0]);
             }
         }
         if ("maxZoomLevel".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.maxZoomLevel();
             }
         }
         if ("minZoomLevel".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.minZoomLevel();
             }
         }
         if ("projection".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.projection();
             }
         }
         if ("scale".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.scale(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.scale(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("tileFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.BoundingBox.class}, false)) {
-                return typedTarget.tileFor((com.codename1.maps.BoundingBox) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.BoundingBox.class}, false);
+                return typedTarget.tileFor((com.codename1.maps.BoundingBox) adaptedArgs[0]);
             }
         }
         if ("tileSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.tileSize();
             }
         }
         if ("tileSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false)) {
-                typedTarget.tileSize((com.codename1.ui.geom.Dimension) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false);
+                typedTarget.tileSize((com.codename1.ui.geom.Dimension) adaptedArgs[0]); return null;
             }
         }
         if ("translate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.translate((com.codename1.maps.Coord) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.translate((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -256,57 +287,68 @@ public final class GeneratedAccess_com_codename1_maps_providers {
     private static Object invoke2(com.codename1.maps.providers.TiledProvider typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("attribution".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.attribution();
             }
         }
         if ("bboxFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false)) {
-                return typedTarget.bboxFor((com.codename1.maps.Coord) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false);
+                return typedTarget.bboxFor((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("maxZoomFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Tile.class}, false)) {
-                return typedTarget.maxZoomFor((com.codename1.maps.Tile) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Tile.class}, false);
+                return typedTarget.maxZoomFor((com.codename1.maps.Tile) adaptedArgs[0]);
             }
         }
         if ("maxZoomLevel".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.maxZoomLevel();
             }
         }
         if ("minZoomLevel".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.minZoomLevel();
             }
         }
         if ("projection".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.projection();
             }
         }
         if ("scale".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.scale(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.scale(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("tileFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.BoundingBox.class}, false)) {
-                return typedTarget.tileFor((com.codename1.maps.BoundingBox) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.BoundingBox.class}, false);
+                return typedTarget.tileFor((com.codename1.maps.BoundingBox) adaptedArgs[0]);
             }
         }
         if ("tileSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.tileSize();
             }
         }
         if ("tileSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false)) {
-                typedTarget.tileSize((com.codename1.ui.geom.Dimension) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false);
+                typedTarget.tileSize((com.codename1.ui.geom.Dimension) adaptedArgs[0]); return null;
             }
         }
         if ("translate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.translate((com.codename1.maps.Coord) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.translate((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -315,57 +357,68 @@ public final class GeneratedAccess_com_codename1_maps_providers {
     private static Object invoke3(com.codename1.maps.providers.MapProvider typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("attribution".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.attribution();
             }
         }
         if ("bboxFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false)) {
-                return typedTarget.bboxFor((com.codename1.maps.Coord) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class}, false);
+                return typedTarget.bboxFor((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("maxZoomFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Tile.class}, false)) {
-                return typedTarget.maxZoomFor((com.codename1.maps.Tile) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Tile.class}, false);
+                return typedTarget.maxZoomFor((com.codename1.maps.Tile) adaptedArgs[0]);
             }
         }
         if ("maxZoomLevel".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.maxZoomLevel();
             }
         }
         if ("minZoomLevel".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.minZoomLevel();
             }
         }
         if ("projection".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.projection();
             }
         }
         if ("scale".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.scale(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.scale(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("tileFor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.BoundingBox.class}, false)) {
-                return typedTarget.tileFor((com.codename1.maps.BoundingBox) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.BoundingBox.class}, false);
+                return typedTarget.tileFor((com.codename1.maps.BoundingBox) adaptedArgs[0]);
             }
         }
         if ("tileSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.tileSize();
             }
         }
         if ("tileSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false)) {
-                typedTarget.tileSize((com.codename1.ui.geom.Dimension) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false);
+                typedTarget.tileSize((com.codename1.ui.geom.Dimension) adaptedArgs[0]); return null;
             }
         }
         if ("translate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return typedTarget.translate((com.codename1.maps.Coord) safeArgs[0], ((Number) safeArgs[1]).intValue(), ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.translate((com.codename1.maps.Coord) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -394,6 +447,88 @@ public final class GeneratedAccess_com_codename1_maps_providers {
 
     private static Object[] safeArgs(Object[] args) {
         return args == null ? new Object[0] : args;
+    }
+
+    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (args == null || args.length == 0) {
+            return args == null ? new Object[0] : args;
+        }
+        Object[] adapted = args.clone();
+        if (!varArgs) {
+            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {
+                adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+            }
+            return adapted;
+        }
+        if (paramTypes.length == 0) {
+            return adapted;
+        }
+        int fixedCount = paramTypes.length - 1;
+        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {
+            adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < adapted.length; i++) {
+            adapted[i] = adaptValue(adapted[i], componentType);
+        }
+        return adapted;
+    }
+
+    private static boolean isSamInterface(Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == java.util.Observer.class) {
+            return true;
+        }
+        if (type == java.lang.Iterable.class) {
+            return true;
+        }
+        return false;
+    }
+
+    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.util.Observer.class) {
+            return new java.util.Observer() {
+                public void update(java.util.Observable arg0, java.lang.Object arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Iterable.class) {
+            return new java.lang.Iterable() {
+                public java.util.Iterator iterator() {
+                    try {
+                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        return lambda;
+    }
+
+    private static Object adaptValue(Object value, Class<?> type) {
+        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
+            return value;
+        }
+        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -449,6 +584,9 @@ public final class GeneratedAccess_com_codename1_maps_providers {
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
             return value instanceof Number;
+        }
+        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+            return isSamInterface(type);
         }
         return type.isInstance(value);
     }

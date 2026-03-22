@@ -39,7 +39,8 @@ public final class GeneratedAccess_com_codenameone_playground {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codenameone.playground.PlaygroundContext.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Form.class, com.codename1.ui.Container.class, com.codename1.ui.util.Resources.class, com.codenameone.playground.PlaygroundContext.Logger.class}, false)) {
-                return new com.codenameone.playground.PlaygroundContext((com.codename1.ui.Form) safeArgs[0], (com.codename1.ui.Container) safeArgs[1], (com.codename1.ui.util.Resources) safeArgs[2], (com.codenameone.playground.PlaygroundContext.Logger) safeArgs[3]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Form.class, com.codename1.ui.Container.class, com.codename1.ui.util.Resources.class, com.codenameone.playground.PlaygroundContext.Logger.class}, false);
+                return new com.codenameone.playground.PlaygroundContext((com.codename1.ui.Form) adaptedArgs[0], (com.codename1.ui.Container) adaptedArgs[1], (com.codename1.ui.util.Resources) adaptedArgs[2], (com.codenameone.playground.PlaygroundContext.Logger) adaptedArgs[3]);
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -54,17 +55,20 @@ public final class GeneratedAccess_com_codenameone_playground {
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("debug".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                com.codenameone.playground.PlaygroundContext.debug((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                com.codenameone.playground.PlaygroundContext.debug((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("getCurrent".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codenameone.playground.PlaygroundContext.getCurrent();
             }
         }
         if ("interceptMethodInvocation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class, java.lang.Object[].class}, false)) {
-                return com.codenameone.playground.PlaygroundContext.interceptMethodInvocation((java.lang.Object) safeArgs[0], (java.lang.String) safeArgs[1], (java.lang.Object[]) safeArgs[2]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class, java.lang.Object[].class}, false);
+                return com.codenameone.playground.PlaygroundContext.interceptMethodInvocation((java.lang.Object) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2]);
             }
         }
         throw unsupportedStatic(com.codenameone.playground.PlaygroundContext.class, name, safeArgs);
@@ -103,31 +107,37 @@ public final class GeneratedAccess_com_codenameone_playground {
     private static Object invoke0(com.codenameone.playground.CN1Playground typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("destroy".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.destroy(); return null;
             }
         }
         if ("getTheme".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getTheme();
             }
         }
         if ("init".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                typedTarget.init((java.lang.Object) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.init((java.lang.Object) adaptedArgs[0]); return null;
             }
         }
         if ("runApp".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.runApp(); return null;
             }
         }
         if ("start".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.start(); return null;
             }
         }
         if ("stop".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.stop(); return null;
             }
         }
@@ -137,52 +147,62 @@ public final class GeneratedAccess_com_codenameone_playground {
     private static Object invoke1(com.codenameone.playground.PlaygroundContext typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("captureShownForm".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Form.class}, false)) {
-                typedTarget.captureShownForm((com.codename1.ui.Form) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Form.class}, false);
+                typedTarget.captureShownForm((com.codename1.ui.Form) adaptedArgs[0]); return null;
             }
         }
         if ("clearPreview".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clearPreview(); return null;
             }
         }
         if ("clearShownForm".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clearShownForm(); return null;
             }
         }
         if ("getHostForm".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getHostForm();
             }
         }
         if ("getPreviewRoot".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPreviewRoot();
             }
         }
         if ("getShownForm".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getShownForm();
             }
         }
         if ("getTheme".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getTheme();
             }
         }
         if ("log".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.log((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.log((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("refreshPreview".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.refreshPreview(); return null;
             }
         }
         if ("setTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.setTitle((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setTitle((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -191,16 +211,19 @@ public final class GeneratedAccess_com_codenameone_playground {
     private static Object invoke2(com.codenameone.playground.WebsiteThemeNative typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("isDarkMode".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isDarkMode();
             }
         }
         if ("isSupported".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isSupported();
             }
         }
         if ("notifyUiReady".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.notifyUiReady(); return null;
             }
         }
@@ -225,6 +248,88 @@ public final class GeneratedAccess_com_codenameone_playground {
 
     private static Object[] safeArgs(Object[] args) {
         return args == null ? new Object[0] : args;
+    }
+
+    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (args == null || args.length == 0) {
+            return args == null ? new Object[0] : args;
+        }
+        Object[] adapted = args.clone();
+        if (!varArgs) {
+            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {
+                adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+            }
+            return adapted;
+        }
+        if (paramTypes.length == 0) {
+            return adapted;
+        }
+        int fixedCount = paramTypes.length - 1;
+        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {
+            adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < adapted.length; i++) {
+            adapted[i] = adaptValue(adapted[i], componentType);
+        }
+        return adapted;
+    }
+
+    private static boolean isSamInterface(Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == java.util.Observer.class) {
+            return true;
+        }
+        if (type == java.lang.Iterable.class) {
+            return true;
+        }
+        return false;
+    }
+
+    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.util.Observer.class) {
+            return new java.util.Observer() {
+                public void update(java.util.Observable arg0, java.lang.Object arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Iterable.class) {
+            return new java.lang.Iterable() {
+                public java.util.Iterator iterator() {
+                    try {
+                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        return lambda;
+    }
+
+    private static Object adaptValue(Object value, Class<?> type) {
+        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
+            return value;
+        }
+        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -280,6 +385,9 @@ public final class GeneratedAccess_com_codenameone_playground {
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
             return value instanceof Number;
+        }
+        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+            return isSamInterface(type);
         }
         return type.isInstance(value);
     }

@@ -46,6 +46,7 @@ public final class GeneratedAccess_com_codename1_codescan {
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("getInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.codescan.CodeScanner.getInstance();
             }
         }
@@ -78,12 +79,14 @@ public final class GeneratedAccess_com_codename1_codescan {
     private static Object invoke0(com.codename1.codescan.CodeScanner typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("scanBarCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.codescan.ScanResult.class}, false)) {
-                typedTarget.scanBarCode((com.codename1.codescan.ScanResult) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.codescan.ScanResult.class}, false);
+                typedTarget.scanBarCode((com.codename1.codescan.ScanResult) adaptedArgs[0]); return null;
             }
         }
         if ("scanQRCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.codescan.ScanResult.class}, false)) {
-                typedTarget.scanQRCode((com.codename1.codescan.ScanResult) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.codescan.ScanResult.class}, false);
+                typedTarget.scanQRCode((com.codename1.codescan.ScanResult) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -92,17 +95,20 @@ public final class GeneratedAccess_com_codename1_codescan {
     private static Object invoke1(com.codename1.codescan.ScanResult typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("scanCanceled".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.scanCanceled(); return null;
             }
         }
         if ("scanCompleted".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, byte[].class}, false)) {
-                typedTarget.scanCompleted((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1], (byte[]) safeArgs[2]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, byte[].class}, false);
+                typedTarget.scanCompleted((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (byte[]) adaptedArgs[2]); return null;
             }
         }
         if ("scanError".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
-                typedTarget.scanError(((Number) safeArgs[0]).intValue(), (java.lang.String) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
+                typedTarget.scanError(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -126,6 +132,88 @@ public final class GeneratedAccess_com_codename1_codescan {
 
     private static Object[] safeArgs(Object[] args) {
         return args == null ? new Object[0] : args;
+    }
+
+    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (args == null || args.length == 0) {
+            return args == null ? new Object[0] : args;
+        }
+        Object[] adapted = args.clone();
+        if (!varArgs) {
+            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {
+                adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+            }
+            return adapted;
+        }
+        if (paramTypes.length == 0) {
+            return adapted;
+        }
+        int fixedCount = paramTypes.length - 1;
+        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {
+            adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < adapted.length; i++) {
+            adapted[i] = adaptValue(adapted[i], componentType);
+        }
+        return adapted;
+    }
+
+    private static boolean isSamInterface(Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == java.util.Observer.class) {
+            return true;
+        }
+        if (type == java.lang.Iterable.class) {
+            return true;
+        }
+        return false;
+    }
+
+    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.util.Observer.class) {
+            return new java.util.Observer() {
+                public void update(java.util.Observable arg0, java.lang.Object arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Iterable.class) {
+            return new java.lang.Iterable() {
+                public java.util.Iterator iterator() {
+                    try {
+                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        return lambda;
+    }
+
+    private static Object adaptValue(Object value, Class<?> type) {
+        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
+            return value;
+        }
+        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -181,6 +269,9 @@ public final class GeneratedAccess_com_codename1_codescan {
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
             return value instanceof Number;
+        }
+        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+            return isSamInterface(type);
         }
         return type.isInstance(value);
     }

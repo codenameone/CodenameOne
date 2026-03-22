@@ -51,15 +51,18 @@ public final class GeneratedAccess_com_codename1_l10n {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.l10n.ParseException.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
-                return new com.codename1.l10n.ParseException((java.lang.String) safeArgs[0], ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
+                return new com.codename1.l10n.ParseException((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         if (type == com.codename1.l10n.SimpleDateFormat.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.l10n.SimpleDateFormat();
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return new com.codename1.l10n.SimpleDateFormat((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new com.codename1.l10n.SimpleDateFormat((java.lang.String) adaptedArgs[0]);
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -76,32 +79,38 @@ public final class GeneratedAccess_com_codename1_l10n {
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("getDateInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.l10n.DateFormat.getDateInstance();
             }
         }
         if ("getDateInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return com.codename1.l10n.DateFormat.getDateInstance(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return com.codename1.l10n.DateFormat.getDateInstance(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getDateTimeInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
-                return com.codename1.l10n.DateFormat.getDateTimeInstance(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return com.codename1.l10n.DateFormat.getDateTimeInstance(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("getInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.l10n.DateFormat.getInstance();
             }
         }
         if ("getTimeInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.l10n.DateFormat.getTimeInstance();
             }
         }
         if ("getTimeInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return com.codename1.l10n.DateFormat.getTimeInstance(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return com.codename1.l10n.DateFormat.getTimeInstance(((Number) adaptedArgs[0]).intValue());
             }
         }
         throw unsupportedStatic(com.codename1.l10n.DateFormat.class, name, safeArgs);
@@ -110,6 +119,7 @@ public final class GeneratedAccess_com_codename1_l10n {
     private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
         if ("getInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.l10n.L10NManager.getInstance();
             }
         }
@@ -119,12 +129,14 @@ public final class GeneratedAccess_com_codename1_l10n {
     private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
         if ("isRestrictMonthNameLength".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.l10n.SimpleDateFormat.isRestrictMonthNameLength();
             }
         }
         if ("setRestrictMonthNameLength".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                com.codename1.l10n.SimpleDateFormat.setRestrictMonthNameLength(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                com.codename1.l10n.SimpleDateFormat.setRestrictMonthNameLength(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         throw unsupportedStatic(com.codename1.l10n.SimpleDateFormat.class, name, safeArgs);
@@ -184,51 +196,61 @@ public final class GeneratedAccess_com_codename1_l10n {
     private static Object invoke0(com.codename1.l10n.SimpleDateFormat typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("applyPattern".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.applyPattern((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.applyPattern((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.equals((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.format((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.format((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
-                return typedTarget.format((java.util.Date) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
+                return typedTarget.format((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("getDateFormatSymbols".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDateFormatSymbols();
             }
         }
         if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.hashCode();
             }
         }
         if ("parse".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.parse((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.parse((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("parseObject".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.parseObject((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.parseObject((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("setDateFormatSymbols".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.l10n.DateFormatSymbols.class}, false)) {
-                typedTarget.setDateFormatSymbols((com.codename1.l10n.DateFormatSymbols) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.l10n.DateFormatSymbols.class}, false);
+                typedTarget.setDateFormatSymbols((com.codename1.l10n.DateFormatSymbols) adaptedArgs[0]); return null;
             }
         }
         if ("toPattern".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toPattern();
             }
         }
@@ -238,32 +260,38 @@ public final class GeneratedAccess_com_codename1_l10n {
     private static Object invoke1(com.codename1.l10n.DateFormat typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.equals((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.format((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.format((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
-                return typedTarget.format((java.util.Date) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
+                return typedTarget.format((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.hashCode();
             }
         }
         if ("parse".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.parse((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.parse((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("parseObject".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.parseObject((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.parseObject((java.lang.String) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -272,117 +300,140 @@ public final class GeneratedAccess_com_codename1_l10n {
     private static Object invoke2(com.codename1.l10n.DateFormatSymbols typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addZoneMapping".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
-                typedTarget.addZoneMapping((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1], (java.lang.String) safeArgs[2], (java.lang.String) safeArgs[3], (java.lang.String) safeArgs[4]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.addZoneMapping((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4]); return null;
             }
         }
         if ("getAmPmStrings".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getAmPmStrings();
             }
         }
         if ("getEras".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getEras();
             }
         }
         if ("getMonths".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getMonths();
             }
         }
         if ("getResourceBundle".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getResourceBundle();
             }
         }
         if ("getShortMonths".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getShortMonths();
             }
         }
         if ("getShortWeekdays".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getShortWeekdays();
             }
         }
         if ("getWeekdays".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getWeekdays();
             }
         }
         if ("getZoneLongName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                return typedTarget.getZoneLongName((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.getZoneLongName((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
         }
         if ("getZoneLongNameDST".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                return typedTarget.getZoneLongNameDST((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.getZoneLongNameDST((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
         }
         if ("getZoneShortName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                return typedTarget.getZoneShortName((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.getZoneShortName((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
         }
         if ("getZoneShortNameDST".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                return typedTarget.getZoneShortNameDST((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.getZoneShortNameDST((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
         }
         if ("getZoneStrings".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getZoneStrings();
             }
         }
         if ("isLocalized".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isLocalized();
             }
         }
         if ("setAmPmStrings".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, false)) {
-                typedTarget.setAmPmStrings((java.lang.String[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, false);
+                typedTarget.setAmPmStrings((java.lang.String[]) adaptedArgs[0]); return null;
             }
         }
         if ("setEras".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, false)) {
-                typedTarget.setEras((java.lang.String[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, false);
+                typedTarget.setEras((java.lang.String[]) adaptedArgs[0]); return null;
             }
         }
         if ("setLocalized".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                typedTarget.setLocalized(((Boolean) safeArgs[0]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setLocalized(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setMonths".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, false)) {
-                typedTarget.setMonths((java.lang.String[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, false);
+                typedTarget.setMonths((java.lang.String[]) adaptedArgs[0]); return null;
             }
         }
         if ("setResourceBundle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Hashtable.class}, false)) {
-                typedTarget.setResourceBundle((java.util.Hashtable) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Hashtable.class}, false);
+                typedTarget.setResourceBundle((java.util.Hashtable) adaptedArgs[0]); return null;
             }
         }
         if ("setShortMonths".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, false)) {
-                typedTarget.setShortMonths((java.lang.String[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, false);
+                typedTarget.setShortMonths((java.lang.String[]) adaptedArgs[0]); return null;
             }
         }
         if ("setShortWeekdays".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, false)) {
-                typedTarget.setShortWeekdays((java.lang.String[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, false);
+                typedTarget.setShortWeekdays((java.lang.String[]) adaptedArgs[0]); return null;
             }
         }
         if ("setWeekdays".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, false)) {
-                typedTarget.setWeekdays((java.lang.String[]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, false);
+                typedTarget.setWeekdays((java.lang.String[]) adaptedArgs[0]); return null;
             }
         }
         if ("setZoneStrings".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[][].class}, false)) {
-                typedTarget.setZoneStrings((java.lang.String[][]) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[][].class}, false);
+                typedTarget.setZoneStrings((java.lang.String[][]) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -391,12 +442,14 @@ public final class GeneratedAccess_com_codename1_l10n {
     private static Object invoke3(com.codename1.l10n.Format typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.format((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.format((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("parseObject".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.parseObject((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.parseObject((java.lang.String) adaptedArgs[0]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -405,107 +458,128 @@ public final class GeneratedAccess_com_codename1_l10n {
     private static Object invoke4(com.codename1.l10n.L10NManager typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.format(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.format(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                return typedTarget.format(((Number) safeArgs[0]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.format(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false)) {
-                return typedTarget.format(((Number) safeArgs[0]).doubleValue(), ((Number) safeArgs[1]).intValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false);
+                return typedTarget.format(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("formatCurrency".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                return typedTarget.formatCurrency(((Number) safeArgs[0]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.formatCurrency(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("formatDateLongStyle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
-                return typedTarget.formatDateLongStyle((java.util.Date) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
+                return typedTarget.formatDateLongStyle((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("formatDateShortStyle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
-                return typedTarget.formatDateShortStyle((java.util.Date) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
+                return typedTarget.formatDateShortStyle((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("formatDateTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
-                return typedTarget.formatDateTime((java.util.Date) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
+                return typedTarget.formatDateTime((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("formatDateTimeMedium".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
-                return typedTarget.formatDateTimeMedium((java.util.Date) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
+                return typedTarget.formatDateTimeMedium((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("formatDateTimeShort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
-                return typedTarget.formatDateTimeShort((java.util.Date) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
+                return typedTarget.formatDateTimeShort((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("formatTime".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
-                return typedTarget.formatTime((java.util.Date) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
+                return typedTarget.formatTime((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("getCurrencySymbol".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCurrencySymbol();
             }
         }
         if ("getLanguage".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getLanguage();
             }
         }
         if ("getLocale".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getLocale();
             }
         }
         if ("getLongMonthName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
-                return typedTarget.getLongMonthName((java.util.Date) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
+                return typedTarget.getLongMonthName((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("getShortMonthName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
-                return typedTarget.getShortMonthName((java.util.Date) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
+                return typedTarget.getShortMonthName((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("isRTLLocale".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isRTLLocale();
             }
         }
         if ("parseCurrency".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.parseCurrency((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.parseCurrency((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("parseDouble".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.parseDouble((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.parseDouble((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("parseInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.parseInt((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.parseInt((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("parseLong".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.parseLong((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.parseLong((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("setLocale".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                typedTarget.setLocale((java.lang.String) safeArgs[0], (java.lang.String) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.setLocale((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -514,6 +588,7 @@ public final class GeneratedAccess_com_codename1_l10n {
     private static Object invoke5(com.codename1.l10n.ParseException typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getErrorOffset".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getErrorOffset();
             }
         }
@@ -562,6 +637,88 @@ public final class GeneratedAccess_com_codename1_l10n {
 
     private static Object[] safeArgs(Object[] args) {
         return args == null ? new Object[0] : args;
+    }
+
+    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (args == null || args.length == 0) {
+            return args == null ? new Object[0] : args;
+        }
+        Object[] adapted = args.clone();
+        if (!varArgs) {
+            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {
+                adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+            }
+            return adapted;
+        }
+        if (paramTypes.length == 0) {
+            return adapted;
+        }
+        int fixedCount = paramTypes.length - 1;
+        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {
+            adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < adapted.length; i++) {
+            adapted[i] = adaptValue(adapted[i], componentType);
+        }
+        return adapted;
+    }
+
+    private static boolean isSamInterface(Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == java.util.Observer.class) {
+            return true;
+        }
+        if (type == java.lang.Iterable.class) {
+            return true;
+        }
+        return false;
+    }
+
+    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.util.Observer.class) {
+            return new java.util.Observer() {
+                public void update(java.util.Observable arg0, java.lang.Object arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Iterable.class) {
+            return new java.lang.Iterable() {
+                public java.util.Iterator iterator() {
+                    try {
+                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        return lambda;
+    }
+
+    private static Object adaptValue(Object value, Class<?> type) {
+        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
+            return value;
+        }
+        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -617,6 +774,9 @@ public final class GeneratedAccess_com_codename1_l10n {
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
             return value instanceof Number;
+        }
+        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+            return isSamInterface(type);
         }
         return type.isInstance(value);
     }

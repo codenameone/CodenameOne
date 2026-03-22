@@ -937,7 +937,7 @@ public final class GenerateCN1AccessRegistry {
                 writeGetField(writer, generatedPackage.classes);
                 writeSetStaticField(writer, generatedPackage.classes);
                 writeSetField(writer, generatedPackage.classes);
-                writeHelpers(writer);
+                writeHelpers(writer, collectSamInterfaces(discovery));
                 writer.write("}\n");
             }
         }
@@ -1291,6 +1291,8 @@ public final class GenerateCN1AccessRegistry {
             for (ApiConstructor constructor : apiClass.constructors) {
                 writer.write("            if (matches(safeArgs, " + classArrayLiteral(constructor.paramTypes) + ", "
                         + constructor.varArgs + ")) {\n");
+                writer.write("                Object[] adaptedArgs = adaptArgs(safeArgs, " + classArrayLiteral(constructor.paramTypes)
+                        + ", " + constructor.varArgs + ");\n");
                 if (constructor.varArgs && !constructor.paramTypes.isEmpty()) {
                     writeVarArgsInvocation(writer, "                ", constructor.paramTypes,
                             constructorCall(apiClass, constructor));
@@ -1535,9 +1537,40 @@ public final class GenerateCN1AccessRegistry {
         return out;
     }
 
-    private static void writeHelpers(Writer writer) throws IOException {
+    private static void writeHelpers(Writer writer, List<SamInterfaceAdapter> samInterfaces) throws IOException {
         writer.write("    private static Object[] safeArgs(Object[] args) {\n");
         writer.write("        return args == null ? new Object[0] : args;\n");
+        writer.write("    }\n\n");
+        writer.write("    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {\n");
+        writer.write("        if (args == null || args.length == 0) {\n");
+        writer.write("            return args == null ? new Object[0] : args;\n");
+        writer.write("        }\n");
+        writer.write("        Object[] adapted = args.clone();\n");
+        writer.write("        if (!varArgs) {\n");
+        writer.write("            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {\n");
+        writer.write("                adapted[i] = adaptValue(adapted[i], paramTypes[i]);\n");
+        writer.write("            }\n");
+        writer.write("            return adapted;\n");
+        writer.write("        }\n");
+        writer.write("        if (paramTypes.length == 0) {\n");
+        writer.write("            return adapted;\n");
+        writer.write("        }\n");
+        writer.write("        int fixedCount = paramTypes.length - 1;\n");
+        writer.write("        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {\n");
+        writer.write("            adapted[i] = adaptValue(adapted[i], paramTypes[i]);\n");
+        writer.write("        }\n");
+        writer.write("        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();\n");
+        writer.write("        for (int i = fixedCount; i < adapted.length; i++) {\n");
+        writer.write("            adapted[i] = adaptValue(adapted[i], componentType);\n");
+        writer.write("        }\n");
+        writer.write("        return adapted;\n");
+        writer.write("    }\n\n");
+        writeSamAdaptHelpers(writer, samInterfaces);
+        writer.write("    private static Object adaptValue(Object value, Class<?> type) {\n");
+        writer.write("        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {\n");
+        writer.write("            return value;\n");
+        writer.write("        }\n");
+        writer.write("        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);\n");
         writer.write("    }\n\n");
         writer.write("    private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {\n");
         writer.write("        if (!varArgs) {\n");
@@ -1592,6 +1625,9 @@ public final class GenerateCN1AccessRegistry {
         writer.write("                || \"float\".equals(type.getName()) || type == Float.class || \"double\".equals(type.getName()) || type == Double.class) {\n");
         writer.write("            return value instanceof Number;\n");
         writer.write("        }\n");
+        writer.write("        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {\n");
+        writer.write("            return isSamInterface(type);\n");
+        writer.write("        }\n");
         writer.write("        return type.isInstance(value);\n");
         writer.write("    }\n\n");
         writer.write("    private static CN1AccessException unsupportedConstruct(Class<?> type, Object[] args) {\n");
@@ -1618,6 +1654,196 @@ public final class GenerateCN1AccessRegistry {
         writeDescribeHelpers(writer);
     }
 
+    private static void writeSamAdaptHelpers(Writer writer, List<SamInterfaceAdapter> samInterfaces) throws IOException {
+        writer.write("    private static boolean isSamInterface(Class<?> type) {\n");
+        for (SamInterfaceAdapter adapter : samInterfaces) {
+            writer.write("        if (type == " + typeLiteral(adapter.apiClass.qualifiedName) + ") {\n");
+            writer.write("            return true;\n");
+            writer.write("        }\n");
+        }
+        writer.write("        return false;\n");
+        writer.write("    }\n\n");
+        writer.write("    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {\n");
+        for (SamInterfaceAdapter adapter : samInterfaces) {
+            writer.write("        if (type == " + typeLiteral(adapter.apiClass.qualifiedName) + ") {\n");
+            writer.write("            return new " + adapter.apiClass.qualifiedName + "() {\n");
+            writer.write("                public " + adapter.method.returnType.canonicalName() + " " + adapter.method.name + "("
+                    + samParameterList(adapter.method.paramTypes) + ") {\n");
+            String invokeExpr = "lambda.invoke(" + samArgumentArray(adapter.method.paramTypes) + ")";
+            if (adapter.method.returnType.isVoid()) {
+                writer.write("                    try {\n");
+                writer.write("                        " + invokeExpr + ";\n");
+                writer.write("                    } catch (bsh.EvalError ex) {\n");
+                writer.write("                        throw new RuntimeException(ex);\n");
+                writer.write("                    }\n");
+            } else {
+                writer.write("                    try {\n");
+                writer.write("                        return " + samReturnExpression(adapter.method.returnType, invokeExpr) + ";\n");
+                writer.write("                    } catch (bsh.EvalError ex) {\n");
+                writer.write("                        throw new RuntimeException(ex);\n");
+                writer.write("                    }\n");
+            }
+            writer.write("                }\n");
+            writer.write("            };\n");
+            writer.write("        }\n");
+        }
+        writer.write("        return lambda;\n");
+        writer.write("    }\n\n");
+    }
+
+    private static List<SamInterfaceAdapter> collectSamInterfaces(Discovery discovery) {
+        Map<String, ApiClass> byName = new LinkedHashMap<String, ApiClass>();
+        for (GeneratedPackage generatedPackage : discovery.packages) {
+            for (ApiClass apiClass : generatedPackage.classes) {
+                byName.put(apiClass.qualifiedName, apiClass);
+            }
+        }
+        LinkedHashMap<String, SamInterfaceAdapter> adapters = new LinkedHashMap<String, SamInterfaceAdapter>();
+        for (GeneratedPackage generatedPackage : discovery.packages) {
+            for (ApiClass apiClass : generatedPackage.classes) {
+                collectSamInterfaces(apiClass.constructors, byName, adapters);
+                collectSamInterfaces(apiClass.staticMethods, byName, adapters);
+                collectSamInterfaces(apiClass.instanceMethods, byName, adapters);
+            }
+        }
+        return new ArrayList<SamInterfaceAdapter>(adapters.values());
+    }
+
+    private static void collectSamInterfaces(List<?> executables, Map<String, ApiClass> byName,
+            LinkedHashMap<String, SamInterfaceAdapter> adapters) {
+        for (Object executable : executables) {
+            List<ApiType> paramTypes;
+            if (executable instanceof ApiConstructor) {
+                paramTypes = ((ApiConstructor) executable).paramTypes;
+            } else {
+                paramTypes = ((ApiMethod) executable).paramTypes;
+            }
+            for (ApiType paramType : paramTypes) {
+                ApiType effectiveType = paramType.varArgs ? paramType.componentType() : paramType;
+                if (effectiveType.arrayDepth != 0) {
+                    continue;
+                }
+                ApiClass candidate = byName.get(effectiveType.baseName);
+                if (candidate == null || !candidate.isInterface) {
+                    continue;
+                }
+                ApiMethod sam = findSamMethod(candidate);
+                if (sam != null) {
+                    adapters.put(candidate.qualifiedName, new SamInterfaceAdapter(candidate, sam));
+                }
+            }
+        }
+    }
+
+    private static ApiMethod findSamMethod(ApiClass apiClass) {
+        Class<?> runtimeClass = loadRuntimeClass(apiClass.qualifiedName);
+        if (runtimeClass == null || !runtimeClass.isInterface()) {
+            return null;
+        }
+        Method samMethod = findRuntimeSamMethod(runtimeClass);
+        if (samMethod == null) {
+            return null;
+        }
+        return findApiMethod(apiClass, samMethod);
+    }
+
+    private static Method findRuntimeSamMethod(Class<?> runtimeClass) {
+        Method found = null;
+        for (Method method : runtimeClass.getMethods()) {
+            int modifiers = method.getModifiers();
+            if (!java.lang.reflect.Modifier.isAbstract(modifiers)
+                    || java.lang.reflect.Modifier.isStatic(modifiers)
+                    || method.isDefault()
+                    || method.isSynthetic()
+                    || isObjectMethod(method)) {
+                continue;
+            }
+            if (found != null) {
+                return null;
+            }
+            found = method;
+        }
+        return found;
+    }
+
+    private static ApiMethod findApiMethod(ApiClass apiClass, Method runtimeMethod) {
+        for (ApiMethod method : apiClass.instanceMethods) {
+            if (matchesRuntimeMethod(method, runtimeMethod)) {
+                return method;
+            }
+        }
+        return null;
+    }
+
+    private static boolean matchesRuntimeMethod(ApiMethod method, Method runtimeMethod) {
+        if (!method.name.equals(runtimeMethod.getName())) {
+            return false;
+        }
+        if (!matchesRuntimeType(method.returnType, runtimeMethod.getReturnType())) {
+            return false;
+        }
+        Class<?>[] runtimeParamTypes = runtimeMethod.getParameterTypes();
+        if (method.paramTypes.size() != runtimeParamTypes.length) {
+            return false;
+        }
+        for (int i = 0; i < runtimeParamTypes.length; i++) {
+            if (!matchesRuntimeType(method.paramTypes.get(i), runtimeParamTypes[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean matchesRuntimeType(ApiType apiType, Class<?> runtimeType) {
+        return apiType.canonicalName().equals(runtimeCanonicalName(runtimeType));
+    }
+
+    private static String runtimeCanonicalName(Class<?> runtimeType) {
+        if (runtimeType.isArray()) {
+            return runtimeCanonicalName(runtimeType.getComponentType()) + "[]";
+        }
+        return runtimeType.getName();
+    }
+
+    private static boolean isObjectMethod(ApiMethod method) {
+        return ("toString".equals(method.name) && method.paramTypes.isEmpty())
+                || ("hashCode".equals(method.name) && method.paramTypes.isEmpty())
+                || ("equals".equals(method.name) && method.paramTypes.size() == 1
+                && "java.lang.Object".equals(method.paramTypes.get(0).baseName)
+                && method.paramTypes.get(0).arrayDepth == 0);
+    }
+
+    private static boolean isObjectMethod(Method method) {
+        return ("toString".equals(method.getName()) && method.getParameterCount() == 0)
+                || ("hashCode".equals(method.getName()) && method.getParameterCount() == 0)
+                || ("equals".equals(method.getName()) && method.getParameterCount() == 1
+                && method.getParameterTypes()[0] == Object.class);
+    }
+
+    private static String samParameterList(List<ApiType> paramTypes) {
+        List<String> parts = new ArrayList<String>();
+        for (int i = 0; i < paramTypes.size(); i++) {
+            parts.add(paramTypes.get(i).canonicalName() + " arg" + i);
+        }
+        return join(parts, ", ");
+    }
+
+    private static String samArgumentArray(List<ApiType> paramTypes) {
+        if (paramTypes.isEmpty()) {
+            return "new Object[0]";
+        }
+        List<String> parts = new ArrayList<String>();
+        for (int i = 0; i < paramTypes.size(); i++) {
+            parts.add("arg" + i);
+        }
+        return "new Object[]{" + join(parts, ", ") + "}";
+    }
+
+    private static String samReturnExpression(ApiType returnType, String invocation) {
+        return castValue("bsh.cn1.CN1LambdaSupport.coerceResult(" + invocation + ", " + matchTypeLiteral(returnType) + ")",
+                returnType);
+    }
+
     private static void writeDescribeHelpers(Writer writer) throws IOException {
         writer.write("    private static String describeArgs(Object[] args) {\n");
         writer.write("        if (args == null || args.length == 0) {\n");
@@ -1642,6 +1868,7 @@ public final class GenerateCN1AccessRegistry {
             boolean varArgs, String invocation) throws IOException {
         writer.write(indent + guardPrefix + " {\n");
         writer.write(indent + "    if (matches(safeArgs, " + classArrayLiteral(paramTypes) + ", " + varArgs + ")) {\n");
+        writer.write(indent + "        Object[] adaptedArgs = adaptArgs(safeArgs, " + classArrayLiteral(paramTypes) + ", " + varArgs + ");\n");
         if (varArgs && !paramTypes.isEmpty()) {
             writeVarArgsInvocation(writer, indent + "        ", paramTypes, invocation);
         } else {
@@ -1656,9 +1883,9 @@ public final class GenerateCN1AccessRegistry {
         int fixedCount = paramTypes.size() - 1;
         ApiType componentType = paramTypes.get(paramTypes.size() - 1).componentType();
         writer.write(indent + componentType.canonicalName() + "[] varArgs = new " + componentType.canonicalName()
-                + "[safeArgs.length - " + fixedCount + "];\n");
-        writer.write(indent + "for (int i = " + fixedCount + "; i < safeArgs.length; i++) {\n");
-        writer.write(indent + "    varArgs[i - " + fixedCount + "] = " + castValue("safeArgs[i]", componentType) + ";\n");
+                + "[adaptedArgs.length - " + fixedCount + "];\n");
+        writer.write(indent + "for (int i = " + fixedCount + "; i < adaptedArgs.length; i++) {\n");
+        writer.write(indent + "    varArgs[i - " + fixedCount + "] = " + castValue("adaptedArgs[i]", componentType) + ";\n");
         writer.write(indent + "}\n");
         writer.write(indent + invocation.replace("__VARARGS__", "varArgs") + "\n");
     }
@@ -1684,7 +1911,7 @@ public final class GenerateCN1AccessRegistry {
         List<String> parts = new ArrayList<String>();
         int fixedCount = varArgs ? paramTypes.size() - 1 : paramTypes.size();
         for (int i = 0; i < fixedCount; i++) {
-            parts.add(castValue("safeArgs[" + i + "]", paramTypes.get(i)));
+            parts.add(castValue("adaptedArgs[" + i + "]", paramTypes.get(i)));
         }
         if (varArgs) {
             parts.add("__VARARGS__");
@@ -2285,6 +2512,16 @@ public final class GenerateCN1AccessRegistry {
             this.type = type;
             this.isStatic = isStatic;
             this.writable = writable;
+        }
+    }
+
+    private static final class SamInterfaceAdapter {
+        final ApiClass apiClass;
+        final ApiMethod method;
+
+        SamInterfaceAdapter(ApiClass apiClass, ApiMethod method) {
+            this.apiClass = apiClass;
+            this.method = method;
         }
     }
 

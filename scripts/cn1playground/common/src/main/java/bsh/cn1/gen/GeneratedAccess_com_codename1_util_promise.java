@@ -39,7 +39,8 @@ public final class GeneratedAccess_com_codename1_util_promise {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.util.promise.Promise.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.promise.ExecutorFunction.class}, false)) {
-                return new com.codename1.util.promise.Promise((com.codename1.util.promise.ExecutorFunction) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.promise.ExecutorFunction.class}, false);
+                return new com.codename1.util.promise.Promise((com.codename1.util.promise.ExecutorFunction) adaptedArgs[0]);
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -54,30 +55,34 @@ public final class GeneratedAccess_com_codename1_util_promise {
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("all".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.promise.Promise[].class}, true)) {
-                com.codename1.util.promise.Promise[] varArgs = new com.codename1.util.promise.Promise[safeArgs.length - 0];
-                for (int i = 0; i < safeArgs.length; i++) {
-                    varArgs[i - 0] = (com.codename1.util.promise.Promise) safeArgs[i];
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.promise.Promise[].class}, true);
+                com.codename1.util.promise.Promise[] varArgs = new com.codename1.util.promise.Promise[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (com.codename1.util.promise.Promise) adaptedArgs[i];
                 }
                 return com.codename1.util.promise.Promise.all(varArgs);
             }
         }
         if ("allSettled".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.promise.Promise[].class}, true)) {
-                com.codename1.util.promise.Promise[] varArgs = new com.codename1.util.promise.Promise[safeArgs.length - 0];
-                for (int i = 0; i < safeArgs.length; i++) {
-                    varArgs[i - 0] = (com.codename1.util.promise.Promise) safeArgs[i];
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.promise.Promise[].class}, true);
+                com.codename1.util.promise.Promise[] varArgs = new com.codename1.util.promise.Promise[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (com.codename1.util.promise.Promise) adaptedArgs[i];
                 }
                 return com.codename1.util.promise.Promise.allSettled(varArgs);
             }
         }
         if ("promisify".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.AsyncResource.class}, false)) {
-                return com.codename1.util.promise.Promise.promisify((com.codename1.util.AsyncResource) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.AsyncResource.class}, false);
+                return com.codename1.util.promise.Promise.promisify((com.codename1.util.AsyncResource) adaptedArgs[0]);
             }
         }
         if ("reject".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
-                return com.codename1.util.promise.Promise.reject((java.lang.Throwable) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                return com.codename1.util.promise.Promise.reject((java.lang.Throwable) adaptedArgs[0]);
             }
         }
         throw unsupportedStatic(com.codename1.util.promise.Promise.class, name, safeArgs);
@@ -109,52 +114,62 @@ public final class GeneratedAccess_com_codename1_util_promise {
     private static Object invoke0(com.codename1.util.promise.Promise typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("always".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.promise.Functor.class}, false)) {
-                return typedTarget.always((com.codename1.util.promise.Functor) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.promise.Functor.class}, false);
+                return typedTarget.always((com.codename1.util.promise.Functor) adaptedArgs[0]);
             }
         }
         if ("asAsyncResource".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.asAsyncResource();
             }
         }
         if ("except".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.promise.Functor.class}, false)) {
-                return typedTarget.except((com.codename1.util.promise.Functor) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.promise.Functor.class}, false);
+                return typedTarget.except((com.codename1.util.promise.Functor) adaptedArgs[0]);
             }
         }
         if ("getState".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getState();
             }
         }
         if ("onComplete".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false)) {
-                return typedTarget.onComplete((com.codename1.util.SuccessCallback) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false);
+                return typedTarget.onComplete((com.codename1.util.SuccessCallback) adaptedArgs[0]);
             }
         }
         if ("onFail".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false)) {
-                return typedTarget.onFail((com.codename1.util.SuccessCallback) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false);
+                return typedTarget.onFail((com.codename1.util.SuccessCallback) adaptedArgs[0]);
             }
         }
         if ("onSuccess".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false)) {
-                return typedTarget.onSuccess((com.codename1.util.SuccessCallback) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false);
+                return typedTarget.onSuccess((com.codename1.util.SuccessCallback) adaptedArgs[0]);
             }
         }
         if ("ready".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class, com.codename1.util.SuccessCallback.class}, false)) {
-                return typedTarget.ready((com.codename1.util.SuccessCallback) safeArgs[0], (com.codename1.util.SuccessCallback) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class, com.codename1.util.SuccessCallback.class}, false);
+                return typedTarget.ready((com.codename1.util.SuccessCallback) adaptedArgs[0], (com.codename1.util.SuccessCallback) adaptedArgs[1]);
             }
         }
         if ("then".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.promise.Functor.class}, false)) {
-                return typedTarget.then((com.codename1.util.promise.Functor) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.promise.Functor.class}, false);
+                return typedTarget.then((com.codename1.util.promise.Functor) adaptedArgs[0]);
             }
         }
         if ("then".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.promise.Functor.class, com.codename1.util.promise.Functor.class}, false)) {
-                return typedTarget.then((com.codename1.util.promise.Functor) safeArgs[0], (com.codename1.util.promise.Functor) safeArgs[1]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.promise.Functor.class, com.codename1.util.promise.Functor.class}, false);
+                return typedTarget.then((com.codename1.util.promise.Functor) adaptedArgs[0], (com.codename1.util.promise.Functor) adaptedArgs[1]);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -163,7 +178,8 @@ public final class GeneratedAccess_com_codename1_util_promise {
     private static Object invoke1(com.codename1.util.promise.ExecutorFunction typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("call".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.promise.Functor.class, com.codename1.util.promise.Functor.class}, false)) {
-                typedTarget.call((com.codename1.util.promise.Functor) safeArgs[0], (com.codename1.util.promise.Functor) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.promise.Functor.class, com.codename1.util.promise.Functor.class}, false);
+                typedTarget.call((com.codename1.util.promise.Functor) adaptedArgs[0], (com.codename1.util.promise.Functor) adaptedArgs[1]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -187,6 +203,88 @@ public final class GeneratedAccess_com_codename1_util_promise {
 
     private static Object[] safeArgs(Object[] args) {
         return args == null ? new Object[0] : args;
+    }
+
+    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (args == null || args.length == 0) {
+            return args == null ? new Object[0] : args;
+        }
+        Object[] adapted = args.clone();
+        if (!varArgs) {
+            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {
+                adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+            }
+            return adapted;
+        }
+        if (paramTypes.length == 0) {
+            return adapted;
+        }
+        int fixedCount = paramTypes.length - 1;
+        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {
+            adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < adapted.length; i++) {
+            adapted[i] = adaptValue(adapted[i], componentType);
+        }
+        return adapted;
+    }
+
+    private static boolean isSamInterface(Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == java.util.Observer.class) {
+            return true;
+        }
+        if (type == java.lang.Iterable.class) {
+            return true;
+        }
+        return false;
+    }
+
+    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.util.Observer.class) {
+            return new java.util.Observer() {
+                public void update(java.util.Observable arg0, java.lang.Object arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Iterable.class) {
+            return new java.lang.Iterable() {
+                public java.util.Iterator iterator() {
+                    try {
+                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        return lambda;
+    }
+
+    private static Object adaptValue(Object value, Class<?> type) {
+        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
+            return value;
+        }
+        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -242,6 +340,9 @@ public final class GeneratedAccess_com_codename1_util_promise {
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
             return value instanceof Number;
+        }
+        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+            return isSamInterface(type);
         }
         return type.isInstance(value);
     }

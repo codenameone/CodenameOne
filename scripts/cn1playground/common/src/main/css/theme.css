@@ -20,6 +20,58 @@ TitleArea {
     background: #e5e7eb;
 }
 
+PlaygroundForm, PlaygroundContent {
+    background: #f5f7fb;
+}
+
+PlaygroundFormDark, PlaygroundContentDark {
+    background: #111827;
+}
+
+PlaygroundToolbar {
+    background: #e5e7eb;
+    padding: 1mm 2mm 1mm 2mm;
+}
+
+PlaygroundToolbarDark {
+    background: #111827;
+    padding: 1mm 2mm 1mm 2mm;
+}
+
+PlaygroundTitle {
+    color: #111827;
+    background: #e5e7eb;
+    font-family: "native:MainLight";
+    font-size: 6mm;
+}
+
+PlaygroundTitleDark {
+    color: #f8fafc;
+    background: #111827;
+    font-family: "native:MainLight";
+    font-size: 6mm;
+}
+
+PlaygroundPanel {
+    background: white;
+    margin: 1mm;
+    padding: 1mm;
+}
+
+PlaygroundPanelDark {
+    background: #1f2937;
+    margin: 1mm;
+    padding: 1mm;
+}
+
+PlaygroundPreview {
+    background: white;
+}
+
+PlaygroundPreviewDark {
+    background: #0f172a;
+}
+
 /** Style for Dialog body */
 DialogBody {
     font-family: "native:MainLight";
@@ -58,6 +110,28 @@ SideCommand {
     border-bottom: 2px solid #cccccc;
 }
 
+PlaygroundSideCommand {
+    padding: 1mm;
+    border: none;
+    text-decoration: none;
+    color: #111827;
+    background: white;
+    font-family: "native:MainLight";
+    font-size: 4mm;
+    border-bottom: 2px solid #cccccc;
+}
+
+PlaygroundSideCommandDark {
+    padding: 1mm;
+    border: none;
+    text-decoration: none;
+    color: #e5e7eb;
+    background: #0f172a;
+    font-family: "native:MainLight";
+    font-size: 4mm;
+    border-bottom: 2px solid #1f2937;
+}
+
 PlaygroundMenuSection {
     padding: 2mm 1mm 0.5mm 1mm;
     margin: 1mm 0 0 0;
@@ -66,8 +140,24 @@ PlaygroundMenuSection {
     background: white;
 }
 
+PlaygroundMenuSectionDark {
+    padding: 2mm 1mm 0.5mm 1mm;
+    margin: 1mm 0 0 0;
+    border: none;
+    border-bottom: 1px solid #334155;
+    background: #0f172a;
+}
+
 PlaygroundMenuSectionTitle {
     color: #6b7280;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-decoration: none;
+    padding: 0 0 1mm 0;
+}
+
+PlaygroundMenuSectionTitleDark {
+    color: #94a3b8;
     font-family: "native:MainBold";
     font-size: 2.6mm;
     text-decoration: none;
@@ -79,4 +169,20 @@ PlaygroundMenuEmpty {
     font-family: "native:MainLight";
     font-size: 3mm;
     padding: 1mm;
+}
+
+PlaygroundMenuEmptyDark {
+    color: #94a3b8;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+    padding: 1mm;
+    background: #0f172a;
+}
+
+PlaygroundMenuContainer {
+    background: white;
+}
+
+PlaygroundMenuContainerDark {
+    background: #0f172a;
 }

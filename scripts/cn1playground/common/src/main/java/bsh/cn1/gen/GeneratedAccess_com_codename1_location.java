@@ -51,26 +51,32 @@ public final class GeneratedAccess_com_codename1_location {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.location.Geofence.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.location.Location.class, java.lang.Integer.class, java.lang.Long.class}, false)) {
-                return new com.codename1.location.Geofence((java.lang.String) safeArgs[0], (com.codename1.location.Location) safeArgs[1], ((Number) safeArgs[2]).intValue(), ((Number) safeArgs[3]).longValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.location.Location.class, java.lang.Integer.class, java.lang.Long.class}, false);
+                return new com.codename1.location.Geofence((java.lang.String) adaptedArgs[0], (com.codename1.location.Location) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).longValue());
             }
         }
         if (type == com.codename1.location.Location.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.location.Location();
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false)) {
-                return new com.codename1.location.Location(((Number) safeArgs[0]).doubleValue(), ((Number) safeArgs[1]).doubleValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false);
+                return new com.codename1.location.Location(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Float.class}, false)) {
-                return new com.codename1.location.Location(((Number) safeArgs[0]).doubleValue(), ((Number) safeArgs[1]).doubleValue(), ((Number) safeArgs[2]).doubleValue(), ((Number) safeArgs[3]).floatValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Float.class}, false);
+                return new com.codename1.location.Location(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).floatValue());
             }
         }
         if (type == com.codename1.location.LocationRequest.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.location.LocationRequest();
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Long.class}, false)) {
-                return new com.codename1.location.LocationRequest(((Number) safeArgs[0]).intValue(), ((Number) safeArgs[1]).longValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Long.class}, false);
+                return new com.codename1.location.LocationRequest(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).longValue());
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -87,12 +93,14 @@ public final class GeneratedAccess_com_codename1_location {
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("createDistanceComparator".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.location.Geofence.class}, false)) {
-                return com.codename1.location.Geofence.createDistanceComparator((com.codename1.location.Geofence) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.location.Geofence.class}, false);
+                return com.codename1.location.Geofence.createDistanceComparator((com.codename1.location.Geofence) adaptedArgs[0]);
             }
         }
         if ("createDistanceComparator".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.location.Location.class}, false)) {
-                return com.codename1.location.Geofence.createDistanceComparator((com.codename1.location.Location) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.location.Location.class}, false);
+                return com.codename1.location.Geofence.createDistanceComparator((com.codename1.location.Location) adaptedArgs[0]);
             }
         }
         throw unsupportedStatic(com.codename1.location.Geofence.class, name, safeArgs);
@@ -101,6 +109,7 @@ public final class GeneratedAccess_com_codename1_location {
     private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
         if ("getInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.location.GeofenceManager.getInstance();
             }
         }
@@ -110,6 +119,7 @@ public final class GeneratedAccess_com_codename1_location {
     private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
         if ("getLocationManager".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return com.codename1.location.LocationManager.getLocationManager();
             }
         }
@@ -177,36 +187,43 @@ public final class GeneratedAccess_com_codename1_location {
     private static Object invoke0(com.codename1.location.Geofence typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                return typedTarget.equals((java.lang.Object) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("getDistanceTo".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.location.Geofence.class}, false)) {
-                return typedTarget.getDistanceTo((com.codename1.location.Geofence) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.location.Geofence.class}, false);
+                return typedTarget.getDistanceTo((com.codename1.location.Geofence) adaptedArgs[0]);
             }
         }
         if ("getExpiration".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getExpiration();
             }
         }
         if ("getId".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getId();
             }
         }
         if ("getLoc".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getLoc();
             }
         }
         if ("getRadius".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getRadius();
             }
         }
         if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.hashCode();
             }
         }
@@ -216,115 +233,136 @@ public final class GeneratedAccess_com_codename1_location {
     private static Object invoke1(com.codename1.location.GeofenceManager typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.location.Geofence[].class}, true)) {
-                com.codename1.location.Geofence[] varArgs = new com.codename1.location.Geofence[safeArgs.length - 0];
-                for (int i = 0; i < safeArgs.length; i++) {
-                    varArgs[i - 0] = (com.codename1.location.Geofence) safeArgs[i];
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.location.Geofence[].class}, true);
+                com.codename1.location.Geofence[] varArgs = new com.codename1.location.Geofence[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (com.codename1.location.Geofence) adaptedArgs[i];
                 }
                 typedTarget.add(varArgs); return null;
             }
         }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
-                typedTarget.add((java.util.Collection) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
+                typedTarget.add((java.util.Collection) adaptedArgs[0]); return null;
             }
         }
         if ("asList".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.asList();
             }
         }
         if ("asMap".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.asMap();
             }
         }
         if ("asSortedList".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.asSortedList();
             }
         }
         if ("clear".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.clear(); return null;
             }
         }
         if ("getBubbleExpiration".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getBubbleExpiration();
             }
         }
         if ("getBubbleRadius".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getBubbleRadius();
             }
         }
         if ("getListenerClass".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getListenerClass();
             }
         }
         if ("isBubble".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.isBubble((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.isBubble((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("isCurrentlyActive".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                return typedTarget.isCurrentlyActive((java.lang.String) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.isCurrentlyActive((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("iterator".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.iterator();
             }
         }
         if ("refresh".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 typedTarget.refresh(); return null;
             }
         }
         if ("remove".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, true)) {
-                java.lang.String[] varArgs = new java.lang.String[safeArgs.length - 0];
-                for (int i = 0; i < safeArgs.length; i++) {
-                    varArgs[i - 0] = (java.lang.String) safeArgs[i];
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, true);
+                java.lang.String[] varArgs = new java.lang.String[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (java.lang.String) adaptedArgs[i];
                 }
                 typedTarget.remove(varArgs); return null;
             }
         }
         if ("remove".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
-                typedTarget.remove((java.util.Collection) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
+                typedTarget.remove((java.util.Collection) adaptedArgs[0]); return null;
             }
         }
         if ("setBubbleExpiration".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                typedTarget.setBubbleExpiration(((Number) safeArgs[0]).longValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                typedTarget.setBubbleExpiration(((Number) adaptedArgs[0]).longValue()); return null;
             }
         }
         if ("setBubbleRadius".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setBubbleRadius(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setBubbleRadius(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setListenerClass".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Class.class}, false)) {
-                typedTarget.setListenerClass((java.lang.Class) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class}, false);
+                typedTarget.setListenerClass((java.lang.Class) adaptedArgs[0]); return null;
             }
         }
         if ("size".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.size();
             }
         }
         if ("update".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.update(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.update(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("update".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
-                typedTarget.update(((Number) safeArgs[0]).intValue(), ((Boolean) safeArgs[1]).booleanValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
+                typedTarget.update(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -333,106 +371,127 @@ public final class GeneratedAccess_com_codename1_location {
     private static Object invoke2(com.codename1.location.Location typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("createDistanceCompartor".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.createDistanceCompartor();
             }
         }
         if ("getAccuracy".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getAccuracy();
             }
         }
         if ("getAltitude".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getAltitude();
             }
         }
         if ("getDirection".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getDirection();
             }
         }
         if ("getDistanceTo".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.location.Location.class}, false)) {
-                return typedTarget.getDistanceTo((com.codename1.location.Location) safeArgs[0]);
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.location.Location.class}, false);
+                return typedTarget.getDistanceTo((com.codename1.location.Location) adaptedArgs[0]);
             }
         }
         if ("getLatitude".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getLatitude();
             }
         }
         if ("getLongitude".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getLongitude();
             }
         }
         if ("getLongtitude".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getLongtitude();
             }
         }
         if ("getStatus".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getStatus();
             }
         }
         if ("getTimeStamp".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getTimeStamp();
             }
         }
         if ("getVelocity".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getVelocity();
             }
         }
         if ("setAccuracy".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.setAccuracy(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setAccuracy(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("setAltitude".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                typedTarget.setAltitude(((Number) safeArgs[0]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                typedTarget.setAltitude(((Number) adaptedArgs[0]).doubleValue()); return null;
             }
         }
         if ("setDirection".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.setDirection(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setDirection(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("setLatitude".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                typedTarget.setLatitude(((Number) safeArgs[0]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                typedTarget.setLatitude(((Number) adaptedArgs[0]).doubleValue()); return null;
             }
         }
         if ("setLongitude".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                typedTarget.setLongitude(((Number) safeArgs[0]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                typedTarget.setLongitude(((Number) adaptedArgs[0]).doubleValue()); return null;
             }
         }
         if ("setLongtitude".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
-                typedTarget.setLongtitude(((Number) safeArgs[0]).doubleValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                typedTarget.setLongtitude(((Number) adaptedArgs[0]).doubleValue()); return null;
             }
         }
         if ("setStatus".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.setStatus(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setStatus(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("setTimeStamp".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                typedTarget.setTimeStamp(((Number) safeArgs[0]).longValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                typedTarget.setTimeStamp(((Number) adaptedArgs[0]).longValue()); return null;
             }
         }
         if ("setVelocity".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
-                typedTarget.setVelocity(((Number) safeArgs[0]).floatValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setVelocity(((Number) adaptedArgs[0]).floatValue()); return null;
             }
         }
         if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.toString();
             }
         }
@@ -442,72 +501,86 @@ public final class GeneratedAccess_com_codename1_location {
     private static Object invoke3(com.codename1.location.LocationManager typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addGeoFencing".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, com.codename1.location.Geofence.class}, false)) {
-                typedTarget.addGeoFencing((java.lang.Class) safeArgs[0], (com.codename1.location.Geofence) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, com.codename1.location.Geofence.class}, false);
+                typedTarget.addGeoFencing((java.lang.Class) adaptedArgs[0], (com.codename1.location.Geofence) adaptedArgs[1]); return null;
             }
         }
         if ("getCurrentLocation".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCurrentLocation();
             }
         }
         if ("getCurrentLocationSync".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getCurrentLocationSync();
             }
         }
         if ("getCurrentLocationSync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                return typedTarget.getCurrentLocationSync(((Number) safeArgs[0]).longValue());
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                return typedTarget.getCurrentLocationSync(((Number) adaptedArgs[0]).longValue());
             }
         }
         if ("getLastKnownLocation".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getLastKnownLocation();
             }
         }
         if ("getStatus".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getStatus();
             }
         }
         if ("isBackgroundLocationSupported".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isBackgroundLocationSupported();
             }
         }
         if ("isGPSDetectionSupported".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isGPSDetectionSupported();
             }
         }
         if ("isGPSEnabled".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isGPSEnabled();
             }
         }
         if ("isGeofenceSupported".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.isGeofenceSupported();
             }
         }
         if ("removeGeoFencing".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.removeGeoFencing((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.removeGeoFencing((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("setBackgroundLocationListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Class.class}, false)) {
-                typedTarget.setBackgroundLocationListener((java.lang.Class) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class}, false);
+                typedTarget.setBackgroundLocationListener((java.lang.Class) adaptedArgs[0]); return null;
             }
         }
         if ("setLocationListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.location.LocationListener.class}, false)) {
-                typedTarget.setLocationListener((com.codename1.location.LocationListener) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.location.LocationListener.class}, false);
+                typedTarget.setLocationListener((com.codename1.location.LocationListener) adaptedArgs[0]); return null;
             }
         }
         if ("setLocationListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.location.LocationListener.class, com.codename1.location.LocationRequest.class}, false)) {
-                typedTarget.setLocationListener((com.codename1.location.LocationListener) safeArgs[0], (com.codename1.location.LocationRequest) safeArgs[1]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.location.LocationListener.class, com.codename1.location.LocationRequest.class}, false);
+                typedTarget.setLocationListener((com.codename1.location.LocationListener) adaptedArgs[0], (com.codename1.location.LocationRequest) adaptedArgs[1]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -516,11 +589,13 @@ public final class GeneratedAccess_com_codename1_location {
     private static Object invoke4(com.codename1.location.LocationRequest typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getInterval".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getInterval();
             }
         }
         if ("getPriority".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return typedTarget.getPriority();
             }
         }
@@ -530,12 +605,14 @@ public final class GeneratedAccess_com_codename1_location {
     private static Object invoke5(com.codename1.location.GeofenceListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("onEntered".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.onEntered((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.onEntered((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("onExit".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                typedTarget.onExit((java.lang.String) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.onExit((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -544,12 +621,14 @@ public final class GeneratedAccess_com_codename1_location {
     private static Object invoke6(com.codename1.location.LocationListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("locationUpdated".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.location.Location.class}, false)) {
-                typedTarget.locationUpdated((com.codename1.location.Location) safeArgs[0]); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.location.Location.class}, false);
+                typedTarget.locationUpdated((com.codename1.location.Location) adaptedArgs[0]); return null;
             }
         }
         if ("providerStateChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                typedTarget.providerStateChanged(((Number) safeArgs[0]).intValue()); return null;
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.providerStateChanged(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -583,6 +662,88 @@ public final class GeneratedAccess_com_codename1_location {
 
     private static Object[] safeArgs(Object[] args) {
         return args == null ? new Object[0] : args;
+    }
+
+    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (args == null || args.length == 0) {
+            return args == null ? new Object[0] : args;
+        }
+        Object[] adapted = args.clone();
+        if (!varArgs) {
+            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {
+                adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+            }
+            return adapted;
+        }
+        if (paramTypes.length == 0) {
+            return adapted;
+        }
+        int fixedCount = paramTypes.length - 1;
+        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {
+            adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < adapted.length; i++) {
+            adapted[i] = adaptValue(adapted[i], componentType);
+        }
+        return adapted;
+    }
+
+    private static boolean isSamInterface(Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == java.util.Observer.class) {
+            return true;
+        }
+        if (type == java.lang.Iterable.class) {
+            return true;
+        }
+        return false;
+    }
+
+    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.util.Observer.class) {
+            return new java.util.Observer() {
+                public void update(java.util.Observable arg0, java.lang.Object arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Iterable.class) {
+            return new java.lang.Iterable() {
+                public java.util.Iterator iterator() {
+                    try {
+                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        return lambda;
+    }
+
+    private static Object adaptValue(Object value, Class<?> type) {
+        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
+            return value;
+        }
+        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
     }
 
     private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
@@ -638,6 +799,9 @@ public final class GeneratedAccess_com_codename1_location {
                 || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
                 || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
             return value instanceof Number;
+        }
+        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+            return isSamInterface(type);
         }
         return type.isInstance(value);
     }
