@@ -60,7 +60,7 @@ public final class GenerateCN1AccessRegistry {
         }
         File rootOutput = new File(args[0]);
         File projectRoot = projectRoot(rootOutput);
-        File cn1Root = new File(System.getProperty("user.home"), "dev/cn1");
+        File cn1Root = locateCn1Root(projectRoot);
         Discovery discovery = discover(projectRoot, cn1Root);
         File helperDir = new File(rootOutput.getParentFile(), "gen");
         recreateDir(helperDir);
@@ -1777,6 +1777,44 @@ public final class GenerateCN1AccessRegistry {
             current = current.getParentFile();
         }
         throw new IllegalStateException("Failed to locate project root from " + output);
+    }
+
+    private static File locateCn1Root(File projectRoot) {
+        List<File> candidates = new ArrayList<File>();
+
+        String configuredRoot = System.getenv("CN1_REPO_ROOT");
+        if (configuredRoot != null && configuredRoot.trim().length() > 0) {
+            candidates.add(new File(configuredRoot.trim()));
+        }
+
+        String githubWorkspace = System.getenv("GITHUB_WORKSPACE");
+        if (githubWorkspace != null && githubWorkspace.trim().length() > 0) {
+            candidates.add(new File(githubWorkspace.trim()));
+        }
+
+        File current = projectRoot;
+        while (current != null) {
+            candidates.add(current);
+            current = current.getParentFile();
+        }
+
+        candidates.add(new File(System.getProperty("user.home"), "dev/cn1"));
+
+        for (File candidate : candidates) {
+            if (looksLikeCn1Root(candidate)) {
+                return candidate;
+            }
+        }
+
+        throw new IllegalStateException(
+                "Failed to locate Codename One source tree. Checked CN1_REPO_ROOT, GITHUB_WORKSPACE, "
+                        + "ancestors of " + projectRoot + ", and ~/dev/cn1");
+    }
+
+    private static boolean looksLikeCn1Root(File candidate) {
+        return candidate != null
+                && new File(candidate, "CodenameOne/src").isDirectory()
+                && new File(candidate, "Ports/CLDC11/src").isDirectory();
     }
 
     private static String join(List<String> values, String delimiter) {
