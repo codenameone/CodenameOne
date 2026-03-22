@@ -20,26 +20,67 @@ import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 final class PlaygroundRunner {
+    static final class Diagnostic {
+        final int line;
+        final int column;
+        final int endLine;
+        final int endColumn;
+        final String message;
+        final String severity;
+
+        Diagnostic(int line, int column, int endLine, int endColumn, String message, String severity) {
+            this.line = line;
+            this.column = column;
+            this.endLine = endLine;
+            this.endColumn = endColumn;
+            this.message = message;
+            this.severity = severity;
+        }
+    }
+
+    static final class InlineMessage {
+        final int line;
+        final String text;
+        final String kind;
+
+        InlineMessage(int line, String text, String kind) {
+            this.line = line;
+            this.text = text;
+            this.kind = kind;
+        }
+    }
+
     static final class RunResult {
         private final Component component;
-        private final String message;
+        private final List<Diagnostic> diagnostics;
+        private final List<InlineMessage> messages;
 
-        RunResult(Component component, String message) {
+        RunResult(Component component, List<Diagnostic> diagnostics, List<InlineMessage> messages) {
             this.component = component;
-            this.message = message;
+            this.diagnostics = diagnostics;
+            this.messages = messages;
         }
 
         Component getComponent() {
             return component;
         }
 
-        String getMessage() {
-            return message;
+        List<Diagnostic> getDiagnostics() {
+            return diagnostics;
+        }
+
+        List<InlineMessage> getMessages() {
+            return messages;
         }
     }
 
     RunResult run(String script, PlaygroundContext context) {
+        List<InlineMessage> inlineMessages = new ArrayList<InlineMessage>();
         try {
             Interpreter interpreter = new Interpreter();
             bindGlobals(interpreter, context);
@@ -47,20 +88,21 @@ final class PlaygroundRunner {
             try {
                 Object result = interpreter.eval(adaptScript(script));
                 Component component = resolveComponent(interpreter, result, context);
-                return new RunResult(component, "Preview updated.");
+                inlineMessages.add(new InlineMessage(0, "Preview updated.", "success"));
+                return new RunResult(component, Collections.<Diagnostic>emptyList(), inlineMessages);
             } finally {
                 PlaygroundContext.clearCurrent();
             }
         } catch (ParseException ex) {
-            return new RunResult(null, "Parse error: " + safeMessage(ex));
+            return failure("Parse error: " + safeMessage(ex), ex.getErrorLineNumber(), extractColumn(ex.getMessage()), inlineMessages);
         } catch (TokenMgrException ex) {
-            return new RunResult(null, "Lexer error: " + safeMessage(ex));
+            return failure("Lexer error: " + safeMessage(ex), extractLine(ex.getMessage()), extractColumn(ex.getMessage()), inlineMessages);
         } catch (TargetError ex) {
-            return new RunResult(null, "Evaluation error: " + safeMessage(ex));
+            return failure("Evaluation error: " + safeMessage(ex), extractTargetLine(ex), 1, inlineMessages);
         } catch (EvalError ex) {
-            return new RunResult(null, "Evaluation error: " + safeMessage(ex));
+            return failure("Evaluation error: " + safeMessage(ex), ex.getErrorLineNumber(), 1, inlineMessages);
         } catch (RuntimeException ex) {
-            return new RunResult(null, "Unexpected error: " + safeMessage(ex));
+            return failure("Unexpected error: " + safeMessage(ex), 1, 1, inlineMessages);
         }
     }
 
@@ -90,6 +132,63 @@ final class PlaygroundRunner {
     private String adaptScript(String script) {
         String adapted = unwrapSingleTopLevelClass(script);
         return adapted == null ? script : adapted;
+    }
+
+    private RunResult failure(String message, int line, int column, List<InlineMessage> inlineMessages) {
+        int safeLine = Math.max(1, line);
+        int safeColumn = Math.max(1, column);
+        List<Diagnostic> diagnostics = new ArrayList<Diagnostic>();
+        diagnostics.add(new Diagnostic(safeLine, safeColumn, safeLine, safeColumn + 1, message, "error"));
+        inlineMessages.add(new InlineMessage(safeLine, message, "error"));
+        return new RunResult(null, diagnostics, inlineMessages);
+    }
+
+    private int extractTargetLine(TargetError ex) {
+        if (ex.getTarget() instanceof EvalError) {
+            return ((EvalError) ex.getTarget()).getErrorLineNumber();
+        }
+        return 1;
+    }
+
+    private int extractLine(String raw) {
+        if (raw == null) {
+            return 1;
+        }
+        int at = raw.indexOf("line ");
+        if (at < 0) {
+            return 1;
+        }
+        return parseNumber(raw, at + 5);
+    }
+
+    private int extractColumn(String raw) {
+        if (raw == null) {
+            return 1;
+        }
+        int at = raw.indexOf("column ");
+        if (at < 0) {
+            return 1;
+        }
+        return parseNumber(raw, at + 7);
+    }
+
+    private int parseNumber(String text, int start) {
+        int i = start;
+        while (i < text.length() && !Character.isDigit(text.charAt(i))) {
+            i++;
+        }
+        int from = i;
+        while (i < text.length() && Character.isDigit(text.charAt(i))) {
+            i++;
+        }
+        if (from == i) {
+            return 1;
+        }
+        try {
+            return Integer.parseInt(text.substring(from, i));
+        } catch (NumberFormatException ex) {
+            return 1;
+        }
     }
 
     private String unwrapSingleTopLevelClass(String script) {

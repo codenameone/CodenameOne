@@ -1,23 +1,23 @@
 package com.codenameone.playground;
 
-import com.codename1.components.SplitPane;
 import com.codename1.components.MultiButton;
+import com.codename1.components.SplitPane;
 import com.codename1.system.Lifecycle;
-import com.codename1.ui.Button;
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.ui.TextArea;
 import com.codename1.ui.Toolbar;
-import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
-import com.codename1.ui.util.UITimer;
 import com.codename1.ui.util.Resources;
+import com.codename1.ui.util.UITimer;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class CN1Playground extends Lifecycle {
@@ -25,12 +25,13 @@ public class CN1Playground extends Lifecycle {
 
     private final PlaygroundRunner runner = new PlaygroundRunner();
     private Form appForm;
-    private TextArea editor;
-    private TextArea output;
+    private PlaygroundBrowserEditor editor;
     private Container previewRoot;
     private Container historyMenu;
     private Resources theme;
     private boolean websiteDarkMode;
+    private String currentScript;
+    private List<PlaygroundRunner.InlineMessage> currentMessages = new ArrayList<PlaygroundRunner.InlineMessage>();
     private int editSequence;
     private int autoRunSequence;
 
@@ -38,25 +39,24 @@ public class CN1Playground extends Lifecycle {
     public void runApp() {
         com.codename1.ui.CN.setProperty("platformHint.javascript.beforeUnloadMessage", null);
         theme = Resources.getGlobalResources();
+        currentScript = PlaygroundStateStore.loadCurrentScript();
+
         Form form = new Form("CN1 Playground", new BorderLayout());
         appForm = form;
         Toolbar toolbar = form.getToolbar();
         toolbar.setTitleCentered(false);
         setThemeRole(form.getContentPane(), "form");
 
-        editor = createEditor(PlaygroundStateStore.loadCurrentScript());
-        output = createOutput(PlaygroundStateStore.loadCurrentOutput());
+        editor = new PlaygroundBrowserEditor(currentScript, websiteDarkMode, this::handleSourceChanged);
         previewRoot = createPreviewRoot();
         historyMenu = new Container(BoxLayout.y());
 
         Container editorPanel = new Container(new BorderLayout());
         setThemeRole(editorPanel, "panel");
-        editorPanel.add(BorderLayout.CENTER, editor);
-        editorPanel.add(BorderLayout.SOUTH, output);
+        editorPanel.add(BorderLayout.CENTER, editor.getComponent());
 
         Container previewPanel = new Container(new BorderLayout());
         setThemeRole(previewPanel, "panel");
-        previewPanel.add(BorderLayout.NORTH, createPreviewHeader());
         previewPanel.add(BorderLayout.CENTER, previewRoot);
 
         Component content = createMainContent(editorPanel, previewPanel);
@@ -64,43 +64,17 @@ public class CN1Playground extends Lifecycle {
         form.add(BorderLayout.CENTER, content);
 
         installSideMenu(toolbar, form);
-        editor.addDataChangedListener((type, index) -> {
-            persistCurrentState();
-            scheduleHistorySnapshot();
-            scheduleAutoRun();
-        });
-
         runScript(form);
         initWebsiteThemeSync(form);
         form.show();
         notifyWebsiteUiReady();
     }
 
-    private TextArea createEditor(String initialText) {
-        TextArea area = new TextArea(initialText, 16, 80);
-        area.setHint("Write BeanShell playground code here");
-        area.setGrowByContent(false);
-        area.setRows(18);
-        area.setMaxSize(100000);
-        setThemeRole(area, "editor");
-        return area;
-    }
-
-    private TextArea createOutput(String initialText) {
-        TextArea area = new TextArea(initialText, 5, 80);
-        area.setConstraint(TextArea.ANY | TextArea.UNEDITABLE);
-        area.setFocusable(true);
-        area.setActAsLabel(false);
-        area.setTextSelectionEnabled(true);
-        area.setSingleLineTextArea(false);
-        area.setGrowByContent(false);
-        area.setRows(6);
-        area.getAllStyles().setBgColor(0xf3f4f6);
-        area.getAllStyles().setBgTransparency(255);
-        area.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
-        area.getAllStyles().setPadding(2, 2, 2, 2);
-        setThemeRole(area, "output");
-        return area;
+    private void handleSourceChanged(String source, int version) {
+        currentScript = source == null ? "" : source;
+        persistCurrentState();
+        scheduleHistorySnapshot();
+        scheduleAutoRun();
     }
 
     private Container createPreviewRoot() {
@@ -114,15 +88,6 @@ public class CN1Playground extends Lifecycle {
         return root;
     }
 
-    private Container createPreviewHeader() {
-        Container header = new Container(BoxLayout.x());
-        setThemeRole(header, "header");
-        Label title = new Label("Live Preview");
-        setThemeRole(title, "headerTitle");
-        header.add(title);
-        return header;
-    }
-
     private Component createMainContent(Container editorPanel, Container previewPanel) {
         if (com.codename1.ui.CN.getDisplayWidth() >= 900) {
             return new SplitPane(SplitPane.HORIZONTAL_SPLIT, editorPanel, previewPanel, "45%", "25%", "75%");
@@ -133,15 +98,21 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void runScript(Form form) {
-        List<PlaygroundStateStore.HistoryEntry> history = PlaygroundStateStore.pushHistory(editor.getText());
+        List<PlaygroundStateStore.HistoryEntry> history = PlaygroundStateStore.pushHistory(currentScript);
         refreshHistoryMenu(form.getToolbar(), history);
         previewRoot.removeAll();
-        output.setText("");
-        appendOutput("Running script...");
-        PlaygroundContext context = new PlaygroundContext(form, previewRoot, theme, this::appendOutput);
-        PlaygroundRunner.RunResult result = runner.run(editor.getText(), context);
+
+        List<PlaygroundRunner.InlineMessage> loggedMessages = new ArrayList<PlaygroundRunner.InlineMessage>();
+        PlaygroundContext context = new PlaygroundContext(form, previewRoot, theme,
+                message -> loggedMessages.add(new PlaygroundRunner.InlineMessage(0, message, "info")));
+        PlaygroundRunner.RunResult result = runner.run(currentScript, context);
+
+        currentMessages = new ArrayList<PlaygroundRunner.InlineMessage>(loggedMessages);
+        currentMessages.addAll(result.getMessages());
+
         replacePreview(result.getComponent());
-        appendOutput(result.getMessage());
+        editor.setMarkers(result.getDiagnostics());
+        editor.setInlineMessages(currentMessages);
         persistCurrentState();
     }
 
@@ -163,23 +134,11 @@ public class CN1Playground extends Lifecycle {
         }
     }
 
-    private void appendOutput(String message) {
-        String current = output.getText();
-        if (current == null || current.length() == 0) {
-            output.setText(message);
-        } else {
-            output.setText(current + "\n" + message);
-        }
-        persistCurrentState();
-    }
-
     private void installSideMenu(Toolbar toolbar, Form form) {
         toolbar.addComponentToSideMenu(new PlaygroundMenuSection("Samples"));
         for (PlaygroundExamples.Sample sample : PlaygroundExamples.SAMPLES) {
             toolbar.addComponentToSideMenu(createSideMenuButton(sample.title, () -> {
-                editor.setText(sample.script);
-                persistCurrentState();
-                runScript(form);
+                setScript(sample.script, true);
                 toolbar.closeSideMenu();
             }));
         }
@@ -209,12 +168,7 @@ public class CN1Playground extends Lifecycle {
         button.setTextLine2(entry.detail(history));
         button.setUIID("SideCommand");
         button.addActionListener(e -> {
-            editor.setText(entry.script);
-            persistCurrentState();
-            Form current = editor.getComponentForm();
-            if (current != null) {
-                runScript(current);
-            }
+            setScript(entry.script, true);
             toolbar.closeSideMenu();
         });
         return button;
@@ -227,11 +181,34 @@ public class CN1Playground extends Lifecycle {
         return button;
     }
 
-    private void persistCurrentState() {
-        if (editor == null || output == null) {
-            return;
+    private void setScript(String script, boolean runNow) {
+        currentScript = script == null ? "" : script;
+        if (editor != null) {
+            editor.setSource(currentScript);
         }
-        PlaygroundStateStore.saveCurrentState(editor.getText(), output.getText());
+        persistCurrentState();
+        if (runNow && appForm != null) {
+            runScript(appForm);
+        }
+    }
+
+    private void persistCurrentState() {
+        PlaygroundStateStore.saveCurrentState(currentScript, joinMessages(currentMessages));
+    }
+
+    private String joinMessages(List<PlaygroundRunner.InlineMessage> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < messages.size(); i++) {
+            PlaygroundRunner.InlineMessage message = messages.get(i);
+            if (i > 0) {
+                out.append('\n');
+            }
+            out.append(message.text);
+        }
+        return out.toString();
     }
 
     private void scheduleHistorySnapshot() {
@@ -240,10 +217,10 @@ public class CN1Playground extends Lifecycle {
         }
         final int snapshot = ++editSequence;
         UITimer.timer(1200, false, appForm, () -> {
-            if (snapshot != editSequence || editor == null) {
+            if (snapshot != editSequence) {
                 return;
             }
-            refreshHistoryMenu(appForm.getToolbar(), PlaygroundStateStore.pushHistory(editor.getText()));
+            refreshHistoryMenu(appForm.getToolbar(), PlaygroundStateStore.pushHistory(currentScript));
         });
     }
 
@@ -252,8 +229,8 @@ public class CN1Playground extends Lifecycle {
             return;
         }
         final int runTicket = ++autoRunSequence;
-        UITimer.timer(900, false, appForm, () -> {
-            if (runTicket != autoRunSequence || editor == null) {
+        UITimer.timer(850, false, appForm, () -> {
+            if (runTicket != autoRunSequence) {
                 return;
             }
             runScript(appForm);
@@ -262,9 +239,7 @@ public class CN1Playground extends Lifecycle {
 
     private void initWebsiteThemeSync(Form form) {
         refreshWebsiteTheme(form);
-        UITimer.timer(900, true, form, () -> {
-            refreshWebsiteTheme(form);
-        });
+        UITimer.timer(900, true, form, () -> refreshWebsiteTheme(form));
     }
 
     private void notifyWebsiteUiReady() {
@@ -315,6 +290,9 @@ public class CN1Playground extends Lifecycle {
                     if (dark != websiteDarkMode) {
                         websiteDarkMode = dark;
                         applyWebsiteTheme(form, dark);
+                        if (editor != null) {
+                            editor.applyTheme(dark);
+                        }
                         form.refreshTheme();
                     }
                 });
@@ -338,9 +316,6 @@ public class CN1Playground extends Lifecycle {
         style.setPaddingUnit(Style.UNIT_TYPE_DIPS);
         switch (role) {
             case "form":
-                style.setBgTransparency(255);
-                style.setBgColor(dark ? 0x111827 : 0xf5f7fb);
-                break;
             case "content":
                 style.setBgTransparency(255);
                 style.setBgColor(dark ? 0x111827 : 0xf5f7fb);
@@ -351,18 +326,6 @@ public class CN1Playground extends Lifecycle {
                 style.setMarginUnit(Style.UNIT_TYPE_DIPS);
                 style.setMargin(1, 1, 1, 1);
                 style.setPadding(1, 1, 1, 1);
-                break;
-            case "editor":
-                style.setBgTransparency(255);
-                style.setBgColor(dark ? 0x0f172a : 0xffffff);
-                style.setFgColor(dark ? 0xe5e7eb : 0x111827);
-                style.setPadding(2, 2, 2, 2);
-                break;
-            case "output":
-                style.setBgTransparency(255);
-                style.setBgColor(dark ? 0x111827 : 0xf3f4f6);
-                style.setFgColor(dark ? 0xcbd5e1 : 0x1f2937);
-                style.setPadding(2, 2, 2, 2);
                 break;
             case "preview":
                 style.setBgTransparency(255);
@@ -376,12 +339,6 @@ public class CN1Playground extends Lifecycle {
                 break;
             case "headerTitle":
                 style.setFgColor(dark ? 0xf8fafc : 0x111827);
-                break;
-            case "headerButton":
-                style.setBgTransparency(255);
-                style.setBgColor(dark ? 0x2563eb : 0x1d4ed8);
-                style.setFgColor(0xffffff);
-                style.setPadding(1, 1, 2, 2);
                 break;
             default:
                 break;

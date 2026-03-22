@@ -23,6 +23,10 @@
     <build>
         <resources>
             <resource>
+                <directory>../src/html</directory>
+                <targetPath>html</targetPath>
+            </resource>
+            <resource>
                 <directory>src/main/javascript</directory>
             </resource>
             <resource>

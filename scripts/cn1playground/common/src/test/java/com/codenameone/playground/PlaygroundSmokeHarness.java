@@ -88,9 +88,11 @@ public final class PlaygroundSmokeHarness {
                 + "}\n",
                 context);
 
-        require(result.getComponent() != null, "Lifecycle wrapper script did not produce a preview component: " + result.getMessage());
+        require(result.getComponent() != null,
+                "Lifecycle wrapper script did not produce a preview component: " + summarizeMessages(result));
         require(result.getComponent() instanceof Form, "Lifecycle wrapper script should return the shown Form");
-        require("Preview updated.".equals(result.getMessage()), "Lifecycle wrapper script returned unexpected message: " + result.getMessage());
+        require(containsMessage(result, "Preview updated."),
+                "Lifecycle wrapper script returned unexpected messages: " + summarizeMessages(result));
         require(log.size() == 1 && "Preview built successfully".equals(log.get(0)),
                 "Lifecycle wrapper script did not execute expected lifecycle body");
         require("Host".equals(host.getTitle()), "Lifecycle wrapper script should not replace the host form title");
@@ -102,5 +104,31 @@ public final class PlaygroundSmokeHarness {
         if (!condition) {
             throw new IllegalStateException(message);
         }
+    }
+
+    private static boolean containsMessage(PlaygroundRunner.RunResult result, String expected) {
+        List<PlaygroundRunner.InlineMessage> messages = result.getMessages();
+        for (int i = 0; i < messages.size(); i++) {
+            PlaygroundRunner.InlineMessage message = messages.get(i);
+            if (expected.equals(message.text)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String summarizeMessages(PlaygroundRunner.RunResult result) {
+        List<PlaygroundRunner.InlineMessage> messages = result.getMessages();
+        if (messages.isEmpty()) {
+            return "<no messages>";
+        }
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < messages.size(); i++) {
+            if (i > 0) {
+                out.append(" | ");
+            }
+            out.append(messages.get(i).text);
+        }
+        return out.toString();
     }
 }

@@ -44,6 +44,7 @@ public final class GenerateCN1AccessRegistry {
     private static final String ROOT_CLASS_NAME = "GeneratedCN1Access";
     private static final String HELPER_CLASS_PREFIX = "GeneratedAccess_";
     private static final int FIND_CLASS_CHUNK_SIZE = 64;
+    private static final char MEMBER_SEPARATOR = '\u001f';
 
     private static final String[] INDEX_PACKAGE_PREFIXES = new String[]{
             "com.codename1.",
@@ -950,6 +951,15 @@ public final class GenerateCN1AccessRegistry {
         writer.write("        }\n");
         writer.write("        return CLASS_INDEX.get(name);\n");
         writer.write("    }\n\n");
+        writer.write("    public String[] getIndexedClassNames() {\n");
+        writer.write("        return INDEXED_CLASS_NAMES.clone();\n");
+        writer.write("    }\n\n");
+        writer.write("    public String[] getMethodSignatures(String name) {\n");
+        writer.write("        return copyStrings(METHOD_INDEX.get(name));\n");
+        writer.write("    }\n\n");
+        writer.write("    public String[] getFieldNames(String name) {\n");
+        writer.write("        return copyStrings(FIELD_INDEX.get(name));\n");
+        writer.write("    }\n\n");
     }
 
     private static void writeRootClassIndex(Writer writer, List<GeneratedPackage> packages) throws IOException {
@@ -957,7 +967,17 @@ public final class GenerateCN1AccessRegistry {
         for (GeneratedPackage generatedPackage : packages) {
             classes.addAll(generatedPackage.classes);
         }
+        writer.write("    private static final String[] EMPTY_STRINGS = new String[0];\n\n");
+        writer.write("    private static final String[] INDEXED_CLASS_NAMES = new String[]{\n");
+        for (int i = 0; i < classes.size(); i++) {
+            ApiClass apiClass = classes.get(i);
+            writer.write("        \"" + apiClass.qualifiedName + "\"");
+            writer.write(i + 1 < classes.size() ? ",\n" : "\n");
+        }
+        writer.write("    };\n\n");
         writer.write("    private static final Map<String, Class<?>> CLASS_INDEX = buildClassIndex();\n\n");
+        writer.write("    private static final Map<String, String[]> METHOD_INDEX = buildMethodIndex();\n\n");
+        writer.write("    private static final Map<String, String[]> FIELD_INDEX = buildFieldIndex();\n\n");
         writer.write("    private static Map<String, Class<?>> buildClassIndex() {\n");
         writer.write("        Map<String, Class<?>> index = new LinkedHashMap<String, Class<?>>();\n");
         int chunkCount = (classes.size() + FIND_CLASS_CHUNK_SIZE - 1) / FIND_CLASS_CHUNK_SIZE;
@@ -974,6 +994,48 @@ public final class GenerateCN1AccessRegistry {
             for (int j = fromIndex; j < toIndex; j++) {
                 ApiClass apiClass = classes.get(j);
                 writer.write("        index.put(\"" + apiClass.qualifiedName + "\", " + typeLiteral(apiClass.qualifiedName) + ");\n");
+            }
+            writer.write("    }\n");
+        }
+        writer.write("\n");
+        writer.write("    private static Map<String, String[]> buildMethodIndex() {\n");
+        writer.write("        Map<String, String[]> index = new LinkedHashMap<String, String[]>();\n");
+        for (int i = 0; i < chunkCount; i++) {
+            writer.write("        fillMethodIndex" + i + "(index);\n");
+        }
+        writer.write("        return index;\n");
+        writer.write("    }\n");
+        for (int i = 0; i < chunkCount; i++) {
+            int fromIndex = i * FIND_CLASS_CHUNK_SIZE;
+            int toIndex = Math.min(classes.size(), fromIndex + FIND_CLASS_CHUNK_SIZE);
+            writer.write("\n");
+            writer.write("    private static void fillMethodIndex" + i + "(Map<String, String[]> index) {\n");
+            for (int j = fromIndex; j < toIndex; j++) {
+                ApiClass apiClass = classes.get(j);
+                List<String> methods = collectEditorMethodSignatures(apiClass);
+                writer.write("        index.put(\"" + apiClass.qualifiedName + "\", splitMembers(\""
+                        + escape(joinMembers(methods)) + "\"));\n");
+            }
+            writer.write("    }\n");
+        }
+        writer.write("\n");
+        writer.write("    private static Map<String, String[]> buildFieldIndex() {\n");
+        writer.write("        Map<String, String[]> index = new LinkedHashMap<String, String[]>();\n");
+        for (int i = 0; i < chunkCount; i++) {
+            writer.write("        fillFieldIndex" + i + "(index);\n");
+        }
+        writer.write("        return index;\n");
+        writer.write("    }\n");
+        for (int i = 0; i < chunkCount; i++) {
+            int fromIndex = i * FIND_CLASS_CHUNK_SIZE;
+            int toIndex = Math.min(classes.size(), fromIndex + FIND_CLASS_CHUNK_SIZE);
+            writer.write("\n");
+            writer.write("    private static void fillFieldIndex" + i + "(Map<String, String[]> index) {\n");
+            for (int j = fromIndex; j < toIndex; j++) {
+                ApiClass apiClass = classes.get(j);
+                List<String> fields = collectEditorFields(apiClass);
+                writer.write("        index.put(\"" + apiClass.qualifiedName + "\", splitMembers(\""
+                        + escape(joinMembers(fields)) + "\"));\n");
             }
             writer.write("    }\n");
         }
@@ -1122,6 +1184,30 @@ public final class GenerateCN1AccessRegistry {
         writer.write("        int lastDot = name.lastIndexOf('.');\n");
         writer.write("        return lastDot < 0 || lastDot == name.length() - 1 ? null : name.substring(lastDot + 1);\n");
         writer.write("    }\n\n");
+        writer.write("    private static String[] copyStrings(String[] values) {\n");
+        writer.write("        return values == null ? EMPTY_STRINGS : values.clone();\n");
+        writer.write("    }\n\n");
+        writer.write("    private static String[] splitMembers(String data) {\n");
+        writer.write("        if (data == null || data.length() == 0) {\n");
+        writer.write("            return EMPTY_STRINGS;\n");
+        writer.write("        }\n");
+        writer.write("        int count = 1;\n");
+        writer.write("        for (int i = 0; i < data.length(); i++) {\n");
+        writer.write("            if (data.charAt(i) == '\\u001f') {\n");
+        writer.write("                count++;\n");
+        writer.write("            }\n");
+        writer.write("        }\n");
+        writer.write("        String[] out = new String[count];\n");
+        writer.write("        int start = 0;\n");
+        writer.write("        int index = 0;\n");
+        writer.write("        for (int i = 0; i <= data.length(); i++) {\n");
+        writer.write("            if (i == data.length() || data.charAt(i) == '\\u001f') {\n");
+        writer.write("                out[index++] = data.substring(start, i);\n");
+        writer.write("                start = i + 1;\n");
+        writer.write("            }\n");
+        writer.write("        }\n");
+        writer.write("        return out;\n");
+        writer.write("    }\n\n");
         writer.write("    private static CN1AccessException unsupportedConstruct(Class<?> type, Object[] args) {\n");
         writer.write("        return new CN1AccessException(\"Generated constructor dispatch not implemented for \" + type.getName() + describeArgs(args));\n");
         writer.write("    }\n\n");
@@ -1217,6 +1303,59 @@ public final class GenerateCN1AccessRegistry {
         }
         writer.write("        throw unsupportedConstruct(type, safeArgs);\n");
         writer.write("    }\n\n");
+    }
+
+    private static List<String> collectEditorMethodSignatures(ApiClass apiClass) {
+        if (!isEditorDetailedClass(apiClass)) {
+            return Collections.emptyList();
+        }
+        LinkedHashSet<String> signatures = new LinkedHashSet<String>();
+        for (ApiMethod method : apiClass.instanceMethods) {
+            signatures.add(editorMethodSignature(method));
+        }
+        for (ApiMethod method : apiClass.staticMethods) {
+            signatures.add(editorMethodSignature(method));
+        }
+        return new ArrayList<String>(signatures);
+    }
+
+    private static List<String> collectEditorFields(ApiClass apiClass) {
+        if (!isEditorDetailedClass(apiClass)) {
+            return Collections.emptyList();
+        }
+        LinkedHashSet<String> names = new LinkedHashSet<String>();
+        for (ApiField field : apiClass.instanceFields) {
+            names.add(field.name);
+        }
+        for (ApiField field : apiClass.staticFields) {
+            names.add(field.name);
+        }
+        return new ArrayList<String>(names);
+    }
+
+    private static String editorMethodSignature(ApiMethod method) {
+        return method.paramTypes.isEmpty() && !method.varArgs ? method.name + "()" : method.name + "(...)";
+    }
+
+    private static String joinMembers(List<String> members) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < members.size(); i++) {
+            if (i > 0) {
+                out.append(MEMBER_SEPARATOR);
+            }
+            out.append(members.get(i));
+        }
+        return out.toString();
+    }
+
+    private static boolean isEditorDetailedClass(ApiClass apiClass) {
+        return apiClass.packageName.startsWith("com.codename1.ui")
+                || apiClass.packageName.startsWith("com.codename1.components")
+                || apiClass.packageName.startsWith("com.codenameone.playground");
+    }
+
+    private static String escape(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     private static void writeInvokeStatic(Writer writer, List<ApiClass> classes) throws IOException {
