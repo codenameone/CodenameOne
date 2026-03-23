@@ -112,7 +112,8 @@ final class PlaygroundRunner {
     private void bindGlobals(Interpreter interpreter, PlaygroundContext context) throws EvalError {
         NameSpace namespace = interpreter.getNameSpace();
         interpreter.set("ctx", context);
-        interpreter.set("__lambdaSupport", new LambdaBridge());
+        interpreter.set("__lambdaSupport", new PlaygroundLambdaBridge());
+        interpreter.set("__listenerSupport", new PlaygroundListenerBridge());
         interpreter.set("theme", context.getTheme());
         interpreter.set("hostForm", context.getHostForm());
         interpreter.set("previewRoot", context.getPreviewRoot());
@@ -136,6 +137,7 @@ final class PlaygroundRunner {
     private String adaptScript(String script) {
         String adapted = unwrapSingleTopLevelClass(script);
         String normalized = adapted == null ? script : adapted;
+        normalized = rewriteKnownSamCalls(normalized);
         normalized = rewriteLambdaArguments(normalized);
         String wrapped = wrapLooseScript(normalized);
         return wrapped == null ? normalized : wrapped;
@@ -718,6 +720,115 @@ final class PlaygroundRunner {
         return out.toString();
     }
 
+    private String rewriteKnownSamCalls(String script) {
+        String rewritten = rewriteKnownSamCalls(script,
+                "addActionListener",
+                "actionListener");
+        rewritten = rewriteKnownSamCalls(rewritten,
+                "addResponseListener",
+                "networkListener");
+        rewritten = rewriteKnownSamCalls(rewritten,
+                "callSerially",
+                "runnable");
+        rewritten = rewriteKnownSamCalls(rewritten,
+                "callSeriallyAndWait",
+                "runnable");
+        return rewritten;
+    }
+
+    private String rewriteKnownSamCalls(String script, String methodName, String factoryMethod) {
+        String marker = "." + methodName + "(";
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        for (int i = 0; i < script.length(); i++) {
+            char ch = script.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(script, i);
+                continue;
+            }
+            if (startsLineComment(script, i)) {
+                i = skipLineComment(script, i);
+                continue;
+            }
+            if (startsBlockComment(script, i)) {
+                i = skipBlockComment(script, i);
+                continue;
+            }
+            if (!script.startsWith(marker, i)) {
+                continue;
+            }
+            int open = i + marker.length() - 1;
+            int close = findMatchingParen(script, open);
+            if (close < 0) {
+                break;
+            }
+            String args = script.substring(open + 1, close);
+            String rewrittenArgs = rewriteKnownSamArgument(args, factoryMethod);
+            out.append(script, last, open + 1);
+            out.append(rewrittenArgs == null ? args : rewrittenArgs);
+            last = close;
+            i = close;
+        }
+        out.append(script.substring(last));
+        return out.toString();
+    }
+
+    private String rewriteKnownSamArgument(String args, String factoryMethod) {
+        String rewrittenLambda = rewriteLambdaToAnonymousSam(args, factoryMethod);
+        if (rewrittenLambda != null) {
+            return rewrittenLambda;
+        }
+        return rewriteAnonymousSamToAnonymousSam(args, factoryMethod);
+    }
+
+    private String rewriteLambdaToAnonymousSam(String segment, String factoryMethod) {
+        int arrow = findTopLevelArrow(segment);
+        if (arrow < 0) {
+            return null;
+        }
+        String[] params = parseLambdaParameters(segment.substring(0, arrow));
+        if (params == null) {
+            return null;
+        }
+        String body = normalizeLambdaBody(segment.substring(arrow + 2));
+        if (body == null) {
+            return null;
+        }
+        return listenerFactoryExpression(factoryMethod, params, body);
+    }
+
+    private String rewriteAnonymousSamToAnonymousSam(String segment, String factoryMethod) {
+        String trimmed = segment.trim();
+        if (!trimmed.startsWith("new ")) {
+            return null;
+        }
+        int openParen = findTopLevelChar(trimmed, '(', 4);
+        if (openParen < 0) {
+            return null;
+        }
+        int closeParen = findMatchingParen(trimmed, openParen);
+        if (closeParen < 0 || containsNonWhitespace(trimmed.substring(openParen + 1, closeParen))) {
+            return null;
+        }
+        int bodyStart = skipWhitespace(trimmed, closeParen + 1);
+        if (bodyStart >= trimmed.length() || trimmed.charAt(bodyStart) != '{') {
+            return null;
+        }
+        int bodyEnd = findMatchingBrace(trimmed, bodyStart);
+        if (bodyEnd != trimmed.length() - 1) {
+            return null;
+        }
+        AnonymousSam anonymousSam = parseAnonymousSamBody(trimmed.substring(bodyStart + 1, bodyEnd));
+        if (anonymousSam == null) {
+            return null;
+        }
+        return listenerFactoryExpression(factoryMethod, anonymousSam.parameterNames, anonymousSam.bodySource);
+    }
+
+    private String listenerFactoryExpression(String factoryMethod, String[] params, String body) {
+        return "__listenerSupport." + factoryMethod + "(" + lambdaPlaceholder(params, body) + ")";
+    }
+
     private String rewriteLambdaSegments(String text) {
         StringBuilder out = new StringBuilder();
         int start = 0;
@@ -758,7 +869,7 @@ final class PlaygroundRunner {
     private String rewriteLambdaExpression(String segment) {
         int arrow = findTopLevelArrow(segment);
         if (arrow < 0) {
-            return rewriteAnonymousSamExpression(segment);
+            return null;
         }
         String[] params = parseLambdaParameters(segment.substring(0, arrow));
         if (params == null) {
@@ -1109,12 +1220,6 @@ final class PlaygroundRunner {
         AnonymousSam(String[] parameterNames, String bodySource) {
             this.parameterNames = parameterNames;
             this.bodySource = bodySource;
-        }
-    }
-
-    public static final class LambdaBridge {
-        public CN1LambdaSupport.LambdaValue lambda(String[] parameterNames, String bodySource) {
-            return CN1LambdaSupport.lambda(parameterNames, bodySource);
         }
     }
 

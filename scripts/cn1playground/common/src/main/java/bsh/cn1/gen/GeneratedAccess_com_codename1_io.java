@@ -4862,52 +4862,10 @@ public final class GeneratedAccess_com_codename1_io {
     }
 
     private static boolean isSamInterface(Class<?> type) {
-        if (type == java.lang.Runnable.class) {
-            return true;
-        }
-        if (type == java.util.Observer.class) {
-            return true;
-        }
-        if (type == java.lang.Iterable.class) {
-            return true;
-        }
         return false;
     }
 
     private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
-        if (type == java.lang.Runnable.class) {
-            return new java.lang.Runnable() {
-                public void run() {
-                    try {
-                        lambda.invoke(new Object[0]);
-                    } catch (bsh.EvalError ex) {
-                        throw new RuntimeException(ex);
-                    }
-                }
-            };
-        }
-        if (type == java.util.Observer.class) {
-            return new java.util.Observer() {
-                public void update(java.util.Observable arg0, java.lang.Object arg1) {
-                    try {
-                        lambda.invoke(new Object[]{arg0, arg1});
-                    } catch (bsh.EvalError ex) {
-                        throw new RuntimeException(ex);
-                    }
-                }
-            };
-        }
-        if (type == java.lang.Iterable.class) {
-            return new java.lang.Iterable() {
-                public java.util.Iterator iterator() {
-                    try {
-                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
-                    } catch (bsh.EvalError ex) {
-                        throw new RuntimeException(ex);
-                    }
-                }
-            };
-        }
         return lambda;
     }
 

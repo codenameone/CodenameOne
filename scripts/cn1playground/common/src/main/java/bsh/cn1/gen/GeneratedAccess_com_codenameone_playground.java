@@ -30,6 +30,12 @@ public final class GeneratedAccess_com_codenameone_playground {
         if ("PlaygroundContext".equals(simpleName)) {
             return com.codenameone.playground.PlaygroundContext.class;
         }
+        if ("PlaygroundLambdaBridge".equals(simpleName)) {
+            return com.codenameone.playground.PlaygroundLambdaBridge.class;
+        }
+        if ("PlaygroundListenerBridge".equals(simpleName)) {
+            return com.codenameone.playground.PlaygroundListenerBridge.class;
+        }
         if ("WebsiteThemeNative".equals(simpleName)) {
             return com.codenameone.playground.WebsiteThemeNative.class;
         }
@@ -91,9 +97,23 @@ public final class GeneratedAccess_com_codenameone_playground {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codenameone.playground.PlaygroundLambdaBridge) {
+            try {
+                return invoke2((com.codenameone.playground.PlaygroundLambdaBridge) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codenameone.playground.PlaygroundListenerBridge) {
+            try {
+                return invoke3((com.codenameone.playground.PlaygroundListenerBridge) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codenameone.playground.WebsiteThemeNative) {
             try {
-                return invoke2((com.codenameone.playground.WebsiteThemeNative) target, name, safeArgs);
+                return invoke4((com.codenameone.playground.WebsiteThemeNative) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -208,7 +228,39 @@ public final class GeneratedAccess_com_codenameone_playground {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke2(com.codenameone.playground.WebsiteThemeNative typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke2(com.codenameone.playground.PlaygroundLambdaBridge typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("lambda".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.String.class}, false);
+                return typedTarget.lambda((java.lang.Object[]) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke3(com.codenameone.playground.PlaygroundListenerBridge typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("actionListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.actionListener((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("networkListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.networkListener((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("runnable".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.runnable((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke4(com.codenameone.playground.WebsiteThemeNative typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("isDarkMode".equals(name)) {
             if (matches(safeArgs, new Class<?>[0], false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
@@ -276,52 +328,10 @@ public final class GeneratedAccess_com_codenameone_playground {
     }
 
     private static boolean isSamInterface(Class<?> type) {
-        if (type == java.lang.Runnable.class) {
-            return true;
-        }
-        if (type == java.util.Observer.class) {
-            return true;
-        }
-        if (type == java.lang.Iterable.class) {
-            return true;
-        }
         return false;
     }
 
     private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
-        if (type == java.lang.Runnable.class) {
-            return new java.lang.Runnable() {
-                public void run() {
-                    try {
-                        lambda.invoke(new Object[0]);
-                    } catch (bsh.EvalError ex) {
-                        throw new RuntimeException(ex);
-                    }
-                }
-            };
-        }
-        if (type == java.util.Observer.class) {
-            return new java.util.Observer() {
-                public void update(java.util.Observable arg0, java.lang.Object arg1) {
-                    try {
-                        lambda.invoke(new Object[]{arg0, arg1});
-                    } catch (bsh.EvalError ex) {
-                        throw new RuntimeException(ex);
-                    }
-                }
-            };
-        }
-        if (type == java.lang.Iterable.class) {
-            return new java.lang.Iterable() {
-                public java.util.Iterator iterator() {
-                    try {
-                        return (java.util.Iterator) bsh.cn1.CN1LambdaSupport.coerceResult(lambda.invoke(new Object[0]), java.util.Iterator.class);
-                    } catch (bsh.EvalError ex) {
-                        throw new RuntimeException(ex);
-                    }
-                }
-            };
-        }
         return lambda;
     }
 
