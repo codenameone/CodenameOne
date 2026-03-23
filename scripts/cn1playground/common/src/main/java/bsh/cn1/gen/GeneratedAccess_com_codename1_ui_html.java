@@ -229,23 +229,16 @@ public final class GeneratedAccess_com_codename1_ui_html {
                 unsupported = ex;
             }
         }
-        if (target instanceof com.codename1.ui.html.HTMLParser) {
-            try {
-                return invoke6((com.codename1.ui.html.HTMLParser) target, name, safeArgs);
-            } catch (CN1AccessException ex) {
-                unsupported = ex;
-            }
-        }
         if (target instanceof com.codename1.ui.html.AsyncDocumentRequestHandler) {
             try {
-                return invoke7((com.codename1.ui.html.AsyncDocumentRequestHandler) target, name, safeArgs);
+                return invoke6((com.codename1.ui.html.AsyncDocumentRequestHandler) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.html.HTMLCallback) {
             try {
-                return invoke8((com.codename1.ui.html.HTMLCallback) target, name, safeArgs);
+                return invoke7((com.codename1.ui.html.HTMLCallback) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -2753,28 +2746,10 @@ public final class GeneratedAccess_com_codename1_ui_html {
     }
 
     private static Object invoke5(com.codename1.ui.html.HTMLElement typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("addChild".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false);
-                typedTarget.addChild((com.codename1.xml.Element) adaptedArgs[0]); return null;
-            }
-        }
-        if ("contains".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false);
-                return typedTarget.contains((com.codename1.xml.Element) adaptedArgs[0]);
-            }
-        }
         if ("getAttribute".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.getAttribute((java.lang.String) adaptedArgs[0]);
-            }
-        }
-        if ("getAttributeAsInt".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return typedTarget.getAttributeAsInt((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("getAttributeById".equals(name)) {
@@ -2789,30 +2764,6 @@ public final class GeneratedAccess_com_codename1_ui_html {
                 return typedTarget.getAttributeName(Integer.valueOf(((Number) adaptedArgs[0]).intValue()));
             }
         }
-        if ("getAttributes".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
-                return typedTarget.getAttributes();
-            }
-        }
-        if ("getChildAt".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                return typedTarget.getChildAt(((Number) adaptedArgs[0]).intValue());
-            }
-        }
-        if ("getChildIndex".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false);
-                return typedTarget.getChildIndex((com.codename1.xml.Element) adaptedArgs[0]);
-            }
-        }
-        if ("getChildrenByTagName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                return typedTarget.getChildrenByTagName((java.lang.String) adaptedArgs[0]);
-            }
-        }
         if ("getDescendantsByTagId".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
@@ -2825,52 +2776,10 @@ public final class GeneratedAccess_com_codename1_ui_html {
                 return typedTarget.getDescendantsByTagId(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
-        if ("getDescendantsByTagName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                return typedTarget.getDescendantsByTagName((java.lang.String) adaptedArgs[0]);
-            }
-        }
-        if ("getDescendantsByTagName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return typedTarget.getDescendantsByTagName((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
-            }
-        }
-        if ("getDescendantsByTagNameAndAttribute".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Integer.class}, false);
-                return typedTarget.getDescendantsByTagNameAndAttribute((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue());
-            }
-        }
-        if ("getElementById".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                return typedTarget.getElementById((java.lang.String) adaptedArgs[0]);
-            }
-        }
         if ("getFirstChildByTagId".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.getFirstChildByTagId(((Number) adaptedArgs[0]).intValue());
-            }
-        }
-        if ("getFirstChildByTagName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                return typedTarget.getFirstChildByTagName((java.lang.String) adaptedArgs[0]);
-            }
-        }
-        if ("getNumChildren".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
-                return typedTarget.getNumChildren();
-            }
-        }
-        if ("getParent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
-                return typedTarget.getParent();
             }
         }
         if ("getSupportedAttributesList".equals(name)) {
@@ -2891,66 +2800,6 @@ public final class GeneratedAccess_com_codename1_ui_html {
                 return typedTarget.getTagName();
             }
         }
-        if ("getText".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
-                return typedTarget.getText();
-            }
-        }
-        if ("getTextChildren".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
-                return typedTarget.getTextChildren((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
-            }
-        }
-        if ("getTextDescendants".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
-                return typedTarget.getTextDescendants((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
-            }
-        }
-        if ("getTextDescendants".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
-                return typedTarget.getTextDescendants((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
-            }
-        }
-        if ("hasTextChild".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
-                return typedTarget.hasTextChild();
-            }
-        }
-        if ("insertChildAt".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class, java.lang.Integer.class}, false);
-                typedTarget.insertChildAt((com.codename1.xml.Element) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
-            }
-        }
-        if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
-                return typedTarget.isEmpty();
-            }
-        }
-        if ("isTextElement".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
-                return typedTarget.isTextElement();
-            }
-        }
-        if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
-                return typedTarget.iterator();
-            }
-        }
-        if ("removeAttribute".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                typedTarget.removeAttribute((java.lang.String) adaptedArgs[0]); return null;
-            }
-        }
         if ("removeAttributeById".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
@@ -2963,12 +2812,6 @@ public final class GeneratedAccess_com_codename1_ui_html {
                 typedTarget.removeChildAt(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
-        if ("replaceChild".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class, com.codename1.xml.Element.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class, com.codename1.xml.Element.class}, false);
-                typedTarget.replaceChild((com.codename1.xml.Element) adaptedArgs[0], (com.codename1.xml.Element) adaptedArgs[1]); return null;
-            }
-        }
         if ("setAttribute".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
@@ -2979,12 +2822,6 @@ public final class GeneratedAccess_com_codename1_ui_html {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
                 typedTarget.setAttributeById(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1]); return null;
-            }
-        }
-        if ("setText".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                typedTarget.setText((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("toString".equals(name)) {
@@ -3002,47 +2839,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke6(com.codename1.ui.html.HTMLParser typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("addCharEntitiesRange".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.Integer.class}, false);
-                typedTarget.addCharEntitiesRange((java.lang.String[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
-            }
-        }
-        if ("addCharEntity".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                typedTarget.addCharEntity((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
-            }
-        }
-        if ("isCaseSensitive".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
-                return typedTarget.isCaseSensitive();
-            }
-        }
-        if ("setCaseSensitive".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
-                typedTarget.setCaseSensitive(((Boolean) adaptedArgs[0]).booleanValue()); return null;
-            }
-        }
-        if ("setIncludeWhitespacesBetweenTags".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
-                typedTarget.setIncludeWhitespacesBetweenTags(((Boolean) adaptedArgs[0]).booleanValue()); return null;
-            }
-        }
-        if ("setParserCallback".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{com.codename1.xml.ParserCallback.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.ParserCallback.class}, false);
-                typedTarget.setParserCallback((com.codename1.xml.ParserCallback) adaptedArgs[0]); return null;
-            }
-        }
-        throw unsupportedInstance(typedTarget, name, safeArgs);
-    }
-
-    private static Object invoke7(com.codename1.ui.html.AsyncDocumentRequestHandler typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke6(com.codename1.ui.html.AsyncDocumentRequestHandler typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("resourceRequestedAsync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.html.DocumentInfo.class, com.codename1.ui.html.IOCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.html.DocumentInfo.class, com.codename1.ui.html.IOCallback.class}, false);
@@ -3052,7 +2849,7 @@ public final class GeneratedAccess_com_codename1_ui_html {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke8(com.codename1.ui.html.HTMLCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.ui.html.HTMLCallback typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("actionPerformed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class, com.codename1.ui.html.HTMLComponent.class, com.codename1.ui.html.HTMLElement.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class, com.codename1.ui.html.HTMLComponent.class, com.codename1.ui.html.HTMLElement.class}, false);
@@ -3105,12 +2902,6 @@ public final class GeneratedAccess_com_codename1_ui_html {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.html.HTMLComponent.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.html.HTMLComponent.class, java.lang.Integer.class, java.lang.String.class}, false);
                 typedTarget.pageStatusChanged((com.codename1.ui.html.HTMLComponent) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), (java.lang.String) adaptedArgs[2]); return null;
-            }
-        }
-        if ("parsingError".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
-                return typedTarget.parsingError(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4]);
             }
         }
         if ("selectionChanged".equals(name)) {
