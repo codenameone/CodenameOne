@@ -48,21 +48,9 @@ public final class GenerateCN1AccessRegistry {
     private static final char MEMBER_SEPARATOR = '\u001f';
 
     private static final String[] INDEX_PACKAGE_PREFIXES = new String[]{
-            "com.codename1.ui",
-            "com.codename1.components",
-            "com.codename1.io",
-            "com.codename1.capture",
-            "com.codename1.util",
+            "com.codename1.",
+            "com.codenameone.playground.",
             "java."
-    };
-
-    private static final String[] EXCLUDED_PACKAGES = new String[]{
-            "com.codename1.io.tar",
-            "com.codename1.io.gzip",
-            "com.codename1.xml",
-            "com.codename1.ui.tree",
-            "com.codename1.ui.scene",
-            "com.codename1.ui.animations"
     };
 
     private GenerateCN1AccessRegistry() {
@@ -86,6 +74,7 @@ public final class GenerateCN1AccessRegistry {
         List<File> sourceRoots = new ArrayList<File>();
         sourceRoots.add(new File(cn1Root, "CodenameOne/src"));
         sourceRoots.add(new File(cn1Root, "Ports/CLDC11/src"));
+        sourceRoots.add(new File(projectRoot, "common/src/main/java"));
 
         List<File> sourceFiles = new ArrayList<File>();
         for (File sourceRoot : sourceRoots) {
@@ -96,8 +85,7 @@ public final class GenerateCN1AccessRegistry {
         LinkedHashMap<String, SourceClass> indexedClasses = new LinkedHashMap<String, SourceClass>();
         for (SourceUnit unit : units) {
             for (SourceClass sourceClass : unit.topLevelClasses) {
-                if (matchesPrefix(sourceClass.qualifiedName, INDEX_PACKAGE_PREFIXES)
-                        && !matchesPrefix(sourceClass.qualifiedName, EXCLUDED_PACKAGES)) {
+                if (matchesPrefix(sourceClass.qualifiedName, INDEX_PACKAGE_PREFIXES)) {
                     indexedClasses.put(sourceClass.qualifiedName, sourceClass);
                 }
             }
@@ -798,55 +786,19 @@ public final class GenerateCN1AccessRegistry {
     }
 
     private static boolean isDispatchClass(ApiClass apiClass) {
-        String packageName = apiClass.packageName;
-        if (packageName.startsWith("com.codename1.ui")
-                && !packageName.startsWith("com.codename1.ui.tree")
-                && !packageName.startsWith("com.codename1.ui.scene")
-                && !packageName.startsWith("com.codename1.ui.animations")) {
-            return true;
-        }
-        if (packageName.equals("com.codename1.components")) {
-            return true;
-        }
-        if (packageName.startsWith("com.codename1.io")
-                && !packageName.startsWith("com.codename1.io.tar")
-                && !packageName.startsWith("com.codename1.io.gzip")) {
-            return true;
-        }
-        if (packageName.equals("com.codename1.capture")
-                || packageName.startsWith("com.codename1.util")) {
-            return true;
-        }
-        return isSupportedJavaDispatchPackage(packageName);
+        return apiClass.packageName.startsWith("com.codename1.")
+                || isSupportedJavaDispatchPackage(apiClass.packageName)
+                || "com.codenameone.playground".equals(apiClass.packageName)
+                || apiClass.packageName.startsWith("com.codenameone.playground.");
     }
 
     private static boolean isSupportedJavaDispatchPackage(String packageName) {
-        if (!packageName.startsWith("java.")) {
-            return false;
-        }
-        return!packageName.startsWith("java.lang.annotation")
-                && !packageName.startsWith("java.lang.invoke")
-                && !packageName.startsWith("java.lang.constant")
-                && !packageName.startsWith("java.lang.reflect")
-                && !packageName.startsWith("java.time")
-                && !packageName.startsWith("java.util.function")
-                && !packageName.startsWith("java.util.stream")
-                && !packageName.startsWith("java.util.concurrent")
-                && !packageName.startsWith("java.util.regex")
-                && !packageName.startsWith("java.util.jar")
-                && !packageName.startsWith("java.util.zip")
-                && !packageName.startsWith("java.util.prefs")
-                && !packageName.startsWith("java.util.spi")
-                && !packageName.startsWith("java.io")
-                && !packageName.startsWith("java.net")
-                && !packageName.startsWith("java.nio")
-                && !packageName.startsWith("java.security")
-                && !packageName.startsWith("java.awt")
-                && !packageName.startsWith("java.applet")
-                && !packageName.startsWith("java.beans")
-                && !packageName.startsWith("java.sql")
-                && !packageName.startsWith("java.text.spi")
-                && !packageName.startsWith("java.rmi");
+        return packageName.startsWith("java.")
+                && !isPackageOrChild(packageName, "java.lang.annotation")
+                && !isPackageOrChild(packageName, "java.lang.invoke")
+                && !isPackageOrChild(packageName, "java.time")
+                && !isPackageOrChild(packageName, "java.util.function")
+                && !isPackageOrChild(packageName, "java.util.stream");
     }
 
     private static boolean isSupportedType(ApiType type) {
