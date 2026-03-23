@@ -525,6 +525,9 @@ public class CN1Playground extends Lifecycle {
                 case "PlaygroundMenuSectionTitle":
                 case "PlaygroundMenuEmpty":
                 case "PlaygroundMenuContainer":
+                case "SideNavigationPanel":
+                case "SideCommand":
+                case "StatusBarSideMenu":
                     return uiid + "Dark";
                 default:
                     return uiid;
@@ -546,6 +549,9 @@ public class CN1Playground extends Lifecycle {
             case "PlaygroundMenuSectionTitle":
             case "PlaygroundMenuEmpty":
             case "PlaygroundMenuContainer":
+            case "SideNavigationPanel":
+            case "SideCommand":
+            case "StatusBarSideMenu":
                 return base;
             default:
                 return uiid;

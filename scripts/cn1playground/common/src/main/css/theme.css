@@ -47,7 +47,7 @@ PlaygroundTitle {
 
 PlaygroundTitleDark {
     color: #f8fafc;
-    background: #111827;
+    background: none;
     font-family: "native:MainLight";
     font-size: 6mm;
 }
@@ -90,10 +90,18 @@ SideNavigationPanel {
     padding: 2mm 1mm 1mm 1mm;
 }
 
+SideNavigationPanelDark {
+    background: #0f172a;
+    padding: 2mm 1mm 1mm 1mm;
+}
+
 @media platform-ios {
     /** iOS Only styles for side menu. */
     SideNavigationPanel {
         /** Extra top padding to deal with notch on iPhoneX */
+        padding: 6mm 1mm 1mm 1mm;
+    }
+    SideNavigationPanelDark {
         padding: 6mm 1mm 1mm 1mm;
     }
 }
@@ -108,6 +116,27 @@ SideCommand {
     font-family: "native:MainLight";
     font-size: 4mm;
     border-bottom: 2px solid #cccccc;
+}
+
+SideCommandDark {
+    padding: 1mm;
+    border: none;
+    text-decoration: none;
+    color: #e5e7eb;
+    background: #0f172a;
+    font-family: "native:MainLight";
+    font-size: 4mm;
+    border-bottom: 2px solid #1f2937;
+}
+
+StatusBarSideMenu {
+    background: white;
+    padding: 0mm;
+}
+
+StatusBarSideMenuDark {
+    background: #0f172a;
+    padding: 0mm;
 }
 
 PlaygroundSideCommand {
