@@ -79,7 +79,6 @@ public class CN1Playground extends Lifecycle {
         form.add(BorderLayout.CENTER, content);
 
         installSideMenu(toolbar, form);
-        applyGlobalThemeStyles(websiteDarkMode);
         runScript(form);
         initWebsiteThemeSync(form);
         form.show();
@@ -156,25 +155,19 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void installSideMenu(Toolbar toolbar, Form form) {
-        PlaygroundMenuSection shareSection = new PlaygroundMenuSection("Share");
-        applyWebsiteTheme(shareSection, websiteDarkMode);
-        toolbar.addComponentToSideMenu(shareSection);
+        toolbar.addComponentToSideMenu(new PlaygroundMenuSection("Share"));
         toolbar.addComponentToSideMenu(createSideMenuButton(SHARE_BUTTON_LABEL, () -> {
             copyCurrentSourceUrl();
             toolbar.closeSideMenu();
         }));
-        PlaygroundMenuSection samplesSection = new PlaygroundMenuSection("Samples");
-        applyWebsiteTheme(samplesSection, websiteDarkMode);
-        toolbar.addComponentToSideMenu(samplesSection);
+        toolbar.addComponentToSideMenu(new PlaygroundMenuSection("Samples"));
         for (PlaygroundExamples.Sample sample : PlaygroundExamples.SAMPLES) {
             toolbar.addComponentToSideMenu(createSideMenuButton(sample.title, () -> {
                 setScript(sample.script, true);
                 toolbar.closeSideMenu();
             }));
         }
-        PlaygroundMenuSection historySection = new PlaygroundMenuSection("History");
-        applyWebsiteTheme(historySection, websiteDarkMode);
-        toolbar.addComponentToSideMenu(historySection);
+        toolbar.addComponentToSideMenu(new PlaygroundMenuSection("History"));
         toolbar.addComponentToSideMenu(historyMenu);
         refreshHistoryMenu(toolbar, PlaygroundStateStore.loadHistory());
     }
@@ -184,7 +177,6 @@ public class CN1Playground extends Lifecycle {
         if (history.isEmpty()) {
             Label empty = new Label("No saved runs yet");
             empty.setUIID("PlaygroundMenuEmpty");
-            setThemeRole(empty, "sideMenu");
             historyMenu.add(empty);
         } else {
             for (int i = 0; i < history.size(); i++) {
@@ -192,7 +184,6 @@ public class CN1Playground extends Lifecycle {
                 historyMenu.add(createHistoryButton(entry, history, toolbar));
             }
         }
-        applyWebsiteTheme(historyMenu, websiteDarkMode);
         historyMenu.revalidate();
     }
 
@@ -201,8 +192,6 @@ public class CN1Playground extends Lifecycle {
         MultiButton button = new MultiButton(entry.title());
         button.setTextLine2(entry.detail(history));
         button.setUIID("PlaygroundSideCommand");
-        setThemeRole(button, "sideCommand");
-        applyWebsiteTheme(button, websiteDarkMode);
         button.addActionListener(e -> {
             setScript(entry.script, true);
             toolbar.closeSideMenu();
@@ -214,7 +203,6 @@ public class CN1Playground extends Lifecycle {
         Button button = new Button(text);
         button.setUIID("PlaygroundSideCommand");
         setThemeRole(button, "sideCommand");
-        applyWebsiteTheme(button, websiteDarkMode);
         button.addActionListener(e -> action.run());
         return button;
     }
@@ -425,11 +413,11 @@ public class CN1Playground extends Lifecycle {
                     boolean dark = "true".equals(String.valueOf(res));
                     if (dark != websiteDarkMode) {
                         websiteDarkMode = dark;
-                        form.refreshTheme();
                         applyWebsiteTheme(form, dark);
                         if (editor != null) {
                             editor.applyTheme(dark);
                         }
+                        form.refreshTheme();
                     }
                 });
     }

@@ -6,7 +6,6 @@ import com.sun.source.tree.ImportTree;
 import com.sun.source.tree.MethodTree;
 import com.sun.source.tree.ModifiersTree;
 import com.sun.source.tree.Tree;
-import com.sun.source.tree.TypeParameterTree;
 import com.sun.source.tree.VariableTree;
 import com.sun.source.util.JavacTask;
 
@@ -194,38 +193,13 @@ public final class GenerateCN1AccessRegistry {
             String qualifiedName = qualify(packageName, simpleName);
             Map<String, String> nestedTypes = new LinkedHashMap<String, String>();
             collectNestedTypes(classTree, qualifiedName, nestedTypes);
-            Map<String, String> typeParameterBounds = resolveTypeParameterBounds(packageName, simpleName, qualifiedName,
-                    classTree, explicitImports, wildcardImports, nestedTypes);
             SourceClass unresolved = new SourceClass(packageName, simpleName, qualifiedName, classTree,
-                    explicitImports, wildcardImports, nestedTypes, typeParameterBounds, Collections.<String>emptyList());
+                    explicitImports, wildcardImports, nestedTypes, Collections.<String>emptyList());
             List<String> superTypes = resolveSuperTypes(unresolved);
             topLevelClasses.add(new SourceClass(packageName, simpleName, qualifiedName, classTree,
-                    explicitImports, wildcardImports, nestedTypes, typeParameterBounds, superTypes));
+                    explicitImports, wildcardImports, nestedTypes, superTypes));
         }
         return new SourceUnit(packageName, topLevelClasses);
-    }
-
-    private static Map<String, String> resolveTypeParameterBounds(String packageName, String simpleName, String qualifiedName,
-            ClassTree classTree, Map<String, String> explicitImports, List<String> wildcardImports,
-            Map<String, String> nestedTypes) {
-        if (classTree.getTypeParameters().isEmpty()) {
-            return Collections.emptyMap();
-        }
-        SourceClass sourceClass = new SourceClass(packageName, simpleName, qualifiedName, classTree,
-                explicitImports, wildcardImports, nestedTypes, Collections.<String, String>emptyMap(),
-                Collections.<String>emptyList());
-        Map<String, String> out = new LinkedHashMap<String, String>();
-        for (TypeParameterTree typeParameter : classTree.getTypeParameters()) {
-            String bound = "java.lang.Object";
-            if (!typeParameter.getBounds().isEmpty()) {
-                String resolved = resolveHierarchyTypeName(sourceClass, typeParameter.getBounds().get(0).toString());
-                if (resolved != null) {
-                    bound = resolved;
-                }
-            }
-            out.put(typeParameter.getName().toString(), bound);
-        }
-        return out;
     }
 
     private static List<String> resolveSuperTypes(SourceClass sourceClass) {
@@ -662,28 +636,15 @@ public final class GenerateCN1AccessRegistry {
     }
 
     private static Class<?> loadRuntimeClass(String canonicalName) {
-        ClassLoader contextLoader = Thread.currentThread().getContextClassLoader();
-        Class<?> loaded = tryLoadRuntimeClass(contextLoader, canonicalName);
-        if (loaded != null) {
-            return loaded;
-        }
-        loaded = tryLoadRuntimeClass(GenerateCN1AccessRegistry.class.getClassLoader(), canonicalName);
-        if (loaded != null) {
-            return loaded;
-        }
-        return tryLoadRuntimeClass(null, canonicalName);
-    }
-
-    private static Class<?> tryLoadRuntimeClass(ClassLoader loader, String canonicalName) {
         try {
-            return loader == null ? Class.forName(canonicalName) : Class.forName(canonicalName, false, loader);
+            return Class.forName(canonicalName);
         } catch (Throwable ex) {
             String attempt = canonicalName;
             int dot = attempt.lastIndexOf('.');
             while (dot > 0) {
                 attempt = attempt.substring(0, dot) + "$" + attempt.substring(dot + 1);
                 try {
-                    return loader == null ? Class.forName(attempt) : Class.forName(attempt, false, loader);
+                    return Class.forName(attempt);
                 } catch (Throwable ignore) {
                     dot = attempt.lastIndexOf('.', dot - 1);
                 }
@@ -1731,7 +1692,21 @@ public final class GenerateCN1AccessRegistry {
     }
 
     private static List<SamInterfaceAdapter> collectSamInterfaces(Discovery discovery) {
-        return Collections.emptyList();
+        Map<String, ApiClass> byName = new LinkedHashMap<String, ApiClass>();
+        for (GeneratedPackage generatedPackage : discovery.packages) {
+            for (ApiClass apiClass : generatedPackage.classes) {
+                byName.put(apiClass.qualifiedName, apiClass);
+            }
+        }
+        LinkedHashMap<String, SamInterfaceAdapter> adapters = new LinkedHashMap<String, SamInterfaceAdapter>();
+        for (GeneratedPackage generatedPackage : discovery.packages) {
+            for (ApiClass apiClass : generatedPackage.classes) {
+                collectSamInterfaces(apiClass.constructors, byName, adapters);
+                collectSamInterfaces(apiClass.staticMethods, byName, adapters);
+                collectSamInterfaces(apiClass.instanceMethods, byName, adapters);
+            }
+        }
+        return new ArrayList<SamInterfaceAdapter>(adapters.values());
     }
 
     private static void collectSamInterfaces(List<?> executables, Map<String, ApiClass> byName,
@@ -2439,12 +2414,11 @@ public final class GenerateCN1AccessRegistry {
         final Map<String, String> explicitImports;
         final List<String> wildcardImports;
         final Map<String, String> nestedTypes;
-        final Map<String, String> typeParameterBounds;
         final List<String> superTypes;
 
         SourceClass(String packageName, String simpleName, String qualifiedName, ClassTree classTree,
                 Map<String, String> explicitImports, List<String> wildcardImports, Map<String, String> nestedTypes,
-                Map<String, String> typeParameterBounds, List<String> superTypes) {
+                List<String> superTypes) {
             this.packageName = packageName;
             this.simpleName = simpleName;
             this.qualifiedName = qualifiedName;
@@ -2452,7 +2426,6 @@ public final class GenerateCN1AccessRegistry {
             this.explicitImports = explicitImports;
             this.wildcardImports = wildcardImports;
             this.nestedTypes = nestedTypes;
-            this.typeParameterBounds = typeParameterBounds;
             this.superTypes = superTypes;
         }
     }

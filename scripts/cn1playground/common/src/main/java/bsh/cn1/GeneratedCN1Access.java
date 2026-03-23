@@ -633,8 +633,6 @@ public final class GeneratedCN1Access implements CN1Access {
         "com.codename1.xml.XMLWriter",
         "com.codenameone.playground.CN1Playground",
         "com.codenameone.playground.PlaygroundContext",
-        "com.codenameone.playground.PlaygroundLambdaBridge",
-        "com.codenameone.playground.PlaygroundListenerBridge",
         "com.codenameone.playground.WebsiteThemeNative",
         "java.io.ByteArrayInputStream",
         "java.io.ByteArrayOutputStream",
@@ -1382,8 +1380,6 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("com.codename1.xml.XMLWriter", com.codename1.xml.XMLWriter.class);
         index.put("com.codenameone.playground.CN1Playground", com.codenameone.playground.CN1Playground.class);
         index.put("com.codenameone.playground.PlaygroundContext", com.codenameone.playground.PlaygroundContext.class);
-        index.put("com.codenameone.playground.PlaygroundLambdaBridge", com.codenameone.playground.PlaygroundLambdaBridge.class);
-        index.put("com.codenameone.playground.PlaygroundListenerBridge", com.codenameone.playground.PlaygroundListenerBridge.class);
         index.put("com.codenameone.playground.WebsiteThemeNative", com.codenameone.playground.WebsiteThemeNative.class);
         index.put("java.io.ByteArrayInputStream", java.io.ByteArrayInputStream.class);
         index.put("java.io.ByteArrayOutputStream", java.io.ByteArrayOutputStream.class);
@@ -1415,11 +1411,11 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.lang.AutoCloseable", java.lang.AutoCloseable.class);
         index.put("java.lang.Boolean", java.lang.Boolean.class);
         index.put("java.lang.Byte", java.lang.Byte.class);
+        index.put("java.lang.CharSequence", java.lang.CharSequence.class);
+        index.put("java.lang.Character", java.lang.Character.class);
     }
 
     private static void fillClassIndex9(Map<String, Class<?>> index) {
-        index.put("java.lang.CharSequence", java.lang.CharSequence.class);
-        index.put("java.lang.Character", java.lang.Character.class);
         index.put("java.lang.Class", java.lang.Class.class);
         index.put("java.lang.ClassCastException", java.lang.ClassCastException.class);
         index.put("java.lang.ClassLoader", java.lang.ClassLoader.class);
@@ -1482,11 +1478,11 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.net.URI", java.net.URI.class);
         index.put("java.net.URISyntaxException", java.net.URISyntaxException.class);
         index.put("java.nio.charset.Charset", java.nio.charset.Charset.class);
+        index.put("java.text.DateFormat", java.text.DateFormat.class);
+        index.put("java.text.DateFormatSymbols", java.text.DateFormatSymbols.class);
     }
 
     private static void fillClassIndex10(Map<String, Class<?>> index) {
-        index.put("java.text.DateFormat", java.text.DateFormat.class);
-        index.put("java.text.DateFormatSymbols", java.text.DateFormatSymbols.class);
         index.put("java.text.Format", java.text.Format.class);
         index.put("java.text.ParseException", java.text.ParseException.class);
         index.put("java.text.SimpleDateFormat", java.text.SimpleDateFormat.class);
@@ -2131,8 +2127,6 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("com.codename1.xml.XMLWriter", splitMembers(""));
         index.put("com.codenameone.playground.CN1Playground", splitMembers("destroy()getTheme()init(...)runApp()start()stop()"));
         index.put("com.codenameone.playground.PlaygroundContext", splitMembers("captureShownForm(...)clearPreview()clearShownForm()getHostForm()getPreviewRoot()getShownForm()getTheme()log(...)refreshPreview()setTitle(...)debug(...)getCurrent()interceptMethodInvocation(...)"));
-        index.put("com.codenameone.playground.PlaygroundLambdaBridge", splitMembers("lambda(...)"));
-        index.put("com.codenameone.playground.PlaygroundListenerBridge", splitMembers("actionListener(...)networkListener(...)runnable(...)"));
         index.put("com.codenameone.playground.WebsiteThemeNative", splitMembers("isDarkMode()isSupported()notifyUiReady()"));
         index.put("java.io.ByteArrayInputStream", splitMembers(""));
         index.put("java.io.ByteArrayOutputStream", splitMembers(""));
@@ -2164,11 +2158,11 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.lang.AutoCloseable", splitMembers(""));
         index.put("java.lang.Boolean", splitMembers(""));
         index.put("java.lang.Byte", splitMembers(""));
+        index.put("java.lang.CharSequence", splitMembers(""));
+        index.put("java.lang.Character", splitMembers(""));
     }
 
     private static void fillMethodIndex9(Map<String, String[]> index) {
-        index.put("java.lang.CharSequence", splitMembers(""));
-        index.put("java.lang.Character", splitMembers(""));
         index.put("java.lang.Class", splitMembers(""));
         index.put("java.lang.ClassCastException", splitMembers(""));
         index.put("java.lang.ClassLoader", splitMembers(""));
@@ -2231,11 +2225,11 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.net.URI", splitMembers(""));
         index.put("java.net.URISyntaxException", splitMembers(""));
         index.put("java.nio.charset.Charset", splitMembers(""));
+        index.put("java.text.DateFormat", splitMembers(""));
+        index.put("java.text.DateFormatSymbols", splitMembers(""));
     }
 
     private static void fillMethodIndex10(Map<String, String[]> index) {
-        index.put("java.text.DateFormat", splitMembers(""));
-        index.put("java.text.DateFormatSymbols", splitMembers(""));
         index.put("java.text.Format", splitMembers(""));
         index.put("java.text.ParseException", splitMembers(""));
         index.put("java.text.SimpleDateFormat", splitMembers(""));
@@ -2880,8 +2874,6 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("com.codename1.xml.XMLWriter", splitMembers(""));
         index.put("com.codenameone.playground.CN1Playground", splitMembers(""));
         index.put("com.codenameone.playground.PlaygroundContext", splitMembers(""));
-        index.put("com.codenameone.playground.PlaygroundLambdaBridge", splitMembers(""));
-        index.put("com.codenameone.playground.PlaygroundListenerBridge", splitMembers(""));
         index.put("com.codenameone.playground.WebsiteThemeNative", splitMembers(""));
         index.put("java.io.ByteArrayInputStream", splitMembers(""));
         index.put("java.io.ByteArrayOutputStream", splitMembers(""));
@@ -2913,11 +2905,11 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.lang.AutoCloseable", splitMembers(""));
         index.put("java.lang.Boolean", splitMembers(""));
         index.put("java.lang.Byte", splitMembers(""));
+        index.put("java.lang.CharSequence", splitMembers(""));
+        index.put("java.lang.Character", splitMembers(""));
     }
 
     private static void fillFieldIndex9(Map<String, String[]> index) {
-        index.put("java.lang.CharSequence", splitMembers(""));
-        index.put("java.lang.Character", splitMembers(""));
         index.put("java.lang.Class", splitMembers(""));
         index.put("java.lang.ClassCastException", splitMembers(""));
         index.put("java.lang.ClassLoader", splitMembers(""));
@@ -2980,11 +2972,11 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.net.URI", splitMembers(""));
         index.put("java.net.URISyntaxException", splitMembers(""));
         index.put("java.nio.charset.Charset", splitMembers(""));
+        index.put("java.text.DateFormat", splitMembers(""));
+        index.put("java.text.DateFormatSymbols", splitMembers(""));
     }
 
     private static void fillFieldIndex10(Map<String, String[]> index) {
-        index.put("java.text.DateFormat", splitMembers(""));
-        index.put("java.text.DateFormatSymbols", splitMembers(""));
         index.put("java.text.Format", splitMembers(""));
         index.put("java.text.ParseException", splitMembers(""));
         index.put("java.text.SimpleDateFormat", splitMembers(""));

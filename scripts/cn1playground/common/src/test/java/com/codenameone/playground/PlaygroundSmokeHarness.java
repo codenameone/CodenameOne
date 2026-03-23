@@ -18,7 +18,6 @@ public final class PlaygroundSmokeHarness {
         smokeGeneratedRegistry();
         smokeLifecycleWrapperScript();
         smokeLooseScriptListeners();
-        smokeLooseScriptListSnippet();
         System.out.println("Playground smoke tests passed.");
     }
 
@@ -141,46 +140,6 @@ public final class PlaygroundSmokeHarness {
                 context);
         require(anonResult.getComponent() != null,
                 "Loose script anonymous listener should compile: " + summarizeMessages(anonResult));
-    }
-
-    private static void smokeLooseScriptListSnippet() {
-        Display.init(null);
-
-        Form host = new Form("Host", new BorderLayout());
-        Container preview = new Container(new BorderLayout());
-        host.add(BorderLayout.CENTER, preview);
-        host.show();
-
-        final List<String> log = new ArrayList<String>();
-        PlaygroundContext context = new PlaygroundContext(host, preview, null,
-                new PlaygroundContext.Logger() {
-                    public void log(String message) {
-                        log.add(message);
-                    }
-                });
-
-        PlaygroundRunner runner = new PlaygroundRunner();
-        PlaygroundRunner.RunResult result = runner.run(
-                "import com.codename1.ui.*;\n"
-                        + "import com.codename1.ui.layouts.*;\n"
-                        + "import com.codename1.components.*;\n"
-                        + "\n"
-                        + "Container root = new Container(BoxLayout.y());\n"
-                        + "root.setScrollableY(true);\n"
-                        + "for (int i = 1; i <= 8; i++) {\n"
-                        + "    MultiButton row = new MultiButton(\"Menu Item \" + i);\n"
-                        + "    row.addActionListener(e -> {});\n"
-                        + "    row.setTextLine2(\"Secondary line for item \" + i);\n"
-                        + "    root.add(row);\n"
-                        + "}\n"
-                        + "ctx.log(\"List sample loaded\");\n"
-                        + "root;\n",
-                context);
-
-        require(result.getComponent() instanceof Container,
-                "Loose script list snippet should produce a Container: " + summarizeMessages(result));
-        require(log.size() == 1 && "List sample loaded".equals(log.get(0)),
-                "Loose script list snippet should log its completion");
     }
 
     private static void require(boolean condition, String message) {
