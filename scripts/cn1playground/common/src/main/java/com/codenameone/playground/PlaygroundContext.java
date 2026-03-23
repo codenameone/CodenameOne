@@ -58,15 +58,21 @@ public class PlaygroundContext {
 
     public static boolean interceptMethodInvocation(Object target, String methodName, Object[] args) {
         PlaygroundContext context = CURRENT.get();
-        if (context == null || !"show".equals(methodName)) {
-            return false;
-        }
-        if (args != null && args.length != 0) {
+        if (context == null) {
             return false;
         }
         if (target instanceof Dialog) {
             final Dialog dialog = (Dialog) target;
-            CN.callSerially(dialog::showModeless);
+            if (methodName != null && methodName.startsWith("show")) {
+                CN.callSerially(dialog::showModeless);
+                context.log("Dialog opened modelessly in the playground.");
+                return true;
+            }
+        }
+        if (!"show".equals(methodName) || (args != null && args.length != 0)) {
+            return false;
+        }
+        if (target instanceof Dialog) {
             context.log("Dialog opened modelessly in the playground.");
             return true;
         }
