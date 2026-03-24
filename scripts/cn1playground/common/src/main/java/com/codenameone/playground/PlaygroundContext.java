@@ -61,14 +61,6 @@ public class PlaygroundContext {
         if (context == null) {
             return false;
         }
-        if (target instanceof Dialog) {
-            final Dialog dialog = (Dialog) target;
-            if (methodName != null && methodName.startsWith("show")) {
-                CN.callSerially(dialog::showModeless);
-                context.log("Dialog opened modelessly in the playground.");
-                return true;
-            }
-        }
         if (!"show".equals(methodName) || (args != null && args.length != 0)) {
             return false;
         }

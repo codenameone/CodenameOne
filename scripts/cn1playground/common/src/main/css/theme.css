@@ -47,7 +47,7 @@ PlaygroundTitle {
 
 PlaygroundTitleDark {
     color: #f8fafc;
-    background: none;
+    background: #111827;
     font-family: "native:MainLight";
     font-size: 6mm;
 }

@@ -6,6 +6,7 @@ import com.codename1.components.SplitPane;
 import com.codename1.system.Lifecycle;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Button;
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
@@ -119,22 +120,24 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void executeRunScript(Form form) {
-        List<PlaygroundStateStore.HistoryEntry> history = PlaygroundStateStore.pushHistory(currentScript);
-        refreshHistoryMenu(form.getToolbar(), history);
-        previewRoot.removeAll();
+        CN.callSerially(() -> {
+            List<PlaygroundStateStore.HistoryEntry> history = PlaygroundStateStore.pushHistory(currentScript);
+            refreshHistoryMenu(form.getToolbar(), history);
+            previewRoot.removeAll();
 
-        List<PlaygroundRunner.InlineMessage> loggedMessages = new ArrayList<PlaygroundRunner.InlineMessage>();
-        PlaygroundContext context = new PlaygroundContext(form, previewRoot, theme,
-                message -> loggedMessages.add(new PlaygroundRunner.InlineMessage(0, message, "info")));
-        PlaygroundRunner.RunResult result = runner.run(currentScript, context);
+            List<PlaygroundRunner.InlineMessage> loggedMessages = new ArrayList<PlaygroundRunner.InlineMessage>();
+            PlaygroundContext context = new PlaygroundContext(form, previewRoot, theme,
+                    message -> loggedMessages.add(new PlaygroundRunner.InlineMessage(0, message, "info")));
+            PlaygroundRunner.RunResult result = runner.run(currentScript, context);
 
-        currentMessages = new ArrayList<PlaygroundRunner.InlineMessage>(loggedMessages);
-        currentMessages.addAll(result.getMessages());
+            currentMessages = new ArrayList<>(loggedMessages);
+            currentMessages.addAll(result.getMessages());
 
-        replacePreview(result.getComponent());
-        editor.setMarkers(result.getDiagnostics());
-        editor.setInlineMessages(currentMessages);
-        persistCurrentState();
+            replacePreview(result.getComponent());
+            editor.setMarkers(result.getDiagnostics());
+            editor.setInlineMessages(currentMessages);
+            persistCurrentState();
+        });
     }
 
     private void replacePreview(Component component) {
