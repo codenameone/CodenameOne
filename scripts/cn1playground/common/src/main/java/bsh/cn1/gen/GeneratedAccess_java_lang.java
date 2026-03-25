@@ -614,14 +614,6 @@ public final class GeneratedAccess_java_lang {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return new java.lang.String((java.lang.String) adaptedArgs[0]);
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.StringBuffer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.StringBuffer.class}, false);
-                return new java.lang.String((java.lang.StringBuffer) adaptedArgs[0]);
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.StringBuilder.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.StringBuilder.class}, false);
-                return new java.lang.String((java.lang.StringBuilder) adaptedArgs[0]);
-            }
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
                 return new java.lang.String((byte[]) adaptedArgs[0]);

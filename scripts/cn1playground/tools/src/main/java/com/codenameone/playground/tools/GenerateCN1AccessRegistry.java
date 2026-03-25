@@ -668,6 +668,9 @@ public final class GenerateCN1AccessRegistry {
         if (paramTypes == null) {
             return false;
         }
+        if (isUnsupportedConstructor(runtimeClass, paramTypes)) {
+            return false;
+        }
         try {
             Constructor<?> runtimeConstructor = runtimeClass.getConstructor(paramTypes);
             return java.lang.reflect.Modifier.isPublic(runtimeConstructor.getModifiers())
@@ -675,6 +678,17 @@ public final class GenerateCN1AccessRegistry {
         } catch (NoSuchMethodException ex) {
             return false;
         }
+    }
+
+    private static boolean isUnsupportedConstructor(Class<?> runtimeClass, Class<?>[] paramTypes) {
+        String className = runtimeClass.getName();
+        if ("java.lang.String".equals(className) && paramTypes.length == 1 && paramTypes[0] == StringBuffer.class) {
+            return true;
+        }
+        if ("java.lang.String".equals(className) && paramTypes.length == 1 && paramTypes[0] == StringBuilder.class) {
+            return true;
+        }
+        return false;
     }
 
     private static boolean hasRuntimeMethod(Class<?> runtimeClass, ApiMethod method) {
