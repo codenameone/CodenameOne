@@ -188,17 +188,13 @@ final class PlaygroundExamples {
             root.setScrollableY(true);
             SpanLabel output = new SpanLabel("Tap load to fetch XML as text via RequestBuilder.");
             Button load = new Button("Load codenameone.com");
-            load.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    RequestBuilder builder = Rest.get("https://www.codenameone.com/feed.xml");
-                    builder.getAsString(new Callback() {
-                        public void onSucess(Object value) {
-                            String text = String.valueOf(value);
-                            output.setText(text.length() > 280 ? text.substring(0, 280) + "..." : text);
-                            output.getParent().revalidate();
-                        }
-                    });
-                }
+            load.addActionListener(() -> {
+                RequestBuilder builder = Rest.get("https://www.codenameone.com/feed.xml");
+                builder.fetchAsString(response -> {
+                    String text = response.getResponseData();
+                    output.setText(text == null ? "No data" : (text.length() > 280 ? text.substring(0, 280) + "..." : text));
+                    output.getParent().revalidate();
+                });
             });
             root.addAll(load, output);
             root;

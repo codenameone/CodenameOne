@@ -828,13 +828,13 @@ public final class GeneratedAccess_com_codename1_charts_models {
             }
         }
         if ("removeSeries".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.XYSeries.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.XYSeries.class}, false);
-                typedTarget.removeSeries((com.codename1.charts.models.XYSeries) adaptedArgs[0]); return null;
-            }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.removeSeries(((Number) adaptedArgs[0]).intValue()); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.charts.models.XYSeries.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.charts.models.XYSeries.class}, false);
+                typedTarget.removeSeries((com.codename1.charts.models.XYSeries) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1025,10 +1025,108 @@ public final class GeneratedAccess_com_codename1_charts_models {
     }
 
     private static boolean isSamInterface(Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return true;
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return true;
+        }
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return true;
+        }
         return false;
     }
 
     private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return new com.codename1.util.OnComplete() {
+                public void completed(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return new com.codename1.util.SuccessCallback() {
+                public void onSucess(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return new com.codename1.util.FailureCallback() {
+                public void onError(java.lang.Object arg0, java.lang.Throwable arg1, int arg2, java.lang.String arg3) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1, arg2, arg3});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return new com.codename1.ui.events.ActionListener() {
+                public void actionPerformed(com.codename1.ui.events.ActionEvent arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return new com.codename1.ui.events.DataChangedListener() {
+                public void dataChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return new com.codename1.ui.events.SelectionListener() {
+                public void selectionChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
         return lambda;
     }
 

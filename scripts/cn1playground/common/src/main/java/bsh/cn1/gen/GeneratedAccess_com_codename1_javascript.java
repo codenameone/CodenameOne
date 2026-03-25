@@ -89,14 +89,6 @@ public final class GeneratedAccess_com_codename1_javascript {
 
     private static Object invoke0(com.codename1.javascript.JSObject typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("call".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class}, true)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class}, true);
-                java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 0];
-                for (int i = 0; i < adaptedArgs.length; i++) {
-                    varArgs[i - 0] = (java.lang.Object) adaptedArgs[i];
-                }
-                return typedTarget.call(varArgs);
-            }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.call((java.lang.String) adaptedArgs[0]);
@@ -107,29 +99,13 @@ public final class GeneratedAccess_com_codename1_javascript {
             }
         }
         if ("callAsync".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, com.codename1.util.Callback.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, com.codename1.util.Callback.class}, false);
-                typedTarget.callAsync((java.lang.Object[]) adaptedArgs[0], (com.codename1.util.Callback) adaptedArgs[1]); return null;
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false);
-                typedTarget.callAsync((java.lang.Object[]) adaptedArgs[0], (com.codename1.util.SuccessCallback) adaptedArgs[1]); return null;
-            }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false);
                 typedTarget.callAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.Callback) adaptedArgs[1]); return null;
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false);
-                typedTarget.callAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.SuccessCallback) adaptedArgs[1]); return null;
-            }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class, com.codename1.util.Callback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class, com.codename1.util.Callback.class}, false);
                 typedTarget.callAsync((java.lang.String) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1], (com.codename1.util.Callback) adaptedArgs[2]); return null;
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false);
-                typedTarget.callAsync((java.lang.String) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1], (com.codename1.util.SuccessCallback) adaptedArgs[2]); return null;
             }
         }
         if ("callDouble".equals(name)) {
@@ -143,10 +119,6 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false);
                 typedTarget.callDoubleAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.Callback) adaptedArgs[1]); return null;
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false);
-                typedTarget.callDoubleAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.SuccessCallback) adaptedArgs[1]); return null;
-            }
         }
         if ("callInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
@@ -158,10 +130,6 @@ public final class GeneratedAccess_com_codename1_javascript {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false);
                 typedTarget.callIntAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.Callback) adaptedArgs[1]); return null;
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false);
-                typedTarget.callIntAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.SuccessCallback) adaptedArgs[1]); return null;
             }
         }
         if ("callObject".equals(name)) {
@@ -175,10 +143,6 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false);
                 typedTarget.callObjectAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.Callback) adaptedArgs[1]); return null;
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false);
-                typedTarget.callObjectAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.SuccessCallback) adaptedArgs[1]); return null;
-            }
         }
         if ("callString".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
@@ -190,10 +154,6 @@ public final class GeneratedAccess_com_codename1_javascript {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false);
                 typedTarget.callStringAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.Callback) adaptedArgs[1]); return null;
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false);
-                typedTarget.callStringAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.SuccessCallback) adaptedArgs[1]); return null;
             }
         }
         if ("get".equals(name)) {
@@ -355,27 +315,15 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, java.lang.Boolean.class, com.codename1.util.Callback.class}, false);
                 return typedTarget.call((java.lang.String) adaptedArgs[0], (com.codename1.javascript.JSObject) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue(), (com.codename1.util.Callback) adaptedArgs[4]);
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, java.lang.Boolean.class, com.codename1.util.SuccessCallback.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, java.lang.Boolean.class, com.codename1.util.SuccessCallback.class}, false);
-                return typedTarget.call((java.lang.String) adaptedArgs[0], (com.codename1.javascript.JSObject) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue(), (com.codename1.util.SuccessCallback) adaptedArgs[4]);
-            }
         }
         if ("callAsync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.javascript.JSObject.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, com.codename1.util.Callback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.javascript.JSObject.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, com.codename1.util.Callback.class}, false);
                 typedTarget.callAsync((com.codename1.javascript.JSObject) adaptedArgs[0], (com.codename1.javascript.JSObject) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2], (com.codename1.util.Callback) adaptedArgs[3]); return null;
             }
-            if (matches(safeArgs, new Class<?>[]{com.codename1.javascript.JSObject.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.javascript.JSObject.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false);
-                typedTarget.callAsync((com.codename1.javascript.JSObject) adaptedArgs[0], (com.codename1.javascript.JSObject) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2], (com.codename1.util.SuccessCallback) adaptedArgs[3]); return null;
-            }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, com.codename1.util.Callback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, com.codename1.util.Callback.class}, false);
                 typedTarget.callAsync((java.lang.String) adaptedArgs[0], (com.codename1.javascript.JSObject) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2], (com.codename1.util.Callback) adaptedArgs[3]); return null;
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false);
-                typedTarget.callAsync((java.lang.String) adaptedArgs[0], (com.codename1.javascript.JSObject) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2], (com.codename1.util.SuccessCallback) adaptedArgs[3]); return null;
             }
         }
         if ("cleanup".equals(name)) {
@@ -393,10 +341,6 @@ public final class GeneratedAccess_com_codename1_javascript {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false);
                 typedTarget.getAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.Callback) adaptedArgs[1]); return null;
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false);
-                typedTarget.getAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.SuccessCallback) adaptedArgs[1]); return null;
             }
         }
         if ("getWindow".equals(name)) {
@@ -488,10 +432,108 @@ public final class GeneratedAccess_com_codename1_javascript {
     }
 
     private static boolean isSamInterface(Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return true;
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return true;
+        }
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return true;
+        }
         return false;
     }
 
     private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return new com.codename1.util.OnComplete() {
+                public void completed(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return new com.codename1.util.SuccessCallback() {
+                public void onSucess(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return new com.codename1.util.FailureCallback() {
+                public void onError(java.lang.Object arg0, java.lang.Throwable arg1, int arg2, java.lang.String arg3) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1, arg2, arg3});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return new com.codename1.ui.events.ActionListener() {
+                public void actionPerformed(com.codename1.ui.events.ActionEvent arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return new com.codename1.ui.events.DataChangedListener() {
+                public void dataChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return new com.codename1.ui.events.SelectionListener() {
+                public void selectionChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
         return lambda;
     }
 

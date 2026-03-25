@@ -733,6 +733,9 @@ final class PlaygroundRunner {
         rewritten = rewriteKnownSamCalls(rewritten,
                 "callSeriallyAndWait",
                 "runnable");
+        rewritten = rewriteKnownSamCalls(rewritten,
+                "fetchAsString",
+                "onComplete");
         return rewritten;
     }
 
@@ -794,6 +797,7 @@ final class PlaygroundRunner {
         if (body == null) {
             return null;
         }
+        body = rewriteKnownSamCalls(rewriteLambdaSegments(rewriteLambdaArguments(body)));
         return listenerFactoryExpression(factoryMethod, params, body);
     }
 
@@ -822,7 +826,8 @@ final class PlaygroundRunner {
         if (anonymousSam == null) {
             return null;
         }
-        return listenerFactoryExpression(factoryMethod, anonymousSam.parameterNames, anonymousSam.bodySource);
+        String rewrittenBody = rewriteKnownSamCalls(rewriteLambdaSegments(rewriteLambdaArguments(anonymousSam.bodySource)));
+        return listenerFactoryExpression(factoryMethod, anonymousSam.parameterNames, rewrittenBody);
     }
 
     private String listenerFactoryExpression(String factoryMethod, String[] params, String body) {
@@ -879,6 +884,7 @@ final class PlaygroundRunner {
         if (body == null) {
             return null;
         }
+        body = rewriteKnownSamCalls(rewriteLambdaSegments(rewriteLambdaArguments(body)));
         return lambdaPlaceholder(params, body);
     }
 

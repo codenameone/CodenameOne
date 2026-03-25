@@ -105,6 +105,7 @@ public final class GenerateCN1AccessRegistry {
             }
         }
         apiClasses = resolveInheritedMembers(apiClasses);
+        apiClasses = validateInheritedAgainstRuntime(apiClasses);
         Collections.sort(apiClasses, new Comparator<ApiClass>() {
             public int compare(ApiClass a, ApiClass b) {
                 return a.qualifiedName.compareTo(b.qualifiedName);
@@ -418,20 +419,57 @@ public final class GenerateCN1AccessRegistry {
                 instanceFields);
     }
 
+    private static List<ApiClass> validateInheritedAgainstRuntime(List<ApiClass> apiClasses) {
+        List<ApiClass> result = new ArrayList<ApiClass>();
+        for (ApiClass apiClass : apiClasses) {
+            result.add(validateMethodsAgainstRuntime(apiClass));
+        }
+        return result;
+    }
+
+    private static ApiClass validateMethodsAgainstRuntime(ApiClass apiClass) {
+        Class<?> runtimeClass = loadRuntimeClass(apiClass.qualifiedName);
+        if (runtimeClass == null) {
+            return apiClass;
+        }
+        
+        List<ApiMethod> staticMethods = new ArrayList<ApiMethod>();
+        for (ApiMethod method : apiClass.staticMethods) {
+            if (hasRuntimeMethod(runtimeClass, method)) {
+                staticMethods.add(method);
+            }
+        }
+
+        List<ApiMethod> instanceMethods = new ArrayList<ApiMethod>();
+        for (ApiMethod method : apiClass.instanceMethods) {
+            if (hasRuntimeMethod(runtimeClass, method)) {
+                instanceMethods.add(method);
+            }
+        }
+
+        return new ApiClass(apiClass.packageName, apiClass.simpleName, apiClass.qualifiedName, apiClass.superTypes,
+                apiClass.isInterface, apiClass.isAbstract, apiClass.constructors, staticMethods, instanceMethods,
+                apiClass.staticFields, apiClass.instanceFields);
+    }
+
     private static List<ApiClass> resolveInheritedMembers(List<ApiClass> apiClasses) {
         Map<String, ApiClass> classIndex = new LinkedHashMap<String, ApiClass>();
         for (ApiClass apiClass : apiClasses) {
             classIndex.put(apiClass.qualifiedName, apiClass);
         }
+        Map<String, List<String>> typeHierarchy = new LinkedHashMap<String, List<String>>();
+        for (ApiClass apiClass : apiClasses) {
+            typeHierarchy.put(apiClass.qualifiedName, apiClass.superTypes);
+        }
         Map<String, ApiClass> resolved = new LinkedHashMap<String, ApiClass>();
         for (ApiClass apiClass : apiClasses) {
-            resolveInheritedMembers(apiClass, classIndex, resolved, new LinkedHashSet<String>());
+            resolveInheritedMembers(apiClass, classIndex, resolved, new LinkedHashSet<String>(), typeHierarchy);
         }
         return new ArrayList<ApiClass>(resolved.values());
     }
 
     private static ApiClass resolveInheritedMembers(ApiClass apiClass, Map<String, ApiClass> classIndex,
-            Map<String, ApiClass> resolved, Set<String> visiting) {
+            Map<String, ApiClass> resolved, Set<String> visiting, Map<String, List<String>> typeHierarchy) {
         ApiClass existing = resolved.get(apiClass.qualifiedName);
         if (existing != null) {
             return existing;
@@ -447,7 +485,7 @@ public final class GenerateCN1AccessRegistry {
             if (superClass == null) {
                 continue;
             }
-            ApiClass resolvedSuper = resolveInheritedMembers(superClass, classIndex, resolved, visiting);
+            ApiClass resolvedSuper = resolveInheritedMembers(superClass, classIndex, resolved, visiting, typeHierarchy);
             mergeInheritedMethods(inheritedMethods, resolvedSuper.instanceMethods);
             mergeInheritedFields(inheritedFields, resolvedSuper.instanceFields);
         }
@@ -455,7 +493,8 @@ public final class GenerateCN1AccessRegistry {
         mergeDeclaredMethods(inheritedMethods, apiClass.instanceMethods);
         mergeDeclaredFields(inheritedFields, apiClass.instanceFields);
 
-        List<ApiMethod> instanceMethods = new ArrayList<ApiMethod>(inheritedMethods.values());
+        List<ApiMethod> instanceMethods = filterBridgeLikeMethods(new ArrayList<ApiMethod>(inheritedMethods.values()), typeHierarchy);
+        instanceMethods = filterGenericInheritedMethods(apiClass.qualifiedName, instanceMethods);
         List<ApiField> instanceFields = new ArrayList<ApiField>(inheritedFields.values());
         sortMethods(instanceMethods);
         sortFields(instanceFields);
@@ -512,6 +551,118 @@ public final class GenerateCN1AccessRegistry {
         return sb.toString();
     }
 
+    private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, Map<String, List<String>> typeHierarchy) {
+        Map<String, List<ApiMethod>> byName = new LinkedHashMap<String, List<ApiMethod>>();
+        for (ApiMethod method : methods) {
+            List<ApiMethod> list = byName.get(method.name);
+            if (list == null) {
+                list = new ArrayList<ApiMethod>();
+                byName.put(method.name, list);
+            }
+            list.add(method);
+        }
+        List<ApiMethod> result = new ArrayList<ApiMethod>();
+        for (List<ApiMethod> overloads : byName.values()) {
+            if (overloads.size() == 1) {
+                result.add(overloads.get(0));
+                continue;
+            }
+            Set<ApiMethod> bridgeLike = new LinkedHashSet<ApiMethod>();
+            for (int i = 0; i < overloads.size(); i++) {
+                ApiMethod m1 = overloads.get(i);
+                for (int j = 0; j < overloads.size(); j++) {
+                    if (i == j) continue;
+                    ApiMethod m2 = overloads.get(j);
+                    if (isBridgeLikeOverload(m1, m2, typeHierarchy)) {
+                        bridgeLike.add(m1);
+                    }
+                }
+            }
+            for (ApiMethod method : overloads) {
+                if (!bridgeLike.contains(method)) {
+                    result.add(method);
+                }
+            }
+        }
+        return result;
+    }
+
+    private static boolean isBridgeLikeOverload(ApiMethod bridgeCandidate, ApiMethod other, Map<String, List<String>> typeHierarchy) {
+        if (bridgeCandidate.paramTypes.size() != other.paramTypes.size()) {
+            return false;
+        }
+        boolean hasLessSpecificParam = false;
+        for (int i = 0; i < bridgeCandidate.paramTypes.size(); i++) {
+            String bridgeParam = bridgeCandidate.paramTypes.get(i).baseName;
+            String otherParam = other.paramTypes.get(i).baseName;
+            if (!bridgeParam.equals(otherParam)) {
+                if ("java.lang.Object".equals(bridgeParam)) {
+                    hasLessSpecificParam = true;
+                } else if (isSubtype(otherParam, bridgeParam, typeHierarchy)) {
+                    hasLessSpecificParam = true;
+                } else {
+                    return false;
+                }
+            }
+        }
+        return hasLessSpecificParam;
+    }
+
+    private static boolean isSubtype(String subTypeName, String superTypeName, Map<String, List<String>> typeHierarchy) {
+        if (subTypeName.equals(superTypeName)) {
+            return false;
+        }
+        return isSubtype(subTypeName, superTypeName, typeHierarchy, new LinkedHashSet<String>());
+    }
+
+    private static boolean isSubtype(String subTypeName, String superTypeName, Map<String, List<String>> typeHierarchy, Set<String> visited) {
+        if (subTypeName.equals(superTypeName)) {
+            return true;
+        }
+        if (visited.contains(subTypeName)) {
+            return false;
+        }
+        visited.add(subTypeName);
+        List<String> superTypes = typeHierarchy.get(subTypeName);
+        if (superTypes == null) {
+            return false;
+        }
+        for (String superType : superTypes) {
+            if (superType.equals(superTypeName)) {
+                return true;
+            }
+            if (isSubtype(superType, superTypeName, typeHierarchy, visited)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<ApiMethod> filterGenericInheritedMethods(String qualifiedName, List<ApiMethod> methods) {
+        List<ApiMethod> result = new ArrayList<ApiMethod>();
+        for (ApiMethod method : methods) {
+            if (isGenericInheritedMethod(qualifiedName, method)) {
+                continue;
+            }
+            result.add(method);
+        }
+        return result;
+    }
+
+    private static boolean isGenericInheritedMethod(String qualifiedName, ApiMethod method) {
+        if (method.paramTypes.size() == 1 && "java.lang.Object".equals(method.paramTypes.get(0).baseName)) {
+            if ("setPluginEventResponse".equals(method.name)) {
+                return qualifiedName.startsWith("com.codename1.plugin.event.");
+            }
+        }
+        if (method.paramTypes.size() == 1 && "com.codename1.ui.events.ActionEvent".equals(method.paramTypes.get(0).baseName)) {
+            if ("actionPerformed".equals(method.name)) {
+                return "com.codename1.plugin.Plugin".equals(qualifiedName);
+            }
+        }
+        return false;
+    }
+
     private static boolean hasRuntimeConstructor(Class<?> runtimeClass, ApiConstructor constructor) {
         Class<?>[] paramTypes = runtimeTypes(constructor.paramTypes);
         if (paramTypes == null) {
@@ -540,11 +691,30 @@ public final class GenerateCN1AccessRegistry {
             if (java.lang.reflect.Modifier.isStatic(runtimeMethod.getModifiers()) != method.isStatic) {
                 return false;
             }
+            if (runtimeMethod.isBridge()) {
+                return false;
+            }
+            if (hasGenericTypeParameters(runtimeMethod, paramTypes)) {
+                return false;
+            }
             return (returnType == null || runtimeMethod.getReturnType() == returnType)
                     && throwsOnlySupportedExceptions(runtimeMethod.getExceptionTypes());
         } catch (NoSuchMethodException ex) {
             return false;
         }
+    }
+
+    private static boolean hasGenericTypeParameters(Method method, Class<?>[] paramTypes) {
+        java.lang.reflect.Type[] genericParamTypes = method.getGenericParameterTypes();
+        if (genericParamTypes.length != paramTypes.length) {
+            return false;
+        }
+        for (int i = 0; i < paramTypes.length; i++) {
+            if (paramTypes[i] == Object.class && genericParamTypes[i] instanceof java.lang.reflect.TypeVariable) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean hasRuntimeField(Class<?> runtimeClass, ApiField field) {
@@ -913,12 +1083,43 @@ public final class GenerateCN1AccessRegistry {
             return a.size() - b.size();
         }
         for (int i = 0; i < a.size(); i++) {
-            int compare = a.get(i).canonicalName().compareTo(b.get(i).canonicalName());
+            int compare = compareTypesBySpecificity(a.get(i), b.get(i));
             if (compare != 0) {
                 return compare;
             }
         }
         return 0;
+    }
+
+    private static int compareTypesBySpecificity(ApiType a, ApiType b) {
+        if (a.arrayDepth != b.arrayDepth) {
+            return a.arrayDepth - b.arrayDepth;
+        }
+        if (a.isPrimitive() || b.isPrimitive()) {
+            if (a.isPrimitive() && b.isPrimitive()) {
+                return a.baseName.compareTo(b.baseName);
+            }
+            return a.isPrimitive() ? -1 : 1;
+        }
+        Class<?> classA = loadRuntimeClass(a.canonicalName());
+        Class<?> classB = loadRuntimeClass(b.canonicalName());
+        if (classA != null && classB != null) {
+            if (classA.isAssignableFrom(classB)) {
+                return 1;
+            }
+            if (classB.isAssignableFrom(classA)) {
+                return -1;
+            }
+        }
+        String nameA = a.canonicalName();
+        String nameB = b.canonicalName();
+        if ("java.lang.Object".equals(nameA)) {
+            return 1;
+        }
+        if ("java.lang.Object".equals(nameB)) {
+            return -1;
+        }
+        return nameA.compareTo(nameB);
     }
 
     private static void writeRootRegistry(File output, Discovery discovery) throws IOException {
@@ -1752,7 +1953,60 @@ public final class GenerateCN1AccessRegistry {
     }
 
     private static List<SamInterfaceAdapter> collectSamInterfaces(Discovery discovery) {
-        return Collections.emptyList();
+        LinkedHashMap<String, SamInterfaceAdapter> adapters = new LinkedHashMap<String, SamInterfaceAdapter>();
+        String[] knownSamInterfaces = {
+            "com.codename1.util.OnComplete",
+            "com.codename1.util.SuccessCallback",
+            "com.codename1.util.FailureCallback",
+            "com.codename1.util.Callback",
+            "com.codename1.ui.events.ActionListener",
+            "java.lang.Runnable",
+            "com.codename1.ui.events.DataChangedListener",
+            "com.codename1.ui.events.SelectionListener"
+        };
+        Map<String, ApiClass> byName = new HashMap<String, ApiClass>();
+        for (GeneratedPackage pkg : discovery.packages) {
+            for (ApiClass apiClass : pkg.classes) {
+                byName.put(apiClass.qualifiedName, apiClass);
+            }
+        }
+        for (String samInterface : knownSamInterfaces) {
+            ApiClass apiClass = byName.get(samInterface);
+            if (apiClass == null || !apiClass.isInterface) {
+                continue;
+            }
+            Class<?> runtimeClass = loadRuntimeClass(samInterface);
+            if (runtimeClass != null) {
+                Method samMethod = findRuntimeSamMethod(runtimeClass);
+                if (samMethod == null) {
+                    continue;
+                }
+                ApiMethod apiMethod = findApiMethod(apiClass, samMethod);
+                if (apiMethod != null) {
+                    adapters.put(samInterface, new SamInterfaceAdapter(apiClass, apiMethod));
+                }
+            } else {
+                ApiMethod apiMethod = findSamMethodFromApiClass(apiClass);
+                if (apiMethod != null) {
+                    adapters.put(samInterface, new SamInterfaceAdapter(apiClass, apiMethod));
+                }
+            }
+        }
+        return new ArrayList<SamInterfaceAdapter>(adapters.values());
+    }
+
+    private static ApiMethod findSamMethodFromApiClass(ApiClass apiClass) {
+        ApiMethod candidate = null;
+        for (ApiMethod method : apiClass.instanceMethods) {
+            if (method.isStatic) {
+                continue;
+            }
+            if (candidate != null) {
+                return null;
+            }
+            candidate = method;
+        }
+        return candidate;
     }
 
     private static void collectSamInterfaces(List<?> executables, Map<String, ApiClass> byName,
@@ -1783,14 +2037,27 @@ public final class GenerateCN1AccessRegistry {
 
     private static ApiMethod findSamMethod(ApiClass apiClass) {
         Class<?> runtimeClass = loadRuntimeClass(apiClass.qualifiedName);
-        if (runtimeClass == null || !runtimeClass.isInterface()) {
+        if (runtimeClass != null && runtimeClass.isInterface()) {
+            Method samMethod = findRuntimeSamMethod(runtimeClass);
+            if (samMethod == null) {
+                return null;
+            }
+            return findApiMethod(apiClass, samMethod);
+        }
+        if (!apiClass.isInterface) {
             return null;
         }
-        Method samMethod = findRuntimeSamMethod(runtimeClass);
-        if (samMethod == null) {
-            return null;
+        ApiMethod candidate = null;
+        for (ApiMethod method : apiClass.instanceMethods) {
+            if (method.isStatic) {
+                continue;
+            }
+            if (candidate != null) {
+                return null;
+            }
+            candidate = method;
         }
-        return findApiMethod(apiClass, samMethod);
+        return candidate;
     }
 
     private static Method findRuntimeSamMethod(Class<?> runtimeClass) {
@@ -2299,6 +2566,10 @@ public final class GenerateCN1AccessRegistry {
             if (sourceClass.simpleName.equals(simpleName)) {
                 return sourceClass.qualifiedName;
             }
+            String typeParamBound = sourceClass.typeParameterBounds.get(simpleName);
+            if (typeParamBound != null) {
+                return typeParamBound;
+            }
             String nested = sourceClass.nestedTypes.get(simpleName);
             if (nested != null) {
                 return nested;
@@ -2524,7 +2795,7 @@ public final class GenerateCN1AccessRegistry {
         }
 
         boolean isLookupOnly() {
-            return "java.lang.String".equals(qualifiedName) || "java.lang.StringBuilder".equals(qualifiedName);
+            return "java.lang.StringBuilder".equals(qualifiedName);
         }
     }
 

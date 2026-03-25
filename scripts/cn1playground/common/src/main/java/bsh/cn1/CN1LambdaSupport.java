@@ -136,8 +136,25 @@ public final class CN1LambdaSupport {
             } catch (UtilEvalError ex) {
                 throw ex.toEvalError(null, null);
             }
-            synchronized (interpreter) {
-                return Primitive.unwrap(interpreter.eval(bodySource, lambdaNs));
+            Interpreter prevInterpreter = CURRENT_INTERPRETER.get();
+            NameSpace prevNamespace = CURRENT_NAMESPACE.get();
+            try {
+                CURRENT_INTERPRETER.set(interpreter);
+                CURRENT_NAMESPACE.set(lambdaNs);
+                synchronized (interpreter) {
+                    return Primitive.unwrap(interpreter.eval(bodySource, lambdaNs));
+                }
+            } finally {
+                if (prevInterpreter != null) {
+                    CURRENT_INTERPRETER.set(prevInterpreter);
+                } else {
+                    CURRENT_INTERPRETER.remove();
+                }
+                if (prevNamespace != null) {
+                    CURRENT_NAMESPACE.set(prevNamespace);
+                } else {
+                    CURRENT_NAMESPACE.remove();
+                }
             }
         }
     }

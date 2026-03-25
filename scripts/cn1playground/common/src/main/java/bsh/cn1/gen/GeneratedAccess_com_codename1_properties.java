@@ -159,6 +159,22 @@ public final class GeneratedAccess_com_codename1_properties {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return new com.codename1.properties.ListProperty((java.lang.String) adaptedArgs[0]);
             }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true);
+                java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 1];
+                for (int i = 1; i < adaptedArgs.length; i++) {
+                    varArgs[i - 1] = (java.lang.Object) adaptedArgs[i];
+                }
+                return new com.codename1.properties.ListProperty((java.lang.String) adaptedArgs[0], varArgs);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Class.class, java.lang.Object[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Class.class, java.lang.Object[].class}, true);
+                java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 2];
+                for (int i = 2; i < adaptedArgs.length; i++) {
+                    varArgs[i - 2] = (java.lang.Object) adaptedArgs[i];
+                }
+                return new com.codename1.properties.ListProperty((java.lang.String) adaptedArgs[0], (java.lang.Class) adaptedArgs[1], varArgs);
+            }
         }
         if (type == com.codename1.properties.LongProperty.class) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
@@ -185,9 +201,17 @@ public final class GeneratedAccess_com_codename1_properties {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return new com.codename1.properties.Property((java.lang.String) adaptedArgs[0]);
             }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false);
+                return new com.codename1.properties.Property((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]);
+            }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Class.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Class.class}, false);
                 return new com.codename1.properties.Property((java.lang.String) adaptedArgs[0], (java.lang.Class) adaptedArgs[1]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Class.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Class.class, java.lang.Object.class}, false);
+                return new com.codename1.properties.Property((java.lang.String) adaptedArgs[0], (java.lang.Class) adaptedArgs[1], (java.lang.Object) adaptedArgs[2]);
             }
         }
         if (type == com.codename1.properties.PropertyIndex.class) {
@@ -204,6 +228,22 @@ public final class GeneratedAccess_com_codename1_properties {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return new com.codename1.properties.SetProperty((java.lang.String) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true);
+                java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 1];
+                for (int i = 1; i < adaptedArgs.length; i++) {
+                    varArgs[i - 1] = (java.lang.Object) adaptedArgs[i];
+                }
+                return new com.codename1.properties.SetProperty((java.lang.String) adaptedArgs[0], varArgs);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Class.class, java.lang.Object[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Class.class, java.lang.Object[].class}, true);
+                java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 2];
+                for (int i = 2; i < adaptedArgs.length; i++) {
+                    varArgs[i - 2] = (java.lang.Object) adaptedArgs[i];
+                }
+                return new com.codename1.properties.SetProperty((java.lang.String) adaptedArgs[0], (java.lang.Class) adaptedArgs[1], varArgs);
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -461,6 +501,11 @@ public final class GeneratedAccess_com_codename1_properties {
                 return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
             }
         }
+        if ("get".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.get();
+            }
+        }
         if ("getByte".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getByte();
@@ -509,6 +554,12 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
             }
         }
+        if ("set".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
+            }
+        }
         if ("setLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -545,6 +596,11 @@ public final class GeneratedAccess_com_codename1_properties {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("get".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.get();
             }
         }
         if ("getChar".equals(name)) {
@@ -595,6 +651,12 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
             }
         }
+        if ("set".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
+            }
+        }
         if ("setLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -631,6 +693,11 @@ public final class GeneratedAccess_com_codename1_properties {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("get".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.get();
             }
         }
         if ("getClientProperty".equals(name)) {
@@ -681,6 +748,12 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
             }
         }
+        if ("set".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
+            }
+        }
         if ("setLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -717,6 +790,11 @@ public final class GeneratedAccess_com_codename1_properties {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("get".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.get();
             }
         }
         if ("getClientProperty".equals(name)) {
@@ -767,6 +845,12 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
             }
         }
+        if ("set".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
+            }
+        }
         if ("setLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -803,6 +887,11 @@ public final class GeneratedAccess_com_codename1_properties {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("get".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.get();
             }
         }
         if ("getClientProperty".equals(name)) {
@@ -853,6 +942,12 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
             }
         }
+        if ("set".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
+            }
+        }
         if ("setLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -889,6 +984,11 @@ public final class GeneratedAccess_com_codename1_properties {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("get".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.get();
             }
         }
         if ("getClientProperty".equals(name)) {
@@ -939,6 +1039,12 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
             }
         }
+        if ("set".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
+            }
+        }
         if ("setLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -975,6 +1081,11 @@ public final class GeneratedAccess_com_codename1_properties {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("get".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.get();
             }
         }
         if ("getBoolean".equals(name)) {
@@ -1020,6 +1131,12 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
             }
         }
+        if ("set".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
+            }
+        }
         if ("setLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -1040,6 +1157,22 @@ public final class GeneratedAccess_com_codename1_properties {
     }
 
     private static Object invoke7(com.codename1.properties.ListProperty typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("add".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.add((java.lang.Object) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false);
+                return typedTarget.add(((Number) adaptedArgs[0]).intValue(), (java.lang.Object) adaptedArgs[1]);
+            }
+        }
+        if ("addAll".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
+                return typedTarget.addAll((java.util.Collection) adaptedArgs[0]);
+            }
+        }
         if ("addChangeListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false);
@@ -1061,10 +1194,22 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.clear(); return null;
             }
         }
+        if ("contains".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.contains((java.lang.Object) adaptedArgs[0]);
+            }
+        }
         if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("get".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.get(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getClientProperty".equals(name)) {
@@ -1093,6 +1238,12 @@ public final class GeneratedAccess_com_codename1_properties {
                 return typedTarget.hashCode();
             }
         }
+        if ("indexOf".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.indexOf((java.lang.Object) adaptedArgs[0]);
+            }
+        }
         if ("iterator".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.iterator();
@@ -1104,16 +1255,44 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.putClientProperty((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
         }
+        if ("remove".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.remove(((Number) adaptedArgs[0]).intValue());
+            }
+        }
+        if ("removeAll".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
+                return typedTarget.removeAll((java.util.Collection) adaptedArgs[0]);
+            }
+        }
         if ("removeChangeListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false);
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
             }
         }
+        if ("set".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
+                return typedTarget.set((java.util.Collection) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false);
+                return typedTarget.set(((Number) adaptedArgs[0]).intValue(), (java.lang.Object) adaptedArgs[1]);
+            }
+        }
         if ("setLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.setLabel((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setList".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
+                return typedTarget.setList((java.util.Collection) adaptedArgs[0]);
             }
         }
         if ("size".equals(name)) {
@@ -1145,6 +1324,11 @@ public final class GeneratedAccess_com_codename1_properties {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("get".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.get();
             }
         }
         if ("getClientProperty".equals(name)) {
@@ -1190,6 +1374,12 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
             }
         }
+        if ("set".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
+            }
+        }
         if ("setLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -1216,6 +1406,18 @@ public final class GeneratedAccess_com_codename1_properties {
     }
 
     private static Object invoke9(com.codename1.properties.SetProperty typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("add".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.add((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("addAll".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
+                return typedTarget.addAll((java.util.Collection) adaptedArgs[0]);
+            }
+        }
         if ("addChangeListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false);
@@ -1235,6 +1437,12 @@ public final class GeneratedAccess_com_codename1_properties {
         if ("clear".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
+            }
+        }
+        if ("contains".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.contains((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("equals".equals(name)) {
@@ -1280,10 +1488,28 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.putClientProperty((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
         }
+        if ("remove".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.remove(((Number) adaptedArgs[0]).intValue());
+            }
+        }
+        if ("removeAll".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
+                return typedTarget.removeAll((java.util.Collection) adaptedArgs[0]);
+            }
+        }
         if ("removeChangeListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false);
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("set".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
+                return typedTarget.set((java.util.Collection) adaptedArgs[0]);
             }
         }
         if ("setLabel".equals(name)) {
@@ -1311,6 +1537,18 @@ public final class GeneratedAccess_com_codename1_properties {
     }
 
     private static Object invoke10(com.codename1.properties.CollectionProperty typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("add".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.add((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("addAll".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
+                return typedTarget.addAll((java.util.Collection) adaptedArgs[0]);
+            }
+        }
         if ("addChangeListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false);
@@ -1330,6 +1568,12 @@ public final class GeneratedAccess_com_codename1_properties {
         if ("clear".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
+            }
+        }
+        if ("contains".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.contains((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("equals".equals(name)) {
@@ -1375,10 +1619,28 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.putClientProperty((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
         }
+        if ("remove".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.remove(((Number) adaptedArgs[0]).intValue());
+            }
+        }
+        if ("removeAll".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
+                return typedTarget.removeAll((java.util.Collection) adaptedArgs[0]);
+            }
+        }
         if ("removeChangeListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false);
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("set".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
+                return typedTarget.set((java.util.Collection) adaptedArgs[0]);
             }
         }
         if ("setLabel".equals(name)) {
@@ -1433,6 +1695,12 @@ public final class GeneratedAccess_com_codename1_properties {
                 return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
             }
         }
+        if ("get".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.get((java.lang.Object) adaptedArgs[0]);
+            }
+        }
         if ("getClientProperty".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -1479,10 +1747,22 @@ public final class GeneratedAccess_com_codename1_properties {
                 return typedTarget.keySet();
             }
         }
+        if ("put".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
+                return typedTarget.put((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]);
+            }
+        }
         if ("putClientProperty".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false);
                 typedTarget.putClientProperty((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
+            }
+        }
+        if ("remove".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.remove((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("removeChangeListener".equals(name)) {
@@ -1491,10 +1771,22 @@ public final class GeneratedAccess_com_codename1_properties {
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
             }
         }
+        if ("set".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
+                return typedTarget.set((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]);
+            }
+        }
         if ("setLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.setLabel((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setMap".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Map.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Map.class}, false);
+                return typedTarget.setMap((java.util.Map) adaptedArgs[0]);
             }
         }
         if ("size".equals(name)) {
@@ -1533,6 +1825,11 @@ public final class GeneratedAccess_com_codename1_properties {
                 return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
             }
         }
+        if ("get".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.get();
+            }
+        }
         if ("getClientProperty".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -1569,6 +1866,12 @@ public final class GeneratedAccess_com_codename1_properties {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyChangeListener.class}, false);
                 typedTarget.removeChangeListener((com.codename1.properties.PropertyChangeListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("set".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.set((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("setLabel".equals(name)) {
@@ -2224,10 +2527,108 @@ public final class GeneratedAccess_com_codename1_properties {
     }
 
     private static boolean isSamInterface(Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return true;
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return true;
+        }
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return true;
+        }
         return false;
     }
 
     private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return new com.codename1.util.OnComplete() {
+                public void completed(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return new com.codename1.util.SuccessCallback() {
+                public void onSucess(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return new com.codename1.util.FailureCallback() {
+                public void onError(java.lang.Object arg0, java.lang.Throwable arg1, int arg2, java.lang.String arg3) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1, arg2, arg3});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return new com.codename1.ui.events.ActionListener() {
+                public void actionPerformed(com.codename1.ui.events.ActionEvent arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return new com.codename1.ui.events.DataChangedListener() {
+                public void dataChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return new com.codename1.ui.events.SelectionListener() {
+                public void selectionChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
         return lambda;
     }
 

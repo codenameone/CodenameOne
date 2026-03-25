@@ -718,9 +718,17 @@ public final class GeneratedAccess_com_codename1_io {
             }
         }
         if ("get".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
-                return com.codename1.io.Preferences.get((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return com.codename1.io.Preferences.get((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
+                return com.codename1.io.Preferences.get((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false);
+                return com.codename1.io.Preferences.get((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class}, false);
@@ -730,23 +738,23 @@ public final class GeneratedAccess_com_codename1_io {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Float.class}, false);
                 return com.codename1.io.Preferences.get((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue());
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return com.codename1.io.Preferences.get((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
-                return com.codename1.io.Preferences.get((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false);
-                return com.codename1.io.Preferences.get((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue());
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
+                return com.codename1.io.Preferences.get((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
             }
         }
         if ("getAndSet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
-                return com.codename1.io.Preferences.getAndSet((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return com.codename1.io.Preferences.getAndSet((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
+                return com.codename1.io.Preferences.getAndSet((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false);
+                return com.codename1.io.Preferences.getAndSet((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class}, false);
@@ -756,17 +764,9 @@ public final class GeneratedAccess_com_codename1_io {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Float.class}, false);
                 return com.codename1.io.Preferences.getAndSet((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue());
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                return com.codename1.io.Preferences.getAndSet((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
-                return com.codename1.io.Preferences.getAndSet((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false);
-                return com.codename1.io.Preferences.getAndSet((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue());
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
+                return com.codename1.io.Preferences.getAndSet((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
             }
         }
         if ("getPreferencesLocation".equals(name)) {
@@ -785,9 +785,17 @@ public final class GeneratedAccess_com_codename1_io {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Map.class}, false);
                 com.codename1.io.Preferences.set((java.util.Map) adaptedArgs[0]); return null;
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
-                com.codename1.io.Preferences.set((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                com.codename1.io.Preferences.set((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
+                com.codename1.io.Preferences.set((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false);
+                com.codename1.io.Preferences.set((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue()); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class}, false);
@@ -797,17 +805,9 @@ public final class GeneratedAccess_com_codename1_io {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Float.class}, false);
                 com.codename1.io.Preferences.set((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue()); return null;
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
-                com.codename1.io.Preferences.set((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
-                com.codename1.io.Preferences.set((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false);
-                com.codename1.io.Preferences.set((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue()); return null;
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
+                com.codename1.io.Preferences.set((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
         if ("setPreferencesLocation".equals(name)) {
@@ -960,6 +960,10 @@ public final class GeneratedAccess_com_codename1_io {
             }
         }
         if ("encodeBody".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.io.Util.encodeBody((java.lang.String) adaptedArgs[0]);
+            }
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
                 return com.codename1.io.Util.encodeBody((byte[]) adaptedArgs[0]);
@@ -968,12 +972,12 @@ public final class GeneratedAccess_com_codename1_io {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class}, false);
                 return com.codename1.io.Util.encodeBody((char[]) adaptedArgs[0]);
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                return com.codename1.io.Util.encodeBody((java.lang.String) adaptedArgs[0]);
-            }
         }
         if ("encodeUrl".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.io.Util.encodeUrl((java.lang.String) adaptedArgs[0]);
+            }
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
                 return com.codename1.io.Util.encodeUrl((byte[]) adaptedArgs[0]);
@@ -981,10 +985,6 @@ public final class GeneratedAccess_com_codename1_io {
             if (matches(safeArgs, new Class<?>[]{char[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class}, false);
                 return com.codename1.io.Util.encodeUrl((char[]) adaptedArgs[0]);
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
-                return com.codename1.io.Util.encodeUrl((java.lang.String) adaptedArgs[0]);
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
@@ -1040,13 +1040,13 @@ public final class GeneratedAccess_com_codename1_io {
             }
         }
         if ("guessMimeType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
-                return com.codename1.io.Util.guessMimeType((byte[]) adaptedArgs[0]);
-            }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return com.codename1.io.Util.guessMimeType((java.lang.String) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                return com.codename1.io.Util.guessMimeType((byte[]) adaptedArgs[0]);
             }
         }
         if ("indexOf".equals(name)) {
@@ -2298,13 +2298,13 @@ public final class GeneratedAccess_com_codename1_io {
             }
         }
         if ("write".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
-                typedTarget.write((byte[]) adaptedArgs[0]); return null;
-            }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.write(((Number) adaptedArgs[0]).intValue()); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                typedTarget.write((byte[]) adaptedArgs[0]); return null;
             }
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
@@ -3926,6 +3926,12 @@ public final class GeneratedAccess_com_codename1_io {
                 return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
             }
         }
+        if ("get".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.get((java.lang.Object) adaptedArgs[0]);
+            }
+        }
         if ("getProperty".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -3960,6 +3966,12 @@ public final class GeneratedAccess_com_codename1_io {
             if (matches(safeArgs, new Class<?>[]{java.util.Map.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Map.class}, false);
                 typedTarget.putAll((java.util.Map) adaptedArgs[0]); return null;
+            }
+        }
+        if ("remove".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.remove((java.lang.Object) adaptedArgs[0]);
             }
         }
         if ("setProperty".equals(name)) {
@@ -4404,10 +4416,108 @@ public final class GeneratedAccess_com_codename1_io {
     }
 
     private static boolean isSamInterface(Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return true;
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return true;
+        }
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return true;
+        }
         return false;
     }
 
     private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return new com.codename1.util.OnComplete() {
+                public void completed(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return new com.codename1.util.SuccessCallback() {
+                public void onSucess(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return new com.codename1.util.FailureCallback() {
+                public void onError(java.lang.Object arg0, java.lang.Throwable arg1, int arg2, java.lang.String arg3) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1, arg2, arg3});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return new com.codename1.ui.events.ActionListener() {
+                public void actionPerformed(com.codename1.ui.events.ActionEvent arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return new com.codename1.ui.events.DataChangedListener() {
+                public void dataChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return new com.codename1.ui.events.SelectionListener() {
+                public void selectionChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
         return lambda;
     }
 

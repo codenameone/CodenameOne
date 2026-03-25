@@ -87,13 +87,21 @@ public final class GeneratedAccess_com_codename1_ui_list {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.ui.list.DefaultListModel();
             }
+            if (matches(safeArgs, new Class<?>[]{java.util.Vector.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Vector.class}, false);
+                return new com.codename1.ui.list.DefaultListModel((java.util.Vector) adaptedArgs[0]);
+            }
             if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
                 return new com.codename1.ui.list.DefaultListModel((java.util.Collection) adaptedArgs[0]);
             }
-            if (matches(safeArgs, new Class<?>[]{java.util.Vector.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Vector.class}, false);
-                return new com.codename1.ui.list.DefaultListModel((java.util.Vector) adaptedArgs[0]);
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class}, true);
+                java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (java.lang.Object) adaptedArgs[i];
+                }
+                return new com.codename1.ui.list.DefaultListModel(varArgs);
             }
         }
         if (type == com.codename1.ui.list.FilterProxyListModel.class) {
@@ -274,13 +282,13 @@ public final class GeneratedAccess_com_codename1_ui_list {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Component.class}, false);
                 return typedTarget.add((java.lang.Object) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1]);
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Image.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Image.class}, false);
-                return typedTarget.add((java.lang.Object) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1]);
-            }
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false);
                 return typedTarget.add((java.lang.Object) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Image.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Image.class}, false);
+                return typedTarget.add((java.lang.Object) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1]);
             }
         }
         if ("addActionListener".equals(name)) {
@@ -307,10 +315,6 @@ public final class GeneratedAccess_com_codename1_ui_list {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.Component.class}, false);
                 typedTarget.addComponent(((Number) adaptedArgs[0]).intValue(), (com.codename1.ui.Component) adaptedArgs[1]); return null;
-            }
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Component.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Component.class}, false);
-                typedTarget.addComponent((java.lang.Object) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1]); return null;
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class, com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class, com.codename1.ui.Component.class}, false);
@@ -2398,6 +2402,12 @@ public final class GeneratedAccess_com_codename1_ui_list {
                 return typedTarget.getBounds((com.codename1.ui.geom.Rectangle) adaptedArgs[0]);
             }
         }
+        if ("getCellRendererComponent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Object.class, java.lang.Object.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Object.class, java.lang.Object.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
+                return typedTarget.getCellRendererComponent((com.codename1.ui.Component) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], (java.lang.Object) adaptedArgs[2], ((Number) adaptedArgs[3]).intValue(), ((Boolean) adaptedArgs[4]).booleanValue());
+            }
+        }
         if ("getClientProperty".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -2568,6 +2578,12 @@ public final class GeneratedAccess_com_codename1_ui_list {
         if ("getLabelForComponent".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getLabelForComponent();
+            }
+        }
+        if ("getListCellRendererComponent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.List.class, java.lang.Object.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.List.class, java.lang.Object.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
+                return typedTarget.getListCellRendererComponent((com.codename1.ui.List) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue());
             }
         }
         if ("getListFocusComponent".equals(name)) {
@@ -4062,6 +4078,18 @@ public final class GeneratedAccess_com_codename1_ui_list {
                 typedTarget.addDataChangedListener((com.codename1.ui.events.DataChangedListener) adaptedArgs[0]); return null;
             }
         }
+        if ("addItem".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.addItem((java.lang.Object) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addItemAtIndex".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
+                typedTarget.addItemAtIndex((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
+            }
+        }
         if ("addSelectedIndices".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, true);
@@ -4076,6 +4104,12 @@ public final class GeneratedAccess_com_codename1_ui_list {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.SelectionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.SelectionListener.class}, false);
                 typedTarget.addSelectionListener((com.codename1.ui.events.SelectionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("getItemAt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getItemAt(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getList".equals(name)) {
@@ -4136,6 +4170,12 @@ public final class GeneratedAccess_com_codename1_ui_list {
                 typedTarget.removeSelectionListener((com.codename1.ui.events.SelectionListener) adaptedArgs[0]); return null;
             }
         }
+        if ("setItem".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false);
+                typedTarget.setItem(((Number) adaptedArgs[0]).intValue(), (java.lang.Object) adaptedArgs[1]); return null;
+            }
+        }
         if ("setMultiSelectionMode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
@@ -4168,6 +4208,12 @@ public final class GeneratedAccess_com_codename1_ui_list {
                 typedTarget.addDataChangedListener((com.codename1.ui.events.DataChangedListener) adaptedArgs[0]); return null;
             }
         }
+        if ("addItem".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.addItem((java.lang.Object) adaptedArgs[0]); return null;
+            }
+        }
         if ("addSelectionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.SelectionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.SelectionListener.class}, false);
@@ -4184,6 +4230,12 @@ public final class GeneratedAccess_com_codename1_ui_list {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.filter((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("getItemAt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getItemAt(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getSelectedIndex".equals(name)) {
@@ -4256,10 +4308,22 @@ public final class GeneratedAccess_com_codename1_ui_list {
                 return typedTarget.getAdapter();
             }
         }
+        if ("getCellRendererComponent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Object.class, java.lang.Object.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Object.class, java.lang.Object.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
+                return typedTarget.getCellRendererComponent((com.codename1.ui.Component) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], (java.lang.Object) adaptedArgs[2], ((Number) adaptedArgs[3]).intValue(), ((Boolean) adaptedArgs[4]).booleanValue());
+            }
+        }
         if ("getFocusComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
                 return typedTarget.getFocusComponent((com.codename1.ui.Component) adaptedArgs[0]);
+            }
+        }
+        if ("getListCellRendererComponent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.List.class, java.lang.Object.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.List.class, java.lang.Object.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
+                return typedTarget.getListCellRendererComponent((com.codename1.ui.List) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue());
             }
         }
         if ("getListFocusComponent".equals(name)) {
@@ -4353,6 +4417,12 @@ public final class GeneratedAccess_com_codename1_ui_list {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.FocusListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.FocusListener.class}, false);
                 typedTarget.addFocusListener((com.codename1.ui.events.FocusListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addItem".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.addItem((java.lang.Object) adaptedArgs[0]); return null;
             }
         }
         if ("addLongPressListener".equals(name)) {
@@ -4834,6 +4904,11 @@ public final class GeneratedAccess_com_codename1_ui_list {
                 return typedTarget.getRenderer();
             }
         }
+        if ("getRenderingPrototype".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getRenderingPrototype();
+            }
+        }
         if ("getSameHeight".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSameHeight();
@@ -4892,6 +4967,11 @@ public final class GeneratedAccess_com_codename1_ui_list {
         if ("getSelectedIndex".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSelectedIndex();
+            }
+        }
+        if ("getSelectedItem".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSelectedItem();
             }
         }
         if ("getSelectedRect".equals(name)) {
@@ -5843,6 +5923,12 @@ public final class GeneratedAccess_com_codename1_ui_list {
                 typedTarget.setRenderer((com.codename1.ui.list.ListCellRenderer) adaptedArgs[0]); return null;
             }
         }
+        if ("setRenderingPrototype".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.setRenderingPrototype((java.lang.Object) adaptedArgs[0]); return null;
+            }
+        }
         if ("setRippleEffect".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
@@ -5893,6 +5979,12 @@ public final class GeneratedAccess_com_codename1_ui_list {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setSelectedIndex(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+            }
+        }
+        if ("setSelectedItem".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.setSelectedItem((java.lang.Object) adaptedArgs[0]); return null;
             }
         }
         if ("setSelectedStyle".equals(name)) {
@@ -6054,6 +6146,12 @@ public final class GeneratedAccess_com_codename1_ui_list {
     }
 
     private static Object invoke6(com.codename1.ui.list.CellRenderer typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getCellRendererComponent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Object.class, java.lang.Object.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Object.class, java.lang.Object.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
+                return typedTarget.getCellRendererComponent((com.codename1.ui.Component) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], (java.lang.Object) adaptedArgs[2], ((Number) adaptedArgs[3]).intValue(), ((Boolean) adaptedArgs[4]).booleanValue());
+            }
+        }
         if ("getFocusComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -6064,6 +6162,12 @@ public final class GeneratedAccess_com_codename1_ui_list {
     }
 
     private static Object invoke7(com.codename1.ui.list.ListCellRenderer typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getListCellRendererComponent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.List.class, java.lang.Object.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.List.class, java.lang.Object.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
+                return typedTarget.getListCellRendererComponent((com.codename1.ui.List) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue());
+            }
+        }
         if ("getListFocusComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.List.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.List.class}, false);
@@ -6080,10 +6184,22 @@ public final class GeneratedAccess_com_codename1_ui_list {
                 typedTarget.addDataChangedListener((com.codename1.ui.events.DataChangedListener) adaptedArgs[0]); return null;
             }
         }
+        if ("addItem".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.addItem((java.lang.Object) adaptedArgs[0]); return null;
+            }
+        }
         if ("addSelectionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.SelectionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.SelectionListener.class}, false);
                 typedTarget.addSelectionListener((com.codename1.ui.events.SelectionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("getItemAt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getItemAt(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getSelectedIndex".equals(name)) {
@@ -6130,6 +6246,12 @@ public final class GeneratedAccess_com_codename1_ui_list {
                 typedTarget.addDataChangedListener((com.codename1.ui.events.DataChangedListener) adaptedArgs[0]); return null;
             }
         }
+        if ("addItem".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.addItem((java.lang.Object) adaptedArgs[0]); return null;
+            }
+        }
         if ("addSelectedIndices".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, true);
@@ -6144,6 +6266,12 @@ public final class GeneratedAccess_com_codename1_ui_list {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.SelectionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.SelectionListener.class}, false);
                 typedTarget.addSelectionListener((com.codename1.ui.events.SelectionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("getItemAt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getItemAt(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getSelectedIndex".equals(name)) {
@@ -6258,10 +6386,108 @@ public final class GeneratedAccess_com_codename1_ui_list {
     }
 
     private static boolean isSamInterface(Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return true;
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return true;
+        }
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return true;
+        }
         return false;
     }
 
     private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return new com.codename1.util.OnComplete() {
+                public void completed(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return new com.codename1.util.SuccessCallback() {
+                public void onSucess(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return new com.codename1.util.FailureCallback() {
+                public void onError(java.lang.Object arg0, java.lang.Throwable arg1, int arg2, java.lang.String arg3) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1, arg2, arg3});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return new com.codename1.ui.events.ActionListener() {
+                public void actionPerformed(com.codename1.ui.events.ActionEvent arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return new com.codename1.ui.events.DataChangedListener() {
+                public void dataChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return new com.codename1.ui.events.SelectionListener() {
+                public void selectionChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
         return lambda;
     }
 

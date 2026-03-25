@@ -5,6 +5,7 @@ import bsh.cn1.CN1LambdaSupport;
 import com.codename1.io.NetworkEvent;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.util.OnComplete;
 
 public class PlaygroundListenerBridge {
     public ActionListener actionListener(Object lambdaValue) {
@@ -30,6 +31,15 @@ public class PlaygroundListenerBridge {
         return new Runnable() {
             public void run() {
                 invoke(lambda);
+            }
+        };
+    }
+
+    public OnComplete onComplete(Object lambdaValue) {
+        final CN1LambdaSupport.LambdaValue lambda = requireLambda(lambdaValue);
+        return new OnComplete() {
+            public void completed(Object value) {
+                invoke(lambda, value);
             }
         };
     }

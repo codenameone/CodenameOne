@@ -171,51 +171,58 @@ public final class GeneratedAccess_com_codename1_ui_events {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.ui.events.ActionListener) {
+            try {
+                return invoke4((com.codename1.ui.events.ActionListener) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.ui.events.ActionSource) {
             try {
-                return invoke4((com.codename1.ui.events.ActionSource) target, name, safeArgs);
+                return invoke5((com.codename1.ui.events.ActionSource) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.BrowserNavigationCallback) {
             try {
-                return invoke5((com.codename1.ui.events.BrowserNavigationCallback) target, name, safeArgs);
+                return invoke6((com.codename1.ui.events.BrowserNavigationCallback) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.DataChangedListener) {
             try {
-                return invoke6((com.codename1.ui.events.DataChangedListener) target, name, safeArgs);
+                return invoke7((com.codename1.ui.events.DataChangedListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.FocusListener) {
             try {
-                return invoke7((com.codename1.ui.events.FocusListener) target, name, safeArgs);
+                return invoke8((com.codename1.ui.events.FocusListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.ScrollListener) {
             try {
-                return invoke8((com.codename1.ui.events.ScrollListener) target, name, safeArgs);
+                return invoke9((com.codename1.ui.events.ScrollListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.SelectionListener) {
             try {
-                return invoke9((com.codename1.ui.events.SelectionListener) target, name, safeArgs);
+                return invoke10((com.codename1.ui.events.SelectionListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.StyleListener) {
             try {
-                return invoke10((com.codename1.ui.events.StyleListener) target, name, safeArgs);
+                return invoke11((com.codename1.ui.events.StyleListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -606,7 +613,17 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke4(com.codename1.ui.events.ActionSource typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke4(com.codename1.ui.events.ActionListener typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("actionPerformed".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false);
+                typedTarget.actionPerformed((com.codename1.ui.events.ActionEvent) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke5(com.codename1.ui.events.ActionSource typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addActionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -622,7 +639,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke5(com.codename1.ui.events.BrowserNavigationCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke6(com.codename1.ui.events.BrowserNavigationCallback typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("shouldNavigate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -632,7 +649,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke6(com.codename1.ui.events.DataChangedListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.ui.events.DataChangedListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("dataChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
@@ -642,7 +659,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke7(com.codename1.ui.events.FocusListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke8(com.codename1.ui.events.FocusListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("focusGained".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -658,7 +675,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke8(com.codename1.ui.events.ScrollListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke9(com.codename1.ui.events.ScrollListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("scrollChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
@@ -668,7 +685,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke9(com.codename1.ui.events.SelectionListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke10(com.codename1.ui.events.SelectionListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("selectionChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
@@ -678,7 +695,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke10(com.codename1.ui.events.StyleListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke11(com.codename1.ui.events.StyleListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("styleChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.plaf.Style.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.plaf.Style.class}, false);
@@ -739,10 +756,108 @@ public final class GeneratedAccess_com_codename1_ui_events {
     }
 
     private static boolean isSamInterface(Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return true;
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return true;
+        }
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return true;
+        }
         return false;
     }
 
     private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return new com.codename1.util.OnComplete() {
+                public void completed(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return new com.codename1.util.SuccessCallback() {
+                public void onSucess(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return new com.codename1.util.FailureCallback() {
+                public void onError(java.lang.Object arg0, java.lang.Throwable arg1, int arg2, java.lang.String arg3) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1, arg2, arg3});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return new com.codename1.ui.events.ActionListener() {
+                public void actionPerformed(com.codename1.ui.events.ActionEvent arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return new com.codename1.ui.events.DataChangedListener() {
+                public void dataChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return new com.codename1.ui.events.SelectionListener() {
+                public void selectionChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
         return lambda;
     }
 

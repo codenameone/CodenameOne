@@ -104,21 +104,21 @@ public final class GeneratedAccess_com_codename1_util {
             }
         }
         if (type == com.codename1.util.BigInteger.class) {
-            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
-                return new com.codename1.util.BigInteger((byte[]) adaptedArgs[0]);
-            }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return new com.codename1.util.BigInteger((java.lang.String) adaptedArgs[0]);
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, byte[].class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, byte[].class}, false);
-                return new com.codename1.util.BigInteger(((Number) adaptedArgs[0]).intValue(), (byte[]) adaptedArgs[1]);
+            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                return new com.codename1.util.BigInteger((byte[]) adaptedArgs[0]);
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Random.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Random.class}, false);
                 return new com.codename1.util.BigInteger(((Number) adaptedArgs[0]).intValue(), (java.util.Random) adaptedArgs[1]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, byte[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, byte[].class}, false);
+                return new com.codename1.util.BigInteger(((Number) adaptedArgs[0]).intValue(), (byte[]) adaptedArgs[1]);
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
@@ -153,6 +153,12 @@ public final class GeneratedAccess_com_codename1_util {
                 return new com.codename1.util.DateUtil((java.util.TimeZone) adaptedArgs[0]);
             }
         }
+        if (type == com.codename1.util.Wrapper.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return new com.codename1.util.Wrapper((java.lang.Object) adaptedArgs[0]);
+            }
+        }
         throw unsupportedConstruct(type, safeArgs);
     }
 
@@ -172,6 +178,10 @@ public final class GeneratedAccess_com_codename1_util {
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("all".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
+                return com.codename1.util.AsyncResource.all((java.util.Collection) adaptedArgs[0]);
+            }
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.AsyncResource[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.AsyncResource[].class}, true);
                 com.codename1.util.AsyncResource[] varArgs = new com.codename1.util.AsyncResource[adaptedArgs.length - 0];
@@ -180,12 +190,12 @@ public final class GeneratedAccess_com_codename1_util {
                 }
                 return com.codename1.util.AsyncResource.all(varArgs);
             }
-            if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
-                return com.codename1.util.AsyncResource.all((java.util.Collection) adaptedArgs[0]);
-            }
         }
         if ("await".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
+                com.codename1.util.AsyncResource.await((java.util.Collection) adaptedArgs[0]); return null;
+            }
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.AsyncResource[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.AsyncResource[].class}, true);
                 com.codename1.util.AsyncResource[] varArgs = new com.codename1.util.AsyncResource[adaptedArgs.length - 0];
@@ -193,10 +203,6 @@ public final class GeneratedAccess_com_codename1_util {
                     varArgs[i - 0] = (com.codename1.util.AsyncResource) adaptedArgs[i];
                 }
                 com.codename1.util.AsyncResource.await(varArgs); return null;
-            }
-            if (matches(safeArgs, new Class<?>[]{java.util.Collection.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
-                com.codename1.util.AsyncResource.await((java.util.Collection) adaptedArgs[0]); return null;
             }
         }
         if ("isCancelled".equals(name)) {
@@ -265,6 +271,12 @@ public final class GeneratedAccess_com_codename1_util {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.FailureCallback.class, java.lang.Throwable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.FailureCallback.class, java.lang.Throwable.class}, false);
                 com.codename1.util.CallbackDispatcher.dispatchError((com.codename1.util.FailureCallback) adaptedArgs[0], (java.lang.Throwable) adaptedArgs[1]); return null;
+            }
+        }
+        if ("dispatchSuccess".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class, java.lang.Object.class}, false);
+                com.codename1.util.CallbackDispatcher.dispatchSuccess((com.codename1.util.SuccessCallback) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
         }
         throw unsupportedStatic(com.codename1.util.CallbackDispatcher.class, name, safeArgs);
@@ -580,23 +592,65 @@ public final class GeneratedAccess_com_codename1_util {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.util.Wrapper) {
+            try {
+                return invoke9((com.codename1.util.Wrapper) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.util.AsyncResult) {
+            try {
+                return invoke10((com.codename1.util.AsyncResult) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.util.Callback) {
             try {
-                return invoke9((com.codename1.util.Callback) target, name, safeArgs);
+                return invoke11((com.codename1.util.Callback) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.util.FailureCallback) {
             try {
-                return invoke10((com.codename1.util.FailureCallback) target, name, safeArgs);
+                return invoke12((com.codename1.util.FailureCallback) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.util.LazyValue) {
+            try {
+                return invoke13((com.codename1.util.LazyValue) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.util.OnComplete) {
+            try {
+                return invoke14((com.codename1.util.OnComplete) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.util.RunnableWithResult) {
             try {
-                return invoke11((com.codename1.util.RunnableWithResult) target, name, safeArgs);
+                return invoke15((com.codename1.util.RunnableWithResult) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.util.RunnableWithResultSync) {
+            try {
+                return invoke16((com.codename1.util.RunnableWithResultSync) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.util.SuccessCallback) {
+            try {
+                return invoke17((com.codename1.util.SuccessCallback) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -636,6 +690,12 @@ public final class GeneratedAccess_com_codename1_util {
                 return typedTarget.cancel(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
+        if ("complete".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.complete((java.lang.Object) adaptedArgs[0]); return null;
+            }
+        }
         if ("countObservers".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.countObservers();
@@ -666,6 +726,15 @@ public final class GeneratedAccess_com_codename1_util {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class, com.codename1.util.EasyThread.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class, com.codename1.util.EasyThread.class}, false);
                 return typedTarget.except((com.codename1.util.SuccessCallback) adaptedArgs[0], (com.codename1.util.EasyThread) adaptedArgs[1]);
+            }
+        }
+        if ("get".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.get();
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.get(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("hasChanged".equals(name)) {
@@ -883,10 +952,6 @@ public final class GeneratedAccess_com_codename1_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.BigInteger.class}, false);
                 return typedTarget.compareTo((com.codename1.util.BigInteger) adaptedArgs[0]);
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
-                return typedTarget.compareTo((java.lang.Object) adaptedArgs[0]);
-            }
         }
         if ("divide".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.BigInteger.class}, false)) {
@@ -1076,10 +1141,6 @@ public final class GeneratedAccess_com_codename1_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Character.class}, false);
                 return typedTarget.append(((Character) adaptedArgs[0]).charValue());
             }
-            if (matches(safeArgs, new Class<?>[]{char[].class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class}, false);
-                return typedTarget.append((char[]) adaptedArgs[0]);
-            }
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
                 return typedTarget.append(((Number) adaptedArgs[0]).doubleValue());
@@ -1092,17 +1153,17 @@ public final class GeneratedAccess_com_codename1_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.append(((Number) adaptedArgs[0]).intValue());
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
-                return typedTarget.append((java.lang.Object) adaptedArgs[0]);
+            if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                return typedTarget.append(((Number) adaptedArgs[0]).longValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.append((java.lang.String) adaptedArgs[0]);
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
-                return typedTarget.append(((Number) adaptedArgs[0]).longValue());
+            if (matches(safeArgs, new Class<?>[]{char[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class}, false);
+                return typedTarget.append((char[]) adaptedArgs[0]);
             }
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
@@ -1136,10 +1197,6 @@ public final class GeneratedAccess_com_codename1_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Character.class}, false);
                 return typedTarget.insert(((Number) adaptedArgs[0]).intValue(), ((Character) adaptedArgs[1]).charValue());
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, char[].class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, char[].class}, false);
-                return typedTarget.insert(((Number) adaptedArgs[0]).intValue(), (char[]) adaptedArgs[1]);
-            }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Double.class}, false);
                 return typedTarget.insert(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).doubleValue());
@@ -1152,17 +1209,17 @@ public final class GeneratedAccess_com_codename1_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return typedTarget.insert(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false);
-                return typedTarget.insert(((Number) adaptedArgs[0]).intValue(), (java.lang.Object) adaptedArgs[1]);
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Long.class}, false);
+                return typedTarget.insert(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).longValue());
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
                 return typedTarget.insert(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1]);
             }
-            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Long.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Long.class}, false);
-                return typedTarget.insert(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).longValue());
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, char[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, char[].class}, false);
+                return typedTarget.insert(((Number) adaptedArgs[0]).intValue(), (char[]) adaptedArgs[1]);
             }
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
@@ -1193,6 +1250,12 @@ public final class GeneratedAccess_com_codename1_util {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Throwable.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Throwable.class, java.lang.Integer.class, java.lang.String.class}, false);
                 typedTarget.onError((java.lang.Object) adaptedArgs[0], (java.lang.Throwable) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.String) adaptedArgs[3]); return null;
+            }
+        }
+        if ("onSucess".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.onSucess((java.lang.Object) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1363,7 +1426,48 @@ public final class GeneratedAccess_com_codename1_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke9(com.codename1.util.Callback typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke9(com.codename1.util.Wrapper typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("get".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.get();
+            }
+        }
+        if ("set".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.set((java.lang.Object) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke10(com.codename1.util.AsyncResult typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("onReady".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Throwable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Throwable.class}, false);
+                typedTarget.onReady((java.lang.Object) adaptedArgs[0], (java.lang.Throwable) adaptedArgs[1]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke11(com.codename1.util.Callback typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("onError".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Throwable.class, java.lang.Integer.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Throwable.class, java.lang.Integer.class, java.lang.String.class}, false);
+                typedTarget.onError((java.lang.Object) adaptedArgs[0], (java.lang.Throwable) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.String) adaptedArgs[3]); return null;
+            }
+        }
+        if ("onSucess".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.onSucess((java.lang.Object) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke12(com.codename1.util.FailureCallback typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("onError".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Throwable.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Throwable.class, java.lang.Integer.class, java.lang.String.class}, false);
@@ -1373,21 +1477,54 @@ public final class GeneratedAccess_com_codename1_util {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke10(com.codename1.util.FailureCallback typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("onError".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Throwable.class, java.lang.Integer.class, java.lang.String.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Throwable.class, java.lang.Integer.class, java.lang.String.class}, false);
-                typedTarget.onError((java.lang.Object) adaptedArgs[0], (java.lang.Throwable) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.String) adaptedArgs[3]); return null;
+    private static Object invoke13(com.codename1.util.LazyValue typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("get".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class}, true);
+                java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (java.lang.Object) adaptedArgs[i];
+                }
+                return typedTarget.get(varArgs);
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke11(com.codename1.util.RunnableWithResult typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke14(com.codename1.util.OnComplete typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("completed".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.completed((java.lang.Object) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke15(com.codename1.util.RunnableWithResult typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("run".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false);
                 typedTarget.run((com.codename1.util.SuccessCallback) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke16(com.codename1.util.RunnableWithResultSync typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("run".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.run();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke17(com.codename1.util.SuccessCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("onSucess".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.onSucess((java.lang.Object) adaptedArgs[0]); return null;
             }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
@@ -1452,10 +1589,108 @@ public final class GeneratedAccess_com_codename1_util {
     }
 
     private static boolean isSamInterface(Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return true;
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return true;
+        }
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return true;
+        }
         return false;
     }
 
     private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return new com.codename1.util.OnComplete() {
+                public void completed(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return new com.codename1.util.SuccessCallback() {
+                public void onSucess(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return new com.codename1.util.FailureCallback() {
+                public void onError(java.lang.Object arg0, java.lang.Throwable arg1, int arg2, java.lang.String arg3) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1, arg2, arg3});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return new com.codename1.ui.events.ActionListener() {
+                public void actionPerformed(com.codename1.ui.events.ActionEvent arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return new com.codename1.ui.events.DataChangedListener() {
+                public void dataChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return new com.codename1.ui.events.SelectionListener() {
+                public void selectionChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
         return lambda;
     }
 
