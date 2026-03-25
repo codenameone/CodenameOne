@@ -132,26 +132,22 @@ public final class GeneratedAccess_com_codename1_facebook {
             }
         }
         if ("getApiVersion".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.facebook.FaceBookAccess.getApiVersion();
             }
         }
         if ("getInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.facebook.FaceBookAccess.getInstance();
             }
         }
         if ("getToken".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.facebook.FaceBookAccess.getToken();
             }
         }
         if ("logOut".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 com.codename1.facebook.FaceBookAccess.logOut(); return null;
             }
         }
@@ -266,98 +262,82 @@ public final class GeneratedAccess_com_codename1_facebook {
             }
         }
         if ("getCount".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCount();
             }
         }
         if ("getCoverPhoto".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCoverPhoto();
             }
         }
         if ("getCover_photo".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCover_photo();
             }
         }
         if ("getCreatedTime".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCreatedTime();
             }
         }
         if ("getCreated_time".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCreated_time();
             }
         }
         if ("getDescription".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDescription();
             }
         }
         if ("getFrom".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFrom();
             }
         }
         if ("getId".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getId();
             }
         }
         if ("getLink".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLink();
             }
         }
         if ("getLocation".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLocation();
             }
         }
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }
         if ("getPrivacy".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPrivacy();
             }
         }
         if ("getType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getType();
             }
         }
         if ("getUpdatedTime".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getUpdatedTime();
             }
         }
         if ("getUpdated_time".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getUpdated_time();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -384,74 +364,62 @@ public final class GeneratedAccess_com_codename1_facebook {
             }
         }
         if ("getAbout".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAbout();
             }
         }
         if ("getCategory".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCategory();
             }
         }
         if ("getCoverId".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCoverId();
             }
         }
         if ("getCoverLink".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCoverLink();
             }
         }
         if ("getFounded".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFounded();
             }
         }
         if ("getId".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getId();
             }
         }
         if ("getLikesCount".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLikesCount();
             }
         }
         if ("getLink".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLink();
             }
         }
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }
         if ("getUsername".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getUsername();
             }
         }
         if ("getWebsite".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWebsite();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -478,104 +446,87 @@ public final class GeneratedAccess_com_codename1_facebook {
             }
         }
         if ("getComments".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getComments();
             }
         }
         if ("getCreatedTime".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCreatedTime();
             }
         }
         if ("getCreated_time".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCreated_time();
             }
         }
         if ("getFrom".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFrom();
             }
         }
         if ("getHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHeight();
             }
         }
         if ("getIconUrl".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getIconUrl();
             }
         }
         if ("getId".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getId();
             }
         }
         if ("getImages".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getImages();
             }
         }
         if ("getLink".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLink();
             }
         }
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }
         if ("getPictureUrl".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPictureUrl();
             }
         }
         if ("getPosition".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPosition();
             }
         }
         if ("getSourceUrl".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSourceUrl();
             }
         }
         if ("getUpdatedTime".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getUpdatedTime();
             }
         }
         if ("getUpdated_time".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getUpdated_time();
             }
         }
         if ("getWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWidth();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -602,92 +553,77 @@ public final class GeneratedAccess_com_codename1_facebook {
             }
         }
         if ("getAttribution".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAttribution();
             }
         }
         if ("getCommentsCount".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCommentsCount();
             }
         }
         if ("getCreatedTime".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCreatedTime();
             }
         }
         if ("getFrom".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFrom();
             }
         }
         if ("getId".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getId();
             }
         }
         if ("getLikes".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLikes();
             }
         }
         if ("getLinkDescription".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLinkDescription();
             }
         }
         if ("getLinkName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLinkName();
             }
         }
         if ("getLinkUrl".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLinkUrl();
             }
         }
         if ("getMessage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMessage();
             }
         }
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }
         if ("getPicture".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPicture();
             }
         }
         if ("getTo".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTo();
             }
         }
         if ("getType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getType();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -698,8 +634,7 @@ public final class GeneratedAccess_com_codename1_facebook {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -720,146 +655,122 @@ public final class GeneratedAccess_com_codename1_facebook {
             }
         }
         if ("getAbout".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAbout();
             }
         }
         if ("getBio".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBio();
             }
         }
         if ("getBirthday".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBirthday();
             }
         }
         if ("getEmail".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getEmail();
             }
         }
         if ("getFirstName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFirstName();
             }
         }
         if ("getFirst_name".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFirst_name();
             }
         }
         if ("getGender".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getGender();
             }
         }
         if ("getHometown".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHometown();
             }
         }
         if ("getId".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getId();
             }
         }
         if ("getLastName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLastName();
             }
         }
         if ("getLastUpdated".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLastUpdated();
             }
         }
         if ("getLast_name".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLast_name();
             }
         }
         if ("getLast_updated".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLast_updated();
             }
         }
         if ("getLink".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLink();
             }
         }
         if ("getLocale".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLocale();
             }
         }
         if ("getLocation".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLocation();
             }
         }
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }
         if ("getQuotes".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getQuotes();
             }
         }
         if ("getRelationshipStatus".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRelationshipStatus();
             }
         }
         if ("getRelationship_status".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRelationship_status();
             }
         }
         if ("getTimezone".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTimezone();
             }
         }
         if ("getUsername".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getUsername();
             }
         }
         if ("getWebsite".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWebsite();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -886,20 +797,17 @@ public final class GeneratedAccess_com_codename1_facebook {
             }
         }
         if ("getId".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getId();
             }
         }
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -920,8 +828,7 @@ public final class GeneratedAccess_com_codename1_facebook {
             }
         }
         if ("cleanTempStorage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.cleanTempStorage(); return null;
             }
         }
@@ -936,16 +843,13 @@ public final class GeneratedAccess_com_codename1_facebook {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
                 typedTarget.createNote((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("createNote".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.createNote((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (com.codename1.ui.events.ActionListener) adaptedArgs[3]); return null;
             }
         }
         if ("createOAuth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.createOAuth();
             }
         }
@@ -954,8 +858,6 @@ public final class GeneratedAccess_com_codename1_facebook {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
                 return typedTarget.getAlbum((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
             }
-        }
-        if ("getAlbum".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.facebook.Album.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.facebook.Album.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.getAlbum((java.lang.String) adaptedArgs[0], (com.codename1.facebook.Album) adaptedArgs[1], (com.codename1.ui.events.ActionListener) adaptedArgs[2]); return null;
@@ -972,8 +874,6 @@ public final class GeneratedAccess_com_codename1_facebook {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.getFaceBookObject((java.lang.String) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
             }
-        }
-        if ("getFaceBookObject".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.events.ActionListener.class, java.lang.Boolean.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.events.ActionListener.class, java.lang.Boolean.class, java.lang.Boolean.class}, false);
                 typedTarget.getFaceBookObject((java.lang.String) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue(), ((Boolean) adaptedArgs[3]).booleanValue()); return null;
@@ -996,8 +896,6 @@ public final class GeneratedAccess_com_codename1_facebook {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.getNewsFeed((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], (com.codename1.ui.events.ActionListener) adaptedArgs[2]); return null;
             }
-        }
-        if ("getNewsFeed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.getNewsFeed((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (com.codename1.ui.events.ActionListener) adaptedArgs[3]); return null;
@@ -1014,8 +912,6 @@ public final class GeneratedAccess_com_codename1_facebook {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
                 return typedTarget.getPhoto((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
             }
-        }
-        if ("getPhoto".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.facebook.Photo.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.facebook.Photo.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.getPhoto((java.lang.String) adaptedArgs[0], (com.codename1.facebook.Photo) adaptedArgs[1], (com.codename1.ui.events.ActionListener) adaptedArgs[2]); return null;
@@ -1026,8 +922,6 @@ public final class GeneratedAccess_com_codename1_facebook {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.events.ActionListener.class, java.lang.Boolean.class}, false);
                 typedTarget.getPhotoThumbnail((java.lang.String) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
-        }
-        if ("getPhotoThumbnail".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Label.class, com.codename1.ui.geom.Dimension.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Label.class, com.codename1.ui.geom.Dimension.class, java.lang.Boolean.class}, false);
                 typedTarget.getPhotoThumbnail((java.lang.String) adaptedArgs[0], (com.codename1.ui.Label) adaptedArgs[1], (com.codename1.ui.geom.Dimension) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue()); return null;
@@ -1038,14 +932,10 @@ public final class GeneratedAccess_com_codename1_facebook {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Label.class, com.codename1.ui.geom.Dimension.class, java.lang.Boolean.class}, false);
                 typedTarget.getPicture((java.lang.String) adaptedArgs[0], (com.codename1.ui.Label) adaptedArgs[1], (com.codename1.ui.geom.Dimension) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue()); return null;
             }
-        }
-        if ("getPicture".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.events.ActionListener.class, com.codename1.ui.geom.Dimension.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.events.ActionListener.class, com.codename1.ui.geom.Dimension.class, java.lang.Boolean.class}, false);
                 typedTarget.getPicture((java.lang.String) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1], (com.codename1.ui.geom.Dimension) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue()); return null;
             }
-        }
-        if ("getPicture".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.String.class, com.codename1.ui.geom.Dimension.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.String.class, com.codename1.ui.geom.Dimension.class, java.lang.Boolean.class}, false);
                 typedTarget.getPicture((java.lang.String) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (java.lang.String) adaptedArgs[3], (com.codename1.ui.geom.Dimension) adaptedArgs[4], ((Boolean) adaptedArgs[5]).booleanValue()); return null;
@@ -1062,8 +952,6 @@ public final class GeneratedAccess_com_codename1_facebook {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
                 return typedTarget.getPost((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
             }
-        }
-        if ("getPost".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.facebook.Post.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.facebook.Post.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.getPost((java.lang.String) adaptedArgs[0], (com.codename1.facebook.Post) adaptedArgs[1], (com.codename1.ui.events.ActionListener) adaptedArgs[2]); return null;
@@ -1080,8 +968,6 @@ public final class GeneratedAccess_com_codename1_facebook {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.getUser((java.lang.String) adaptedArgs[0]);
             }
-        }
-        if ("getUser".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.facebook.User.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.facebook.User.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.getUser((java.lang.String) adaptedArgs[0], (com.codename1.facebook.User) adaptedArgs[1], (com.codename1.ui.events.ActionListener) adaptedArgs[2]); return null;
@@ -1128,8 +1014,6 @@ public final class GeneratedAccess_com_codename1_facebook {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.getWallFeed((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], (com.codename1.ui.events.ActionListener) adaptedArgs[2]); return null;
             }
-        }
-        if ("getWallFeed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.getWallFeed((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (com.codename1.ui.events.ActionListener) adaptedArgs[3]); return null;
@@ -1140,22 +1024,18 @@ public final class GeneratedAccess_com_codename1_facebook {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.getWallPosts((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], (com.codename1.ui.events.ActionListener) adaptedArgs[2]); return null;
             }
-        }
-        if ("getWallPosts".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.list.DefaultListModel.class, java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.getWallPosts((java.lang.String) adaptedArgs[0], (com.codename1.ui.list.DefaultListModel) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), (com.codename1.ui.events.ActionListener) adaptedArgs[3]); return null;
             }
         }
         if ("isAuthenticated".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isAuthenticated();
             }
         }
         if ("killCurrentRequest".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.killCurrentRequest(); return null;
             }
         }
@@ -1164,8 +1044,6 @@ public final class GeneratedAccess_com_codename1_facebook {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 typedTarget.postComment((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
-        }
-        if ("postComment".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.postComment((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (com.codename1.ui.events.ActionListener) adaptedArgs[2]); return null;
@@ -1176,8 +1054,6 @@ public final class GeneratedAccess_com_codename1_facebook {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.postLike((java.lang.String) adaptedArgs[0]); return null;
             }
-        }
-        if ("postLike".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.postLike((java.lang.String) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
@@ -1188,14 +1064,10 @@ public final class GeneratedAccess_com_codename1_facebook {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 typedTarget.postOnWall((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
-        }
-        if ("postOnWall".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.postOnWall((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (com.codename1.ui.events.ActionListener) adaptedArgs[2]); return null;
             }
-        }
-        if ("postOnWall".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.postOnWall((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], (java.lang.String) adaptedArgs[4], (java.lang.String) adaptedArgs[5], (java.lang.String) adaptedArgs[6], (com.codename1.ui.events.ActionListener) adaptedArgs[7]); return null;

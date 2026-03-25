@@ -116,8 +116,7 @@ public final class GeneratedAccess_com_codename1_ui_painter {
             }
         }
         if ("getChain".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getChain();
             }
         }

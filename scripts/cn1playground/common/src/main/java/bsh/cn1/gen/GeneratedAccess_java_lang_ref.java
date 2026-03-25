@@ -73,14 +73,12 @@ public final class GeneratedAccess_java_lang_ref {
 
     private static Object invoke0(java.lang.ref.WeakReference typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
         if ("get".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.get();
             }
         }
@@ -89,14 +87,12 @@ public final class GeneratedAccess_java_lang_ref {
 
     private static Object invoke1(java.lang.ref.Reference typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
         if ("get".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.get();
             }
         }

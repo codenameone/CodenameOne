@@ -106,8 +106,7 @@ public final class GeneratedAccess_com_codename1_charts_util {
 
     private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
         if ("getNumberInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.charts.util.NumberFormat.getNumberInstance();
             }
         }

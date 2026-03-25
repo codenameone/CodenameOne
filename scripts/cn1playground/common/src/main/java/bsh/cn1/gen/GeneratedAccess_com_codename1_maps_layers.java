@@ -161,38 +161,32 @@ public final class GeneratedAccess_com_codename1_maps_layers {
             }
         }
         if ("boundingBox".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.boundingBox();
             }
         }
         if ("getArrowHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getArrowHeight();
             }
         }
         if ("getArrowSegmentLength".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getArrowSegmentLength();
             }
         }
         if ("getArrowWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getArrowWidth();
             }
         }
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }
         if ("getProjection".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getProjection();
             }
         }
@@ -237,20 +231,17 @@ public final class GeneratedAccess_com_codename1_maps_layers {
             }
         }
         if ("boundingBox".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.boundingBox();
             }
         }
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }
         if ("getProjection".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getProjection();
             }
         }
@@ -283,8 +274,7 @@ public final class GeneratedAccess_com_codename1_maps_layers {
             }
         }
         if ("boundingBox".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.boundingBox();
             }
         }
@@ -295,14 +285,12 @@ public final class GeneratedAccess_com_codename1_maps_layers {
             }
         }
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }
         if ("getProjection".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getProjection();
             }
         }
@@ -335,20 +323,17 @@ public final class GeneratedAccess_com_codename1_maps_layers {
 
     private static Object invoke3(com.codename1.maps.layers.AbstractLayer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("boundingBox".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.boundingBox();
             }
         }
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }
         if ("getProjection".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getProjection();
             }
         }
@@ -363,8 +348,7 @@ public final class GeneratedAccess_com_codename1_maps_layers {
 
     private static Object invoke4(com.codename1.maps.layers.PointLayer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("boundingBox".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.boundingBox();
             }
         }
@@ -375,38 +359,32 @@ public final class GeneratedAccess_com_codename1_maps_layers {
             }
         }
         if ("getIcon".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getIcon();
             }
         }
         if ("getLatitude".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLatitude();
             }
         }
         if ("getLongitude".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLongitude();
             }
         }
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isProjected".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isProjected();
             }
         }
@@ -447,8 +425,7 @@ public final class GeneratedAccess_com_codename1_maps_layers {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -457,8 +434,6 @@ public final class GeneratedAccess_com_codename1_maps_layers {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.Coord.class}, false);
                 return typedTarget.translate((com.codename1.maps.Coord) adaptedArgs[0]);
             }
-        }
-        if ("translate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false);
                 return typedTarget.translate(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue());
@@ -469,14 +444,12 @@ public final class GeneratedAccess_com_codename1_maps_layers {
 
     private static Object invoke5(com.codename1.maps.layers.Layer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("boundingBox".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.boundingBox();
             }
         }
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }

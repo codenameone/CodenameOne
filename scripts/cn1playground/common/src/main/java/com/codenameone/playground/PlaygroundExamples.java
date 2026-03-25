@@ -101,6 +101,7 @@ final class PlaygroundExamples {
             root.setScrollableY(true);
             for (int i = 1; i <= 8; i++) {
                 MultiButton row = new MultiButton("Menu Item " + i);
+                row.addActionListener(e -> Dialog.show("Clicked", "Clicked item " + i, "OK", null));
                 row.setTextLine2("Secondary line for item " + i);
                 root.add(row);
             }
@@ -219,7 +220,8 @@ final class PlaygroundExamples {
                 public void actionPerformed(ActionEvent evt) {
                     String path = Capture.capturePhoto();
                     status.setText(path == null ? "Photo capture cancelled" : path);
-                    status.getParent().revalidate();
+                    root.add(new Label(Image.createImage(path)));
+                    root.revalidate();
                 }
             });
             Button audio = new Button("Record Audio");

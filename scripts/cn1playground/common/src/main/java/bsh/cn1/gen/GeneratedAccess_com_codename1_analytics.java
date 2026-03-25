@@ -46,28 +46,23 @@ public final class GeneratedAccess_com_codename1_analytics {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.analytics.AnalyticsService.class}, false);
                 com.codename1.analytics.AnalyticsService.init((com.codename1.analytics.AnalyticsService) adaptedArgs[0]); return null;
             }
-        }
-        if ("init".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 com.codename1.analytics.AnalyticsService.init((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
         }
         if ("isAppsMode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.analytics.AnalyticsService.isAppsMode();
             }
         }
         if ("isEnabled".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.analytics.AnalyticsService.isEnabled();
             }
         }
         if ("isFailSilently".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.analytics.AnalyticsService.isFailSilently();
             }
         }

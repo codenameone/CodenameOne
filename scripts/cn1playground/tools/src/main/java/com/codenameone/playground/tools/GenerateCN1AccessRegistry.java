@@ -1420,14 +1420,31 @@ public final class GenerateCN1AccessRegistry {
                 continue;
             }
             writer.write("    private static Object invokeStatic" + helperIndex + "(String name, Object[] safeArgs) throws Exception {\n");
-            for (ApiMethod method : apiClass.staticMethods) {
-                writeExecutableCase(writer, "        ", "if (\"" + method.name + "\".equals(name))",
-                        method.paramTypes, method.varArgs, staticMethodCall(apiClass, method));
+            LinkedHashMap<String, List<ApiMethod>> methodsByName = groupMethodsByName(apiClass.staticMethods);
+            for (Map.Entry<String, List<ApiMethod>> entry : methodsByName.entrySet()) {
+                writer.write("        if (\"" + entry.getKey() + "\".equals(name)) {\n");
+                for (ApiMethod method : entry.getValue()) {
+                    writeExecutableCase(writer, "            ", method.paramTypes, method.varArgs, staticMethodCall(apiClass, method));
+                }
+                writer.write("        }\n");
             }
             writer.write("        throw unsupportedStatic(" + typeLiteral(apiClass.qualifiedName) + ", name, safeArgs);\n");
             writer.write("    }\n\n");
             helperIndex++;
         }
+    }
+
+    private static LinkedHashMap<String, List<ApiMethod>> groupMethodsByName(List<ApiMethod> methods) {
+        LinkedHashMap<String, List<ApiMethod>> result = new LinkedHashMap<String, List<ApiMethod>>();
+        for (ApiMethod method : methods) {
+            List<ApiMethod> list = result.get(method.name);
+            if (list == null) {
+                list = new ArrayList<ApiMethod>();
+                result.put(method.name, list);
+            }
+            list.add(method);
+        }
+        return result;
     }
 
     private static void writeInvoke(Writer writer, List<ApiClass> classes) throws IOException {
@@ -1462,9 +1479,13 @@ public final class GenerateCN1AccessRegistry {
             }
             writer.write("    private static Object invoke" + helperIndex + "(" + apiClass.qualifiedName
                     + " typedTarget, String name, Object[] safeArgs) throws Exception {\n");
-            for (ApiMethod method : apiClass.instanceMethods) {
-                writeExecutableCase(writer, "        ", "if (\"" + method.name + "\".equals(name))",
-                        method.paramTypes, method.varArgs, instanceMethodCall(method));
+            LinkedHashMap<String, List<ApiMethod>> methodsByName = groupMethodsByName(apiClass.instanceMethods);
+            for (Map.Entry<String, List<ApiMethod>> entry : methodsByName.entrySet()) {
+                writer.write("        if (\"" + entry.getKey() + "\".equals(name)) {\n");
+                for (ApiMethod method : entry.getValue()) {
+                    writeExecutableCase(writer, "            ", method.paramTypes, method.varArgs, instanceMethodCall(method));
+                }
+                writer.write("        }\n");
             }
             writer.write("        throw unsupportedInstance(typedTarget, name, safeArgs);\n");
             writer.write("    }\n\n");
@@ -1889,18 +1910,23 @@ public final class GenerateCN1AccessRegistry {
         writer.write("    }\n");
     }
 
-    private static void writeExecutableCase(Writer writer, String indent, String guardPrefix, List<ApiType> paramTypes,
+    private static void writeExecutableCase(Writer writer, String indent, List<ApiType> paramTypes,
             boolean varArgs, String invocation) throws IOException {
-        writer.write(indent + guardPrefix + " {\n");
-        writer.write(indent + "    if (matches(safeArgs, " + classArrayLiteral(paramTypes) + ", " + varArgs + ")) {\n");
-        writer.write(indent + "        Object[] adaptedArgs = adaptArgs(safeArgs, " + classArrayLiteral(paramTypes) + ", " + varArgs + ");\n");
-        if (varArgs && !paramTypes.isEmpty()) {
-            writeVarArgsInvocation(writer, indent + "        ", paramTypes, invocation);
+        boolean emptyArgs = paramTypes.isEmpty() && !varArgs;
+        if (emptyArgs) {
+            writer.write(indent + "if (safeArgs.length == 0) {\n");
+            writer.write(indent + "    " + invocation + "\n");
+            writer.write(indent + "}\n");
         } else {
-            writer.write(indent + "        " + invocation + "\n");
+            writer.write(indent + "if (matches(safeArgs, " + classArrayLiteral(paramTypes) + ", " + varArgs + ")) {\n");
+            writer.write(indent + "    Object[] adaptedArgs = adaptArgs(safeArgs, " + classArrayLiteral(paramTypes) + ", " + varArgs + ");\n");
+            if (varArgs && !paramTypes.isEmpty()) {
+                writeVarArgsInvocation(writer, indent + "    ", paramTypes, invocation);
+            } else {
+                writer.write(indent + "    " + invocation + "\n");
+            }
+            writer.write(indent + "}\n");
         }
-        writer.write(indent + "    }\n");
-        writer.write(indent + "}\n");
     }
 
     private static void writeVarArgsInvocation(Writer writer, String indent, List<ApiType> paramTypes, String invocation)

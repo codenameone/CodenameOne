@@ -57,8 +57,7 @@ public final class GeneratedAccess_java_util_concurrent {
 
     private static Object invoke0(java.util.concurrent.ThreadLocalRandom typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("nextBoolean".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.nextBoolean();
             }
         }
@@ -69,60 +68,44 @@ public final class GeneratedAccess_java_util_concurrent {
             }
         }
         if ("nextDouble".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.nextDouble();
             }
-        }
-        if ("nextDouble".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
                 return typedTarget.nextDouble(((Number) adaptedArgs[0]).doubleValue());
             }
-        }
-        if ("nextDouble".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false);
                 return typedTarget.nextDouble(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue());
             }
         }
         if ("nextFloat".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.nextFloat();
             }
         }
         if ("nextInt".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.nextInt();
             }
-        }
-        if ("nextInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.nextInt(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("nextInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return typedTarget.nextInt(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("nextLong".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.nextLong();
             }
-        }
-        if ("nextLong".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
                 return typedTarget.nextLong(((Number) adaptedArgs[0]).longValue());
             }
-        }
-        if ("nextLong".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class}, false);
                 return typedTarget.nextLong(((Number) adaptedArgs[0]).longValue(), ((Number) adaptedArgs[1]).longValue());

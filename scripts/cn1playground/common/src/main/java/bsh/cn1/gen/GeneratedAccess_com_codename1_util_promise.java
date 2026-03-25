@@ -119,8 +119,7 @@ public final class GeneratedAccess_com_codename1_util_promise {
             }
         }
         if ("asAsyncResource".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.asAsyncResource();
             }
         }
@@ -131,8 +130,7 @@ public final class GeneratedAccess_com_codename1_util_promise {
             }
         }
         if ("getState".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getState();
             }
         }
@@ -165,8 +163,6 @@ public final class GeneratedAccess_com_codename1_util_promise {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.promise.Functor.class}, false);
                 return typedTarget.then((com.codename1.util.promise.Functor) adaptedArgs[0]);
             }
-        }
-        if ("then".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.promise.Functor.class, com.codename1.util.promise.Functor.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.promise.Functor.class, com.codename1.util.promise.Functor.class}, false);
                 return typedTarget.then((com.codename1.util.promise.Functor) adaptedArgs[0], (com.codename1.util.promise.Functor) adaptedArgs[1]);

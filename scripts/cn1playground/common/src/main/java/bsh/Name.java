@@ -783,7 +783,7 @@ class Name implements java.io.Serializable
             Interpreter.mainSecurityGuard.canInvokeStaticMethod(classOfStaticMethod, methodName, args);
 
             return Reflect.invokeStaticMethod(
-                bcm, classOfStaticMethod, methodName, args, callerInfo );
+                bcm, classOfStaticMethod, methodName, args, callerInfo, callstack );
         }
 
         if ( !Name.isCompound(value) )
@@ -865,7 +865,7 @@ class Name implements java.io.Serializable
         // Validate if can invoke this static method
         Interpreter.mainSecurityGuard.canInvokeStaticMethod(clas, methodName, args);
 
-        return Reflect.invokeStaticMethod( bcm, clas, methodName, args, callerInfo );
+        return Reflect.invokeStaticMethod( bcm, clas, methodName, args, callerInfo, callstack );
     }
 
     /**

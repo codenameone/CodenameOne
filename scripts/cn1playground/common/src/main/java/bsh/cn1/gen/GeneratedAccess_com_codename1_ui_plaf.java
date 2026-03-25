@@ -114,24 +114,18 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("createBevelLowered".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.Border.createBevelLowered();
             }
-        }
-        if ("createBevelLowered".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createBevelLowered(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
             }
         }
         if ("createBevelRaised".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.Border.createBevelRaised();
             }
-        }
-        if ("createBevelRaised".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createBevelRaised(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
@@ -148,8 +142,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createDashedBorder(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("createDashedBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createDashedBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
@@ -160,8 +152,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createDottedBorder(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("createDottedBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createDottedBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
@@ -172,38 +162,29 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createDoubleBorder(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("createDoubleBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createDoubleBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("createEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.Border.createEmpty();
             }
         }
         if ("createEtchedLowered".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.Border.createEtchedLowered();
             }
-        }
-        if ("createEtchedLowered".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createEtchedLowered(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("createEtchedRaised".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.Border.createEtchedRaised();
             }
-        }
-        if ("createEtchedRaised".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createEtchedRaised(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
@@ -214,8 +195,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createGrooveBorder(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("createGrooveBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createGrooveBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
@@ -232,8 +211,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class}, false);
                 return com.codename1.ui.plaf.Border.createImageBorder((com.codename1.ui.Image) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1], (com.codename1.ui.Image) adaptedArgs[2]);
             }
-        }
-        if ("createImageBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class}, false);
                 return com.codename1.ui.plaf.Border.createImageBorder((com.codename1.ui.Image) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1], (com.codename1.ui.Image) adaptedArgs[2], (com.codename1.ui.Image) adaptedArgs[3], (com.codename1.ui.Image) adaptedArgs[4], (com.codename1.ui.Image) adaptedArgs[5], (com.codename1.ui.Image) adaptedArgs[6], (com.codename1.ui.Image) adaptedArgs[7], (com.codename1.ui.Image) adaptedArgs[8]);
@@ -256,8 +233,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createInsetBorder(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("createInsetBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createInsetBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
@@ -268,32 +243,22 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 return com.codename1.ui.plaf.Border.createLineBorder(((Number) adaptedArgs[0]).floatValue());
             }
-        }
-        if ("createLineBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createLineBorder(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("createLineBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createLineBorder(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).intValue());
             }
-        }
-        if ("createLineBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createLineBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
-        }
-        if ("createLineBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
                 return com.codename1.ui.plaf.Border.createLineBorder(((Number) adaptedArgs[0]).intValue(), (java.lang.String) adaptedArgs[1]);
             }
-        }
-        if ("createLineBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.String.class}, false);
                 return com.codename1.ui.plaf.Border.createLineBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (java.lang.String) adaptedArgs[2]);
@@ -304,8 +269,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createOutsetBorder(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("createOutsetBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createOutsetBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
@@ -316,8 +279,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createRidgeBorder(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("createRidgeBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createRidgeBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
@@ -328,20 +289,14 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createRoundBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
-        }
-        if ("createRoundBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
                 return com.codename1.ui.plaf.Border.createRoundBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Boolean) adaptedArgs[2]).booleanValue());
             }
-        }
-        if ("createRoundBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createRoundBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
-        }
-        if ("createRoundBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
                 return com.codename1.ui.plaf.Border.createRoundBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue());
@@ -352,8 +307,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 return com.codename1.ui.plaf.Border.createUndelineBorder(((Number) adaptedArgs[0]).floatValue());
             }
-        }
-        if ("createUndelineBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createUndelineBorder(((Number) adaptedArgs[0]).intValue());
@@ -364,20 +317,14 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 return com.codename1.ui.plaf.Border.createUnderlineBorder(((Number) adaptedArgs[0]).floatValue());
             }
-        }
-        if ("createUnderlineBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createUnderlineBorder(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("createUnderlineBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createUnderlineBorder(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).intValue());
             }
-        }
-        if ("createUnderlineBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.plaf.Border.createUnderlineBorder(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
@@ -390,14 +337,12 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getDefaultBorder".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.Border.getDefaultBorder();
             }
         }
         if ("getEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.Border.getEmpty();
             }
         }
@@ -422,8 +367,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
 
     private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
         if ("create".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.RoundBorder.create();
             }
         }
@@ -432,8 +376,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
 
     private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
         if ("create".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.RoundRectBorder.create();
             }
         }
@@ -456,14 +399,12 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
 
     private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
         if ("getBackgroundTypes".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.StyleParser.getBackgroundTypes();
             }
         }
         if ("getSupportedBackgroundTypes".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.StyleParser.getSupportedBackgroundTypes();
             }
         }
@@ -484,14 +425,12 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
 
     private static Object invokeStatic6(String name, Object[] safeArgs) throws Exception {
         if ("createInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.UIManager.createInstance();
             }
         }
         if ("getInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.UIManager.getInstance();
             }
         }
@@ -597,8 +536,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 }
                 return typedTarget.backgroundImage(varArgs);
             }
-        }
-        if ("backgroundImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.backgroundImage((java.lang.String) adaptedArgs[0]);
@@ -697,14 +634,12 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("clearImageBorderSpecialTile".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clearImageBorderSpecialTile(); return null;
             }
         }
         if ("createPressedVersion".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.createPressedVersion();
             }
         }
@@ -715,32 +650,27 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getCompoundBorders".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCompoundBorders();
             }
         }
         if ("getFocusedInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFocusedInstance();
             }
         }
         if ("getMinimumHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMinimumHeight();
             }
         }
         if ("getMinimumWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMinimumWidth();
             }
         }
         if ("getPressedInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPressedInstance();
             }
         }
@@ -751,50 +681,42 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getThickness".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getThickness();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isBackgroundPainter".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isBackgroundPainter();
             }
         }
         if ("isEmptyBorder".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmptyBorder();
             }
         }
         if ("isPaintOuterBorderFirst".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isPaintOuterBorderFirst();
             }
         }
         if ("isRectangleType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRectangleType();
             }
         }
         if ("lock".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.lock(); return null;
             }
         }
         if ("mirrorBorder".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.mirrorBorder();
             }
         }
@@ -821,8 +743,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Component.class}, false);
                 typedTarget.setImageBorderSpecialTile((com.codename1.ui.Image) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1], (com.codename1.ui.Image) adaptedArgs[2], (com.codename1.ui.Image) adaptedArgs[3], (com.codename1.ui.Component) adaptedArgs[4]); return null;
             }
-        }
-        if ("setImageBorderSpecialTile".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.geom.Rectangle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.geom.Rectangle.class}, false);
                 typedTarget.setImageBorderSpecialTile((com.codename1.ui.Image) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1], (com.codename1.ui.Image) adaptedArgs[2], (com.codename1.ui.Image) adaptedArgs[3], (com.codename1.ui.geom.Rectangle) adaptedArgs[4]); return null;
@@ -851,22 +771,18 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
                 typedTarget.setTrackComponent((com.codename1.ui.Component) adaptedArgs[0]); return null;
             }
-        }
-        if ("setTrackComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
                 typedTarget.setTrackComponent((com.codename1.ui.geom.Rectangle) adaptedArgs[0]); return null;
             }
         }
         if ("toCSSString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toCSSString();
             }
         }
         if ("unlock".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.unlock(); return null;
             }
         }
@@ -995,14 +911,12 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getCheckBoxFocusImages".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCheckBoxFocusImages();
             }
         }
         if ("getCheckBoxImages".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCheckBoxImages();
             }
         }
@@ -1019,74 +933,62 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getDefaultDialogTransitionIn".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultDialogTransitionIn();
             }
         }
         if ("getDefaultDialogTransitionOut".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultDialogTransitionOut();
             }
         }
         if ("getDefaultFormTintColor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultFormTintColor();
             }
         }
         if ("getDefaultFormTransitionIn".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultFormTransitionIn();
             }
         }
         if ("getDefaultFormTransitionOut".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultFormTransitionOut();
             }
         }
         if ("getDefaultMenuTransitionIn".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultMenuTransitionIn();
             }
         }
         if ("getDefaultMenuTransitionOut".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultMenuTransitionOut();
             }
         }
         if ("getDefaultSmoothScrollingSpeed".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultSmoothScrollingSpeed();
             }
         }
         if ("getDisableColor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDisableColor();
             }
         }
         if ("getFadeScrollBarSpeed".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFadeScrollBarSpeed();
             }
         }
         if ("getFadeScrollEdgeLength".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFadeScrollEdgeLength();
             }
         }
         if ("getHorizontalScrollHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHorizontalScrollHeight();
             }
         }
@@ -1103,38 +1005,32 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getMenuBarClass".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMenuBarClass();
             }
         }
         if ("getMenuIcons".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMenuIcons();
             }
         }
         if ("getMenuRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMenuRenderer();
             }
         }
         if ("getPullToRefreshHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPullToRefreshHeight();
             }
         }
         if ("getRadioButtonFocusImages".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRadioButtonFocusImages();
             }
         }
         if ("getRadioButtonImages".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRadioButtonImages();
             }
         }
@@ -1145,8 +1041,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getTactileTouchDuration".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTactileTouchDuration();
             }
         }
@@ -1157,8 +1052,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getTextFieldCursorColor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTextFieldCursorColor();
             }
         }
@@ -1169,104 +1063,87 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getTickerSpeed".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTickerSpeed();
             }
         }
         if ("getVerticalScrollWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getVerticalScrollWidth();
             }
         }
         if ("isBackgroundImageDetermineSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isBackgroundImageDetermineSize();
             }
         }
         if ("isDefaultAlwaysTensile".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDefaultAlwaysTensile();
             }
         }
         if ("isDefaultEndsWith3Points".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDefaultEndsWith3Points();
             }
         }
         if ("isDefaultSmoothScrolling".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDefaultSmoothScrolling();
             }
         }
         if ("isDefaultSnapToGrid".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDefaultSnapToGrid();
             }
         }
         if ("isDefaultTensileDrag".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDefaultTensileDrag();
             }
         }
         if ("isDefaultTensileHighlight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDefaultTensileHighlight();
             }
         }
         if ("isFadeScrollBar".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isFadeScrollBar();
             }
         }
         if ("isFadeScrollEdge".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isFadeScrollEdge();
             }
         }
         if ("isFocusScrolling".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isFocusScrolling();
             }
         }
         if ("isRTL".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRTL();
             }
         }
         if ("isReverseSoftButtons".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isReverseSoftButtons();
             }
         }
         if ("isScrollVisible".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isScrollVisible();
             }
         }
         if ("isTickWhenFocused".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isTickWhenFocused();
             }
         }
         if ("isTouchMenus".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isTouchMenus();
             }
         }
@@ -1299,8 +1176,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class}, false);
                 typedTarget.setCheckBoxImages((com.codename1.ui.Image) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1]); return null;
             }
-        }
-        if ("setCheckBoxImages".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class}, false);
                 typedTarget.setCheckBoxImages((com.codename1.ui.Image) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1], (com.codename1.ui.Image) adaptedArgs[2], (com.codename1.ui.Image) adaptedArgs[3]); return null;
@@ -1473,8 +1348,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class}, false);
                 typedTarget.setRadioButtonImages((com.codename1.ui.Image) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1]); return null;
             }
-        }
-        if ("setRadioButtonImages".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class}, false);
                 typedTarget.setRadioButtonImages((com.codename1.ui.Image) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1], (com.codename1.ui.Image) adaptedArgs[2], (com.codename1.ui.Image) adaptedArgs[3]); return null;
@@ -1517,8 +1390,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("uninstall".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.uninstall(); return null;
             }
         }
@@ -1533,8 +1405,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("clearImageBorderSpecialTile".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clearImageBorderSpecialTile(); return null;
             }
         }
@@ -1545,8 +1416,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("createPressedVersion".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.createPressedVersion();
             }
         }
@@ -1557,44 +1427,37 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getColor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getColor();
             }
         }
         if ("getCompoundBorders".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCompoundBorders();
             }
         }
         if ("getFocusedInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFocusedInstance();
             }
         }
         if ("getMinimumHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMinimumHeight();
             }
         }
         if ("getMinimumWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMinimumWidth();
             }
         }
         if ("getOpacity".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getOpacity();
             }
         }
         if ("getPressedInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPressedInstance();
             }
         }
@@ -1605,134 +1468,112 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getShadowBlur".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShadowBlur();
             }
         }
         if ("getShadowOpacity".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShadowOpacity();
             }
         }
         if ("getShadowSpread".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShadowSpread();
             }
         }
         if ("getShadowX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShadowX();
             }
         }
         if ("getShadowY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShadowY();
             }
         }
         if ("getStrokeColor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getStrokeColor();
             }
         }
         if ("getStrokeOpacity".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getStrokeOpacity();
             }
         }
         if ("getStrokeThickness".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getStrokeThickness();
             }
         }
         if ("getThickness".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getThickness();
             }
         }
         if ("getUIID".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isBackgroundPainter".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isBackgroundPainter();
             }
         }
         if ("isEmptyBorder".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmptyBorder();
             }
         }
         if ("isOnlyLeftRounded".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isOnlyLeftRounded();
             }
         }
         if ("isOnlyRightRounded".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isOnlyRightRounded();
             }
         }
         if ("isPaintOuterBorderFirst".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isPaintOuterBorderFirst();
             }
         }
         if ("isRectangle".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRectangle();
             }
         }
         if ("isRectangleType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRectangleType();
             }
         }
         if ("isShadowMM".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isShadowMM();
             }
         }
         if ("isStrokeMM".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isStrokeMM();
             }
         }
         if ("lock".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.lock(); return null;
             }
         }
         if ("mirrorBorder".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.mirrorBorder();
             }
         }
@@ -1783,8 +1624,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Component.class}, false);
                 typedTarget.setImageBorderSpecialTile((com.codename1.ui.Image) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1], (com.codename1.ui.Image) adaptedArgs[2], (com.codename1.ui.Image) adaptedArgs[3], (com.codename1.ui.Component) adaptedArgs[4]); return null;
             }
-        }
-        if ("setImageBorderSpecialTile".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.geom.Rectangle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.geom.Rectangle.class}, false);
                 typedTarget.setImageBorderSpecialTile((com.codename1.ui.Image) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1], (com.codename1.ui.Image) adaptedArgs[2], (com.codename1.ui.Image) adaptedArgs[3], (com.codename1.ui.geom.Rectangle) adaptedArgs[4]); return null;
@@ -1813,8 +1652,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
                 typedTarget.setTrackComponent((com.codename1.ui.Component) adaptedArgs[0]); return null;
             }
-        }
-        if ("setTrackComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
                 typedTarget.setTrackComponent((com.codename1.ui.geom.Rectangle) adaptedArgs[0]); return null;
@@ -1837,8 +1674,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.shadowSpread(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("shadowSpread".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
                 return typedTarget.shadowSpread(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue());
@@ -1861,8 +1696,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Stroke.class}, false);
                 return typedTarget.stroke((com.codename1.ui.Stroke) adaptedArgs[0]);
             }
-        }
-        if ("stroke".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false);
                 return typedTarget.stroke(((Number) adaptedArgs[0]).floatValue(), ((Boolean) adaptedArgs[1]).booleanValue());
@@ -1893,8 +1726,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("unlock".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.unlock(); return null;
             }
         }
@@ -1939,8 +1771,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("clearImageBorderSpecialTile".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clearImageBorderSpecialTile(); return null;
             }
         }
@@ -1951,8 +1782,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("createPressedVersion".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.createPressedVersion();
             }
         }
@@ -1963,38 +1793,32 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getCompoundBorders".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCompoundBorders();
             }
         }
         if ("getCornerRadius".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCornerRadius();
             }
         }
         if ("getFocusedInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFocusedInstance();
             }
         }
         if ("getMinimumHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMinimumHeight();
             }
         }
         if ("getMinimumWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMinimumWidth();
             }
         }
         if ("getPressedInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPressedInstance();
             }
         }
@@ -2005,176 +1829,147 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getShadowBlur".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShadowBlur();
             }
         }
         if ("getShadowColor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShadowColor();
             }
         }
         if ("getShadowOpacity".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShadowOpacity();
             }
         }
         if ("getShadowSpread".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShadowSpread();
             }
         }
         if ("getShadowX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShadowX();
             }
         }
         if ("getShadowY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShadowY();
             }
         }
         if ("getStrokeColor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getStrokeColor();
             }
         }
         if ("getStrokeOpacity".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getStrokeOpacity();
             }
         }
         if ("getStrokeThickness".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getStrokeThickness();
             }
         }
         if ("getThickness".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getThickness();
             }
         }
         if ("getTrackComponentHorizontalPosition".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTrackComponentHorizontalPosition();
             }
         }
         if ("getTrackComponentSide".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTrackComponentSide();
             }
         }
         if ("getTrackComponentVerticalPosition".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTrackComponentVerticalPosition();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isBackgroundPainter".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isBackgroundPainter();
             }
         }
         if ("isBezierCorners".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isBezierCorners();
             }
         }
         if ("isBottomLeft".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isBottomLeft();
             }
         }
         if ("isBottomOnlyMode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isBottomOnlyMode();
             }
         }
         if ("isBottomRight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isBottomRight();
             }
         }
         if ("isEmptyBorder".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmptyBorder();
             }
         }
         if ("isPaintOuterBorderFirst".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isPaintOuterBorderFirst();
             }
         }
         if ("isRectangleType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRectangleType();
             }
         }
         if ("isStrokeMM".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isStrokeMM();
             }
         }
         if ("isTopLeft".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isTopLeft();
             }
         }
         if ("isTopOnlyMode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isTopOnlyMode();
             }
         }
         if ("isTopRight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isTopRight();
             }
         }
         if ("isUseCache".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isUseCache();
             }
         }
         if ("lock".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.lock(); return null;
             }
         }
         if ("mirrorBorder".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.mirrorBorder();
             }
         }
@@ -2207,8 +2002,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Component.class}, false);
                 typedTarget.setImageBorderSpecialTile((com.codename1.ui.Image) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1], (com.codename1.ui.Image) adaptedArgs[2], (com.codename1.ui.Image) adaptedArgs[3], (com.codename1.ui.Component) adaptedArgs[4]); return null;
             }
-        }
-        if ("setImageBorderSpecialTile".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.geom.Rectangle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.geom.Rectangle.class}, false);
                 typedTarget.setImageBorderSpecialTile((com.codename1.ui.Image) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1], (com.codename1.ui.Image) adaptedArgs[2], (com.codename1.ui.Image) adaptedArgs[3], (com.codename1.ui.geom.Rectangle) adaptedArgs[4]); return null;
@@ -2237,8 +2030,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
                 typedTarget.setTrackComponent((com.codename1.ui.Component) adaptedArgs[0]); return null;
             }
-        }
-        if ("setTrackComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
                 typedTarget.setTrackComponent((com.codename1.ui.geom.Rectangle) adaptedArgs[0]); return null;
@@ -2267,8 +2058,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 return typedTarget.shadowSpread(((Number) adaptedArgs[0]).floatValue());
             }
-        }
-        if ("shadowSpread".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.shadowSpread(((Number) adaptedArgs[0]).intValue());
@@ -2291,8 +2080,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Stroke.class}, false);
                 return typedTarget.stroke((com.codename1.ui.Stroke) adaptedArgs[0]);
             }
-        }
-        if ("stroke".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false);
                 return typedTarget.stroke(((Number) adaptedArgs[0]).floatValue(), ((Boolean) adaptedArgs[1]).booleanValue());
@@ -2347,8 +2134,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("unlock".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.unlock(); return null;
             }
         }
@@ -2369,14 +2155,12 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("clearImageBorderSpecialTile".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clearImageBorderSpecialTile(); return null;
             }
         }
         if ("createPressedVersion".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.createPressedVersion();
             }
         }
@@ -2387,32 +2171,27 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getCompoundBorders".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCompoundBorders();
             }
         }
         if ("getFocusedInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFocusedInstance();
             }
         }
         if ("getMinimumHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMinimumHeight();
             }
         }
         if ("getMinimumWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMinimumWidth();
             }
         }
         if ("getPressedInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPressedInstance();
             }
         }
@@ -2423,50 +2202,42 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getThickness".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getThickness();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isBackgroundPainter".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isBackgroundPainter();
             }
         }
         if ("isEmptyBorder".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmptyBorder();
             }
         }
         if ("isPaintOuterBorderFirst".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isPaintOuterBorderFirst();
             }
         }
         if ("isRectangleType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRectangleType();
             }
         }
         if ("lock".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.lock(); return null;
             }
         }
         if ("mirrorBorder".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.mirrorBorder();
             }
         }
@@ -2493,8 +2264,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Component.class}, false);
                 typedTarget.setImageBorderSpecialTile((com.codename1.ui.Image) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1], (com.codename1.ui.Image) adaptedArgs[2], (com.codename1.ui.Image) adaptedArgs[3], (com.codename1.ui.Component) adaptedArgs[4]); return null;
             }
-        }
-        if ("setImageBorderSpecialTile".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.geom.Rectangle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.Image.class, com.codename1.ui.geom.Rectangle.class}, false);
                 typedTarget.setImageBorderSpecialTile((com.codename1.ui.Image) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1], (com.codename1.ui.Image) adaptedArgs[2], (com.codename1.ui.Image) adaptedArgs[3], (com.codename1.ui.geom.Rectangle) adaptedArgs[4]); return null;
@@ -2523,16 +2292,13 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
                 typedTarget.setTrackComponent((com.codename1.ui.Component) adaptedArgs[0]); return null;
             }
-        }
-        if ("setTrackComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
                 typedTarget.setTrackComponent((com.codename1.ui.geom.Rectangle) adaptedArgs[0]); return null;
             }
         }
         if ("unlock".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.unlock(); return null;
             }
         }
@@ -2655,74 +2421,62 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getDefaultDialogTransitionIn".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultDialogTransitionIn();
             }
         }
         if ("getDefaultDialogTransitionOut".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultDialogTransitionOut();
             }
         }
         if ("getDefaultFormTintColor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultFormTintColor();
             }
         }
         if ("getDefaultFormTransitionIn".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultFormTransitionIn();
             }
         }
         if ("getDefaultFormTransitionOut".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultFormTransitionOut();
             }
         }
         if ("getDefaultMenuTransitionIn".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultMenuTransitionIn();
             }
         }
         if ("getDefaultMenuTransitionOut".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultMenuTransitionOut();
             }
         }
         if ("getDefaultSmoothScrollingSpeed".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultSmoothScrollingSpeed();
             }
         }
         if ("getDisableColor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDisableColor();
             }
         }
         if ("getFadeScrollBarSpeed".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFadeScrollBarSpeed();
             }
         }
         if ("getFadeScrollEdgeLength".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFadeScrollEdgeLength();
             }
         }
         if ("getHorizontalScrollHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHorizontalScrollHeight();
             }
         }
@@ -2739,26 +2493,22 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getMenuBarClass".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMenuBarClass();
             }
         }
         if ("getMenuIcons".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMenuIcons();
             }
         }
         if ("getMenuRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMenuRenderer();
             }
         }
         if ("getPullToRefreshHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPullToRefreshHeight();
             }
         }
@@ -2769,8 +2519,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getTactileTouchDuration".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTactileTouchDuration();
             }
         }
@@ -2781,8 +2530,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getTextFieldCursorColor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTextFieldCursorColor();
             }
         }
@@ -2793,98 +2541,82 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getTickerSpeed".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTickerSpeed();
             }
         }
         if ("getVerticalScrollWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getVerticalScrollWidth();
             }
         }
         if ("isBackgroundImageDetermineSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isBackgroundImageDetermineSize();
             }
         }
         if ("isDefaultAlwaysTensile".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDefaultAlwaysTensile();
             }
         }
         if ("isDefaultEndsWith3Points".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDefaultEndsWith3Points();
             }
         }
         if ("isDefaultSmoothScrolling".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDefaultSmoothScrolling();
             }
         }
         if ("isDefaultSnapToGrid".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDefaultSnapToGrid();
             }
         }
         if ("isDefaultTensileDrag".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDefaultTensileDrag();
             }
         }
         if ("isDefaultTensileHighlight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDefaultTensileHighlight();
             }
         }
         if ("isFadeScrollBar".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isFadeScrollBar();
             }
         }
         if ("isFadeScrollEdge".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isFadeScrollEdge();
             }
         }
         if ("isFocusScrolling".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isFocusScrolling();
             }
         }
         if ("isRTL".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRTL();
             }
         }
         if ("isReverseSoftButtons".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isReverseSoftButtons();
             }
         }
         if ("isScrollVisible".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isScrollVisible();
             }
         }
         if ("isTouchMenus".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isTouchMenus();
             }
         }
@@ -3081,8 +2813,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("uninstall".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.uninstall(); return null;
             }
         }
@@ -3109,128 +2840,107 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("flushMarginsCache".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.flushMarginsCache(); return null;
             }
         }
         if ("getAlignment".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAlignment();
             }
         }
         if ("getBackgroundGradientEndColor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBackgroundGradientEndColor();
             }
         }
         if ("getBackgroundGradientRelativeSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBackgroundGradientRelativeSize();
             }
         }
         if ("getBackgroundGradientRelativeX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBackgroundGradientRelativeX();
             }
         }
         if ("getBackgroundGradientRelativeY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBackgroundGradientRelativeY();
             }
         }
         if ("getBackgroundGradientStartColor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBackgroundGradientStartColor();
             }
         }
         if ("getBackgroundType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBackgroundType();
             }
         }
         if ("getBgColor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBgColor();
             }
         }
         if ("getBgImage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBgImage();
             }
         }
         if ("getBgPainter".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBgPainter();
             }
         }
         if ("getBgTransparency".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBgTransparency();
             }
         }
         if ("getBorder".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBorder();
             }
         }
         if ("getElevation".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getElevation();
             }
         }
         if ("getFgAlpha".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFgAlpha();
             }
         }
         if ("getFgColor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFgColor();
             }
         }
         if ("getFont".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFont();
             }
         }
         if ("getHorizontalMargins".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHorizontalMargins();
             }
         }
         if ("getHorizontalPadding".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHorizontalPadding();
             }
         }
         if ("getIconGap".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getIconGap();
             }
         }
         if ("getIconGapUnit".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getIconGapUnit();
             }
         }
@@ -3239,16 +2949,13 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.getMargin(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("getMargin".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false);
                 return typedTarget.getMargin(((Boolean) adaptedArgs[0]).booleanValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("getMarginBottom".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMarginBottom();
             }
         }
@@ -3265,8 +2972,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getMarginLeftNoRTL".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMarginLeftNoRTL();
             }
         }
@@ -3277,20 +2983,17 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getMarginRightNoRTL".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMarginRightNoRTL();
             }
         }
         if ("getMarginTop".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMarginTop();
             }
         }
         if ("getMarginUnit".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMarginUnit();
             }
         }
@@ -3301,8 +3004,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getOpacity".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getOpacity();
             }
         }
@@ -3311,16 +3013,13 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.getPadding(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("getPadding".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Integer.class}, false);
                 return typedTarget.getPadding(((Boolean) adaptedArgs[0]).booleanValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("getPaddingBottom".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPaddingBottom();
             }
         }
@@ -3337,8 +3036,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getPaddingLeftNoRTL".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPaddingLeftNoRTL();
             }
         }
@@ -3349,20 +3047,17 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getPaddingRightNoRTL".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPaddingRightNoRTL();
             }
         }
         if ("getPaddingTop".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPaddingTop();
             }
         }
         if ("getPaddingUnit".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPaddingUnit();
             }
         }
@@ -3373,92 +3068,77 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getTextDecoration".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTextDecoration();
             }
         }
         if ("getVerticalMargins".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getVerticalMargins();
             }
         }
         if ("getVerticalPadding".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getVerticalPadding();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("is3DTextNorth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.is3DTextNorth();
             }
         }
         if ("isLowered3DText".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isLowered3DText();
             }
         }
         if ("isModified".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isModified();
             }
         }
         if ("isOverline".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isOverline();
             }
         }
         if ("isRaised3DText".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRaised3DText();
             }
         }
         if ("isRendererStyle".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRendererStyle();
             }
         }
         if ("isStrikeThru".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isStrikeThru();
             }
         }
         if ("isSuppressChangeEvents".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isSuppressChangeEvents();
             }
         }
         if ("isSurface".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isSurface();
             }
         }
         if ("isUnderline".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isUnderline();
             }
         }
         if ("markAsRendererStyle".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.markAsRendererStyle(); return null;
             }
         }
@@ -3469,8 +3149,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("removeListeners".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.removeListeners(); return null;
             }
         }
@@ -3481,8 +3160,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("restoreCachedMargins".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.restoreCachedMargins(); return null;
             }
         }
@@ -3503,8 +3181,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setAlignment(((Number) adaptedArgs[0]).intValue()); return null;
             }
-        }
-        if ("setAlignment".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setAlignment(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3515,8 +3191,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setBackgroundGradientEndColor(((Number) adaptedArgs[0]).intValue()); return null;
             }
-        }
-        if ("setBackgroundGradientEndColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setBackgroundGradientEndColor(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3527,8 +3201,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 typedTarget.setBackgroundGradientRelativeSize(((Number) adaptedArgs[0]).floatValue()); return null;
             }
-        }
-        if ("setBackgroundGradientRelativeSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false);
                 typedTarget.setBackgroundGradientRelativeSize(((Number) adaptedArgs[0]).floatValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3539,8 +3211,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 typedTarget.setBackgroundGradientRelativeX(((Number) adaptedArgs[0]).floatValue()); return null;
             }
-        }
-        if ("setBackgroundGradientRelativeX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false);
                 typedTarget.setBackgroundGradientRelativeX(((Number) adaptedArgs[0]).floatValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3551,8 +3221,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 typedTarget.setBackgroundGradientRelativeY(((Number) adaptedArgs[0]).floatValue()); return null;
             }
-        }
-        if ("setBackgroundGradientRelativeY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false);
                 typedTarget.setBackgroundGradientRelativeY(((Number) adaptedArgs[0]).floatValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3563,8 +3231,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setBackgroundGradientStartColor(((Number) adaptedArgs[0]).intValue()); return null;
             }
-        }
-        if ("setBackgroundGradientStartColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setBackgroundGradientStartColor(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3575,8 +3241,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
                 typedTarget.setBackgroundType(((Number) adaptedArgs[0]).byteValue()); return null;
             }
-        }
-        if ("setBackgroundType".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Boolean.class}, false);
                 typedTarget.setBackgroundType(((Number) adaptedArgs[0]).byteValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3587,8 +3251,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setBgColor(((Number) adaptedArgs[0]).intValue()); return null;
             }
-        }
-        if ("setBgColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setBgColor(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3599,8 +3261,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
                 typedTarget.setBgImage((com.codename1.ui.Image) adaptedArgs[0]); return null;
             }
-        }
-        if ("setBgImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, java.lang.Boolean.class}, false);
                 typedTarget.setBgImage((com.codename1.ui.Image) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3617,14 +3277,10 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
                 typedTarget.setBgTransparency(((Number) adaptedArgs[0]).byteValue()); return null;
             }
-        }
-        if ("setBgTransparency".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setBgTransparency(((Number) adaptedArgs[0]).intValue()); return null;
             }
-        }
-        if ("setBgTransparency".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setBgTransparency(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3635,8 +3291,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Border.class}, false);
                 typedTarget.setBorder((com.codename1.ui.plaf.Border) adaptedArgs[0]); return null;
             }
-        }
-        if ("setBorder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Border.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Border.class, java.lang.Boolean.class}, false);
                 typedTarget.setBorder((com.codename1.ui.plaf.Border) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3647,8 +3301,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setElevation(((Number) adaptedArgs[0]).intValue()); return null;
             }
-        }
-        if ("setElevation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setElevation(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3659,8 +3311,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setFgAlpha(((Number) adaptedArgs[0]).intValue()); return null;
             }
-        }
-        if ("setFgAlpha".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setFgAlpha(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3671,8 +3321,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setFgColor(((Number) adaptedArgs[0]).intValue()); return null;
             }
-        }
-        if ("setFgColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setFgColor(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3683,8 +3331,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Font.class}, false);
                 typedTarget.setFont((com.codename1.ui.Font) adaptedArgs[0]); return null;
             }
-        }
-        if ("setFont".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Font.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Font.class, java.lang.Boolean.class}, false);
                 typedTarget.setFont((com.codename1.ui.Font) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3695,20 +3341,14 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 typedTarget.setIconGap(((Number) adaptedArgs[0]).floatValue()); return null;
             }
-        }
-        if ("setIconGap".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false);
                 typedTarget.setIconGap(((Number) adaptedArgs[0]).floatValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
-        }
-        if ("setIconGap".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Byte.class}, false);
                 typedTarget.setIconGap(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).byteValue()); return null;
             }
-        }
-        if ("setIconGap".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Byte.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Byte.class, java.lang.Boolean.class}, false);
                 typedTarget.setIconGap(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).byteValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
@@ -3719,8 +3359,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
                 typedTarget.setIconGapUnit(((Number) adaptedArgs[0]).byteValue()); return null;
             }
-        }
-        if ("setIconGapUnit".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Boolean.class}, false);
                 typedTarget.setIconGapUnit(((Number) adaptedArgs[0]).byteValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3731,32 +3369,22 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class}, false);
                 typedTarget.setMargin(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).floatValue()); return null;
             }
-        }
-        if ("setMargin".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.setMargin(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
             }
-        }
-        if ("setMargin".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class, java.lang.Boolean.class}, false);
                 typedTarget.setMargin(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).floatValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
-        }
-        if ("setMargin".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setMargin(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
-        }
-        if ("setMargin".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
                 typedTarget.setMargin(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue()); return null;
             }
-        }
-        if ("setMargin".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.setMargin(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue()); return null;
@@ -3767,8 +3395,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 typedTarget.setMarginBottom(((Number) adaptedArgs[0]).floatValue()); return null;
             }
-        }
-        if ("setMarginBottom".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setMarginBottom(((Number) adaptedArgs[0]).intValue()); return null;
@@ -3779,8 +3405,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 typedTarget.setMarginLeft(((Number) adaptedArgs[0]).floatValue()); return null;
             }
-        }
-        if ("setMarginLeft".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setMarginLeft(((Number) adaptedArgs[0]).intValue()); return null;
@@ -3791,8 +3415,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 typedTarget.setMarginRight(((Number) adaptedArgs[0]).floatValue()); return null;
             }
-        }
-        if ("setMarginRight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setMarginRight(((Number) adaptedArgs[0]).intValue()); return null;
@@ -3803,8 +3425,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 typedTarget.setMarginTop(((Number) adaptedArgs[0]).floatValue()); return null;
             }
-        }
-        if ("setMarginTop".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setMarginTop(((Number) adaptedArgs[0]).intValue()); return null;
@@ -3849,8 +3469,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setOpacity(((Number) adaptedArgs[0]).intValue()); return null;
             }
-        }
-        if ("setOpacity".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setOpacity(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3867,32 +3485,22 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class}, false);
                 typedTarget.setPadding(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).floatValue()); return null;
             }
-        }
-        if ("setPadding".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.setPadding(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
             }
-        }
-        if ("setPadding".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class, java.lang.Boolean.class}, false);
                 typedTarget.setPadding(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).floatValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
-        }
-        if ("setPadding".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setPadding(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
-        }
-        if ("setPadding".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
                 typedTarget.setPadding(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue()); return null;
             }
-        }
-        if ("setPadding".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.setPadding(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue()); return null;
@@ -3903,8 +3511,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 typedTarget.setPaddingBottom(((Number) adaptedArgs[0]).floatValue()); return null;
             }
-        }
-        if ("setPaddingBottom".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setPaddingBottom(((Number) adaptedArgs[0]).intValue()); return null;
@@ -3915,8 +3521,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 typedTarget.setPaddingLeft(((Number) adaptedArgs[0]).floatValue()); return null;
             }
-        }
-        if ("setPaddingLeft".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setPaddingLeft(((Number) adaptedArgs[0]).intValue()); return null;
@@ -3927,8 +3531,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 typedTarget.setPaddingRight(((Number) adaptedArgs[0]).floatValue()); return null;
             }
-        }
-        if ("setPaddingRight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setPaddingRight(((Number) adaptedArgs[0]).intValue()); return null;
@@ -3939,8 +3541,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 typedTarget.setPaddingTop(((Number) adaptedArgs[0]).floatValue()); return null;
             }
-        }
-        if ("setPaddingTop".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setPaddingTop(((Number) adaptedArgs[0]).intValue()); return null;
@@ -3997,8 +3597,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 typedTarget.setSurface(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
-        }
-        if ("setSurface".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Boolean.class}, false);
                 typedTarget.setSurface(((Boolean) adaptedArgs[0]).booleanValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -4009,8 +3607,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setTextDecoration(((Number) adaptedArgs[0]).intValue()); return null;
             }
-        }
-        if ("setTextDecoration".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setTextDecoration(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -4023,8 +3619,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("stripMarginAndPadding".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.stripMarginAndPadding(); return null;
             }
         }
@@ -4045,8 +3640,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getBundle".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBundle();
             }
         }
@@ -4075,14 +3669,12 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getLookAndFeel".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLookAndFeel();
             }
         }
         if ("getResourceBundle".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getResourceBundle();
             }
         }
@@ -4091,8 +3683,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
                 return typedTarget.getThemeConstant((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
-        }
-        if ("getThemeConstant".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 return typedTarget.getThemeConstant((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
@@ -4111,8 +3701,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("getThemeName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getThemeName();
             }
         }
@@ -4121,16 +3710,13 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.isThemeConstant((java.lang.String) adaptedArgs[0]);
             }
-        }
-        if ("isThemeConstant".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
                 return typedTarget.isThemeConstant((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
             }
         }
         if ("isUseLargerTextScale".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isUseLargerTextScale();
             }
         }
@@ -4193,8 +3779,6 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.plaf.Style.class}, false);
                 typedTarget.setComponentStyle((java.lang.String) adaptedArgs[0], (com.codename1.ui.plaf.Style) adaptedArgs[1]); return null;
             }
-        }
-        if ("setComponentStyle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.plaf.Style.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.plaf.Style.class, java.lang.String.class}, false);
                 typedTarget.setComponentStyle((java.lang.String) adaptedArgs[0], (com.codename1.ui.plaf.Style) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
@@ -4225,8 +3809,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             }
         }
         if ("wasThemeInstalled".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.wasThemeInstalled();
             }
         }

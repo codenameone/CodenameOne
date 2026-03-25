@@ -46,14 +46,10 @@ public final class GeneratedAccess_com_codename1_processing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false);
                 return com.codename1.processing.Result.fromContent((com.codename1.xml.Element) adaptedArgs[0]);
             }
-        }
-        if ("fromContent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Map.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Map.class}, false);
                 return com.codename1.processing.Result.fromContent((java.util.Map) adaptedArgs[0]);
             }
-        }
-        if ("fromContent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 return com.codename1.processing.Result.fromContent((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
@@ -182,8 +178,7 @@ public final class GeneratedAccess_com_codename1_processing {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -194,8 +189,7 @@ public final class GeneratedAccess_com_codename1_processing {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }

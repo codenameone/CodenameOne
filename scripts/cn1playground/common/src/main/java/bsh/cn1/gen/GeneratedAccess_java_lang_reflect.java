@@ -84,8 +84,7 @@ public final class GeneratedAccess_java_lang_reflect {
 
     private static Object invoke0(java.lang.reflect.Constructor typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }
@@ -94,8 +93,7 @@ public final class GeneratedAccess_java_lang_reflect {
 
     private static Object invoke1(java.lang.reflect.Method typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }

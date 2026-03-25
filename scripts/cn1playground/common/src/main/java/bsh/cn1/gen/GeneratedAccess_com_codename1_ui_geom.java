@@ -196,8 +196,6 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
                 return com.codename1.ui.geom.AffineTransform.getRotateInstance(((Number) adaptedArgs[0]).doubleValue());
             }
-        }
-        if ("getRotateInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 return com.codename1.ui.geom.AffineTransform.getRotateInstance(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue());
@@ -208,8 +206,7 @@ public final class GeneratedAccess_com_codename1_ui_geom {
 
     private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
         if ("createFromPool".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.geom.GeneralPath.createFromPool();
             }
         }
@@ -218,8 +215,6 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, float[].class}, false);
                 return com.codename1.ui.geom.GeneralPath.isConvexPolygon((float[]) adaptedArgs[0], (float[]) adaptedArgs[1]);
             }
-        }
-        if ("isConvexPolygon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
                 return com.codename1.ui.geom.GeneralPath.isConvexPolygon((int[]) adaptedArgs[0], (int[]) adaptedArgs[1]);
@@ -371,8 +366,7 @@ public final class GeneratedAccess_com_codename1_ui_geom {
 
     private static Object invoke0(com.codename1.ui.geom.AffineTransform typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("setToIdentity".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.setToIdentity(); return null;
             }
         }
@@ -381,20 +375,14 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
                 typedTarget.setToRotation(((Number) adaptedArgs[0]).doubleValue()); return null;
             }
-        }
-        if ("setToRotation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false);
                 typedTarget.setToRotation(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue()); return null;
             }
-        }
-        if ("setToRotation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 typedTarget.setToRotation(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("setToRotation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 typedTarget.setToRotation(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue()); return null;
@@ -425,14 +413,12 @@ public final class GeneratedAccess_com_codename1_ui_geom {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
         if ("toTransform".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toTransform();
             }
         }
@@ -447,20 +433,17 @@ public final class GeneratedAccess_com_codename1_ui_geom {
             }
         }
         if ("getHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHeight();
             }
         }
         if ("getWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWidth();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -477,8 +460,7 @@ public final class GeneratedAccess_com_codename1_ui_geom {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -487,14 +469,12 @@ public final class GeneratedAccess_com_codename1_ui_geom {
 
     private static Object invoke2(com.codename1.ui.geom.Dimension2D typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHeight();
             }
         }
         if ("getWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWidth();
             }
         }
@@ -511,8 +491,7 @@ public final class GeneratedAccess_com_codename1_ui_geom {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -525,8 +504,6 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.PathIterator.class, java.lang.Boolean.class}, false);
                 typedTarget.append((com.codename1.ui.geom.PathIterator) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
-        }
-        if ("append".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Shape.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Shape.class, java.lang.Boolean.class}, false);
                 typedTarget.append((com.codename1.ui.geom.Shape) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -537,20 +514,14 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 typedTarget.arc(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue(), ((Number) adaptedArgs[4]).doubleValue(), ((Number) adaptedArgs[5]).doubleValue()); return null;
             }
-        }
-        if ("arc".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
                 typedTarget.arc(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).floatValue()); return null;
             }
-        }
-        if ("arc".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Boolean.class}, false);
                 typedTarget.arc(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue(), ((Number) adaptedArgs[4]).doubleValue(), ((Number) adaptedArgs[5]).doubleValue(), ((Boolean) adaptedArgs[6]).booleanValue()); return null;
             }
-        }
-        if ("arc".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Boolean.class}, false);
                 typedTarget.arc(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).floatValue(), ((Boolean) adaptedArgs[6]).booleanValue()); return null;
@@ -561,28 +532,21 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 typedTarget.arcTo(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue()); return null;
             }
-        }
-        if ("arcTo".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
                 typedTarget.arcTo(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue()); return null;
             }
-        }
-        if ("arcTo".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Boolean.class}, false);
                 typedTarget.arcTo(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue(), ((Boolean) adaptedArgs[4]).booleanValue()); return null;
             }
-        }
-        if ("arcTo".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Boolean.class}, false);
                 typedTarget.arcTo(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Boolean) adaptedArgs[4]).booleanValue()); return null;
             }
         }
         if ("closePath".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.closePath(); return null;
             }
         }
@@ -591,8 +555,6 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
                 return typedTarget.contains(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
-        }
-        if ("contains".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return typedTarget.contains(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
@@ -609,8 +571,6 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 typedTarget.curveTo(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue(), ((Number) adaptedArgs[4]).doubleValue(), ((Number) adaptedArgs[5]).doubleValue()); return null;
             }
-        }
-        if ("curveTo".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
                 typedTarget.curveTo(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).floatValue()); return null;
@@ -623,48 +583,36 @@ public final class GeneratedAccess_com_codename1_ui_geom {
             }
         }
         if ("getBounds".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBounds();
             }
-        }
-        if ("getBounds".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
                 typedTarget.getBounds((com.codename1.ui.geom.Rectangle) adaptedArgs[0]); return null;
             }
         }
         if ("getBounds2D".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBounds2D();
             }
-        }
-        if ("getBounds2D".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class}, false);
                 typedTarget.getBounds2D((float[]) adaptedArgs[0]); return null;
             }
         }
         if ("getCurrentPoint".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCurrentPoint();
             }
-        }
-        if ("getCurrentPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class}, false);
                 typedTarget.getCurrentPoint((float[]) adaptedArgs[0]); return null;
             }
         }
         if ("getPathIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPathIterator();
             }
-        }
-        if ("getPathIterator".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Transform.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Transform.class}, false);
                 return typedTarget.getPathIterator((com.codename1.ui.Transform) adaptedArgs[0]);
@@ -677,8 +625,7 @@ public final class GeneratedAccess_com_codename1_ui_geom {
             }
         }
         if ("getPointsSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPointsSize();
             }
         }
@@ -689,14 +636,12 @@ public final class GeneratedAccess_com_codename1_ui_geom {
             }
         }
         if ("getTypesSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTypesSize();
             }
         }
         if ("getWindingRule".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWindingRule();
             }
         }
@@ -705,14 +650,10 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
                 return typedTarget.intersect((com.codename1.ui.geom.Rectangle) adaptedArgs[0]);
             }
-        }
-        if ("intersect".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Shape.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Shape.class}, false);
                 typedTarget.intersect((com.codename1.ui.geom.Shape) adaptedArgs[0]); return null;
             }
-        }
-        if ("intersect".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return typedTarget.intersect(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
@@ -725,14 +666,12 @@ public final class GeneratedAccess_com_codename1_ui_geom {
             }
         }
         if ("isPolygon".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isPolygon();
             }
         }
         if ("isRectangle".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRectangle();
             }
         }
@@ -741,8 +680,6 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false);
                 typedTarget.lineTo(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue()); return null;
             }
-        }
-        if ("lineTo".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
                 typedTarget.lineTo(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue()); return null;
@@ -753,8 +690,6 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false);
                 typedTarget.moveTo(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue()); return null;
             }
-        }
-        if ("moveTo".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
                 typedTarget.moveTo(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue()); return null;
@@ -765,16 +700,13 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 typedTarget.quadTo(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue()); return null;
             }
-        }
-        if ("quadTo".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
                 typedTarget.quadTo(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue()); return null;
             }
         }
         if ("reset".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.reset(); return null;
             }
         }
@@ -803,8 +735,7 @@ public final class GeneratedAccess_com_codename1_ui_geom {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -819,14 +750,12 @@ public final class GeneratedAccess_com_codename1_ui_geom {
 
     private static Object invoke4(com.codename1.ui.geom.Point typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getX();
             }
         }
         if ("getY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getY();
             }
         }
@@ -843,8 +772,7 @@ public final class GeneratedAccess_com_codename1_ui_geom {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -853,14 +781,12 @@ public final class GeneratedAccess_com_codename1_ui_geom {
 
     private static Object invoke5(com.codename1.ui.geom.Point2D typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getX();
             }
         }
         if ("getY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getY();
             }
         }
@@ -877,8 +803,7 @@ public final class GeneratedAccess_com_codename1_ui_geom {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -891,14 +816,10 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
                 return typedTarget.contains((com.codename1.ui.geom.Rectangle) adaptedArgs[0]);
             }
-        }
-        if ("contains".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return typedTarget.contains(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
-        }
-        if ("contains".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return typedTarget.contains(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
@@ -911,62 +832,51 @@ public final class GeneratedAccess_com_codename1_ui_geom {
             }
         }
         if ("getBounds".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBounds();
             }
         }
         if ("getBounds2D".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBounds2D();
             }
         }
         if ("getHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHeight();
             }
         }
         if ("getPathIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPathIterator();
             }
-        }
-        if ("getPathIterator".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Transform.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Transform.class}, false);
                 return typedTarget.getPathIterator((com.codename1.ui.Transform) adaptedArgs[0]);
             }
         }
         if ("getSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSize();
             }
         }
         if ("getWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWidth();
             }
         }
         if ("getX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getX();
             }
         }
         if ("getY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getY();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -975,14 +885,10 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
                 return typedTarget.intersection((com.codename1.ui.geom.Rectangle) adaptedArgs[0]);
             }
-        }
-        if ("intersection".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class, com.codename1.ui.geom.Rectangle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class, com.codename1.ui.geom.Rectangle.class}, false);
                 typedTarget.intersection((com.codename1.ui.geom.Rectangle) adaptedArgs[0], (com.codename1.ui.geom.Rectangle) adaptedArgs[1]); return null;
             }
-        }
-        if ("intersection".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return typedTarget.intersection(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
@@ -993,16 +899,13 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
                 return typedTarget.intersects((com.codename1.ui.geom.Rectangle) adaptedArgs[0]);
             }
-        }
-        if ("intersects".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return typedTarget.intersects(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
             }
         }
         if ("isRectangle".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRectangle();
             }
         }
@@ -1011,8 +914,6 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
                 typedTarget.setBounds((com.codename1.ui.geom.Rectangle) adaptedArgs[0]); return null;
             }
-        }
-        if ("setBounds".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.setBounds(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue()); return null;
@@ -1043,8 +944,7 @@ public final class GeneratedAccess_com_codename1_ui_geom {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -1057,76 +957,60 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle2D.class}, false);
                 return typedTarget.contains((com.codename1.ui.geom.Rectangle2D) adaptedArgs[0]);
             }
-        }
-        if ("contains".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false);
                 return typedTarget.contains(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue());
             }
-        }
-        if ("contains".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return typedTarget.contains(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
-        }
-        if ("contains".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 return typedTarget.contains(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue());
             }
         }
         if ("getBounds".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBounds();
             }
         }
         if ("getBounds2D".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBounds2D();
             }
         }
         if ("getHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHeight();
             }
         }
         if ("getPathIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPathIterator();
             }
-        }
-        if ("getPathIterator".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Transform.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Transform.class}, false);
                 return typedTarget.getPathIterator((com.codename1.ui.Transform) adaptedArgs[0]);
             }
         }
         if ("getSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSize();
             }
         }
         if ("getWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWidth();
             }
         }
         if ("getX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getX();
             }
         }
         if ("getY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getY();
             }
         }
@@ -1135,14 +1019,10 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
                 return typedTarget.intersection((com.codename1.ui.geom.Rectangle) adaptedArgs[0]);
             }
-        }
-        if ("intersection".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle2D.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle2D.class}, false);
                 return typedTarget.intersection((com.codename1.ui.geom.Rectangle2D) adaptedArgs[0]);
             }
-        }
-        if ("intersection".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 return typedTarget.intersection(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue());
@@ -1153,16 +1033,13 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle2D.class}, false);
                 return typedTarget.intersects((com.codename1.ui.geom.Rectangle2D) adaptedArgs[0]);
             }
-        }
-        if ("intersects".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 return typedTarget.intersects(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), ((Number) adaptedArgs[3]).doubleValue());
             }
         }
         if ("isRectangle".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRectangle();
             }
         }
@@ -1189,8 +1066,6 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
                 typedTarget.setX(((Number) adaptedArgs[0]).doubleValue()); return null;
             }
-        }
-        if ("setX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setX(((Number) adaptedArgs[0]).intValue()); return null;
@@ -1201,16 +1076,13 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
                 typedTarget.setY(((Number) adaptedArgs[0]).doubleValue()); return null;
             }
-        }
-        if ("setY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setY(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -1229,28 +1101,23 @@ public final class GeneratedAccess_com_codename1_ui_geom {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
                 return typedTarget.currentSegment((double[]) adaptedArgs[0]);
             }
-        }
-        if ("currentSegment".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class}, false);
                 return typedTarget.currentSegment((float[]) adaptedArgs[0]);
             }
         }
         if ("getWindingRule".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWindingRule();
             }
         }
         if ("isDone".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDone();
             }
         }
         if ("next".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.next(); return null;
             }
         }
@@ -1265,24 +1132,19 @@ public final class GeneratedAccess_com_codename1_ui_geom {
             }
         }
         if ("getBounds".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBounds();
             }
         }
         if ("getBounds2D".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBounds2D();
             }
         }
         if ("getPathIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPathIterator();
             }
-        }
-        if ("getPathIterator".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Transform.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Transform.class}, false);
                 return typedTarget.getPathIterator((com.codename1.ui.Transform) adaptedArgs[0]);
@@ -1295,8 +1157,7 @@ public final class GeneratedAccess_com_codename1_ui_geom {
             }
         }
         if ("isRectangle".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRectangle();
             }
         }

@@ -97,14 +97,10 @@ public final class GeneratedAccess_com_codename1_javascript {
                 }
                 return typedTarget.call(varArgs);
             }
-        }
-        if ("call".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.call((java.lang.String) adaptedArgs[0]);
             }
-        }
-        if ("call".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, false);
                 return typedTarget.call((java.lang.String) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1]);
@@ -115,32 +111,22 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, com.codename1.util.Callback.class}, false);
                 typedTarget.callAsync((java.lang.Object[]) adaptedArgs[0], (com.codename1.util.Callback) adaptedArgs[1]); return null;
             }
-        }
-        if ("callAsync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false);
                 typedTarget.callAsync((java.lang.Object[]) adaptedArgs[0], (com.codename1.util.SuccessCallback) adaptedArgs[1]); return null;
             }
-        }
-        if ("callAsync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false);
                 typedTarget.callAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.Callback) adaptedArgs[1]); return null;
             }
-        }
-        if ("callAsync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false);
                 typedTarget.callAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.SuccessCallback) adaptedArgs[1]); return null;
             }
-        }
-        if ("callAsync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class, com.codename1.util.Callback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class, com.codename1.util.Callback.class}, false);
                 typedTarget.callAsync((java.lang.String) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1], (com.codename1.util.Callback) adaptedArgs[2]); return null;
             }
-        }
-        if ("callAsync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false);
                 typedTarget.callAsync((java.lang.String) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1], (com.codename1.util.SuccessCallback) adaptedArgs[2]); return null;
@@ -157,8 +143,6 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false);
                 typedTarget.callDoubleAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.Callback) adaptedArgs[1]); return null;
             }
-        }
-        if ("callDoubleAsync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false);
                 typedTarget.callDoubleAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.SuccessCallback) adaptedArgs[1]); return null;
@@ -175,8 +159,6 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false);
                 typedTarget.callIntAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.Callback) adaptedArgs[1]); return null;
             }
-        }
-        if ("callIntAsync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false);
                 typedTarget.callIntAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.SuccessCallback) adaptedArgs[1]); return null;
@@ -193,8 +175,6 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false);
                 typedTarget.callObjectAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.Callback) adaptedArgs[1]); return null;
             }
-        }
-        if ("callObjectAsync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false);
                 typedTarget.callObjectAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.SuccessCallback) adaptedArgs[1]); return null;
@@ -211,8 +191,6 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false);
                 typedTarget.callStringAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.Callback) adaptedArgs[1]); return null;
             }
-        }
-        if ("callStringAsync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false);
                 typedTarget.callStringAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.SuccessCallback) adaptedArgs[1]); return null;
@@ -223,8 +201,6 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.get(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("get".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.get((java.lang.String) adaptedArgs[0]);
@@ -235,8 +211,6 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.getBoolean(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("getBoolean".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.getBoolean((java.lang.String) adaptedArgs[0]);
@@ -247,8 +221,6 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.getDouble(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("getDouble".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.getDouble((java.lang.String) adaptedArgs[0]);
@@ -259,8 +231,6 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.getInt(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("getInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.getInt((java.lang.String) adaptedArgs[0]);
@@ -271,8 +241,6 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.getObject(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("getObject".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.getObject((java.lang.String) adaptedArgs[0]);
@@ -283,8 +251,6 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.getString(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("getString".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.getString((java.lang.String) adaptedArgs[0]);
@@ -295,20 +261,14 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class}, false);
                 typedTarget.set(((Number) adaptedArgs[0]).intValue(), (java.lang.Object) adaptedArgs[1]); return null;
             }
-        }
-        if ("set".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false);
                 typedTarget.set((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
-        }
-        if ("set".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class, java.lang.Boolean.class}, false);
                 typedTarget.set(((Number) adaptedArgs[0]).intValue(), (java.lang.Object) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
-        }
-        if ("set".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class, java.lang.Boolean.class}, false);
                 typedTarget.set((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue()); return null;
@@ -319,20 +279,14 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setBoolean(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
-        }
-        if ("setBoolean".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
                 typedTarget.setBoolean((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
-        }
-        if ("setBoolean".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Boolean.class}, false);
                 typedTarget.setBoolean(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
-        }
-        if ("setBoolean".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class, java.lang.Boolean.class}, false);
                 typedTarget.setBoolean((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
@@ -343,20 +297,14 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Double.class}, false);
                 typedTarget.setDouble(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).doubleValue()); return null;
             }
-        }
-        if ("setDouble".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class}, false);
                 typedTarget.setDouble((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).doubleValue()); return null;
             }
-        }
-        if ("setDouble".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Double.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Double.class, java.lang.Boolean.class}, false);
                 typedTarget.setDouble(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
-        }
-        if ("setDouble".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Double.class, java.lang.Boolean.class}, false);
                 typedTarget.setDouble((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).doubleValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
@@ -367,34 +315,26 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.setInt(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
             }
-        }
-        if ("setInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
                 typedTarget.setInt((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
-        }
-        if ("setInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setInt(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
-        }
-        if ("setInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.setInt((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
         }
         if ("toJSPointer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toJSPointer();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -407,20 +347,14 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.javascript.JSObject.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class}, false);
                 return typedTarget.call((com.codename1.javascript.JSObject) adaptedArgs[0], (com.codename1.javascript.JSObject) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2]);
             }
-        }
-        if ("call".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class}, false);
                 return typedTarget.call((java.lang.String) adaptedArgs[0], (com.codename1.javascript.JSObject) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2]);
             }
-        }
-        if ("call".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, java.lang.Boolean.class, com.codename1.util.Callback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, java.lang.Boolean.class, com.codename1.util.Callback.class}, false);
                 return typedTarget.call((java.lang.String) adaptedArgs[0], (com.codename1.javascript.JSObject) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue(), (com.codename1.util.Callback) adaptedArgs[4]);
             }
-        }
-        if ("call".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, java.lang.Boolean.class, com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, java.lang.Boolean.class, com.codename1.util.SuccessCallback.class}, false);
                 return typedTarget.call((java.lang.String) adaptedArgs[0], (com.codename1.javascript.JSObject) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue(), (com.codename1.util.SuccessCallback) adaptedArgs[4]);
@@ -431,28 +365,21 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.javascript.JSObject.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, com.codename1.util.Callback.class}, false);
                 typedTarget.callAsync((com.codename1.javascript.JSObject) adaptedArgs[0], (com.codename1.javascript.JSObject) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2], (com.codename1.util.Callback) adaptedArgs[3]); return null;
             }
-        }
-        if ("callAsync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.javascript.JSObject.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.javascript.JSObject.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false);
                 typedTarget.callAsync((com.codename1.javascript.JSObject) adaptedArgs[0], (com.codename1.javascript.JSObject) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2], (com.codename1.util.SuccessCallback) adaptedArgs[3]); return null;
             }
-        }
-        if ("callAsync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, com.codename1.util.Callback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, com.codename1.util.Callback.class}, false);
                 typedTarget.callAsync((java.lang.String) adaptedArgs[0], (com.codename1.javascript.JSObject) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2], (com.codename1.util.Callback) adaptedArgs[3]); return null;
             }
-        }
-        if ("callAsync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.javascript.JSObject.class, java.lang.Object[].class, com.codename1.util.SuccessCallback.class}, false);
                 typedTarget.callAsync((java.lang.String) adaptedArgs[0], (com.codename1.javascript.JSObject) adaptedArgs[1], (java.lang.Object[]) adaptedArgs[2], (com.codename1.util.SuccessCallback) adaptedArgs[3]); return null;
             }
         }
         if ("cleanup".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.cleanup(); return null;
             }
         }
@@ -467,16 +394,13 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.Callback.class}, false);
                 typedTarget.getAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.Callback) adaptedArgs[1]); return null;
             }
-        }
-        if ("getAsync".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.util.SuccessCallback.class}, false);
                 typedTarget.getAsync((java.lang.String) adaptedArgs[0], (com.codename1.util.SuccessCallback) adaptedArgs[1]); return null;
             }
         }
         if ("getWindow".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWindow();
             }
         }
@@ -485,8 +409,6 @@ public final class GeneratedAccess_com_codename1_javascript {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false);
                 typedTarget.set((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
-        }
-        if ("set".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class, java.lang.Boolean.class}, false);
                 typedTarget.set((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue()); return null;

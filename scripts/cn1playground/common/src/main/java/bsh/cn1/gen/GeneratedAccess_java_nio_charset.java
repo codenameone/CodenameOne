@@ -57,8 +57,7 @@ public final class GeneratedAccess_java_nio_charset {
 
     private static Object invoke0(java.nio.charset.Charset typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("displayName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.displayName();
             }
         }

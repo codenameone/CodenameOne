@@ -63,8 +63,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("getTileSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.maps.providers.GoogleMapsProvider.getTileSize();
             }
         }
@@ -116,8 +115,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
 
     private static Object invoke0(com.codename1.maps.providers.GoogleMapsProvider typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("attribution".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.attribution();
             }
         }
@@ -128,14 +126,12 @@ public final class GeneratedAccess_com_codename1_maps_providers {
             }
         }
         if ("getLanguage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLanguage();
             }
         }
         if ("isSensor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isSensor();
             }
         }
@@ -146,20 +142,17 @@ public final class GeneratedAccess_com_codename1_maps_providers {
             }
         }
         if ("maxZoomLevel".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.maxZoomLevel();
             }
         }
         if ("minZoomLevel".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.minZoomLevel();
             }
         }
         if ("projection".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.projection();
             }
         }
@@ -194,12 +187,9 @@ public final class GeneratedAccess_com_codename1_maps_providers {
             }
         }
         if ("tileSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.tileSize();
             }
-        }
-        if ("tileSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false);
                 typedTarget.tileSize((com.codename1.ui.geom.Dimension) adaptedArgs[0]); return null;
@@ -216,8 +206,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
 
     private static Object invoke1(com.codename1.maps.providers.OpenStreetMapProvider typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("attribution".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.attribution();
             }
         }
@@ -234,20 +223,17 @@ public final class GeneratedAccess_com_codename1_maps_providers {
             }
         }
         if ("maxZoomLevel".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.maxZoomLevel();
             }
         }
         if ("minZoomLevel".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.minZoomLevel();
             }
         }
         if ("projection".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.projection();
             }
         }
@@ -264,12 +250,9 @@ public final class GeneratedAccess_com_codename1_maps_providers {
             }
         }
         if ("tileSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.tileSize();
             }
-        }
-        if ("tileSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false);
                 typedTarget.tileSize((com.codename1.ui.geom.Dimension) adaptedArgs[0]); return null;
@@ -286,8 +269,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
 
     private static Object invoke2(com.codename1.maps.providers.TiledProvider typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("attribution".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.attribution();
             }
         }
@@ -304,20 +286,17 @@ public final class GeneratedAccess_com_codename1_maps_providers {
             }
         }
         if ("maxZoomLevel".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.maxZoomLevel();
             }
         }
         if ("minZoomLevel".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.minZoomLevel();
             }
         }
         if ("projection".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.projection();
             }
         }
@@ -334,12 +313,9 @@ public final class GeneratedAccess_com_codename1_maps_providers {
             }
         }
         if ("tileSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.tileSize();
             }
-        }
-        if ("tileSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false);
                 typedTarget.tileSize((com.codename1.ui.geom.Dimension) adaptedArgs[0]); return null;
@@ -356,8 +332,7 @@ public final class GeneratedAccess_com_codename1_maps_providers {
 
     private static Object invoke3(com.codename1.maps.providers.MapProvider typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("attribution".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.attribution();
             }
         }
@@ -374,20 +349,17 @@ public final class GeneratedAccess_com_codename1_maps_providers {
             }
         }
         if ("maxZoomLevel".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.maxZoomLevel();
             }
         }
         if ("minZoomLevel".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.minZoomLevel();
             }
         }
         if ("projection".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.projection();
             }
         }
@@ -404,12 +376,9 @@ public final class GeneratedAccess_com_codename1_maps_providers {
             }
         }
         if ("tileSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.tileSize();
             }
-        }
-        if ("tileSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false);
                 typedTarget.tileSize((com.codename1.ui.geom.Dimension) adaptedArgs[0]); return null;

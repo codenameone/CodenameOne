@@ -78,12 +78,9 @@ public final class GeneratedAccess_com_codename1_l10n {
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("getDateInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.l10n.DateFormat.getDateInstance();
             }
-        }
-        if ("getDateInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return com.codename1.l10n.DateFormat.getDateInstance(((Number) adaptedArgs[0]).intValue());
@@ -96,18 +93,14 @@ public final class GeneratedAccess_com_codename1_l10n {
             }
         }
         if ("getInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.l10n.DateFormat.getInstance();
             }
         }
         if ("getTimeInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.l10n.DateFormat.getTimeInstance();
             }
-        }
-        if ("getTimeInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return com.codename1.l10n.DateFormat.getTimeInstance(((Number) adaptedArgs[0]).intValue());
@@ -118,8 +111,7 @@ public final class GeneratedAccess_com_codename1_l10n {
 
     private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
         if ("getInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.l10n.L10NManager.getInstance();
             }
         }
@@ -128,8 +120,7 @@ public final class GeneratedAccess_com_codename1_l10n {
 
     private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
         if ("isRestrictMonthNameLength".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.l10n.SimpleDateFormat.isRestrictMonthNameLength();
             }
         }
@@ -211,22 +202,18 @@ public final class GeneratedAccess_com_codename1_l10n {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.format((java.lang.Object) adaptedArgs[0]);
             }
-        }
-        if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
                 return typedTarget.format((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("getDateFormatSymbols".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDateFormatSymbols();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -249,8 +236,7 @@ public final class GeneratedAccess_com_codename1_l10n {
             }
         }
         if ("toPattern".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toPattern();
             }
         }
@@ -269,16 +255,13 @@ public final class GeneratedAccess_com_codename1_l10n {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.format((java.lang.Object) adaptedArgs[0]);
             }
-        }
-        if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
                 return typedTarget.format((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -305,44 +288,37 @@ public final class GeneratedAccess_com_codename1_l10n {
             }
         }
         if ("getAmPmStrings".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAmPmStrings();
             }
         }
         if ("getEras".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getEras();
             }
         }
         if ("getMonths".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMonths();
             }
         }
         if ("getResourceBundle".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getResourceBundle();
             }
         }
         if ("getShortMonths".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShortMonths();
             }
         }
         if ("getShortWeekdays".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShortWeekdays();
             }
         }
         if ("getWeekdays".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWeekdays();
             }
         }
@@ -371,14 +347,12 @@ public final class GeneratedAccess_com_codename1_l10n {
             }
         }
         if ("getZoneStrings".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getZoneStrings();
             }
         }
         if ("isLocalized".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isLocalized();
             }
         }
@@ -461,14 +435,10 @@ public final class GeneratedAccess_com_codename1_l10n {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
                 return typedTarget.format(((Number) adaptedArgs[0]).doubleValue());
             }
-        }
-        if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.format(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Integer.class}, false);
                 return typedTarget.format(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).intValue());
@@ -517,20 +487,17 @@ public final class GeneratedAccess_com_codename1_l10n {
             }
         }
         if ("getCurrencySymbol".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCurrencySymbol();
             }
         }
         if ("getLanguage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLanguage();
             }
         }
         if ("getLocale".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLocale();
             }
         }
@@ -547,8 +514,7 @@ public final class GeneratedAccess_com_codename1_l10n {
             }
         }
         if ("isRTLLocale".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRTLLocale();
             }
         }
@@ -587,8 +553,7 @@ public final class GeneratedAccess_com_codename1_l10n {
 
     private static Object invoke5(com.codename1.l10n.ParseException typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getErrorOffset".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getErrorOffset();
             }
         }

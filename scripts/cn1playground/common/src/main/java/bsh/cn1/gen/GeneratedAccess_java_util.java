@@ -530,92 +530,62 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Byte.class}, false);
                 return java.util.Arrays.binarySearch((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).byteValue());
             }
-        }
-        if ("binarySearch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Character.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Character.class}, false);
                 return java.util.Arrays.binarySearch((char[]) adaptedArgs[0], ((Character) adaptedArgs[1]).charValue());
             }
-        }
-        if ("binarySearch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Double.class}, false);
                 return java.util.Arrays.binarySearch((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).doubleValue());
             }
-        }
-        if ("binarySearch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Float.class}, false);
                 return java.util.Arrays.binarySearch((float[]) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue());
             }
-        }
-        if ("binarySearch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class}, false);
                 return java.util.Arrays.binarySearch((int[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
-        }
-        if ("binarySearch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object.class}, false);
                 return java.util.Arrays.binarySearch((java.lang.Object[]) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]);
             }
-        }
-        if ("binarySearch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{long[].class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class, java.lang.Long.class}, false);
                 return java.util.Arrays.binarySearch((long[]) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue());
             }
-        }
-        if ("binarySearch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{short[].class, java.lang.Short.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class, java.lang.Short.class}, false);
                 return java.util.Arrays.binarySearch((short[]) adaptedArgs[0], ((Number) adaptedArgs[1]).shortValue());
             }
-        }
-        if ("binarySearch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Byte.class}, false);
                 return java.util.Arrays.binarySearch((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).byteValue());
             }
-        }
-        if ("binarySearch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Character.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Character.class}, false);
                 return java.util.Arrays.binarySearch((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Character) adaptedArgs[3]).charValue());
             }
-        }
-        if ("binarySearch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Double.class}, false);
                 return java.util.Arrays.binarySearch((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).doubleValue());
             }
-        }
-        if ("binarySearch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class}, false);
                 return java.util.Arrays.binarySearch((float[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).floatValue());
             }
-        }
-        if ("binarySearch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return java.util.Arrays.binarySearch((int[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
             }
-        }
-        if ("binarySearch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Object.class}, false);
                 return java.util.Arrays.binarySearch((java.lang.Object[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), (java.lang.Object) adaptedArgs[3]);
             }
-        }
-        if ("binarySearch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{long[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Long.class}, false);
                 return java.util.Arrays.binarySearch((long[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).longValue());
             }
-        }
-        if ("binarySearch".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{short[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Short.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Short.class}, false);
                 return java.util.Arrays.binarySearch((short[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).shortValue());
@@ -626,44 +596,30 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{boolean[].class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOf((boolean[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
-        }
-        if ("copyOf".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOf((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
-        }
-        if ("copyOf".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOf((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
-        }
-        if ("copyOf".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOf((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
-        }
-        if ("copyOf".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOf((float[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
-        }
-        if ("copyOf".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOf((int[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
-        }
-        if ("copyOf".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{long[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOf((long[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
-        }
-        if ("copyOf".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{short[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOf((short[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
@@ -674,44 +630,30 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{boolean[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOfRange((boolean[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
-        }
-        if ("copyOfRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOfRange((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
-        }
-        if ("copyOfRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOfRange((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
-        }
-        if ("copyOfRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOfRange((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
-        }
-        if ("copyOfRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOfRange((float[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
-        }
-        if ("copyOfRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOfRange((int[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
-        }
-        if ("copyOfRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{long[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOfRange((long[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
-        }
-        if ("copyOfRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{short[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return java.util.Arrays.copyOfRange((short[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
@@ -740,50 +682,34 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{boolean[].class, boolean[].class}, false);
                 return java.util.Arrays.equals((boolean[]) adaptedArgs[0], (boolean[]) adaptedArgs[1]);
             }
-        }
-        if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, byte[].class}, false);
                 return java.util.Arrays.equals((byte[]) adaptedArgs[0], (byte[]) adaptedArgs[1]);
             }
-        }
-        if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class, char[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, char[].class}, false);
                 return java.util.Arrays.equals((char[]) adaptedArgs[0], (char[]) adaptedArgs[1]);
             }
-        }
-        if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, double[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, double[].class}, false);
                 return java.util.Arrays.equals((double[]) adaptedArgs[0], (double[]) adaptedArgs[1]);
             }
-        }
-        if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class, float[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, float[].class}, false);
                 return java.util.Arrays.equals((float[]) adaptedArgs[0], (float[]) adaptedArgs[1]);
             }
-        }
-        if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
                 return java.util.Arrays.equals((int[]) adaptedArgs[0], (int[]) adaptedArgs[1]);
             }
-        }
-        if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class}, false);
                 return java.util.Arrays.equals((java.lang.Object[]) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1]);
             }
-        }
-        if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{long[].class, long[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class, long[].class}, false);
                 return java.util.Arrays.equals((long[]) adaptedArgs[0], (long[]) adaptedArgs[1]);
             }
-        }
-        if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{short[].class, short[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class, short[].class}, false);
                 return java.util.Arrays.equals((short[]) adaptedArgs[0], (short[]) adaptedArgs[1]);
@@ -794,104 +720,70 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{boolean[].class, java.lang.Boolean.class}, false);
                 java.util.Arrays.fill((boolean[]) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Byte.class}, false);
                 java.util.Arrays.fill((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).byteValue()); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Character.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Character.class}, false);
                 java.util.Arrays.fill((char[]) adaptedArgs[0], ((Character) adaptedArgs[1]).charValue()); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Double.class}, false);
                 java.util.Arrays.fill((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).doubleValue()); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Float.class}, false);
                 java.util.Arrays.fill((float[]) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue()); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class}, false);
                 java.util.Arrays.fill((int[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object.class}, false);
                 java.util.Arrays.fill((java.lang.Object[]) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{long[].class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class, java.lang.Long.class}, false);
                 java.util.Arrays.fill((long[]) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue()); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{short[].class, java.lang.Short.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class, java.lang.Short.class}, false);
                 java.util.Arrays.fill((short[]) adaptedArgs[0], ((Number) adaptedArgs[1]).shortValue()); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{boolean[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{boolean[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
                 java.util.Arrays.fill((boolean[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue()); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Byte.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Byte.class}, false);
                 java.util.Arrays.fill((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).byteValue()); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Character.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Character.class}, false);
                 java.util.Arrays.fill((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Character) adaptedArgs[3]).charValue()); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Double.class}, false);
                 java.util.Arrays.fill((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).doubleValue()); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class}, false);
                 java.util.Arrays.fill((float[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).floatValue()); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 java.util.Arrays.fill((int[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue()); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Object.class}, false);
                 java.util.Arrays.fill((java.lang.Object[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), (java.lang.Object) adaptedArgs[3]); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{long[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Long.class}, false);
                 java.util.Arrays.fill((long[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).longValue()); return null;
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{short[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Short.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Short.class}, false);
                 java.util.Arrays.fill((short[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).shortValue()); return null;
@@ -902,50 +794,34 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{boolean[].class}, false);
                 return java.util.Arrays.hashCode((boolean[]) adaptedArgs[0]);
             }
-        }
-        if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
                 return java.util.Arrays.hashCode((byte[]) adaptedArgs[0]);
             }
-        }
-        if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class}, false);
                 return java.util.Arrays.hashCode((char[]) adaptedArgs[0]);
             }
-        }
-        if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
                 return java.util.Arrays.hashCode((double[]) adaptedArgs[0]);
             }
-        }
-        if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class}, false);
                 return java.util.Arrays.hashCode((float[]) adaptedArgs[0]);
             }
-        }
-        if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, false);
                 return java.util.Arrays.hashCode((int[]) adaptedArgs[0]);
             }
-        }
-        if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class}, false);
                 return java.util.Arrays.hashCode((java.lang.Object[]) adaptedArgs[0]);
             }
-        }
-        if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{long[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class}, false);
                 return java.util.Arrays.hashCode((long[]) adaptedArgs[0]);
             }
-        }
-        if ("hashCode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{short[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class}, false);
                 return java.util.Arrays.hashCode((short[]) adaptedArgs[0]);
@@ -956,92 +832,62 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
                 java.util.Arrays.sort((byte[]) adaptedArgs[0]); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class}, false);
                 java.util.Arrays.sort((char[]) adaptedArgs[0]); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
                 java.util.Arrays.sort((double[]) adaptedArgs[0]); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class}, false);
                 java.util.Arrays.sort((float[]) adaptedArgs[0]); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, false);
                 java.util.Arrays.sort((int[]) adaptedArgs[0]); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class}, false);
                 java.util.Arrays.sort((java.lang.Object[]) adaptedArgs[0]); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{long[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class}, false);
                 java.util.Arrays.sort((long[]) adaptedArgs[0]); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{short[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class}, false);
                 java.util.Arrays.sort((short[]) adaptedArgs[0]); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 java.util.Arrays.sort((byte[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 java.util.Arrays.sort((char[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 java.util.Arrays.sort((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 java.util.Arrays.sort((float[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 java.util.Arrays.sort((int[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 java.util.Arrays.sort((java.lang.Object[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{long[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 java.util.Arrays.sort((long[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{short[].class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 java.util.Arrays.sort((short[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue()); return null;
@@ -1052,50 +898,34 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{boolean[].class}, false);
                 return java.util.Arrays.toString((boolean[]) adaptedArgs[0]);
             }
-        }
-        if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
                 return java.util.Arrays.toString((byte[]) adaptedArgs[0]);
             }
-        }
-        if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{char[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{char[].class}, false);
                 return java.util.Arrays.toString((char[]) adaptedArgs[0]);
             }
-        }
-        if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
                 return java.util.Arrays.toString((double[]) adaptedArgs[0]);
             }
-        }
-        if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class}, false);
                 return java.util.Arrays.toString((float[]) adaptedArgs[0]);
             }
-        }
-        if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, false);
                 return java.util.Arrays.toString((int[]) adaptedArgs[0]);
             }
-        }
-        if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class}, false);
                 return java.util.Arrays.toString((java.lang.Object[]) adaptedArgs[0]);
             }
-        }
-        if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{long[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class}, false);
                 return java.util.Arrays.toString((long[]) adaptedArgs[0]);
             }
-        }
-        if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{short[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class}, false);
                 return java.util.Arrays.toString((short[]) adaptedArgs[0]);
@@ -1106,12 +936,9 @@ public final class GeneratedAccess_java_util {
 
     private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
         if ("getInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return java.util.Calendar.getInstance();
             }
-        }
-        if ("getInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.TimeZone.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.TimeZone.class}, false);
                 return java.util.Calendar.getInstance((java.util.TimeZone) adaptedArgs[0]);
@@ -1140,20 +967,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("emptyList".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return java.util.Collections.emptyList();
             }
         }
         if ("emptyMap".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return java.util.Collections.emptyMap();
             }
         }
         if ("emptySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return java.util.Collections.emptySet();
             }
         }
@@ -1200,12 +1024,9 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("reverseOrder".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return java.util.Collections.reverseOrder();
             }
-        }
-        if ("reverseOrder".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Comparator.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Comparator.class}, false);
                 return java.util.Collections.reverseOrder((java.util.Comparator) adaptedArgs[0]);
@@ -1222,8 +1043,6 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.List.class}, false);
                 java.util.Collections.shuffle((java.util.List) adaptedArgs[0]); return null;
             }
-        }
-        if ("shuffle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.List.class, java.util.Random.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.List.class, java.util.Random.class}, false);
                 java.util.Collections.shuffle((java.util.List) adaptedArgs[0], (java.util.Random) adaptedArgs[1]); return null;
@@ -1234,8 +1053,6 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.List.class}, false);
                 java.util.Collections.sort((java.util.List) adaptedArgs[0]); return null;
             }
-        }
-        if ("sort".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.List.class, java.util.Comparator.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.List.class, java.util.Comparator.class}, false);
                 java.util.Collections.sort((java.util.List) adaptedArgs[0], (java.util.Comparator) adaptedArgs[1]); return null;
@@ -1300,8 +1117,7 @@ public final class GeneratedAccess_java_util {
 
     private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
         if ("getDefault".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return java.util.Locale.getDefault();
             }
         }
@@ -1354,8 +1170,6 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return java.util.Objects.toString((java.lang.Object) adaptedArgs[0]);
             }
-        }
-        if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false);
                 return java.util.Objects.toString((java.lang.Object) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
@@ -1366,14 +1180,12 @@ public final class GeneratedAccess_java_util {
 
     private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
         if ("getAvailableIDs".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return java.util.TimeZone.getAvailableIDs();
             }
         }
         if ("getDefault".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return java.util.TimeZone.getDefault();
             }
         }
@@ -1739,8 +1551,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -1763,20 +1574,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -1799,20 +1607,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -1825,16 +1630,13 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
                 return typedTarget.addAll((java.util.Collection) adaptedArgs[0]);
             }
-        }
-        if ("addAll".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Collection.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Collection.class}, false);
                 return typedTarget.addAll(((Number) adaptedArgs[0]).intValue(), (java.util.Collection) adaptedArgs[1]);
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -1851,8 +1653,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("descendingIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.descendingIterator();
             }
         }
@@ -1863,8 +1664,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -1875,14 +1675,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -1893,12 +1691,9 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("listIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.listIterator();
             }
-        }
-        if ("listIterator".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.listIterator(((Number) adaptedArgs[0]).intValue());
@@ -1935,8 +1730,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
@@ -1947,14 +1741,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -1967,22 +1759,18 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
                 return typedTarget.addAll((java.util.Collection) adaptedArgs[0]);
             }
-        }
-        if ("addAll".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Collection.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Collection.class}, false);
                 return typedTarget.addAll(((Number) adaptedArgs[0]).intValue(), (java.util.Collection) adaptedArgs[1]);
             }
         }
         if ("capacity".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.capacity();
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -2005,14 +1793,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("elements".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.elements();
             }
         }
         if ("empty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.empty();
             }
         }
@@ -2029,8 +1815,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -2039,22 +1824,18 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.indexOf((java.lang.Object) adaptedArgs[0]);
             }
-        }
-        if ("indexOf".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
                 return typedTarget.indexOf((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -2063,20 +1844,15 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.lastIndexOf((java.lang.Object) adaptedArgs[0]);
             }
-        }
-        if ("lastIndexOf".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
                 return typedTarget.lastIndexOf((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("listIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.listIterator();
             }
-        }
-        if ("listIterator".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.listIterator(((Number) adaptedArgs[0]).intValue());
@@ -2095,8 +1871,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("removeAllElements".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.removeAllElements(); return null;
             }
         }
@@ -2131,8 +1906,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
@@ -2143,20 +1917,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
         if ("trimToSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.trimToSize(); return null;
             }
         }
@@ -2169,16 +1940,13 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
                 return typedTarget.addAll((java.util.Collection) adaptedArgs[0]);
             }
-        }
-        if ("addAll".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Collection.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Collection.class}, false);
                 return typedTarget.addAll(((Number) adaptedArgs[0]).intValue(), (java.util.Collection) adaptedArgs[1]);
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -2201,8 +1969,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -2213,14 +1980,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -2231,12 +1996,9 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("listIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.listIterator();
             }
-        }
-        if ("listIterator".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.listIterator(((Number) adaptedArgs[0]).intValue());
@@ -2261,8 +2023,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
@@ -2273,14 +2034,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -2293,16 +2052,13 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
                 return typedTarget.addAll((java.util.Collection) adaptedArgs[0]);
             }
-        }
-        if ("addAll".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Collection.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Collection.class}, false);
                 return typedTarget.addAll(((Number) adaptedArgs[0]).intValue(), (java.util.Collection) adaptedArgs[1]);
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -2331,8 +2087,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -2343,14 +2098,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -2361,12 +2114,9 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("listIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.listIterator();
             }
-        }
-        if ("listIterator".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.listIterator(((Number) adaptedArgs[0]).intValue());
@@ -2391,8 +2141,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
@@ -2403,20 +2152,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
         if ("trimToSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.trimToSize(); return null;
             }
         }
@@ -2431,8 +2177,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -2455,20 +2200,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -2491,20 +2233,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -2513,8 +2252,7 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke6(java.util.LinkedHashMap typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -2531,8 +2269,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("entrySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.entrySet();
             }
         }
@@ -2543,20 +2280,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("keySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.keySet();
             }
         }
@@ -2567,20 +2301,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
         if ("values".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.values();
             }
         }
@@ -2595,14 +2326,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
         if ("comparator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.comparator();
             }
         }
@@ -2625,20 +2354,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -2661,20 +2387,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -2689,14 +2412,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
         if ("comparator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.comparator();
             }
         }
@@ -2713,14 +2434,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("descendingIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.descendingIterator();
             }
         }
         if ("descendingSet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.descendingSet();
             }
         }
@@ -2731,20 +2450,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -2767,20 +2483,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -2793,22 +2506,18 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
                 return typedTarget.addAll((java.util.Collection) adaptedArgs[0]);
             }
-        }
-        if ("addAll".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Collection.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Collection.class}, false);
                 return typedTarget.addAll(((Number) adaptedArgs[0]).intValue(), (java.util.Collection) adaptedArgs[1]);
             }
         }
         if ("capacity".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.capacity();
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -2831,8 +2540,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("elements".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.elements();
             }
         }
@@ -2849,8 +2557,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -2859,22 +2566,18 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.indexOf((java.lang.Object) adaptedArgs[0]);
             }
-        }
-        if ("indexOf".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
                 return typedTarget.indexOf((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -2883,20 +2586,15 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.lastIndexOf((java.lang.Object) adaptedArgs[0]);
             }
-        }
-        if ("lastIndexOf".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class}, false);
                 return typedTarget.lastIndexOf((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("listIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.listIterator();
             }
-        }
-        if ("listIterator".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.listIterator(((Number) adaptedArgs[0]).intValue());
@@ -2915,8 +2613,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("removeAllElements".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.removeAllElements(); return null;
             }
         }
@@ -2945,8 +2642,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
@@ -2957,20 +2653,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
         if ("trimToSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.trimToSize(); return null;
             }
         }
@@ -2983,16 +2676,13 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
                 return typedTarget.addAll((java.util.Collection) adaptedArgs[0]);
             }
-        }
-        if ("addAll".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Collection.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Collection.class}, false);
                 return typedTarget.addAll(((Number) adaptedArgs[0]).intValue(), (java.util.Collection) adaptedArgs[1]);
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -3015,8 +2705,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -3027,14 +2716,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -3045,12 +2732,9 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("listIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.listIterator();
             }
-        }
-        if ("listIterator".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.listIterator(((Number) adaptedArgs[0]).intValue());
@@ -3075,8 +2759,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
@@ -3087,14 +2770,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -3109,8 +2790,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -3133,20 +2813,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -3169,20 +2846,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -3197,8 +2871,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -3221,20 +2894,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -3257,20 +2927,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -3285,8 +2952,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -3303,8 +2969,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("descendingIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.descendingIterator();
             }
         }
@@ -3315,20 +2980,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -3363,20 +3025,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -3385,8 +3044,7 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke14(java.util.HashMap typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -3403,8 +3061,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("entrySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.entrySet();
             }
         }
@@ -3415,20 +3072,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("keySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.keySet();
             }
         }
@@ -3439,20 +3093,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
         if ("values".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.values();
             }
         }
@@ -3461,8 +3112,7 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke15(java.util.Hashtable typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -3485,14 +3135,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("elements".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.elements();
             }
         }
         if ("entrySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.entrySet();
             }
         }
@@ -3503,26 +3151,22 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("keySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.keySet();
             }
         }
         if ("keys".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.keys();
             }
         }
@@ -3533,20 +3177,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
         if ("values".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.values();
             }
         }
@@ -3555,8 +3196,7 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke16(java.util.IdentityHashMap typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -3573,8 +3213,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("entrySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.entrySet();
             }
         }
@@ -3585,20 +3224,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("keySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.keySet();
             }
         }
@@ -3609,20 +3245,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
         if ("values".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.values();
             }
         }
@@ -3631,14 +3264,12 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke17(java.util.TreeMap typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
         if ("comparator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.comparator();
             }
         }
@@ -3655,20 +3286,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("descendingKeySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.descendingKeySet();
             }
         }
         if ("descendingMap".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.descendingMap();
             }
         }
         if ("entrySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.entrySet();
             }
         }
@@ -3679,50 +3307,42 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("firstEntry".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.firstEntry();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("keySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.keySet();
             }
         }
         if ("lastEntry".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.lastEntry();
             }
         }
         if ("navigableKeySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.navigableKeySet();
             }
         }
         if ("pollFirstEntry".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.pollFirstEntry();
             }
         }
         if ("pollLastEntry".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.pollLastEntry();
             }
         }
@@ -3733,20 +3353,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
         if ("values".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.values();
             }
         }
@@ -3761,8 +3378,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -3785,20 +3401,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -3821,20 +3434,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -3843,8 +3453,7 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke19(java.util.AbstractMap typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -3861,8 +3470,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("entrySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.entrySet();
             }
         }
@@ -3873,20 +3481,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("keySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.keySet();
             }
         }
@@ -3897,20 +3502,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
         if ("values".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.values();
             }
         }
@@ -3931,24 +3533,18 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("cardinality".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.cardinality();
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
-        }
-        if ("clear".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.clear(((Number) adaptedArgs[0]).intValue()); return null;
             }
-        }
-        if ("clear".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.clear(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
@@ -3965,8 +3561,6 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.flip(((Number) adaptedArgs[0]).intValue()); return null;
             }
-        }
-        if ("flip".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.flip(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
@@ -3977,16 +3571,13 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.get(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("get".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return typedTarget.get(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -3997,14 +3588,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("length".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.length();
             }
         }
@@ -4031,34 +3620,26 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.set(((Number) adaptedArgs[0]).intValue()); return null;
             }
-        }
-        if ("set".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.set(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
-        }
-        if ("set".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.set(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
             }
-        }
-        if ("set".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
                 typedTarget.set(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Boolean) adaptedArgs[2]).booleanValue()); return null;
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -4103,14 +3684,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("getTime".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTime();
             }
         }
         if ("getTimeZone".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTimeZone();
             }
         }
@@ -4149,14 +3728,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("getTime".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTime();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -4167,8 +3744,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -4177,26 +3753,22 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke23(java.util.Dictionary typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("elements".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.elements();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("keys".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.keys();
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
@@ -4211,32 +3783,27 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("getCause".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCause();
             }
         }
         if ("getLocalizedMessage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLocalizedMessage();
             }
         }
         if ("getMessage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMessage();
             }
         }
         if ("getStackTrace".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getStackTrace();
             }
         }
         if ("getSuppressed".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSuppressed();
             }
         }
@@ -4247,8 +3814,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("printStackTrace".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.printStackTrace(); return null;
             }
         }
@@ -4259,8 +3825,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -4269,14 +3834,12 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke25(java.util.Locale typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getCountry".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCountry();
             }
         }
         if ("getLanguage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLanguage();
             }
         }
@@ -4291,32 +3854,27 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("getCause".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCause();
             }
         }
         if ("getLocalizedMessage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLocalizedMessage();
             }
         }
         if ("getMessage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMessage();
             }
         }
         if ("getStackTrace".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getStackTrace();
             }
         }
         if ("getSuppressed".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSuppressed();
             }
         }
@@ -4327,8 +3885,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("printStackTrace".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.printStackTrace(); return null;
             }
         }
@@ -4339,8 +3896,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -4355,8 +3911,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("countObservers".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.countObservers();
             }
         }
@@ -4367,24 +3922,19 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("deleteObservers".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.deleteObservers(); return null;
             }
         }
         if ("hasChanged".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hasChanged();
             }
         }
         if ("notifyObservers".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.notifyObservers(); return null;
             }
-        }
-        if ("notifyObservers".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 typedTarget.notifyObservers((java.lang.Object) adaptedArgs[0]); return null;
@@ -4395,8 +3945,7 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke28(java.util.Random typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("nextBoolean".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.nextBoolean();
             }
         }
@@ -4407,32 +3956,26 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("nextDouble".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.nextDouble();
             }
         }
         if ("nextFloat".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.nextFloat();
             }
         }
         if ("nextInt".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.nextInt();
             }
-        }
-        if ("nextInt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.nextInt(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("nextLong".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.nextLong();
             }
         }
@@ -4447,36 +3990,29 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke29(java.util.StringTokenizer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("countTokens".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.countTokens();
             }
         }
         if ("hasMoreElements".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hasMoreElements();
             }
         }
         if ("hasMoreTokens".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hasMoreTokens();
             }
         }
         if ("nextElement".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.nextElement();
             }
         }
         if ("nextToken".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.nextToken();
             }
-        }
-        if ("nextToken".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.nextToken((java.lang.String) adaptedArgs[0]);
@@ -4487,8 +4023,7 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke30(java.util.TimeZone typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getID".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getID();
             }
         }
@@ -4499,14 +4034,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("getRawOffset".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRawOffset();
             }
         }
         if ("useDaylightTime".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.useDaylightTime();
             }
         }
@@ -4515,8 +4048,7 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke31(java.util.Timer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("cancel".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.cancel(); return null;
             }
         }
@@ -4525,20 +4057,14 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.TimerTask.class, java.util.Date.class}, false);
                 typedTarget.schedule((java.util.TimerTask) adaptedArgs[0], (java.util.Date) adaptedArgs[1]); return null;
             }
-        }
-        if ("schedule".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.TimerTask.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.TimerTask.class, java.lang.Long.class}, false);
                 typedTarget.schedule((java.util.TimerTask) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue()); return null;
             }
-        }
-        if ("schedule".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.TimerTask.class, java.util.Date.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.TimerTask.class, java.util.Date.class, java.lang.Long.class}, false);
                 typedTarget.schedule((java.util.TimerTask) adaptedArgs[0], (java.util.Date) adaptedArgs[1], ((Number) adaptedArgs[2]).longValue()); return null;
             }
-        }
-        if ("schedule".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.TimerTask.class, java.lang.Long.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.TimerTask.class, java.lang.Long.class, java.lang.Long.class}, false);
                 typedTarget.schedule((java.util.TimerTask) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue(), ((Number) adaptedArgs[2]).longValue()); return null;
@@ -4549,8 +4075,6 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.TimerTask.class, java.util.Date.class, java.lang.Long.class}, false);
                 typedTarget.scheduleAtFixedRate((java.util.TimerTask) adaptedArgs[0], (java.util.Date) adaptedArgs[1], ((Number) adaptedArgs[2]).longValue()); return null;
             }
-        }
-        if ("scheduleAtFixedRate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.TimerTask.class, java.lang.Long.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.TimerTask.class, java.lang.Long.class, java.lang.Long.class}, false);
                 typedTarget.scheduleAtFixedRate((java.util.TimerTask) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue(), ((Number) adaptedArgs[2]).longValue()); return null;
@@ -4561,8 +4085,7 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke32(java.util.TimerTask typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("cancel".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.cancel();
             }
         }
@@ -4577,8 +4100,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -4601,20 +4123,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -4637,14 +4156,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
@@ -4669,8 +4186,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -4687,8 +4203,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("descendingIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.descendingIterator();
             }
         }
@@ -4699,20 +4214,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -4747,14 +4259,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
@@ -4763,8 +4273,7 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke36(java.util.Enumeration typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("hasMoreElements".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hasMoreElements();
             }
         }
@@ -4773,14 +4282,12 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke37(java.util.Iterator typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("hasNext".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hasNext();
             }
         }
         if ("remove".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.remove(); return null;
             }
         }
@@ -4793,16 +4300,13 @@ public final class GeneratedAccess_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Collection.class}, false);
                 return typedTarget.addAll((java.util.Collection) adaptedArgs[0]);
             }
-        }
-        if ("addAll".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Collection.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.util.Collection.class}, false);
                 return typedTarget.addAll(((Number) adaptedArgs[0]).intValue(), (java.util.Collection) adaptedArgs[1]);
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -4825,8 +4329,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -4837,14 +4340,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -4855,12 +4356,9 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("listIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.listIterator();
             }
-        }
-        if ("listIterator".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.listIterator(((Number) adaptedArgs[0]).intValue());
@@ -4885,8 +4383,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
@@ -4897,8 +4394,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
@@ -4907,32 +4403,27 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke39(java.util.ListIterator typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("hasNext".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hasNext();
             }
         }
         if ("hasPrevious".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hasPrevious();
             }
         }
         if ("nextIndex".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.nextIndex();
             }
         }
         if ("previousIndex".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.previousIndex();
             }
         }
         if ("remove".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.remove(); return null;
             }
         }
@@ -4941,8 +4432,7 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke40(java.util.Map typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -4959,8 +4449,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("entrySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.entrySet();
             }
         }
@@ -4971,20 +4460,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("keySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.keySet();
             }
         }
@@ -4995,14 +4481,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("values".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.values();
             }
         }
@@ -5011,14 +4495,12 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke41(java.util.NavigableMap typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
         if ("comparator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.comparator();
             }
         }
@@ -5035,20 +4517,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("descendingKeySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.descendingKeySet();
             }
         }
         if ("descendingMap".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.descendingMap();
             }
         }
         if ("entrySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.entrySet();
             }
         }
@@ -5059,50 +4538,42 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("firstEntry".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.firstEntry();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("keySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.keySet();
             }
         }
         if ("lastEntry".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.lastEntry();
             }
         }
         if ("navigableKeySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.navigableKeySet();
             }
         }
         if ("pollFirstEntry".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.pollFirstEntry();
             }
         }
         if ("pollLastEntry".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.pollLastEntry();
             }
         }
@@ -5113,14 +4584,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("values".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.values();
             }
         }
@@ -5135,14 +4604,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
         if ("comparator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.comparator();
             }
         }
@@ -5159,14 +4626,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("descendingIterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.descendingIterator();
             }
         }
         if ("descendingSet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.descendingSet();
             }
         }
@@ -5177,20 +4642,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -5213,14 +4675,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
@@ -5245,8 +4705,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -5269,20 +4728,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -5305,14 +4761,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
@@ -5327,8 +4781,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
@@ -5351,20 +4804,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -5387,14 +4837,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }
@@ -5403,14 +4851,12 @@ public final class GeneratedAccess_java_util {
 
     private static Object invoke46(java.util.SortedMap typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
         if ("comparator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.comparator();
             }
         }
@@ -5427,8 +4873,7 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("entrySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.entrySet();
             }
         }
@@ -5439,20 +4884,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("keySet".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.keySet();
             }
         }
@@ -5463,14 +4905,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("values".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.values();
             }
         }
@@ -5485,14 +4925,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("clear".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clear(); return null;
             }
         }
         if ("comparator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.comparator();
             }
         }
@@ -5515,20 +4953,17 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEmpty();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
         }
@@ -5551,14 +4986,12 @@ public final class GeneratedAccess_java_util {
             }
         }
         if ("size".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.size();
             }
         }
         if ("toArray".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toArray();
             }
         }

@@ -106,8 +106,6 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.animations.AnimationObject.createAnimationImage((com.codename1.ui.Image) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
             }
-        }
-        if ("createAnimationImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.util.Resources.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.util.Resources.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.animations.AnimationObject.createAnimationImage((java.lang.String) adaptedArgs[0], (com.codename1.ui.util.Resources) adaptedArgs[1], ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
@@ -124,14 +122,12 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("createDialogPulsate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.animations.CommonTransitions.createDialogPulsate();
             }
         }
         if ("createEmpty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.animations.CommonTransitions.createEmpty();
             }
         }
@@ -146,8 +142,6 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.animations.CommonTransitions.createFastSlide(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
             }
-        }
-        if ("createFastSlide".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
                 return com.codename1.ui.animations.CommonTransitions.createFastSlide(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue());
@@ -158,8 +152,6 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
                 return com.codename1.ui.animations.CommonTransitions.createSlide(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue());
             }
-        }
-        if ("createSlide".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
                 return com.codename1.ui.animations.CommonTransitions.createSlide(((Number) adaptedArgs[0]).intValue(), ((Boolean) adaptedArgs[1]).booleanValue(), ((Number) adaptedArgs[2]).intValue(), ((Boolean) adaptedArgs[3]).booleanValue());
@@ -184,8 +176,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("isDefaultLinearMotion".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.animations.CommonTransitions.isDefaultLinearMotion();
             }
         }
@@ -306,8 +297,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("isSlowMotion".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.animations.Motion.isSlowMotion();
             }
         }
@@ -411,14 +401,12 @@ public final class GeneratedAccess_com_codename1_ui_animations {
 
     private static Object invoke0(com.codename1.ui.animations.BubbleTransition typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.animate();
             }
         }
         if ("cleanup".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.cleanup(); return null;
             }
         }
@@ -429,20 +417,17 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("getDestination".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDestination();
             }
         }
         if ("getDuration".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDuration();
             }
         }
         if ("getSource".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSource();
             }
         }
@@ -453,8 +438,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("initTransition".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.initTransition(); return null;
             }
         }
@@ -487,14 +471,12 @@ public final class GeneratedAccess_com_codename1_ui_animations {
 
     private static Object invoke1(com.codename1.ui.animations.CommonTransitions typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.animate();
             }
         }
         if ("cleanup".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.cleanup(); return null;
             }
         }
@@ -505,26 +487,22 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("getDestination".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDestination();
             }
         }
         if ("getMotion".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMotion();
             }
         }
         if ("getSource".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSource();
             }
         }
         if ("getTransitionSpeed".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTransitionSpeed();
             }
         }
@@ -535,44 +513,37 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("initTransition".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.initTransition(); return null;
             }
         }
         if ("isForwardSlide".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isForwardSlide();
             }
         }
         if ("isHorizontalCover".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isHorizontalCover();
             }
         }
         if ("isHorizontalSlide".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isHorizontalSlide();
             }
         }
         if ("isLinearMotion".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isLinearMotion();
             }
         }
         if ("isVerticalCover".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isVerticalCover();
             }
         }
         if ("isVerticalSlide".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isVerticalSlide();
             }
         }
@@ -593,8 +564,6 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.animations.Motion.class}, false);
                 typedTarget.setMotion((com.codename1.ui.animations.Motion) adaptedArgs[0]); return null;
             }
-        }
-        if ("setMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.LazyValue.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.LazyValue.class}, false);
                 typedTarget.setMotion((com.codename1.util.LazyValue) adaptedArgs[0]); return null;
@@ -605,14 +574,12 @@ public final class GeneratedAccess_com_codename1_ui_animations {
 
     private static Object invoke2(com.codename1.ui.animations.FlipTransition typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.animate();
             }
         }
         if ("cleanup".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.cleanup(); return null;
             }
         }
@@ -623,26 +590,22 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("getBgColor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBgColor();
             }
         }
         if ("getDestination".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDestination();
             }
         }
         if ("getDuration".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDuration();
             }
         }
         if ("getSource".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSource();
             }
         }
@@ -653,8 +616,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("initTransition".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.initTransition(); return null;
             }
         }
@@ -681,14 +643,12 @@ public final class GeneratedAccess_com_codename1_ui_animations {
 
     private static Object invoke3(com.codename1.ui.animations.MorphTransition typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.animate();
             }
         }
         if ("cleanup".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.cleanup(); return null;
             }
         }
@@ -699,14 +659,12 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("getDestination".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDestination();
             }
         }
         if ("getSource".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSource();
             }
         }
@@ -717,8 +675,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("initTransition".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.initTransition(); return null;
             }
         }
@@ -727,8 +684,6 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.morph((java.lang.String) adaptedArgs[0]);
             }
-        }
-        if ("morph".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 return typedTarget.morph((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
@@ -745,8 +700,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
 
     private static Object invoke4(com.codename1.ui.animations.AnimationObject typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("copy".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.copy();
             }
         }
@@ -793,14 +747,12 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("getEndTime".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getEndTime();
             }
         }
         if ("getStartTime".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getStartTime();
             }
         }
@@ -827,32 +779,27 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("flush".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.flush(); return null;
             }
         }
         if ("getMaxSteps".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMaxSteps();
             }
         }
         if ("getStep".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getStep();
             }
         }
         if ("isInProgress".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isInProgress();
             }
         }
         if ("isStepModeSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isStepModeSupported();
             }
         }
@@ -875,8 +822,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("updateAnimationState".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.updateAnimationState(); return null;
             }
         }
@@ -885,62 +831,52 @@ public final class GeneratedAccess_com_codename1_ui_animations {
 
     private static Object invoke6(com.codename1.ui.animations.Motion typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("countAvailableVelocitySamplingPoints".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.countAvailableVelocitySamplingPoints();
             }
         }
         if ("finish".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.finish(); return null;
             }
         }
         if ("getCurrentMotionTime".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCurrentMotionTime();
             }
         }
         if ("getDestinationValue".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDestinationValue();
             }
         }
         if ("getDuration".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDuration();
             }
         }
         if ("getSourceValue".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSourceValue();
             }
         }
         if ("getValue".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getValue();
             }
         }
         if ("getVelocity".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getVelocity();
             }
         }
         if ("isDecayMotion".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDecayMotion();
             }
         }
         if ("isFinished".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isFinished();
             }
         }
@@ -963,8 +899,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("start".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.start(); return null;
             }
         }
@@ -985,8 +920,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("animate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.animate();
             }
         }
@@ -995,8 +929,6 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.applyMask((java.lang.Object) adaptedArgs[0]);
             }
-        }
-        if ("applyMask".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return typedTarget.applyMask((java.lang.Object) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue());
@@ -1015,14 +947,12 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("createMask".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.createMask();
             }
         }
         if ("dispose".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.dispose(); return null;
             }
         }
@@ -1033,8 +963,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("fireChangedEvent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.fireChangedEvent(); return null;
             }
         }
@@ -1063,134 +992,111 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("getAnimationCount".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAnimationCount();
             }
         }
         if ("getAnimationDelay".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAnimationDelay();
             }
         }
         if ("getDuration".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDuration();
             }
         }
         if ("getGraphics".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getGraphics();
             }
         }
         if ("getHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHeight();
             }
         }
         if ("getImage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getImage();
             }
         }
         if ("getImageName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getImageName();
             }
         }
         if ("getRGB".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRGB();
             }
-        }
-        if ("getRGB".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, false);
                 typedTarget.getRGB((int[]) adaptedArgs[0]); return null;
             }
         }
         if ("getRGBCached".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRGBCached();
             }
         }
         if ("getSVGDocument".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSVGDocument();
             }
         }
         if ("getSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSize();
             }
         }
         if ("getTime".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTime();
             }
         }
         if ("getWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWidth();
             }
         }
         if ("isAnimation".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isAnimation();
             }
         }
         if ("isLocked".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isLocked();
             }
         }
         if ("isLoop".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isLoop();
             }
         }
         if ("isOpaque".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isOpaque();
             }
         }
         if ("isPause".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isPause();
             }
         }
         if ("isSVG".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isSVG();
             }
         }
         if ("lock".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.lock(); return null;
             }
         }
         if ("mirror".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.mirror();
             }
         }
@@ -1199,8 +1105,6 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
                 return typedTarget.modifyAlpha(((Number) adaptedArgs[0]).byteValue());
             }
-        }
-        if ("modifyAlpha".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Integer.class}, false);
                 return typedTarget.modifyAlpha(((Number) adaptedArgs[0]).byteValue(), ((Number) adaptedArgs[1]).intValue());
@@ -1217,8 +1121,6 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
                 typedTarget.paint((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
             }
-        }
-        if ("paint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, com.codename1.ui.geom.Rectangle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, com.codename1.ui.geom.Rectangle.class}, false);
                 typedTarget.paint((com.codename1.ui.Graphics) adaptedArgs[0], (com.codename1.ui.geom.Rectangle) adaptedArgs[1]); return null;
@@ -1231,8 +1133,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("requiresDrawImage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.requiresDrawImage();
             }
         }
@@ -1339,8 +1240,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("unlock".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.unlock(); return null;
             }
         }
@@ -1349,14 +1249,12 @@ public final class GeneratedAccess_com_codename1_ui_animations {
 
     private static Object invoke8(com.codename1.ui.animations.Transition typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.animate();
             }
         }
         if ("cleanup".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.cleanup(); return null;
             }
         }
@@ -1367,14 +1265,12 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("getDestination".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDestination();
             }
         }
         if ("getSource".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSource();
             }
         }
@@ -1385,8 +1281,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
             }
         }
         if ("initTransition".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.initTransition(); return null;
             }
         }
@@ -1401,8 +1296,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
 
     private static Object invoke9(com.codename1.ui.animations.Animation typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.animate();
             }
         }

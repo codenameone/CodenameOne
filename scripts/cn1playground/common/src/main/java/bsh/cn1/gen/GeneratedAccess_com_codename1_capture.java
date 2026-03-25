@@ -64,74 +64,54 @@ public final class GeneratedAccess_com_codename1_capture {
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("captureAudio".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.capture.Capture.captureAudio();
             }
-        }
-        if ("captureAudio".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.media.MediaRecorderBuilder.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.MediaRecorderBuilder.class}, false);
                 return com.codename1.capture.Capture.captureAudio((com.codename1.media.MediaRecorderBuilder) adaptedArgs[0]);
             }
-        }
-        if ("captureAudio".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
                 com.codename1.capture.Capture.captureAudio((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
             }
-        }
-        if ("captureAudio".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.media.MediaRecorderBuilder.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.MediaRecorderBuilder.class, com.codename1.ui.events.ActionListener.class}, false);
                 com.codename1.capture.Capture.captureAudio((com.codename1.media.MediaRecorderBuilder) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
             }
         }
         if ("capturePhoto".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.capture.Capture.capturePhoto();
             }
-        }
-        if ("capturePhoto".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
                 com.codename1.capture.Capture.capturePhoto((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
             }
-        }
-        if ("capturePhoto".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return com.codename1.capture.Capture.capturePhoto(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("captureVideo".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.capture.Capture.captureVideo();
             }
-        }
-        if ("captureVideo".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.capture.VideoCaptureConstraints.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.capture.VideoCaptureConstraints.class}, false);
                 return com.codename1.capture.Capture.captureVideo((com.codename1.capture.VideoCaptureConstraints) adaptedArgs[0]);
             }
-        }
-        if ("captureVideo".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
                 com.codename1.capture.Capture.captureVideo((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
             }
-        }
-        if ("captureVideo".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.capture.VideoCaptureConstraints.class, com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.capture.VideoCaptureConstraints.class, com.codename1.ui.events.ActionListener.class}, false);
                 com.codename1.capture.Capture.captureVideo((com.codename1.capture.VideoCaptureConstraints) adaptedArgs[0], (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
             }
         }
         if ("hasCamera".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.capture.Capture.hasCamera();
             }
         }
@@ -172,104 +152,87 @@ public final class GeneratedAccess_com_codename1_capture {
             }
         }
         if ("getHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHeight();
             }
         }
         if ("getMaxFileSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMaxFileSize();
             }
         }
         if ("getMaxLength".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMaxLength();
             }
         }
         if ("getPreferredHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPreferredHeight();
             }
         }
         if ("getPreferredMaxFileSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPreferredMaxFileSize();
             }
         }
         if ("getPreferredMaxLength".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPreferredMaxLength();
             }
         }
         if ("getPreferredQuality".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPreferredQuality();
             }
         }
         if ("getPreferredWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPreferredWidth();
             }
         }
         if ("getQuality".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getQuality();
             }
         }
         if ("getWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWidth();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isMaxFileSizeSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isMaxFileSizeSupported();
             }
         }
         if ("isMaxLengthSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isMaxLengthSupported();
             }
         }
         if ("isNullConstraint".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isNullConstraint();
             }
         }
         if ("isQualitySupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isQualitySupported();
             }
         }
         if ("isSizeSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isSizeSupported();
             }
         }
         if ("isSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isSupported();
             }
         }
@@ -304,8 +267,7 @@ public final class GeneratedAccess_com_codename1_capture {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }

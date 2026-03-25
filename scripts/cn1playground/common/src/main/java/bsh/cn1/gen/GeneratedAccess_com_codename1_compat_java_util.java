@@ -80,8 +80,6 @@ public final class GeneratedAccess_com_codename1_compat_java_util {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return com.codename1.compat.java.util.Objects.toString((java.lang.Object) adaptedArgs[0]);
             }
-        }
-        if ("toString".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false);
                 return com.codename1.compat.java.util.Objects.toString((java.lang.Object) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);

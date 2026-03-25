@@ -150,24 +150,18 @@ public final class GeneratedAccess_com_codename1_ui_validation {
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("validEmail".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.validation.RegexConstraint.validEmail();
             }
-        }
-        if ("validEmail".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return com.codename1.ui.validation.RegexConstraint.validEmail((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("validURL".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.validation.RegexConstraint.validURL();
             }
-        }
-        if ("validURL".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return com.codename1.ui.validation.RegexConstraint.validURL((java.lang.String) adaptedArgs[0]);
@@ -178,32 +172,27 @@ public final class GeneratedAccess_com_codename1_ui_validation {
 
     private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
         if ("getDefaultValidationEmblemPositionX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.validation.Validator.getDefaultValidationEmblemPositionX();
             }
         }
         if ("getDefaultValidationEmblemPositionY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.validation.Validator.getDefaultValidationEmblemPositionY();
             }
         }
         if ("getDefaultValidationFailedEmblem".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.validation.Validator.getDefaultValidationFailedEmblem();
             }
         }
         if ("getDefaultValidationFailureHighlightMode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.validation.Validator.getDefaultValidationFailureHighlightMode();
             }
         }
         if ("isValidateOnEveryKey".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.validation.Validator.isValidateOnEveryKey();
             }
         }
@@ -307,8 +296,7 @@ public final class GeneratedAccess_com_codename1_ui_validation {
 
     private static Object invoke0(com.codename1.ui.validation.ExistInConstraint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDefaultFailMessage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultFailMessage();
             }
         }
@@ -323,8 +311,7 @@ public final class GeneratedAccess_com_codename1_ui_validation {
 
     private static Object invoke1(com.codename1.ui.validation.GroupConstraint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDefaultFailMessage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultFailMessage();
             }
         }
@@ -339,8 +326,7 @@ public final class GeneratedAccess_com_codename1_ui_validation {
 
     private static Object invoke2(com.codename1.ui.validation.LengthConstraint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDefaultFailMessage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultFailMessage();
             }
         }
@@ -355,8 +341,7 @@ public final class GeneratedAccess_com_codename1_ui_validation {
 
     private static Object invoke3(com.codename1.ui.validation.NotConstraint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDefaultFailMessage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultFailMessage();
             }
         }
@@ -371,8 +356,7 @@ public final class GeneratedAccess_com_codename1_ui_validation {
 
     private static Object invoke4(com.codename1.ui.validation.NumericConstraint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDefaultFailMessage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultFailMessage();
             }
         }
@@ -387,8 +371,7 @@ public final class GeneratedAccess_com_codename1_ui_validation {
 
     private static Object invoke5(com.codename1.ui.validation.RegexConstraint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDefaultFailMessage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultFailMessage();
             }
         }
@@ -435,44 +418,37 @@ public final class GeneratedAccess_com_codename1_ui_validation {
             }
         }
         if ("getErrorMessageUIID".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getErrorMessageUIID();
             }
         }
         if ("getValidationEmblemPositionX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getValidationEmblemPositionX();
             }
         }
         if ("getValidationEmblemPositionY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getValidationEmblemPositionY();
             }
         }
         if ("getValidationFailedEmblem".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getValidationFailedEmblem();
             }
         }
         if ("getValidationFailureHighlightMode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getValidationFailureHighlightMode();
             }
         }
         if ("isShowErrorMessageForFocusedComponent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isShowErrorMessageForFocusedComponent();
             }
         }
         if ("isValid".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isValid();
             }
         }
@@ -517,8 +493,7 @@ public final class GeneratedAccess_com_codename1_ui_validation {
 
     private static Object invoke7(com.codename1.ui.validation.Constraint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDefaultFailMessage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultFailMessage();
             }
         }

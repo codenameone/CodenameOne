@@ -370,20 +370,17 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getChartType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultMinimum();
             }
         }
@@ -394,14 +391,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getPointsChart".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRenderer();
             }
         }
@@ -440,8 +435,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
-        }
-        if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
@@ -452,8 +445,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
-        }
-        if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
@@ -488,20 +479,17 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getChartType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultMinimum();
             }
         }
@@ -512,14 +500,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getPointsChart".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRenderer();
             }
         }
@@ -558,8 +544,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
-        }
-        if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
@@ -570,8 +554,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
-        }
-        if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
@@ -606,20 +588,17 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getChartType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultMinimum();
             }
         }
@@ -630,14 +609,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getPointsChart".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRenderer();
             }
         }
@@ -676,8 +653,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
-        }
-        if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
@@ -688,8 +663,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
-        }
-        if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
@@ -724,26 +697,22 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getChartType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDataset();
             }
         }
         if ("getDateFormat".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDateFormat();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultMinimum();
             }
         }
@@ -754,14 +723,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getPointsChart".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRenderer();
             }
         }
@@ -806,8 +773,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
-        }
-        if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
@@ -818,8 +783,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
-        }
-        if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
@@ -854,20 +817,17 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getChartType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultMinimum();
             }
         }
@@ -878,14 +838,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getPointsChart".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRenderer();
             }
         }
@@ -924,8 +882,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
-        }
-        if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
@@ -936,8 +892,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
-        }
-        if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
@@ -972,20 +926,17 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getChartType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultMinimum();
             }
         }
@@ -996,14 +947,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getPointsChart".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRenderer();
             }
         }
@@ -1042,8 +991,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
-        }
-        if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
@@ -1054,8 +1001,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
-        }
-        if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
@@ -1090,20 +1035,17 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getChartType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultMinimum();
             }
         }
@@ -1114,14 +1056,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getPointsChart".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRenderer();
             }
         }
@@ -1160,8 +1100,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
-        }
-        if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
@@ -1172,8 +1110,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
-        }
-        if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
@@ -1202,14 +1138,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getCenterX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCenterX();
             }
         }
         if ("getCenterY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCenterY();
             }
         }
@@ -1220,8 +1154,7 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRenderer();
             }
         }
@@ -1232,8 +1165,7 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("isAutocalculateCenter".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isAutocalculateCenter();
             }
         }
@@ -1290,14 +1222,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getCenterX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCenterX();
             }
         }
         if ("getCenterY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCenterY();
             }
         }
@@ -1308,8 +1238,7 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRenderer();
             }
         }
@@ -1320,8 +1249,7 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("isAutocalculateCenter".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isAutocalculateCenter();
             }
         }
@@ -1384,20 +1312,17 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getChartType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultMinimum();
             }
         }
@@ -1408,14 +1333,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getPointsChart".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRenderer();
             }
         }
@@ -1454,8 +1377,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
-        }
-        if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
@@ -1466,8 +1387,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
-        }
-        if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
@@ -1496,14 +1415,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getCenterX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCenterX();
             }
         }
         if ("getCenterY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCenterY();
             }
         }
@@ -1514,8 +1431,7 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRenderer();
             }
         }
@@ -1532,8 +1448,7 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("isAutocalculateCenter".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isAutocalculateCenter();
             }
         }
@@ -1590,14 +1505,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getCenterX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCenterX();
             }
         }
         if ("getCenterY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCenterY();
             }
         }
@@ -1608,8 +1521,7 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRenderer();
             }
         }
@@ -1620,8 +1532,7 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("isAutocalculateCenter".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isAutocalculateCenter();
             }
         }
@@ -1684,20 +1595,17 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getChartType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultMinimum();
             }
         }
@@ -1708,14 +1616,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getPointsChart".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRenderer();
             }
         }
@@ -1754,8 +1660,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
-        }
-        if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
@@ -1766,8 +1670,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
-        }
-        if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
@@ -1796,14 +1698,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getCenterX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCenterX();
             }
         }
         if ("getCenterY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCenterY();
             }
         }
@@ -1814,8 +1714,7 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRenderer();
             }
         }
@@ -1826,8 +1725,7 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("isAutocalculateCenter".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isAutocalculateCenter();
             }
         }
@@ -1890,20 +1788,17 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getChartType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getChartType();
             }
         }
         if ("getDataset".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDataset();
             }
         }
         if ("getDefaultMinimum".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDefaultMinimum();
             }
         }
@@ -1914,14 +1809,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("getPointsChart".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPointsChart();
             }
         }
         if ("getRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRenderer();
             }
         }
@@ -1960,8 +1853,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
             }
-        }
-        if ("toRealPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class}, false);
                 return typedTarget.toRealPoint(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).intValue());
@@ -1972,8 +1863,6 @@ public final class GeneratedAccess_com_codename1_charts_views {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0]);
             }
-        }
-        if ("toScreenPoint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, java.lang.Integer.class}, false);
                 return typedTarget.toScreenPoint((double[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue());
@@ -2024,20 +1913,17 @@ public final class GeneratedAccess_com_codename1_charts_views {
 
     private static Object invoke16(com.codename1.charts.views.ClickableArea typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getRect".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRect();
             }
         }
         if ("getX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getX();
             }
         }
         if ("getY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getY();
             }
         }
@@ -2058,8 +1944,7 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("clearPieSegments".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clearPieSegments(); return null;
             }
         }
@@ -2110,8 +1995,7 @@ public final class GeneratedAccess_com_codename1_charts_views {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -2120,14 +2004,12 @@ public final class GeneratedAccess_com_codename1_charts_views {
 
     private static Object invoke19(com.codename1.charts.views.PointStyle typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }

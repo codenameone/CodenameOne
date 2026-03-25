@@ -58,26 +58,22 @@ public final class GeneratedAccess_com_codename1_system {
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("getCheckboxText".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.system.DefaultCrashReporter.getCheckboxText();
             }
         }
         if ("getDontSendButtonText".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.system.DefaultCrashReporter.getDontSendButtonText();
             }
         }
         if ("getErrorText".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.system.DefaultCrashReporter.getErrorText();
             }
         }
         if ("getSendButtonText".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.system.DefaultCrashReporter.getSendButtonText();
             }
         }
@@ -116,8 +112,7 @@ public final class GeneratedAccess_com_codename1_system {
 
     private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
         if ("isVerbose".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.system.NativeLookup.isVerbose();
             }
         }
@@ -192,14 +187,12 @@ public final class GeneratedAccess_com_codename1_system {
 
     private static Object invoke1(com.codename1.system.Lifecycle typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("destroy".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.destroy(); return null;
             }
         }
         if ("getTheme".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTheme();
             }
         }
@@ -210,20 +203,17 @@ public final class GeneratedAccess_com_codename1_system {
             }
         }
         if ("runApp".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.runApp(); return null;
             }
         }
         if ("start".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.start(); return null;
             }
         }
         if ("stop".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.stop(); return null;
             }
         }
@@ -242,8 +232,7 @@ public final class GeneratedAccess_com_codename1_system {
 
     private static Object invoke3(com.codename1.system.NativeInterface typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("isSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isSupported();
             }
         }

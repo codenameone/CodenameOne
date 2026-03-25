@@ -64,8 +64,7 @@ public final class GeneratedAccess_com_codename1_testing {
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("getInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.testing.TestReporting.getInstance();
             }
         }
@@ -84,80 +83,54 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, byte[].class}, false);
                 com.codename1.testing.TestUtils.assertArrayEqual((byte[]) adaptedArgs[0], (byte[]) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
                 com.codename1.testing.TestUtils.assertArrayEqual((int[]) adaptedArgs[0], (int[]) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class}, false);
                 com.codename1.testing.TestUtils.assertArrayEqual((java.lang.Object[]) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{short[].class, short[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class, short[].class}, false);
                 com.codename1.testing.TestUtils.assertArrayEqual((short[]) adaptedArgs[0], (short[]) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, byte[].class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, byte[].class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertArrayEqual((byte[]) adaptedArgs[0], (byte[]) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, double[].class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, double[].class, java.lang.Double.class}, false);
                 com.codename1.testing.TestUtils.assertArrayEqual((double[]) adaptedArgs[0], (double[]) adaptedArgs[1], ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class, float[].class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, float[].class, java.lang.Double.class}, false);
                 com.codename1.testing.TestUtils.assertArrayEqual((float[]) adaptedArgs[0], (float[]) adaptedArgs[1], ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertArrayEqual((int[]) adaptedArgs[0], (int[]) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertArrayEqual((java.lang.Object[]) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{long[].class, long[].class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class, long[].class, java.lang.Double.class}, false);
                 com.codename1.testing.TestUtils.assertArrayEqual((long[]) adaptedArgs[0], (long[]) adaptedArgs[1], ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{short[].class, short[].class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class, short[].class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertArrayEqual((short[]) adaptedArgs[0], (short[]) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, double[].class, java.lang.Double.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, double[].class, java.lang.Double.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertArrayEqual((double[]) adaptedArgs[0], (double[]) adaptedArgs[1], ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class, float[].class, java.lang.Double.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, float[].class, java.lang.Double.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertArrayEqual((float[]) adaptedArgs[0], (float[]) adaptedArgs[1], ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{long[].class, long[].class, java.lang.Double.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class, long[].class, java.lang.Double.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertArrayEqual((long[]) adaptedArgs[0], (long[]) adaptedArgs[1], ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]); return null;
@@ -168,8 +141,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 com.codename1.testing.TestUtils.assertBool(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
-        }
-        if ("assertBool".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertBool(((Boolean) adaptedArgs[0]).booleanValue(), (java.lang.String) adaptedArgs[1]); return null;
@@ -180,80 +151,54 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Byte.class}, false);
                 com.codename1.testing.TestUtils.assertEqual(((Number) adaptedArgs[0]).byteValue(), ((Number) adaptedArgs[1]).byteValue()); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 com.codename1.testing.TestUtils.assertEqual(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
                 com.codename1.testing.TestUtils.assertEqual((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class}, false);
                 com.codename1.testing.TestUtils.assertEqual(((Number) adaptedArgs[0]).longValue(), ((Number) adaptedArgs[1]).longValue()); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class}, false);
                 com.codename1.testing.TestUtils.assertEqual(((Number) adaptedArgs[0]).shortValue(), ((Number) adaptedArgs[1]).shortValue()); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Byte.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Byte.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertEqual(((Number) adaptedArgs[0]).byteValue(), ((Number) adaptedArgs[1]).byteValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 com.codename1.testing.TestUtils.assertEqual(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Double.class}, false);
                 com.codename1.testing.TestUtils.assertEqual(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertEqual(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertEqual((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertEqual(((Number) adaptedArgs[0]).longValue(), ((Number) adaptedArgs[1]).longValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertEqual(((Number) adaptedArgs[0]).shortValue(), ((Number) adaptedArgs[1]).shortValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertEqual(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Double.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Double.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertEqual(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]); return null;
@@ -264,8 +209,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.RuntimeException.class, java.lang.Runnable.class}, false);
                 com.codename1.testing.TestUtils.assertException((java.lang.RuntimeException) adaptedArgs[0], (java.lang.Runnable) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertException".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.RuntimeException.class, java.lang.Runnable.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.RuntimeException.class, java.lang.Runnable.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertException((java.lang.RuntimeException) adaptedArgs[0], (java.lang.Runnable) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
@@ -276,8 +219,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 com.codename1.testing.TestUtils.assertFalse(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
-        }
-        if ("assertFalse".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertFalse(((Boolean) adaptedArgs[0]).booleanValue(), (java.lang.String) adaptedArgs[1]); return null;
@@ -288,14 +229,10 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertLabel((java.lang.String) adaptedArgs[0]); return null;
             }
-        }
-        if ("assertLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertLabel((int[]) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertLabel((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
@@ -306,8 +243,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
                 com.codename1.testing.TestUtils.assertNoException((java.lang.Runnable) adaptedArgs[0]); return null;
             }
-        }
-        if ("assertNoException".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertNoException((java.lang.Runnable) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
@@ -318,68 +253,46 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Byte.class}, false);
                 com.codename1.testing.TestUtils.assertNotEqual(((Number) adaptedArgs[0]).byteValue(), ((Number) adaptedArgs[1]).byteValue()); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 com.codename1.testing.TestUtils.assertNotEqual(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
                 com.codename1.testing.TestUtils.assertNotEqual((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class}, false);
                 com.codename1.testing.TestUtils.assertNotEqual(((Number) adaptedArgs[0]).shortValue(), ((Number) adaptedArgs[1]).shortValue()); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Byte.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Byte.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertNotEqual(((Number) adaptedArgs[0]).byteValue(), ((Number) adaptedArgs[1]).byteValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 com.codename1.testing.TestUtils.assertNotEqual(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertNotEqual(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertNotEqual((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class, java.lang.Double.class}, false);
                 com.codename1.testing.TestUtils.assertNotEqual(((Number) adaptedArgs[0]).longValue(), ((Number) adaptedArgs[1]).longValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertNotEqual(((Number) adaptedArgs[0]).shortValue(), ((Number) adaptedArgs[1]).shortValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertNotEqual(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class, java.lang.Double.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class, java.lang.Double.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertNotEqual(((Number) adaptedArgs[0]).longValue(), ((Number) adaptedArgs[1]).longValue(), ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]); return null;
@@ -390,8 +303,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 com.codename1.testing.TestUtils.assertNotNull((java.lang.Object) adaptedArgs[0]); return null;
             }
-        }
-        if ("assertNotNull".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertNotNull((java.lang.Object) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
@@ -402,8 +313,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
                 com.codename1.testing.TestUtils.assertNotSame((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertNotSame".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertNotSame((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
@@ -414,8 +323,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 com.codename1.testing.TestUtils.assertNull((java.lang.Object) adaptedArgs[0]); return null;
             }
-        }
-        if ("assertNull".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertNull((java.lang.Object) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
@@ -426,8 +333,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 com.codename1.testing.TestUtils.assertRange(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("assertRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertRange(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]); return null;
@@ -438,8 +343,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
                 com.codename1.testing.TestUtils.assertSame((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertSame".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertSame((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
@@ -450,14 +353,10 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertTextArea((java.lang.String) adaptedArgs[0]); return null;
             }
-        }
-        if ("assertTextArea".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertTextArea((int[]) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertTextArea".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertTextArea((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
@@ -492,8 +391,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 com.codename1.testing.TestUtils.assertTrue(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
-        }
-        if ("assertTrue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.assertTrue(((Boolean) adaptedArgs[0]).booleanValue(), (java.lang.String) adaptedArgs[1]); return null;
@@ -528,14 +425,10 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
                 com.codename1.testing.TestUtils.ensureVisible((com.codename1.ui.Component) adaptedArgs[0]); return null;
             }
-        }
-        if ("ensureVisible".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, false);
                 com.codename1.testing.TestUtils.ensureVisible((int[]) adaptedArgs[0]); return null;
             }
-        }
-        if ("ensureVisible".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.ensureVisible((java.lang.String) adaptedArgs[0]); return null;
@@ -548,12 +441,9 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("fail".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 com.codename1.testing.TestUtils.fail(); return null;
             }
-        }
-        if ("fail".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.fail((java.lang.String) adaptedArgs[0]); return null;
@@ -596,14 +486,12 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("getToolbarCommands".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.testing.TestUtils.getToolbarCommands();
             }
         }
         if ("goBack".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 com.codename1.testing.TestUtils.goBack(); return null;
             }
         }
@@ -624,8 +512,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.log((java.lang.String) adaptedArgs[0]); return null;
             }
-        }
-        if ("log".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
                 com.codename1.testing.TestUtils.log((java.lang.Throwable) adaptedArgs[0]); return null;
@@ -636,8 +522,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, int[].class}, false);
                 com.codename1.testing.TestUtils.pointerDrag(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), (int[]) adaptedArgs[2]); return null;
             }
-        }
-        if ("pointerDrag".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.pointerDrag(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), (java.lang.String) adaptedArgs[2]); return null;
@@ -648,8 +532,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, int[].class}, false);
                 com.codename1.testing.TestUtils.pointerPress(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), (int[]) adaptedArgs[2]); return null;
             }
-        }
-        if ("pointerPress".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.pointerPress(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), (java.lang.String) adaptedArgs[2]); return null;
@@ -660,8 +542,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, int[].class}, false);
                 com.codename1.testing.TestUtils.pointerRelease(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), (int[]) adaptedArgs[2]); return null;
             }
-        }
-        if ("pointerRelease".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.pointerRelease(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), (java.lang.String) adaptedArgs[2]); return null;
@@ -678,8 +558,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class}, false);
                 com.codename1.testing.TestUtils.selectInList((int[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
-        }
-        if ("selectInList".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
                 com.codename1.testing.TestUtils.selectInList((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
@@ -690,8 +568,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.setText((int[]) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
-        }
-        if ("setText".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.setText((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
@@ -704,8 +580,7 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("showSidemenu".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 com.codename1.testing.TestUtils.showSidemenu(); return null;
             }
         }
@@ -720,8 +595,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.waitForFormName((java.lang.String) adaptedArgs[0]); return null;
             }
-        }
-        if ("waitForFormName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false);
                 com.codename1.testing.TestUtils.waitForFormName((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue()); return null;
@@ -732,20 +605,15 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 com.codename1.testing.TestUtils.waitForFormTitle((java.lang.String) adaptedArgs[0]); return null;
             }
-        }
-        if ("waitForFormTitle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class}, false);
                 com.codename1.testing.TestUtils.waitForFormTitle((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue()); return null;
             }
         }
         if ("waitForUnnamedForm".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 com.codename1.testing.TestUtils.waitForUnnamedForm(); return null;
             }
-        }
-        if ("waitForUnnamedForm".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
                 com.codename1.testing.TestUtils.waitForUnnamedForm(((Number) adaptedArgs[0]).longValue()); return null;
@@ -804,80 +672,54 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, byte[].class}, false);
                 typedTarget.assertArrayEqual((byte[]) adaptedArgs[0], (byte[]) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
                 typedTarget.assertArrayEqual((int[]) adaptedArgs[0], (int[]) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class}, false);
                 typedTarget.assertArrayEqual((java.lang.Object[]) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{short[].class, short[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class, short[].class}, false);
                 typedTarget.assertArrayEqual((short[]) adaptedArgs[0], (short[]) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, byte[].class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, byte[].class, java.lang.String.class}, false);
                 typedTarget.assertArrayEqual((byte[]) adaptedArgs[0], (byte[]) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, double[].class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, double[].class, java.lang.Double.class}, false);
                 typedTarget.assertArrayEqual((double[]) adaptedArgs[0], (double[]) adaptedArgs[1], ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class, float[].class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, float[].class, java.lang.Double.class}, false);
                 typedTarget.assertArrayEqual((float[]) adaptedArgs[0], (float[]) adaptedArgs[1], ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class, java.lang.String.class}, false);
                 typedTarget.assertArrayEqual((int[]) adaptedArgs[0], (int[]) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class, java.lang.String.class}, false);
                 typedTarget.assertArrayEqual((java.lang.Object[]) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{long[].class, long[].class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class, long[].class, java.lang.Long.class}, false);
                 typedTarget.assertArrayEqual((long[]) adaptedArgs[0], (long[]) adaptedArgs[1], ((Number) adaptedArgs[2]).longValue()); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{short[].class, short[].class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class, short[].class, java.lang.String.class}, false);
                 typedTarget.assertArrayEqual((short[]) adaptedArgs[0], (short[]) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{double[].class, double[].class, java.lang.Double.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{double[].class, double[].class, java.lang.Double.class, java.lang.String.class}, false);
                 typedTarget.assertArrayEqual((double[]) adaptedArgs[0], (double[]) adaptedArgs[1], ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class, float[].class, java.lang.Double.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, float[].class, java.lang.Double.class, java.lang.String.class}, false);
                 typedTarget.assertArrayEqual((float[]) adaptedArgs[0], (float[]) adaptedArgs[1], ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]); return null;
             }
-        }
-        if ("assertArrayEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{long[].class, long[].class, java.lang.Long.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class, long[].class, java.lang.Long.class, java.lang.String.class}, false);
                 typedTarget.assertArrayEqual((long[]) adaptedArgs[0], (long[]) adaptedArgs[1], ((Number) adaptedArgs[2]).longValue(), (java.lang.String) adaptedArgs[3]); return null;
@@ -888,8 +730,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 typedTarget.assertBool(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
-        }
-        if ("assertBool".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.String.class}, false);
                 typedTarget.assertBool(((Boolean) adaptedArgs[0]).booleanValue(), (java.lang.String) adaptedArgs[1]); return null;
@@ -900,80 +740,54 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Byte.class}, false);
                 typedTarget.assertEqual(((Number) adaptedArgs[0]).byteValue(), ((Number) adaptedArgs[1]).byteValue()); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.assertEqual(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
                 typedTarget.assertEqual((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class}, false);
                 typedTarget.assertEqual(((Number) adaptedArgs[0]).longValue(), ((Number) adaptedArgs[1]).longValue()); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class}, false);
                 typedTarget.assertEqual(((Number) adaptedArgs[0]).shortValue(), ((Number) adaptedArgs[1]).shortValue()); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Byte.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Byte.class, java.lang.String.class}, false);
                 typedTarget.assertEqual(((Number) adaptedArgs[0]).byteValue(), ((Number) adaptedArgs[1]).byteValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 typedTarget.assertEqual(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Double.class}, false);
                 typedTarget.assertEqual(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.String.class}, false);
                 typedTarget.assertEqual(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false);
                 typedTarget.assertEqual((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class, java.lang.String.class}, false);
                 typedTarget.assertEqual(((Number) adaptedArgs[0]).longValue(), ((Number) adaptedArgs[1]).longValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class, java.lang.String.class}, false);
                 typedTarget.assertEqual(((Number) adaptedArgs[0]).shortValue(), ((Number) adaptedArgs[1]).shortValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.String.class}, false);
                 typedTarget.assertEqual(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]); return null;
             }
-        }
-        if ("assertEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Double.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Double.class, java.lang.String.class}, false);
                 typedTarget.assertEqual(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]); return null;
@@ -984,8 +798,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.RuntimeException.class, java.lang.Runnable.class}, false);
                 typedTarget.assertException((java.lang.RuntimeException) adaptedArgs[0], (java.lang.Runnable) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertException".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.RuntimeException.class, java.lang.Runnable.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.RuntimeException.class, java.lang.Runnable.class, java.lang.String.class}, false);
                 typedTarget.assertException((java.lang.RuntimeException) adaptedArgs[0], (java.lang.Runnable) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
@@ -996,8 +808,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 typedTarget.assertFalse(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
-        }
-        if ("assertFalse".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.String.class}, false);
                 typedTarget.assertFalse(((Boolean) adaptedArgs[0]).booleanValue(), (java.lang.String) adaptedArgs[1]); return null;
@@ -1008,14 +818,10 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.assertLabel((java.lang.String) adaptedArgs[0]); return null;
             }
-        }
-        if ("assertLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.String.class}, false);
                 typedTarget.assertLabel((int[]) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertLabel".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 typedTarget.assertLabel((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
@@ -1026,8 +832,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
                 typedTarget.assertNoException((java.lang.Runnable) adaptedArgs[0]); return null;
             }
-        }
-        if ("assertNoException".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class, java.lang.String.class}, false);
                 typedTarget.assertNoException((java.lang.Runnable) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
@@ -1038,80 +842,54 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Byte.class}, false);
                 typedTarget.assertNotEqual(((Number) adaptedArgs[0]).byteValue(), ((Number) adaptedArgs[1]).byteValue()); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.assertNotEqual(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
                 typedTarget.assertNotEqual((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class}, false);
                 typedTarget.assertNotEqual(((Number) adaptedArgs[0]).longValue(), ((Number) adaptedArgs[1]).longValue()); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class}, false);
                 typedTarget.assertNotEqual(((Number) adaptedArgs[0]).shortValue(), ((Number) adaptedArgs[1]).shortValue()); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Byte.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class, java.lang.Byte.class, java.lang.String.class}, false);
                 typedTarget.assertNotEqual(((Number) adaptedArgs[0]).byteValue(), ((Number) adaptedArgs[1]).byteValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 typedTarget.assertNotEqual(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Double.class}, false);
                 typedTarget.assertNotEqual(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.String.class}, false);
                 typedTarget.assertNotEqual(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false);
                 typedTarget.assertNotEqual((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class, java.lang.String.class}, false);
                 typedTarget.assertNotEqual(((Number) adaptedArgs[0]).longValue(), ((Number) adaptedArgs[1]).longValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Short.class, java.lang.Short.class, java.lang.String.class}, false);
                 typedTarget.assertNotEqual(((Number) adaptedArgs[0]).shortValue(), ((Number) adaptedArgs[1]).shortValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.String.class}, false);
                 typedTarget.assertNotEqual(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]); return null;
             }
-        }
-        if ("assertNotEqual".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Double.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Double.class, java.lang.String.class}, false);
                 typedTarget.assertNotEqual(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]); return null;
@@ -1122,8 +900,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 typedTarget.assertNotNull((java.lang.Object) adaptedArgs[0]); return null;
             }
-        }
-        if ("assertNotNull".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false);
                 typedTarget.assertNotNull((java.lang.Object) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
@@ -1134,8 +910,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
                 typedTarget.assertNotSame((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertNotSame".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false);
                 typedTarget.assertNotSame((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
@@ -1146,8 +920,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 typedTarget.assertNull((java.lang.Object) adaptedArgs[0]); return null;
             }
-        }
-        if ("assertNull".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false);
                 typedTarget.assertNull((java.lang.Object) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
@@ -1158,8 +930,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class}, false);
                 typedTarget.assertRange(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue()); return null;
             }
-        }
-        if ("assertRange".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.String.class}, false);
                 typedTarget.assertRange(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue(), ((Number) adaptedArgs[2]).doubleValue(), (java.lang.String) adaptedArgs[3]); return null;
@@ -1170,8 +940,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
                 typedTarget.assertSame((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertSame".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.String.class}, false);
                 typedTarget.assertSame((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
@@ -1182,14 +950,10 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.assertTextArea((java.lang.String) adaptedArgs[0]); return null;
             }
-        }
-        if ("assertTextArea".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.String.class}, false);
                 typedTarget.assertTextArea((int[]) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
-        }
-        if ("assertTextArea".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 typedTarget.assertTextArea((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
@@ -1206,16 +970,13 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 typedTarget.assertTrue(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
-        }
-        if ("assertTrue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.String.class}, false);
                 typedTarget.assertTrue(((Boolean) adaptedArgs[0]).booleanValue(), (java.lang.String) adaptedArgs[1]); return null;
             }
         }
         if ("cleanup".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.cleanup(); return null;
             }
         }
@@ -1248,14 +1009,10 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
                 typedTarget.ensureVisible((com.codename1.ui.Component) adaptedArgs[0]); return null;
             }
-        }
-        if ("ensureVisible".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, false);
                 typedTarget.ensureVisible((int[]) adaptedArgs[0]); return null;
             }
-        }
-        if ("ensureVisible".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.ensureVisible((java.lang.String) adaptedArgs[0]); return null;
@@ -1268,12 +1025,9 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("fail".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.fail(); return null;
             }
-        }
-        if ("fail".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.fail((java.lang.String) adaptedArgs[0]); return null;
@@ -1316,20 +1070,17 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("getTimeoutMillis".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTimeoutMillis();
             }
         }
         if ("getToolbarCommands".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getToolbarCommands();
             }
         }
         if ("goBack".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.goBack(); return null;
             }
         }
@@ -1350,8 +1101,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.log((java.lang.String) adaptedArgs[0]); return null;
             }
-        }
-        if ("log".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
                 typedTarget.log((java.lang.Throwable) adaptedArgs[0]); return null;
@@ -1362,8 +1111,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, int[].class}, false);
                 typedTarget.pointerDrag(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), (int[]) adaptedArgs[2]); return null;
             }
-        }
-        if ("pointerDrag".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.String.class}, false);
                 typedTarget.pointerDrag(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), (java.lang.String) adaptedArgs[2]); return null;
@@ -1374,8 +1121,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, int[].class}, false);
                 typedTarget.pointerPress(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), (int[]) adaptedArgs[2]); return null;
             }
-        }
-        if ("pointerPress".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.String.class}, false);
                 typedTarget.pointerPress(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), (java.lang.String) adaptedArgs[2]); return null;
@@ -1386,22 +1131,18 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, int[].class}, false);
                 typedTarget.pointerRelease(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), (int[]) adaptedArgs[2]); return null;
             }
-        }
-        if ("pointerRelease".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.String.class}, false);
                 typedTarget.pointerRelease(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), (java.lang.String) adaptedArgs[2]); return null;
             }
         }
         if ("prepare".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.prepare(); return null;
             }
         }
         if ("runTest".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.runTest();
             }
         }
@@ -1416,8 +1157,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class}, false);
                 typedTarget.selectInList((int[]) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
             }
-        }
-        if ("selectInList".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
                 typedTarget.selectInList((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).intValue()); return null;
@@ -1428,8 +1167,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.String.class}, false);
                 typedTarget.setText((int[]) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
-        }
-        if ("setText".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 typedTarget.setText((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
@@ -1442,14 +1179,12 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("shouldExecuteOnEDT".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.shouldExecuteOnEDT();
             }
         }
         if ("showSidemenu".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.showSidemenu(); return null;
             }
         }
@@ -1472,8 +1207,7 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("waitForUnnamedForm".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.waitForUnnamedForm(); return null;
             }
         }
@@ -1488,8 +1222,7 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("runTests".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.runTests(); return null;
             }
         }
@@ -1502,8 +1235,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.testing.UnitTest.class, java.lang.Boolean.class}, false);
                 typedTarget.finishedTestCase((com.codename1.testing.UnitTest) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
-        }
-        if ("finishedTestCase".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
                 typedTarget.finishedTestCase((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -1526,20 +1257,15 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.testing.UnitTest.class}, false);
                 typedTarget.startingTestCase((com.codename1.testing.UnitTest) adaptedArgs[0]); return null;
             }
-        }
-        if ("startingTestCase".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.startingTestCase((java.lang.String) adaptedArgs[0]); return null;
             }
         }
         if ("testExecutionFinished".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.testExecutionFinished(); return null;
             }
-        }
-        if ("testExecutionFinished".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.testExecutionFinished((java.lang.String) adaptedArgs[0]); return null;
@@ -1558,38 +1284,26 @@ public final class GeneratedAccess_com_codename1_testing {
                 }
                 return typedTarget.add(varArgs);
             }
-        }
-        if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
                 return typedTarget.add((com.codename1.ui.Component) adaptedArgs[0]);
             }
-        }
-        if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
                 return typedTarget.add((com.codename1.ui.Image) adaptedArgs[0]);
             }
-        }
-        if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.add((java.lang.String) adaptedArgs[0]);
             }
-        }
-        if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Component.class}, false);
                 return typedTarget.add((java.lang.Object) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1]);
             }
-        }
-        if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Image.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Image.class}, false);
                 return typedTarget.add((java.lang.Object) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1]);
             }
-        }
-        if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false);
                 return typedTarget.add((java.lang.Object) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
@@ -1610,20 +1324,14 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
                 typedTarget.addComponent((com.codename1.ui.Component) adaptedArgs[0]); return null;
             }
-        }
-        if ("addComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.Component.class}, false);
                 typedTarget.addComponent(((Number) adaptedArgs[0]).intValue(), (com.codename1.ui.Component) adaptedArgs[1]); return null;
             }
-        }
-        if ("addComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Component.class}, false);
                 typedTarget.addComponent((java.lang.Object) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1]); return null;
             }
-        }
-        if ("addComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class, com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class, com.codename1.ui.Component.class}, false);
                 typedTarget.addComponent(((Number) adaptedArgs[0]).intValue(), (java.lang.Object) adaptedArgs[1], (com.codename1.ui.Component) adaptedArgs[2]); return null;
@@ -1696,8 +1404,7 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("animate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.animate();
             }
         }
@@ -1780,14 +1487,12 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("blocksSideSwipe".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.blocksSideSwipe();
             }
         }
         if ("clearClientProperties".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clearClientProperties(); return null;
             }
         }
@@ -1796,8 +1501,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
                 return typedTarget.contains((com.codename1.ui.Component) adaptedArgs[0]);
             }
-        }
-        if ("contains".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return typedTarget.contains(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
@@ -1870,50 +1573,42 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("findFirstFocusable".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.findFirstFocusable();
             }
         }
         if ("flushReplace".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.flushReplace(); return null;
             }
         }
         if ("forceRevalidate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.forceRevalidate(); return null;
             }
         }
         if ("getAbsoluteX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAbsoluteX();
             }
         }
         if ("getAbsoluteY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAbsoluteY();
             }
         }
         if ("getAccessibilityText".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAccessibilityText();
             }
         }
         if ("getAllStyles".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAllStyles();
             }
         }
         if ("getAnimationManager".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAnimationManager();
             }
         }
@@ -1924,26 +1619,22 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("getBaselineResizeBehavior".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBaselineResizeBehavior();
             }
         }
         if ("getBindablePropertyNames".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBindablePropertyNames();
             }
         }
         if ("getBindablePropertyTypes".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBindablePropertyTypes();
             }
         }
         if ("getBottomGap".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getBottomGap();
             }
         }
@@ -1978,14 +1669,12 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("getCloudBoundProperty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCloudBoundProperty();
             }
         }
         if ("getCloudDestinationProperty".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCloudDestinationProperty();
             }
         }
@@ -1994,22 +1683,18 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.getComponentAt(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("getComponentAt".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 return typedTarget.getComponentAt(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue());
             }
         }
         if ("getComponentCount".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getComponentCount();
             }
         }
         if ("getComponentForm".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getComponentForm();
             }
         }
@@ -2020,302 +1705,252 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("getComponentState".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getComponentState();
             }
         }
         if ("getCursor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCursor();
             }
         }
         if ("getDirtyRegion".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDirtyRegion();
             }
         }
         if ("getDisabledStyle".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDisabledStyle();
             }
         }
         if ("getDragTransparency".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDragTransparency();
             }
         }
         if ("getDraggedx".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDraggedx();
             }
         }
         if ("getDraggedy".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDraggedy();
             }
         }
         if ("getEditingDelegate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getEditingDelegate();
             }
         }
         if ("getHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHeight();
             }
         }
         if ("getInlineAllStyles".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getInlineAllStyles();
             }
         }
         if ("getInlineDisabledStyles".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getInlineDisabledStyles();
             }
         }
         if ("getInlinePressedStyles".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getInlinePressedStyles();
             }
         }
         if ("getInlineSelectedStyles".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getInlineSelectedStyles();
             }
         }
         if ("getInlineStylesTheme".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getInlineStylesTheme();
             }
         }
         if ("getInlineUnselectedStyles".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getInlineUnselectedStyles();
             }
         }
         if ("getInnerHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getInnerHeight();
             }
         }
         if ("getInnerPreferredH".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getInnerPreferredH();
             }
         }
         if ("getInnerPreferredW".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getInnerPreferredW();
             }
         }
         if ("getInnerWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getInnerWidth();
             }
         }
         if ("getInnerX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getInnerX();
             }
         }
         if ("getInnerY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getInnerY();
             }
         }
         if ("getLabelForComponent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLabelForComponent();
             }
         }
         if ("getLayout".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLayout();
             }
         }
         if ("getLayoutHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLayoutHeight();
             }
         }
         if ("getLayoutWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLayoutWidth();
             }
         }
         if ("getLeadComponent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLeadComponent();
             }
         }
         if ("getLeadParent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLeadParent();
             }
         }
         if ("getName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getName();
             }
         }
         if ("getNativeOverlay".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getNativeOverlay();
             }
         }
         if ("getNextFocusDown".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getNextFocusDown();
             }
         }
         if ("getNextFocusLeft".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getNextFocusLeft();
             }
         }
         if ("getNextFocusRight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getNextFocusRight();
             }
         }
         if ("getNextFocusUp".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getNextFocusUp();
             }
         }
         if ("getOuterHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getOuterHeight();
             }
         }
         if ("getOuterPreferredH".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getOuterPreferredH();
             }
         }
         if ("getOuterPreferredW".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getOuterPreferredW();
             }
         }
         if ("getOuterWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getOuterWidth();
             }
         }
         if ("getOuterX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getOuterX();
             }
         }
         if ("getOuterY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getOuterY();
             }
         }
         if ("getOwner".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getOwner();
             }
         }
         if ("getParent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getParent();
             }
         }
         if ("getPreferredH".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPreferredH();
             }
         }
         if ("getPreferredSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPreferredSize();
             }
         }
         if ("getPreferredSizeStr".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPreferredSizeStr();
             }
         }
         if ("getPreferredTabIndex".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPreferredTabIndex();
             }
         }
         if ("getPreferredW".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPreferredW();
             }
         }
         if ("getPressedStyle".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPressedStyle();
             }
         }
         if ("getPropertyNames".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPropertyNames();
             }
         }
         if ("getPropertyTypeNames".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPropertyTypeNames();
             }
         }
         if ("getPropertyTypes".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPropertyTypes();
             }
         }
@@ -2332,140 +1967,117 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("getSafeAreaRoot".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSafeAreaRoot();
             }
         }
         if ("getSameHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSameHeight();
             }
         }
         if ("getSameWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSameWidth();
             }
         }
         if ("getScrollAnimationSpeed".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScrollAnimationSpeed();
             }
         }
         if ("getScrollDimension".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScrollDimension();
             }
         }
         if ("getScrollIncrement".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScrollIncrement();
             }
         }
         if ("getScrollOpacity".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScrollOpacity();
             }
         }
         if ("getScrollOpacityChangeSpeed".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScrollOpacityChangeSpeed();
             }
         }
         if ("getScrollX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScrollX();
             }
         }
         if ("getScrollY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScrollY();
             }
         }
         if ("getScrollable".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScrollable();
             }
         }
         if ("getSelectCommandText".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSelectCommandText();
             }
         }
         if ("getSelectedRect".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSelectedRect();
             }
         }
         if ("getSelectedStyle".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSelectedStyle();
             }
         }
         if ("getSideGap".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSideGap();
             }
         }
         if ("getStyle".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getStyle();
             }
         }
         if ("getTabIndex".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTabIndex();
             }
         }
         if ("getTensileLength".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTensileLength();
             }
         }
         if ("getTextSelectionSupport".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTextSelectionSupport();
             }
         }
         if ("getTooltip".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
             }
         }
         if ("getUIID".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
             }
         }
         if ("getUIManager".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getUIManager();
             }
         }
         if ("getUnselectedStyle".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getUnselectedStyle();
             }
         }
@@ -2476,20 +2088,17 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("getWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWidth();
             }
         }
         if ("getX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getX();
             }
         }
         if ("getY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getY();
             }
         }
@@ -2500,44 +2109,37 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("handlesInput".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.handlesInput();
             }
         }
         if ("hasFixedPreferredSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hasFixedPreferredSize();
             }
         }
         if ("hasFocus".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hasFocus();
             }
         }
         if ("invalidate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.invalidate(); return null;
             }
         }
         if ("isAlwaysTensile".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isAlwaysTensile();
             }
         }
         if ("isBlockLead".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isBlockLead();
             }
         }
         if ("isCellRenderer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isCellRenderer();
             }
         }
@@ -2548,86 +2150,71 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("isDraggable".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDraggable();
             }
         }
         if ("isDropTarget".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDropTarget();
             }
         }
         if ("isEditable".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEditable();
             }
         }
         if ("isEditing".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEditing();
             }
         }
         if ("isEnabled".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isEnabled();
             }
         }
         if ("isFlatten".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isFlatten();
             }
         }
         if ("isFocusable".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isFocusable();
             }
         }
         if ("isGrabsPointerEvents".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isGrabsPointerEvents();
             }
         }
         if ("isHidden".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isHidden();
             }
-        }
-        if ("isHidden".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 return typedTarget.isHidden(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
         if ("isHideInLandscape".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isHideInLandscape();
             }
         }
         if ("isHideInPortrait".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isHideInPortrait();
             }
         }
         if ("isIgnorePointerEvents".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isIgnorePointerEvents();
             }
         }
         if ("isOpaque".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isOpaque();
             }
         }
@@ -2638,102 +2225,84 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("isPinchBlocksDragAndDrop".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isPinchBlocksDragAndDrop();
             }
         }
         if ("isRTL".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRTL();
             }
         }
         if ("isRippleEffect".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRippleEffect();
             }
         }
         if ("isSafeArea".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isSafeArea();
             }
         }
         if ("isSafeAreaRoot".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isSafeAreaRoot();
             }
         }
         if ("isScrollVisible".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isScrollVisible();
             }
         }
         if ("isScrollableX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isScrollableX();
             }
         }
         if ("isScrollableY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isScrollableY();
             }
         }
         if ("isSmoothScrolling".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isSmoothScrolling();
             }
         }
         if ("isSnapToGrid".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isSnapToGrid();
             }
         }
         if ("isSurface".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isSurface();
             }
         }
         if ("isTactileTouch".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isTactileTouch();
             }
         }
         if ("isTensileDragEnabled".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isTensileDragEnabled();
             }
         }
         if ("isTraversable".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isTraversable();
             }
         }
         if ("isVisible".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isVisible();
             }
         }
         if ("iterator".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.iterator();
             }
-        }
-        if ("iterator".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 return typedTarget.iterator(((Boolean) adaptedArgs[0]).booleanValue());
@@ -2758,8 +2327,7 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("layoutContainer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.layoutContainer(); return null;
             }
         }
@@ -2798,8 +2366,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
                 typedTarget.paintComponent((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
             }
-        }
-        if ("paintComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Boolean.class}, false);
                 typedTarget.paintComponent((com.codename1.ui.Graphics) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -2824,8 +2390,7 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("paintLockRelease".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.paintLockRelease(); return null;
             }
         }
@@ -2846,8 +2411,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.pointerDragged(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
             }
-        }
-        if ("pointerDragged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
                 typedTarget.pointerDragged((int[]) adaptedArgs[0], (int[]) adaptedArgs[1]); return null;
@@ -2876,8 +2439,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.pointerPressed(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
             }
-        }
-        if ("pointerPressed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
                 typedTarget.pointerPressed((int[]) adaptedArgs[0], (int[]) adaptedArgs[1]); return null;
@@ -2888,8 +2449,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.pointerReleased(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue()); return null;
             }
-        }
-        if ("pointerReleased".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
                 typedTarget.pointerReleased((int[]) adaptedArgs[0], (int[]) adaptedArgs[1]); return null;
@@ -2902,26 +2461,21 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("refreshTheme".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.refreshTheme(); return null;
             }
-        }
-        if ("refreshTheme".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 typedTarget.refreshTheme(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("remove".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.remove(); return null;
             }
         }
         if ("removeAll".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.removeAll(); return null;
             }
         }
@@ -2992,12 +2546,9 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("repaint".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.repaint(); return null;
             }
-        }
-        if ("repaint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.repaint(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue()); return null;
@@ -3008,8 +2559,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class}, false);
                 typedTarget.replace((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2]); return null;
             }
-        }
-        if ("replace".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Runnable.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Runnable.class, java.lang.Integer.class}, false);
                 typedTarget.replace((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2], (java.lang.Runnable) adaptedArgs[3], ((Number) adaptedArgs[4]).intValue()); return null;
@@ -3020,52 +2569,42 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class}, false);
                 typedTarget.replaceAndWait((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2]); return null;
             }
-        }
-        if ("replaceAndWait".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Boolean.class}, false);
                 typedTarget.replaceAndWait((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue()); return null;
             }
-        }
-        if ("replaceAndWait".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Integer.class}, false);
                 typedTarget.replaceAndWait((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2], ((Number) adaptedArgs[3]).intValue()); return null;
             }
         }
         if ("requestFocus".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.requestFocus(); return null;
             }
         }
         if ("respondsToPointerEvents".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.respondsToPointerEvents();
             }
         }
         if ("revalidate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.revalidate(); return null;
             }
         }
         if ("revalidateLater".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.revalidateLater(); return null;
             }
         }
         if ("revalidateWithAnimationSafety".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.revalidateWithAnimationSafety(); return null;
             }
         }
         if ("runTests".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.runTests(); return null;
             }
         }
@@ -3218,8 +2757,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 typedTarget.setHidden(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
-        }
-        if ("setHidden".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Boolean.class}, false);
                 typedTarget.setHidden(((Boolean) adaptedArgs[0]).booleanValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
@@ -3542,8 +3079,6 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.setUIID((java.lang.String) adaptedArgs[0]); return null;
             }
-        }
-        if ("setUIID".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 typedTarget.setUIID((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
@@ -3586,14 +3121,12 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("showForm".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.showForm();
             }
         }
         if ("startEditingAsync".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.startEditingAsync(); return null;
             }
         }
@@ -3604,8 +3137,7 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("stripMarginAndPadding".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.stripMarginAndPadding();
             }
         }
@@ -3616,14 +3148,12 @@ public final class GeneratedAccess_com_codename1_testing {
             }
         }
         if ("toImage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toImage();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -3650,32 +3180,27 @@ public final class GeneratedAccess_com_codename1_testing {
 
     private static Object invoke4(com.codename1.testing.UnitTest typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("cleanup".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.cleanup(); return null;
             }
         }
         if ("getTimeoutMillis".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTimeoutMillis();
             }
         }
         if ("prepare".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.prepare(); return null;
             }
         }
         if ("runTest".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.runTest();
             }
         }
         if ("shouldExecuteOnEDT".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.shouldExecuteOnEDT();
             }
         }

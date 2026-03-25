@@ -224,14 +224,12 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
 
     private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
         if ("getDesignTimeEmptySize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.LayoutUtil.getDesignTimeEmptySize();
             }
         }
         if ("getGlobalDebugMillis".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.LayoutUtil.getGlobalDebugMillis();
             }
         }
@@ -248,8 +246,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getVersion".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.LayoutUtil.getVersion();
             }
         }
@@ -300,8 +297,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("clearWeakReferencesNow".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 com.codename1.ui.layouts.mig.LinkHandler.clearWeakReferencesNow(); return null;
             }
         }
@@ -322,38 +318,32 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
 
     private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
         if ("getButtonOrder".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getButtonOrder();
             }
         }
         if ("getCurrentPlatform".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getCurrentPlatform();
             }
         }
         if ("getDefaultDPI".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getDefaultDPI();
             }
         }
         if ("getDefaultHorizontalUnit".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getDefaultHorizontalUnit();
             }
         }
         if ("getDefaultRowAlignmentBaseline".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getDefaultRowAlignmentBaseline();
             }
         }
         if ("getDefaultVerticalUnit".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getDefaultVerticalUnit();
             }
         }
@@ -370,50 +360,42 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getGapProvider".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getGapProvider();
             }
         }
         if ("getGridGapX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getGridGapX();
             }
         }
         if ("getGridGapY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getGridGapY();
             }
         }
         if ("getHorizontalScaleFactor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getHorizontalScaleFactor();
             }
         }
         if ("getLabelAlignPercentage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getLabelAlignPercentage();
             }
         }
         if ("getLogicalPixelBase".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getLogicalPixelBase();
             }
         }
         if ("getMinimumButtonWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getMinimumButtonWidth();
             }
         }
         if ("getModCount".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getModCount();
             }
         }
@@ -424,8 +406,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getPlatform".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getPlatform();
             }
         }
@@ -448,8 +429,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getVerticalScaleFactor".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.PlatformDefaults.getVerticalScaleFactor();
             }
         }
@@ -584,14 +564,12 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getDefaultUnit".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.UnitValue.getDefaultUnit();
             }
         }
         if ("getGlobalUnitConverters".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.layouts.mig.UnitValue.getGlobalUnitConverters();
             }
         }
@@ -723,8 +701,6 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.align((java.lang.String) adaptedArgs[0]);
             }
-        }
-        if ("align".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, int[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, int[].class}, true);
                 int[] varArgs = new int[adaptedArgs.length - 1];
@@ -741,12 +717,9 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("fill".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.fill();
             }
-        }
-        if ("fill".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, true);
                 int[] varArgs = new int[adaptedArgs.length - 0];
@@ -757,18 +730,13 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("gap".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.gap();
             }
-        }
-        if ("gap".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.gap((java.lang.String) adaptedArgs[0]);
             }
-        }
-        if ("gap".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, int[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, int[].class}, true);
                 int[] varArgs = new int[adaptedArgs.length - 1];
@@ -779,30 +747,23 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getConstaints".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getConstaints();
             }
         }
         if ("getCount".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCount();
             }
         }
         if ("grow".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.grow();
             }
-        }
-        if ("grow".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 return typedTarget.grow(((Number) adaptedArgs[0]).floatValue());
             }
-        }
-        if ("grow".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, int[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, int[].class}, true);
                 int[] varArgs = new int[adaptedArgs.length - 1];
@@ -817,8 +778,6 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.growPrio(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("growPrio".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class}, true);
                 int[] varArgs = new int[adaptedArgs.length - 1];
@@ -835,12 +794,9 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("noGrid".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.noGrid();
             }
-        }
-        if ("noGrid".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class}, true);
                 int[] varArgs = new int[adaptedArgs.length - 0];
@@ -857,18 +813,13 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("shrink".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.shrink();
             }
-        }
-        if ("shrink".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 return typedTarget.shrink(((Number) adaptedArgs[0]).floatValue());
             }
-        }
-        if ("shrink".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, int[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, int[].class}, true);
                 int[] varArgs = new int[adaptedArgs.length - 1];
@@ -883,8 +834,6 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.shrinkPrio(((Number) adaptedArgs[0]).intValue());
             }
-        }
-        if ("shrinkPrio".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class}, true);
                 int[] varArgs = new int[adaptedArgs.length - 1];
@@ -899,8 +848,6 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 return typedTarget.shrinkWeight(((Number) adaptedArgs[0]).floatValue());
             }
-        }
-        if ("shrinkWeight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, int[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, int[].class}, true);
                 int[] varArgs = new int[adaptedArgs.length - 1];
@@ -915,8 +862,6 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.size((java.lang.String) adaptedArgs[0]);
             }
-        }
-        if ("size".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, int[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, int[].class}, true);
                 int[] varArgs = new int[adaptedArgs.length - 1];
@@ -927,18 +872,13 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("sizeGroup".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.sizeGroup();
             }
-        }
-        if ("sizeGroup".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.sizeGroup((java.lang.String) adaptedArgs[0]);
             }
-        }
-        if ("sizeGroup".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, int[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, int[].class}, true);
                 int[] varArgs = new int[adaptedArgs.length - 1];
@@ -959,32 +899,27 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getGapPush".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getGapPush();
             }
         }
         if ("getMax".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMax();
             }
         }
         if ("getMin".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMin();
             }
         }
         if ("getPreferred".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPreferred();
             }
         }
         if ("isUnset".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isUnset();
             }
         }
@@ -1015,26 +950,22 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("dockEast".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.dockEast();
             }
         }
         if ("dockNorth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.dockNorth();
             }
         }
         if ("dockSouth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.dockSouth();
             }
         }
         if ("dockWest".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.dockWest();
             }
         }
@@ -1061,20 +992,17 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("external".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.external();
             }
         }
         if ("flowX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.flowX();
             }
         }
         if ("flowY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.flowY();
             }
         }
@@ -1137,14 +1065,12 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getCellX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCellX();
             }
         }
         if ("getCellY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCellY();
             }
         }
@@ -1155,120 +1081,99 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getDockSide".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDockSide();
             }
         }
         if ("getFlowX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getFlowX();
             }
         }
         if ("getHideMode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHideMode();
             }
         }
         if ("getHorizontal".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHorizontal();
             }
         }
         if ("getId".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getId();
             }
         }
         if ("getNewlineGapSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getNewlineGapSize();
             }
         }
         if ("getPadding".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPadding();
             }
         }
         if ("getPos".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPos();
             }
         }
         if ("getPushX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPushX();
             }
         }
         if ("getPushY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPushY();
             }
         }
         if ("getSkip".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSkip();
             }
         }
         if ("getSpanX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSpanX();
             }
         }
         if ("getSpanY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSpanY();
             }
         }
         if ("getSplit".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSplit();
             }
         }
         if ("getTag".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTag();
             }
         }
         if ("getVertical".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getVertical();
             }
         }
         if ("getVisualPadding".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getVisualPadding();
             }
         }
         if ("getWrapGapSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWrapGapSize();
             }
         }
         if ("grow".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.grow();
             }
-        }
-        if ("grow".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{float[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class}, true);
                 float[] varArgs = new float[adaptedArgs.length - 0];
@@ -1301,24 +1206,18 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("growX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.growX();
             }
-        }
-        if ("growX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 return typedTarget.growX(((Number) adaptedArgs[0]).floatValue());
             }
         }
         if ("growY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.growY();
             }
-        }
-        if ("growY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 return typedTarget.growY(Float.valueOf(((Number) adaptedArgs[0]).floatValue()));
@@ -1343,26 +1242,22 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("isBoundsInGrid".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isBoundsInGrid();
             }
         }
         if ("isExternal".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isExternal();
             }
         }
         if ("isNewline".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isNewline();
             }
         }
         if ("isWrap".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isWrap();
             }
         }
@@ -1391,12 +1286,9 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("newline".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.newline();
             }
-        }
-        if ("newline".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.newline((java.lang.String) adaptedArgs[0]);
@@ -1407,8 +1299,6 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.pad((java.lang.String) adaptedArgs[0]);
             }
-        }
-        if ("pad".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 return typedTarget.pad(((Number) adaptedArgs[0]).intValue(), ((Number) adaptedArgs[1]).intValue(), ((Number) adaptedArgs[2]).intValue(), ((Number) adaptedArgs[3]).intValue());
@@ -1419,44 +1309,33 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 return typedTarget.pos((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
-        }
-        if ("pos".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
                 return typedTarget.pos((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3]);
             }
         }
         if ("push".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.push();
             }
-        }
-        if ("push".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
                 return typedTarget.push(Float.valueOf(((Number) adaptedArgs[0]).floatValue()), Float.valueOf(((Number) adaptedArgs[1]).floatValue()));
             }
         }
         if ("pushX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.pushX();
             }
-        }
-        if ("pushX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 return typedTarget.pushX(Float.valueOf(((Number) adaptedArgs[0]).floatValue()));
             }
         }
         if ("pushY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.pushY();
             }
-        }
-        if ("pushY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
                 return typedTarget.pushY(Float.valueOf(((Number) adaptedArgs[0]).floatValue()));
@@ -1667,12 +1546,9 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("skip".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.skip();
             }
-        }
-        if ("skip".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.skip(((Number) adaptedArgs[0]).intValue());
@@ -1689,36 +1565,27 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("spanX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.spanX();
             }
-        }
-        if ("spanX".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.spanX(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("spanY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.spanY();
             }
-        }
-        if ("spanY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.spanY(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("split".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.split();
             }
-        }
-        if ("split".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.split(((Number) adaptedArgs[0]).intValue());
@@ -1737,12 +1604,9 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("wrap".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.wrap();
             }
-        }
-        if ("wrap".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.wrap((java.lang.String) adaptedArgs[0]);
@@ -1777,8 +1641,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
 
     private static Object invoke3(com.codename1.ui.layouts.mig.DimConstraint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getAlign".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAlign();
             }
         }
@@ -1789,68 +1652,57 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getEndGroup".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getEndGroup();
             }
         }
         if ("getGapAfter".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getGapAfter();
             }
         }
         if ("getGapBefore".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getGapBefore();
             }
         }
         if ("getGrow".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getGrow();
             }
         }
         if ("getGrowPriority".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getGrowPriority();
             }
         }
         if ("getShrink".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShrink();
             }
         }
         if ("getShrinkPriority".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShrinkPriority();
             }
         }
         if ("getSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSize();
             }
         }
         if ("getSizeGroup".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSizeGroup();
             }
         }
         if ("isFill".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isFill();
             }
         }
         if ("isNoGrid".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isNoGrid();
             }
         }
@@ -1931,38 +1783,30 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
 
     private static Object invoke4(com.codename1.ui.layouts.mig.Grid typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getContainer".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getContainer();
             }
         }
         if ("getHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHeight();
             }
-        }
-        if ("getHeight".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.getHeight(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("getWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWidth();
             }
-        }
-        if ("getWidth".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.getWidth(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("invalidateContainerSize".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.invalidateContainerSize(); return null;
             }
         }
@@ -1971,16 +1815,13 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, com.codename1.ui.layouts.mig.UnitValue.class, com.codename1.ui.layouts.mig.UnitValue.class, java.lang.Boolean.class}, false);
                 return typedTarget.layout((int[]) adaptedArgs[0], (com.codename1.ui.layouts.mig.UnitValue) adaptedArgs[1], (com.codename1.ui.layouts.mig.UnitValue) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue());
             }
-        }
-        if ("layout".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{int[].class, com.codename1.ui.layouts.mig.UnitValue.class, com.codename1.ui.layouts.mig.UnitValue.class, java.lang.Boolean.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, com.codename1.ui.layouts.mig.UnitValue.class, com.codename1.ui.layouts.mig.UnitValue.class, java.lang.Boolean.class, java.lang.Boolean.class}, false);
                 return typedTarget.layout((int[]) adaptedArgs[0], (com.codename1.ui.layouts.mig.UnitValue) adaptedArgs[1], (com.codename1.ui.layouts.mig.UnitValue) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue(), ((Boolean) adaptedArgs[4]).booleanValue());
             }
         }
         if ("paintDebug".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.paintDebug(); return null;
             }
         }
@@ -2007,140 +1848,116 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("bottomToTop".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.bottomToTop();
             }
         }
         if ("debug".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.debug();
             }
-        }
-        if ("debug".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.debug(((Number) adaptedArgs[0]).intValue());
             }
         }
         if ("fill".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.fill();
             }
         }
         if ("fillX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.fillX();
             }
         }
         if ("fillY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.fillY();
             }
         }
         if ("flowX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.flowX();
             }
         }
         if ("flowY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.flowY();
             }
         }
         if ("getAlignX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAlignX();
             }
         }
         if ("getAlignY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAlignY();
             }
         }
         if ("getDebugMillis".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDebugMillis();
             }
         }
         if ("getGridGapX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getGridGapX();
             }
         }
         if ("getGridGapY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getGridGapY();
             }
         }
         if ("getHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHeight();
             }
         }
         if ("getHideMode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHideMode();
             }
         }
         if ("getInsets".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getInsets();
             }
         }
         if ("getLeftToRight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLeftToRight();
             }
         }
         if ("getPackHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPackHeight();
             }
         }
         if ("getPackHeightAlign".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPackHeightAlign();
             }
         }
         if ("getPackWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPackWidth();
             }
         }
         if ("getPackWidthAlign".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPackWidthAlign();
             }
         }
         if ("getWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWidth();
             }
         }
         if ("getWrapAfter".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWrapAfter();
             }
         }
@@ -2179,8 +1996,6 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.insets((java.lang.String) adaptedArgs[0]);
             }
-        }
-        if ("insets".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
                 return typedTarget.insets((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3]);
@@ -2193,44 +2008,37 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("isFillX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isFillX();
             }
         }
         if ("isFillY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isFillY();
             }
         }
         if ("isFlowX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isFlowX();
             }
         }
         if ("isNoCache".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isNoCache();
             }
         }
         if ("isNoGrid".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isNoGrid();
             }
         }
         if ("isTopToBottom".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isTopToBottom();
             }
         }
         if ("isVisualPadding".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isVisualPadding();
             }
         }
@@ -2265,30 +2073,24 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("noCache".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.noCache();
             }
         }
         if ("noGrid".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.noGrid();
             }
         }
         if ("noVisualPadding".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.noVisualPadding();
             }
         }
         if ("pack".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.pack();
             }
-        }
-        if ("pack".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 return typedTarget.pack((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
@@ -2301,8 +2103,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("rightToLeft".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.rightToLeft();
             }
         }
@@ -2439,8 +2240,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("topToBottom".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.topToBottom();
             }
         }
@@ -2451,8 +2251,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("wrap".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.wrap();
             }
         }
@@ -2499,8 +2298,6 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Object.class}, false);
                 typedTarget.addLayoutComponent((com.codename1.ui.Component) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
             }
-        }
-        if ("addLayoutComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Component.class, com.codename1.ui.Container.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Component.class, com.codename1.ui.Container.class}, false);
                 typedTarget.addLayoutComponent((java.lang.Object) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.Container) adaptedArgs[2]); return null;
@@ -2519,8 +2316,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getColumnConstraints".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getColumnConstraints();
             }
         }
@@ -2537,8 +2333,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getConstraintMap".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getConstraintMap();
             }
         }
@@ -2555,8 +2350,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getLayoutConstraints".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLayoutConstraints();
             }
         }
@@ -2567,14 +2361,12 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getRowConstraints".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRowConstraints();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -2585,8 +2377,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("isConstraintTracking".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isConstraintTracking();
             }
         }
@@ -2597,8 +2388,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("isOverlapSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isOverlapSupported();
             }
         }
@@ -2691,8 +2481,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
 
     private static Object invoke8(com.codename1.ui.layouts.mig.PlatformDefaults typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("invalidate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.invalidate(); return null;
             }
         }
@@ -2717,14 +2506,12 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getConstraintString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getConstraintString();
             }
         }
         if ("getOperation".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getOperation();
             }
         }
@@ -2741,44 +2528,37 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getSubUnits".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSubUnits();
             }
         }
         if ("getUnit".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getUnit();
             }
         }
         if ("getUnitString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getUnitString();
             }
         }
         if ("getValue".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getValue();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
         if ("isHorizontal".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isHorizontal();
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -2793,8 +2573,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getComponent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getComponent();
             }
         }
@@ -2805,32 +2584,27 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getContentBias".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getContentBias();
             }
         }
         if ("getHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHeight();
             }
         }
         if ("getHorizontalScreenDPI".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHorizontalScreenDPI();
             }
         }
         if ("getLayoutHashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLayoutHashCode();
             }
         }
         if ("getLinkId".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLinkId();
             }
         }
@@ -2859,8 +2633,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getParent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getParent();
             }
         }
@@ -2883,68 +2656,57 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getScreenHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScreenHeight();
             }
         }
         if ("getScreenLocationX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScreenLocationX();
             }
         }
         if ("getScreenLocationY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScreenLocationY();
             }
         }
         if ("getScreenWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScreenWidth();
             }
         }
         if ("getVerticalScreenDPI".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getVerticalScreenDPI();
             }
         }
         if ("getVisualPadding".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getVisualPadding();
             }
         }
         if ("getWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWidth();
             }
         }
         if ("getX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getX();
             }
         }
         if ("getY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getY();
             }
         }
         if ("hasBaseline".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hasBaseline();
             }
         }
         if ("isVisible".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isVisible();
             }
         }
@@ -2971,14 +2733,12 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getComponent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getComponent();
             }
         }
         if ("getComponentCount".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getComponentCount();
             }
         }
@@ -2989,44 +2749,37 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getComponents".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getComponents();
             }
         }
         if ("getContentBias".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getContentBias();
             }
         }
         if ("getHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHeight();
             }
         }
         if ("getHorizontalScreenDPI".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHorizontalScreenDPI();
             }
         }
         if ("getLayout".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLayout();
             }
         }
         if ("getLayoutHashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLayoutHashCode();
             }
         }
         if ("getLinkId".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLinkId();
             }
         }
@@ -3055,8 +2808,7 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getParent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getParent();
             }
         }
@@ -3079,74 +2831,62 @@ public final class GeneratedAccess_com_codename1_ui_layouts_mig {
             }
         }
         if ("getScreenHeight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScreenHeight();
             }
         }
         if ("getScreenLocationX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScreenLocationX();
             }
         }
         if ("getScreenLocationY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScreenLocationY();
             }
         }
         if ("getScreenWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getScreenWidth();
             }
         }
         if ("getVerticalScreenDPI".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getVerticalScreenDPI();
             }
         }
         if ("getVisualPadding".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getVisualPadding();
             }
         }
         if ("getWidth".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWidth();
             }
         }
         if ("getX".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getX();
             }
         }
         if ("getY".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getY();
             }
         }
         if ("hasBaseline".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hasBaseline();
             }
         }
         if ("isLeftToRight".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isLeftToRight();
             }
         }
         if ("isVisible".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isVisible();
             }
         }

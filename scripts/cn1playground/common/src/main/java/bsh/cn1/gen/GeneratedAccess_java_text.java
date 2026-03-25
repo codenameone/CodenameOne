@@ -70,12 +70,9 @@ public final class GeneratedAccess_java_text {
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("getDateInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return java.text.DateFormat.getDateInstance();
             }
-        }
-        if ("getDateInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return java.text.DateFormat.getDateInstance(((Number) adaptedArgs[0]).intValue());
@@ -88,18 +85,14 @@ public final class GeneratedAccess_java_text {
             }
         }
         if ("getInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return java.text.DateFormat.getInstance();
             }
         }
         if ("getTimeInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return java.text.DateFormat.getTimeInstance();
             }
-        }
-        if ("getTimeInstance".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return java.text.DateFormat.getTimeInstance(((Number) adaptedArgs[0]).intValue());
@@ -170,22 +163,18 @@ public final class GeneratedAccess_java_text {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.format((java.lang.Object) adaptedArgs[0]);
             }
-        }
-        if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
                 return typedTarget.format((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("getDateFormatSymbols".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDateFormatSymbols();
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -208,8 +197,7 @@ public final class GeneratedAccess_java_text {
             }
         }
         if ("toPattern".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toPattern();
             }
         }
@@ -228,16 +216,13 @@ public final class GeneratedAccess_java_text {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
                 return typedTarget.format((java.lang.Object) adaptedArgs[0]);
             }
-        }
-        if ("format".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
                 return typedTarget.format((java.util.Date) adaptedArgs[0]);
             }
         }
         if ("hashCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.hashCode();
             }
         }
@@ -258,44 +243,37 @@ public final class GeneratedAccess_java_text {
 
     private static Object invoke2(java.text.DateFormatSymbols typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getAmPmStrings".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAmPmStrings();
             }
         }
         if ("getEras".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getEras();
             }
         }
         if ("getMonths".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getMonths();
             }
         }
         if ("getShortMonths".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShortMonths();
             }
         }
         if ("getShortWeekdays".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShortWeekdays();
             }
         }
         if ("getWeekdays".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getWeekdays();
             }
         }
         if ("getZoneStrings".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getZoneStrings();
             }
         }
@@ -362,8 +340,7 @@ public final class GeneratedAccess_java_text {
 
     private static Object invoke4(java.text.ParseException typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getErrorOffset".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getErrorOffset();
             }
         }

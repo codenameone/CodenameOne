@@ -66,8 +66,7 @@ public final class GeneratedAccess_com_codenameone_playground {
             }
         }
         if ("getCurrent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codenameone.playground.PlaygroundContext.getCurrent();
             }
         }
@@ -126,14 +125,12 @@ public final class GeneratedAccess_com_codenameone_playground {
 
     private static Object invoke0(com.codenameone.playground.CN1Playground typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("destroy".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.destroy(); return null;
             }
         }
         if ("getTheme".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTheme();
             }
         }
@@ -144,20 +141,17 @@ public final class GeneratedAccess_com_codenameone_playground {
             }
         }
         if ("runApp".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.runApp(); return null;
             }
         }
         if ("start".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.start(); return null;
             }
         }
         if ("stop".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.stop(); return null;
             }
         }
@@ -172,38 +166,32 @@ public final class GeneratedAccess_com_codenameone_playground {
             }
         }
         if ("clearPreview".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clearPreview(); return null;
             }
         }
         if ("clearShownForm".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.clearShownForm(); return null;
             }
         }
         if ("getHostForm".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getHostForm();
             }
         }
         if ("getPreviewRoot".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPreviewRoot();
             }
         }
         if ("getShownForm".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getShownForm();
             }
         }
         if ("getTheme".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTheme();
             }
         }
@@ -214,8 +202,7 @@ public final class GeneratedAccess_com_codenameone_playground {
             }
         }
         if ("refreshPreview".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.refreshPreview(); return null;
             }
         }
@@ -262,20 +249,17 @@ public final class GeneratedAccess_com_codenameone_playground {
 
     private static Object invoke4(com.codenameone.playground.WebsiteThemeNative typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("isDarkMode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isDarkMode();
             }
         }
         if ("isSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isSupported();
             }
         }
         if ("notifyUiReady".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.notifyUiReady(); return null;
             }
         }

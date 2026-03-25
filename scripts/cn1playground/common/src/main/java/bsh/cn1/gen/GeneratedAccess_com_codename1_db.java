@@ -78,8 +78,7 @@ public final class GeneratedAccess_com_codename1_db {
             }
         }
         if ("isCustomPathSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.db.Database.isCustomPathSupported();
             }
         }
@@ -150,20 +149,17 @@ public final class GeneratedAccess_com_codename1_db {
 
     private static Object invoke0(com.codename1.db.ThreadSafeDatabase typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("beginTransaction".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.beginTransaction(); return null;
             }
         }
         if ("close".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.close(); return null;
             }
         }
         if ("commitTransaction".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.commitTransaction(); return null;
             }
         }
@@ -172,8 +168,6 @@ public final class GeneratedAccess_com_codename1_db {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.execute((java.lang.String) adaptedArgs[0]); return null;
             }
-        }
-        if ("execute".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true);
                 java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 1];
@@ -182,8 +176,6 @@ public final class GeneratedAccess_com_codename1_db {
                 }
                 typedTarget.execute((java.lang.String) adaptedArgs[0], varArgs); return null;
             }
-        }
-        if ("execute".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false);
                 typedTarget.execute((java.lang.String) adaptedArgs[0], (java.lang.String[]) adaptedArgs[1]); return null;
@@ -194,8 +186,6 @@ public final class GeneratedAccess_com_codename1_db {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.executeQuery((java.lang.String) adaptedArgs[0]);
             }
-        }
-        if ("executeQuery".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true);
                 java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 1];
@@ -204,22 +194,18 @@ public final class GeneratedAccess_com_codename1_db {
                 }
                 return typedTarget.executeQuery((java.lang.String) adaptedArgs[0], varArgs);
             }
-        }
-        if ("executeQuery".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false);
                 return typedTarget.executeQuery((java.lang.String) adaptedArgs[0], (java.lang.String[]) adaptedArgs[1]);
             }
         }
         if ("getThread".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getThread();
             }
         }
         if ("rollbackTransaction".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.rollbackTransaction(); return null;
             }
         }
@@ -228,20 +214,17 @@ public final class GeneratedAccess_com_codename1_db {
 
     private static Object invoke1(com.codename1.db.Database typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("beginTransaction".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.beginTransaction(); return null;
             }
         }
         if ("close".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.close(); return null;
             }
         }
         if ("commitTransaction".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.commitTransaction(); return null;
             }
         }
@@ -250,8 +233,6 @@ public final class GeneratedAccess_com_codename1_db {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.execute((java.lang.String) adaptedArgs[0]); return null;
             }
-        }
-        if ("execute".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true);
                 java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 1];
@@ -260,8 +241,6 @@ public final class GeneratedAccess_com_codename1_db {
                 }
                 typedTarget.execute((java.lang.String) adaptedArgs[0], varArgs); return null;
             }
-        }
-        if ("execute".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false);
                 typedTarget.execute((java.lang.String) adaptedArgs[0], (java.lang.String[]) adaptedArgs[1]); return null;
@@ -272,8 +251,6 @@ public final class GeneratedAccess_com_codename1_db {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.executeQuery((java.lang.String) adaptedArgs[0]);
             }
-        }
-        if ("executeQuery".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true);
                 java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 1];
@@ -282,16 +259,13 @@ public final class GeneratedAccess_com_codename1_db {
                 }
                 return typedTarget.executeQuery((java.lang.String) adaptedArgs[0], varArgs);
             }
-        }
-        if ("executeQuery".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false);
                 return typedTarget.executeQuery((java.lang.String) adaptedArgs[0], (java.lang.String[]) adaptedArgs[1]);
             }
         }
         if ("rollbackTransaction".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.rollbackTransaction(); return null;
             }
         }
@@ -300,20 +274,17 @@ public final class GeneratedAccess_com_codename1_db {
 
     private static Object invoke2(com.codename1.db.Cursor typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("close".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.close(); return null;
             }
         }
         if ("first".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.first();
             }
         }
         if ("getColumnCount".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getColumnCount();
             }
         }
@@ -330,26 +301,22 @@ public final class GeneratedAccess_com_codename1_db {
             }
         }
         if ("getPosition".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPosition();
             }
         }
         if ("getRow".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRow();
             }
         }
         if ("last".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.last();
             }
         }
         if ("next".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.next();
             }
         }
@@ -360,8 +327,7 @@ public final class GeneratedAccess_com_codename1_db {
             }
         }
         if ("prev".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.prev();
             }
         }
@@ -458,8 +424,7 @@ public final class GeneratedAccess_com_codename1_db {
             }
         }
         if ("wasNull".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.wasNull();
             }
         }

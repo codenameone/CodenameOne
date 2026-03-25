@@ -19,6 +19,7 @@
 package bsh;
 
 import bsh.cn1.CN1AccessRegistry;
+import bsh.cn1.CN1LambdaSupport;
 import com.codenameone.playground.PlaygroundContext;
 import java.util.Hashtable;
 import java.util.List;
@@ -65,7 +66,7 @@ public final class Reflect {
         if (object instanceof Class) {
             try {
                 return invokeStaticMethod(interpreter == null ? null : interpreter.getClassManager(),
-                        (Class<?>) object, methodName, args, callerInfo);
+                        (Class<?>) object, methodName, args, callerInfo, callstack);
             } catch (ReflectError e) {
                 throw new EvalError(e.getMessage(), callerInfo, callstack, e);
             } catch (UtilEvalError e) {
@@ -75,12 +76,18 @@ public final class Reflect {
         if (PlaygroundContext.interceptMethodInvocation(object, methodName, unwrapArgs(args))) {
             return Primitive.VOID;
         }
+        NameSpace prevNs = CN1LambdaSupport.getCurrentNameSpace();
         try {
-            return Primitive.wrap(CN1AccessRegistry.getInstance().invoke(object, methodName, unwrapArgs(args)),
-                    null);
-        } catch (Exception ex) {
-            throw new EvalError("Error invoking method " + methodName + ": " + ex.getMessage(),
-                    callerInfo, callstack, ex);
+            CN1LambdaSupport.setCurrentNameSpace(callstack.top());
+            try {
+                return Primitive.wrap(CN1AccessRegistry.getInstance().invoke(object, methodName, unwrapArgs(args)),
+                        null);
+            } catch (Exception ex) {
+                throw new EvalError("Error invoking method " + methodName + ": " + ex.getMessage(),
+                        callerInfo, callstack, ex);
+            }
+        } finally {
+            CN1LambdaSupport.setCurrentNameSpace(prevNs);
         }
     }
 
@@ -98,6 +105,25 @@ public final class Reflect {
         } catch (Exception ex) {
             throw new ReflectError("Static method " + StringUtil.methodString(methodName, Types.getTypes(args))
                     + " not found in class '" + clas.getName() + "'", ex);
+        }
+    }
+
+    public static Object invokeStaticMethod(BshClassManager bcm, Class<?> clas, String methodName,
+            Object[] args, Node callerInfo, CallStack callstack) throws ReflectError, UtilEvalError {
+        NameSpace prevNs = CN1LambdaSupport.getCurrentNameSpace();
+        try {
+            if (callstack != null) {
+                CN1LambdaSupport.setCurrentNameSpace(callstack.top());
+            }
+            try {
+                return Primitive.wrap(CN1AccessRegistry.getInstance().invokeStatic(clas, methodName, unwrapArgs(args)),
+                        null);
+            } catch (Exception ex) {
+                throw new ReflectError("Static method " + StringUtil.methodString(methodName, Types.getTypes(args))
+                        + " not found in class '" + clas.getName() + "'", ex);
+            }
+        } finally {
+            CN1LambdaSupport.setCurrentNameSpace(prevNs);
         }
     }
 

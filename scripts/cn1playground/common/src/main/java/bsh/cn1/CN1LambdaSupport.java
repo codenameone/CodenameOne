@@ -8,6 +8,7 @@ import bsh.UtilEvalError;
 
 public final class CN1LambdaSupport {
     private static final ThreadLocal<Interpreter> CURRENT_INTERPRETER = new ThreadLocal<Interpreter>();
+    private static final ThreadLocal<NameSpace> CURRENT_NAMESPACE = new ThreadLocal<NameSpace>();
 
     private CN1LambdaSupport() {
     }
@@ -20,12 +21,26 @@ public final class CN1LambdaSupport {
         CURRENT_INTERPRETER.remove();
     }
 
+    public static void setCurrentNameSpace(NameSpace namespace) {
+        CURRENT_NAMESPACE.set(namespace);
+    }
+
+    public static NameSpace getCurrentNameSpace() {
+        return CURRENT_NAMESPACE.get();
+    }
+
+    public static void clearCurrentNameSpace() {
+        CURRENT_NAMESPACE.remove();
+    }
+
     public static LambdaValue lambda(String[] parameterNames, String bodySource) {
         Interpreter interpreter = CURRENT_INTERPRETER.get();
         if (interpreter == null) {
             throw new IllegalStateException("No active BeanShell interpreter available for lambda capture.");
         }
-        return new LambdaValue(interpreter, interpreter.getNameSpace(), sanitizeParams(parameterNames), bodySource == null ? "" : bodySource);
+        NameSpace activeNs = CURRENT_NAMESPACE.get();
+        NameSpace parentNs = activeNs != null ? activeNs : interpreter.getNameSpace();
+        return new LambdaValue(interpreter, parentNs, sanitizeParams(parameterNames), bodySource == null ? "" : bodySource);
     }
 
     private static String[] sanitizeParams(String[] parameterNames) {

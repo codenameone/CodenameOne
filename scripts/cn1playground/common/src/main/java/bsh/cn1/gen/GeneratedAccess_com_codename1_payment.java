@@ -76,12 +76,9 @@ public final class GeneratedAccess_com_codename1_payment {
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("getInAppPurchase".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.payment.Purchase.getInAppPurchase();
             }
-        }
-        if ("getInAppPurchase".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 return com.codename1.payment.Purchase.getInAppPurchase(((Boolean) adaptedArgs[0]).booleanValue());
@@ -163,32 +160,27 @@ public final class GeneratedAccess_com_codename1_payment {
 
     private static Object invoke0(com.codename1.payment.ApplePromotionalOffer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getKeyIdentifier".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getKeyIdentifier();
             }
         }
         if ("getNonce".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getNonce();
             }
         }
         if ("getOfferIdentifier".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getOfferIdentifier();
             }
         }
         if ("getSignature".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSignature();
             }
         }
         if ("getTimestamp".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTimestamp();
             }
         }
@@ -227,26 +219,22 @@ public final class GeneratedAccess_com_codename1_payment {
 
     private static Object invoke1(com.codename1.payment.Product typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDescription".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDescription();
             }
         }
         if ("getDisplayName".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getDisplayName();
             }
         }
         if ("getLocalizedPrice".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getLocalizedPrice();
             }
         }
         if ("getSku".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSku();
             }
         }
@@ -299,8 +287,7 @@ public final class GeneratedAccess_com_codename1_payment {
             }
         }
         if ("getPendingPurchases".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPendingPurchases();
             }
         }
@@ -311,12 +298,9 @@ public final class GeneratedAccess_com_codename1_payment {
             }
         }
         if ("getReceipts".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getReceipts();
             }
-        }
-        if ("getReceipts".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, true);
                 java.lang.String[] varArgs = new java.lang.String[adaptedArgs.length - 0];
@@ -327,32 +311,27 @@ public final class GeneratedAccess_com_codename1_payment {
             }
         }
         if ("getStoreCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getStoreCode();
             }
         }
         if ("isItemListingSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isItemListingSupported();
             }
         }
         if ("isManageSubscriptionsSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isManageSubscriptionsSupported();
             }
         }
         if ("isManagedPaymentSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isManagedPaymentSupported();
             }
         }
         if ("isManualPaymentSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isManualPaymentSupported();
             }
         }
@@ -363,8 +342,7 @@ public final class GeneratedAccess_com_codename1_payment {
             }
         }
         if ("isRestoreSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isRestoreSupported();
             }
         }
@@ -379,14 +357,12 @@ public final class GeneratedAccess_com_codename1_payment {
             }
         }
         if ("isSubscriptionSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isSubscriptionSupported();
             }
         }
         if ("isUnsubscribeSupported".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.isUnsubscribeSupported();
             }
         }
@@ -401,8 +377,6 @@ public final class GeneratedAccess_com_codename1_payment {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.String.class}, false);
                 return typedTarget.pay(((Number) adaptedArgs[0]).doubleValue(), (java.lang.String) adaptedArgs[1]);
             }
-        }
-        if ("pay".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.String.class, java.lang.String.class}, false);
                 return typedTarget.pay(((Number) adaptedArgs[0]).doubleValue(), (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2]);
@@ -413,8 +387,6 @@ public final class GeneratedAccess_com_codename1_payment {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.purchase((java.lang.String) adaptedArgs[0]); return null;
             }
-        }
-        if ("purchase".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.payment.PromotionalOffer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.payment.PromotionalOffer.class}, false);
                 typedTarget.purchase((java.lang.String) adaptedArgs[0], (com.codename1.payment.PromotionalOffer) adaptedArgs[1]); return null;
@@ -427,8 +399,7 @@ public final class GeneratedAccess_com_codename1_payment {
             }
         }
         if ("restore".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.restore(); return null;
             }
         }
@@ -443,20 +414,15 @@ public final class GeneratedAccess_com_codename1_payment {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 typedTarget.subscribe((java.lang.String) adaptedArgs[0]); return null;
             }
-        }
-        if ("subscribe".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.payment.PromotionalOffer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.payment.PromotionalOffer.class}, false);
                 typedTarget.subscribe((java.lang.String) adaptedArgs[0], (com.codename1.payment.PromotionalOffer) adaptedArgs[1]); return null;
             }
         }
         if ("synchronizeReceipts".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.synchronizeReceipts(); return null;
             }
-        }
-        if ("synchronizeReceipts".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, com.codename1.util.SuccessCallback.class}, false);
                 typedTarget.synchronizeReceipts(((Number) adaptedArgs[0]).longValue(), (com.codename1.util.SuccessCallback) adaptedArgs[1]); return null;
@@ -485,68 +451,57 @@ public final class GeneratedAccess_com_codename1_payment {
 
     private static Object invoke3(com.codename1.payment.Receipt typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getCancellationDate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getCancellationDate();
             }
         }
         if ("getExpiryDate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getExpiryDate();
             }
         }
         if ("getInternalId".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getInternalId();
             }
         }
         if ("getObjectId".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getObjectId();
             }
         }
         if ("getOrderData".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getOrderData();
             }
         }
         if ("getPurchaseDate".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getPurchaseDate();
             }
         }
         if ("getQuantity".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getQuantity();
             }
         }
         if ("getSku".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getSku();
             }
         }
         if ("getStoreCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getStoreCode();
             }
         }
         if ("getTransactionId".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getTransactionId();
             }
         }
         if ("getVersion".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getVersion();
             }
         }
@@ -605,8 +560,7 @@ public final class GeneratedAccess_com_codename1_payment {
             }
         }
         if ("toString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.toString();
             }
         }
@@ -735,8 +689,7 @@ public final class GeneratedAccess_com_codename1_payment {
             }
         }
         if ("restoreRequestComplete".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.restoreRequestComplete(); return null;
             }
         }

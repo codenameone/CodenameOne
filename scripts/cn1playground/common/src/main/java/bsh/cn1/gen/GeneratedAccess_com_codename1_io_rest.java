@@ -127,8 +127,7 @@ public final class GeneratedAccess_com_codename1_io_rest {
 
     private static Object invoke0(com.codename1.io.rest.RequestBuilder typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("acceptJson".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.acceptJson();
             }
         }
@@ -149,14 +148,10 @@ public final class GeneratedAccess_com_codename1_io_rest {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.Data.class}, false);
                 return typedTarget.body((com.codename1.io.Data) adaptedArgs[0]);
             }
-        }
-        if ("body".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBusinessObject.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.properties.PropertyBusinessObject.class}, false);
                 return typedTarget.body((com.codename1.properties.PropertyBusinessObject) adaptedArgs[0]);
             }
-        }
-        if ("body".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.body((java.lang.String) adaptedArgs[0]);
@@ -203,8 +198,6 @@ public final class GeneratedAccess_com_codename1_io_rest {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.OnComplete.class, java.lang.Class.class}, false);
                 return typedTarget.fetchAsPropertyList((com.codename1.util.OnComplete) adaptedArgs[0], (java.lang.Class) adaptedArgs[1]);
             }
-        }
-        if ("fetchAsPropertyList".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.OnComplete.class, java.lang.Class.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.OnComplete.class, java.lang.Class.class, java.lang.String.class}, false);
                 return typedTarget.fetchAsPropertyList((com.codename1.util.OnComplete) adaptedArgs[0], (java.lang.Class) adaptedArgs[1], (java.lang.String) adaptedArgs[2]);
@@ -217,8 +210,7 @@ public final class GeneratedAccess_com_codename1_io_rest {
             }
         }
         if ("getAsBytes".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAsBytes();
             }
         }
@@ -229,18 +221,13 @@ public final class GeneratedAccess_com_codename1_io_rest {
             }
         }
         if ("getAsJsonMap".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAsJsonMap();
             }
-        }
-        if ("getAsJsonMap".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false);
                 return typedTarget.getAsJsonMap((com.codename1.util.SuccessCallback) adaptedArgs[0]);
             }
-        }
-        if ("getAsJsonMap".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class, com.codename1.util.FailureCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class, com.codename1.util.FailureCallback.class}, false);
                 return typedTarget.getAsJsonMap((com.codename1.util.SuccessCallback) adaptedArgs[0], (com.codename1.util.FailureCallback) adaptedArgs[1]);
@@ -263,16 +250,13 @@ public final class GeneratedAccess_com_codename1_io_rest {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class}, false);
                 return typedTarget.getAsPropertyList((java.lang.Class) adaptedArgs[0]);
             }
-        }
-        if ("getAsPropertyList".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.String.class}, false);
                 return typedTarget.getAsPropertyList((java.lang.Class) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
         }
         if ("getAsString".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getAsString();
             }
         }
@@ -283,14 +267,12 @@ public final class GeneratedAccess_com_codename1_io_rest {
             }
         }
         if ("getRequestUrl".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getRequestUrl();
             }
         }
         if ("gzip".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.gzip();
             }
         }
@@ -307,8 +289,7 @@ public final class GeneratedAccess_com_codename1_io_rest {
             }
         }
         if ("jsonContent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.jsonContent();
             }
         }
@@ -317,8 +298,6 @@ public final class GeneratedAccess_com_codename1_io_rest {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
                 return typedTarget.onError((com.codename1.ui.events.ActionListener) adaptedArgs[0]);
             }
-        }
-        if ("onError".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class, java.lang.Boolean.class}, false);
                 return typedTarget.onError((com.codename1.ui.events.ActionListener) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
@@ -371,8 +350,6 @@ public final class GeneratedAccess_com_codename1_io_rest {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 return typedTarget.queryParam((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
-        }
-        if ("queryParam".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false);
                 return typedTarget.queryParam((java.lang.String) adaptedArgs[0], (java.lang.String[]) adaptedArgs[1]);
@@ -407,14 +384,12 @@ public final class GeneratedAccess_com_codename1_io_rest {
 
     private static Object invoke1(com.codename1.io.rest.Response typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getResponseCode".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getResponseCode();
             }
         }
         if ("getResponseErrorMessage".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return typedTarget.getResponseErrorMessage();
             }
         }

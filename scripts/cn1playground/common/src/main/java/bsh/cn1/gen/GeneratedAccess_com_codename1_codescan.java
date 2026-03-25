@@ -45,8 +45,7 @@ public final class GeneratedAccess_com_codename1_codescan {
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("getInstance".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 return com.codename1.codescan.CodeScanner.getInstance();
             }
         }
@@ -94,8 +93,7 @@ public final class GeneratedAccess_com_codename1_codescan {
 
     private static Object invoke1(com.codename1.codescan.ScanResult typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("scanCanceled".equals(name)) {
-            if (matches(safeArgs, new Class<?>[0], false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+            if (safeArgs.length == 0) {
                 typedTarget.scanCanceled(); return null;
             }
         }
