@@ -1693,19 +1693,39 @@ public class BrowserComponent extends Container {
         Display.impl.browserExposeInJavaScript(internal, o, name);
     }
 
+    /// Sets a client property on this component. BrowserComponent supports several
+    /// special client properties that control platform-specific behavior.
+    ///
+    /// #### HTML5/JavaScript Port Client Properties
+    ///
+    /// - **`HTML5Peer.removeOnDeinitialize`** (Boolean): Controls whether the underlying
+    ///   iframe is removed from the DOM when the component is deinitialized.
+    ///   
+    ///   When a Dialog is shown, the parent Form is deinitialized, which normally causes
+    ///   BrowserComponent's iframe to be removed from the DOM. When the Dialog is dismissed,
+    ///   the Form is re-shown but the iframe must be recreated from scratch, losing all
+    ///   JavaScript state (Monaco editor content, event listeners, etc.).
+    ///   
+    ///   Setting this to `Boolean.FALSE` preserves the iframe in the DOM across
+    ///   deinitialization cycles, which is essential for:
+    ///   - WebRTC connections that break when removed from DOM
+    ///   - Editors and interactive components that need to preserve state
+    ///   - Any app that shows dialogs over a BrowserComponent
+    ///   
+    ///   Example:
+    ///   ```java
+    ///   BrowserComponent browser = new BrowserComponent();
+    ///   browser.putClientProperty("HTML5Peer.removeOnDeinitialize", Boolean.FALSE);
+    ///   ```
+    ///
+    /// - **`BrowserComponent.firebug`** (Boolean): Enables debug mode with Firebug
+    ///   console integration (development only).
+    ///
+    /// @param key the client property key
+    /// @param value the client property value
     @Override
     public void putClientProperty(String key, Object value) {
         super.putClientProperty(key, value);
-        // In Javascript we use an iframe, and normal behaviour is for the
-        // iframe to be added hidden to the DOM immediately on creation, but
-        // it is removed from the DOM on deinitialize() and added in initComponent().
-        // In some cases, e.g. WebRTC, removing from the DOM breaks things, so we
-        // need it to remain on the dom even after deinitialize().  This is necessary
-        // in case we reinitialize it afterward (e.g when displaying a dialog, it will
-        // deinitialize the form, and when we close the dialog it will reshow the form
-        // but the browser will be broken.
-        // Thie client property is a flag to tell the JS port not to remove the peer
-        // on deinitialize.
         if ("HTML5Peer.removeOnDeinitialize".equals(key)) {
             if (internal != null) {
                 internal.putClientProperty(key, value);

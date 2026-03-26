@@ -669,4 +669,55 @@ CN.setProperty("platformHint.javascript.backsideHooksInterval", "0");
 
 WARNING: Do not abuse this feature.  You should enable this polling only when necessary.  E.g. If your app enables the user to listen for voice commands, only enable polling for the period of time that it is listening.  When the user wants to stop listening, you should also stop the polling by setting the interval to "0".
 
+[id="browsercomponent-lifecycle", reftext="BrowserComponent Lifecycle"]
+=== BrowserComponent Lifecycle
+
+On the JavaScript port, `BrowserComponent` uses an iframe that is added to the DOM when the component is initialized. Understanding the lifecycle is important when showing `Dialog`s over forms that contain `BrowserComponent` instances.
+
+[id="browsercomponent-dialogs", reftext="Dialogs and BrowserComponent"]
+==== Dialogs and BrowserComponent
+
+When a `Dialog` is shown, the parent `Form` is deinitialized. This causes any `BrowserComponent` instances on that form to also be deinitialized, which removes their iframes from the DOM. When the `Dialog` is dismissed and the parent form is re-shown, the `BrowserComponent` is reinitialized with a **new iframe**, losing all JavaScript state.
+
+This affects:
+
+* **Editors** (Monaco, CodeMirror) - content and cursor position lost
+* **WebRTC** connections - broken when removed from DOM  
+* **Interactive visualizations** - charts, maps, diagrams with JavaScript state
+* **Any JavaScript state** - event listeners, variables, etc.
+
+[id="browsercomponent-preserve", reftext="Preserving BrowserComponent Across Dialogs"]
+==== Preserving BrowserComponent State
+
+To preserve the iframe and its JavaScript state across deinitialization cycles, set the `HTML5Peer.removeOnDeinitialize` client property to `Boolean.FALSE`:
+
+[source,java]
+----
+BrowserComponent browser = new BrowserComponent();
+browser.putClientProperty("HTML5Peer.removeOnDeinitialize", Boolean.FALSE);
+----
+
+This keeps the iframe in the DOM even when the component is deinitialized, preserving all JavaScript state.
+
+[id="browsercomponent-lifecycle-example", reftext="Lifecycle Example"]
+==== Lifecycle Example
+
+Without the property set:
+
+. `Dialog.show()` is called
+. Parent `Form`'s `deinitialize()` is called
+. `BrowserComponent` is deinitialized, iframe removed from DOM
+. Dialog is dismissed
+. Parent `Form`'s `initComponent()` is called  
+. `BrowserComponent` creates a **new iframe** - JavaScript state is lost
+
+With `removeOnDeinitialize=false`:
+
+. `Dialog.show()` is called
+. Parent `Form`'s `deinitialize()` is called  
+. `BrowserComponent` is deinitialized, but iframe **stays in DOM**
+. Dialog is dismissed
+. Parent `Form`'s `initComponent()` is called
+. `BrowserComponent` reconnects to the existing iframe - JavaScript state preserved
+
 
