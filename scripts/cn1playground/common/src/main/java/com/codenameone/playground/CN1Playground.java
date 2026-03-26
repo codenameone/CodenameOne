@@ -13,6 +13,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.Tabs;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -34,6 +35,7 @@ public class CN1Playground extends Lifecycle {
     private final PlaygroundRunner runner = new PlaygroundRunner();
     private Form appForm;
     private PlaygroundBrowserEditor editor;
+    private PlaygroundInspector inspector;
     private Container previewRoot;
     private Container historyMenu;
     private Resources theme;
@@ -62,6 +64,9 @@ public class CN1Playground extends Lifecycle {
         setThemeRole(toolbar.getTitleComponent(), "headerTitle");
 
         editor = new PlaygroundBrowserEditor(currentScript, websiteDarkMode, this::handleSourceChanged);
+        inspector = new PlaygroundInspector(websiteDarkMode, (component, property, value) -> {
+            handlePropertyChanged(component, property, value);
+        });
         previewRoot = createPreviewRoot();
         historyMenu = new Container(BoxLayout.y());
         historyMenu.setUIID("PlaygroundMenuContainer");
@@ -72,12 +77,23 @@ public class CN1Playground extends Lifecycle {
         setThemeRole(editorPanel, "panel");
         editorPanel.add(BorderLayout.CENTER, editor.getComponent());
 
+        Container inspectorPanel = new Container(new BorderLayout());
+        inspectorPanel.setUIID("PlaygroundPanel");
+        setThemeRole(inspectorPanel, "panel");
+        inspectorPanel.add(BorderLayout.CENTER, inspector.getComponent());
+
+        Tabs editorTabs = new Tabs();
+        editorTabs.setUIID("PlaygroundEditorTabs");
+        editorTabs.addTab("Code", editorPanel);
+        editorTabs.addTab("Inspector", inspectorPanel);
+        applyTabsTheme(editorTabs, websiteDarkMode);
+
         Container previewPanel = new Container(new BorderLayout());
         previewPanel.setUIID("PlaygroundPanel");
         setThemeRole(previewPanel, "panel");
         previewPanel.add(BorderLayout.CENTER, previewRoot);
 
-        Component content = createMainContent(editorPanel, previewPanel);
+        Component content = createMainContent(editorTabs, previewPanel);
         setThemeRole(content, "content");
         form.add(BorderLayout.CENTER, content);
 
@@ -92,6 +108,12 @@ public class CN1Playground extends Lifecycle {
     @Override
     protected void handleNetworkError(NetworkEvent err) {
         Log.p("Networking error: " + err.toString());
+    }
+
+    private void handlePropertyChanged(Component component, String property, Object value) {
+        if (appForm != null) {
+            appForm.refreshTheme();
+        }
     }
 
     private void handleSourceChanged(String source, int version) {
@@ -113,12 +135,12 @@ public class CN1Playground extends Lifecycle {
         return root;
     }
 
-    private Component createMainContent(Container editorPanel, Container previewPanel) {
+    private Component createMainContent(Tabs editorTabs, Container previewPanel) {
         if (com.codename1.ui.CN.getDisplayWidth() >= 900) {
-            return new SplitPane(SplitPane.HORIZONTAL_SPLIT, editorPanel, previewPanel, "45%", "25%", "75%");
+            return new SplitPane(SplitPane.HORIZONTAL_SPLIT, editorTabs, previewPanel, "45%", "25%", "75%");
         }
         Container stacked = new Container(new GridLayout(2, 1));
-        stacked.addAll(editorPanel, previewPanel);
+        stacked.addAll(editorTabs, previewPanel);
         return stacked;
     }
 
@@ -151,11 +173,17 @@ public class CN1Playground extends Lifecycle {
         previewRoot.removeAll();
         if (component == null) {
             previewRoot.revalidate();
+            if (inspector != null) {
+                inspector.setPreviewRoot(null);
+            }
             return;
         }
         detachForPreview(component);
         previewRoot.add(BorderLayout.CENTER, component);
         previewRoot.revalidate();
+        if (inspector != null) {
+            inspector.setPreviewRoot(previewRoot);
+        }
     }
 
     private void detachForPreview(Component component) {
@@ -440,6 +468,9 @@ public class CN1Playground extends Lifecycle {
                         if (editor != null) {
                             editor.applyTheme(dark);
                         }
+                        if (inspector != null) {
+                            inspector.applyTheme(dark);
+                        }
                     }
                 });
     }
@@ -458,6 +489,14 @@ public class CN1Playground extends Lifecycle {
             }
         }
         applyGlobalThemeStyles(dark);
+    }
+
+    private void applyTabsTheme(Tabs tabs, boolean dark) {
+        String tabUiid = dark ? "TabDark" : "Tab";
+        tabs.setTabUIID(tabUiid);
+        Style tabsStyle = tabs.getAllStyles();
+        tabsStyle.setBgTransparency(255);
+        tabsStyle.setBgColor(dark ? 0x374151 : 0xe5e7eb);
     }
 
     private void applyRoleStyle(Component component, String role, boolean dark) {

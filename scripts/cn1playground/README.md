@@ -153,7 +153,7 @@ Additional imports can be declared in scripts as needed.
 
 The playground can generate shareable URLs that contain the script source code. Use the **"Copy Shareable Playground URL"** option in the side menu to copy a link to the clipboard.
 
-**URL Format**: The generated URL uses a `code` query parameter withURL-safe Base64-encoded script content:
+**URL Format**: The generated URL uses a `code` query parameter with URL-safe Base64-encoded script content:
 ```
 https://example.com/playground?code=<base64-encoded-script>
 ```
@@ -164,6 +164,22 @@ The encoding uses URL-safe Base64 (replacing `+` with `-` and `/` with `_`, with
 ```
 https://example.com/playground?sample=<sample-slug>
 ```
+
+### Inspector Tab
+
+The playground includes an **Inspector** tab that displays the component hierarchy of your running UI:
+
+- **Component Tree**: Shows the hierarchical structure of all components in the preview
+- **Component Selection**: Click any node in the tree to see its details
+- **Visual Highlighting**: Selected components are highlighted in the preview using a translucent overlay
+- **Property Editor**: View and edit common properties:
+  - **Type**: The component class name (read-only)
+  - **UIID**: The UIID/styling identifier
+  - **Text**: The text content (for Label, Button, TextField, TextArea components)
+  - **Position**: X and Y coordinates
+  - **Size**: Width and Height
+
+Changes made in the property editor are immediately reflected in the preview. The component tree updates automatically when your script re-runs.
 
 ## BeanShell Interpreter Tradeoffs
 
