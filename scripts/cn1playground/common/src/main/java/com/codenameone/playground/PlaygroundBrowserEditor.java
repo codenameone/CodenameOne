@@ -41,6 +41,7 @@ final class PlaygroundBrowserEditor {
         this.pendingDarkMode = darkMode;
         if (shouldUseBrowserEditor()) {
             browser = new BrowserComponent();
+            browser.putClientProperty("HTML5Peer.removeOnDeinitialize", Boolean.FALSE);
             fallbackEditor = null;
             fallbackMessages = null;
             component = browser;
