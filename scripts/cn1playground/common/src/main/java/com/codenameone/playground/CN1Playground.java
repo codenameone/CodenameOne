@@ -494,8 +494,9 @@ public class CN1Playground extends Lifecycle {
     private void applyTabsTheme(Tabs tabs, boolean dark) {
         String tabUiid = dark ? "TabDark" : "Tab";
         tabs.setTabUIID(tabUiid);
-        String containerUiid = dark ? "TabsContainerDark" : "TabsContainer";
-        tabs.setUIID(containerUiid);
+        Style tabsStyle = tabs.getAllStyles();
+        tabsStyle.setBgTransparency(255);
+        tabsStyle.setBgColor(dark ? 0x374151 : 0xe5e7eb);
     }
 
     private void applyRoleStyle(Component component, String role, boolean dark) {

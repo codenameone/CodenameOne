@@ -66,13 +66,11 @@ final class PlaygroundInspector {
 
     void applyTheme(boolean darkMode) {
         this.darkMode = darkMode;
-        String treeUiid = darkMode ? "PlaygroundInspectorTreeDark" : "PlaygroundInspectorTree";
-        tree.setUIID(treeUiid);
-        String propsUiid = darkMode ? "PlaygroundPropertiesDark" : "PlaygroundProperties";
-        propertiesContainer.setUIID(propsUiid);
-        propertiesContainer.revalidate();
-        if (selectedComponent != null) {
-            updatePropertyPanel(selectedComponent);
+        if (tree != null) {
+            Style treeStyle = tree.getAllStyles();
+            treeStyle.setBgTransparency(255);
+            treeStyle.setBgColor(darkMode ? 0x1f2937 : 0xffffff);
+            treeStyle.setFgColor(darkMode ? 0xe5e7eb : 0x111827);
         }
     }
 
