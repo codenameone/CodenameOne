@@ -676,6 +676,10 @@ public final class GeneratedAccess_com_codename1_testing {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
                 typedTarget.assertArrayEqual((int[]) adaptedArgs[0], (int[]) adaptedArgs[1]); return null;
             }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class}, false);
+                typedTarget.assertArrayEqual((java.lang.Object[]) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1]); return null;
+            }
             if (matches(safeArgs, new Class<?>[]{short[].class, short[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class, short[].class}, false);
                 typedTarget.assertArrayEqual((short[]) adaptedArgs[0], (short[]) adaptedArgs[1]); return null;
@@ -695,6 +699,10 @@ public final class GeneratedAccess_com_codename1_testing {
             if (matches(safeArgs, new Class<?>[]{int[].class, int[].class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class, java.lang.String.class}, false);
                 typedTarget.assertArrayEqual((int[]) adaptedArgs[0], (int[]) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.Object[].class, java.lang.String.class}, false);
+                typedTarget.assertArrayEqual((java.lang.Object[]) adaptedArgs[0], (java.lang.Object[]) adaptedArgs[1], (java.lang.String) adaptedArgs[2]); return null;
             }
             if (matches(safeArgs, new Class<?>[]{long[].class, long[].class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{long[].class, long[].class, java.lang.Long.class}, false);

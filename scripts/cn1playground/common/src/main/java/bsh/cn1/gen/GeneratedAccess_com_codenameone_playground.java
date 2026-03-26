@@ -221,6 +221,10 @@ public final class GeneratedAccess_com_codenameone_playground {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object[].class, java.lang.String.class}, false);
                 return typedTarget.lambda((java.lang.Object[]) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class, java.lang.String.class}, false);
+                return typedTarget.lambda((java.lang.String[]) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
         }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }

@@ -19,6 +19,9 @@ public final class PlaygroundSmokeHarness {
         smokeLifecycleWrapperScript();
         smokeLooseScriptListeners();
         smokeLooseScriptListSnippet();
+        smokeLifecycleDemo();
+        smokeRestScriptWithLambda();
+        smokeStringMethods();
         System.out.println("Playground smoke tests passed.");
     }
 
@@ -213,5 +216,138 @@ public final class PlaygroundSmokeHarness {
             out.append(messages.get(i).text);
         }
         return out.toString();
+    }
+
+    private static void smokeLifecycleDemo() {
+        Display.init(null);
+
+        Form host = new Form("Host", new BorderLayout());
+        Container preview = new Container(new BorderLayout());
+        host.add(BorderLayout.CENTER, preview);
+        host.show();
+
+        final List<String> log = new ArrayList<String>();
+        PlaygroundContext context = new PlaygroundContext(host, preview, null,
+                new PlaygroundContext.Logger() {
+                    public void log(String message) {
+                        log.add(message);
+                    }
+                });
+
+        PlaygroundRunner runner = new PlaygroundRunner();
+        PlaygroundRunner.RunResult result = runner.run(
+                "import com.codename1.ui.*;\n"
+                        + "import com.codename1.ui.events.*;\n"
+                        + "import com.codename1.ui.layouts.*;\n"
+                        + "\n"
+                        + "public class DemoApp {\n"
+                        + "    private Label status;\n"
+                        + "\n"
+                        + "    public void init(Object context) {}\n"
+                        + "\n"
+                        + "    public void start() {\n"
+                        + "        Form form = new Form(\"Lifecycle Demo\", BoxLayout.y());\n"
+                        + "        status = new Label(\"Ready\");\n"
+                        + "        Button button = new Button(\"Tap me\");\n"
+                        + "        button.addActionListener(new ActionListener() {\n"
+                        + "            public void actionPerformed(ActionEvent evt) {\n"
+                        + "                status.setText(\"Tapped at \" + System.currentTimeMillis());\n"
+                        + "                status.getParent().revalidate();\n"
+                        + "            }\n"
+                        + "        });\n"
+                        + "        form.addAll(new Label(\"Lifecycle-style scripts are the easiest place to test listeners.\"), button, status);\n"
+                        + "        form.show();\n"
+                        + "    }\n"
+                        + "}\n",
+                context);
+
+        require(result.getComponent() != null,
+                "Lifecycle demo script should produce a component: " + summarizeMessages(result));
+        require(result.getComponent() instanceof Form,
+                "Lifecycle demo script should produce a Form");
+        require("Lifecycle Demo".equals(((Form) result.getComponent()).getTitle()),
+                "Lifecycle demo script should preserve form title");
+    }
+
+    private static void smokeRestScriptWithLambda() {
+        Display.init(null);
+
+        Form host = new Form("Host", new BorderLayout());
+        Container preview = new Container(new BorderLayout());
+        host.add(BorderLayout.CENTER, preview);
+        host.show();
+
+        PlaygroundContext context = new PlaygroundContext(host, preview, null,
+                new PlaygroundContext.Logger() {
+                    public void log(String message) {
+                    }
+                });
+
+        PlaygroundRunner runner = new PlaygroundRunner();
+        PlaygroundRunner.RunResult result = runner.run(
+                "import com.codename1.components.*;\n"
+                        + "import com.codename1.io.rest.*;\n"
+                        + "import com.codename1.ui.*;\n"
+                        + "import com.codename1.ui.events.*;\n"
+                        + "import com.codename1.ui.layouts.*;\n"
+                        + "\n"
+                        + "Container root = new Container(BoxLayout.y());\n"
+                        + "root.setScrollableY(true);\n"
+                        + "SpanLabel output = new SpanLabel(\"Test\");\n"
+                        + "Button load = new Button(\"Load\");\n"
+                        + "load.addActionListener(() -> {\n"
+                        + "    String text = \"test data\";\n"
+                        + "    output.setText(text.length() > 10 ? text.substring(0, 10) : text);\n"
+                        + "    output.getParent().revalidate();\n"
+                        + "});\n"
+                        + "root.addAll(load, output);\n"
+                        + "root;\n",
+                context);
+
+        require(result.getComponent() != null,
+                "REST script with lambda should compile: " + summarizeMessages(result));
+        require(result.getComponent() instanceof Container,
+                "REST script should produce a Container");
+    }
+
+    private static void smokeStringMethods() {
+        Display.init(null);
+
+        Form host = new Form("Host", new BorderLayout());
+        Container preview = new Container(new BorderLayout());
+        host.add(BorderLayout.CENTER, preview);
+        host.show();
+
+        final List<String> log = new ArrayList<String>();
+        PlaygroundContext context = new PlaygroundContext(host, preview, null,
+                new PlaygroundContext.Logger() {
+                    public void log(String message) {
+                        log.add(message);
+                    }
+                });
+
+        PlaygroundRunner runner = new PlaygroundRunner();
+        PlaygroundRunner.RunResult result = runner.run(
+                "import com.codename1.ui.*;\n"
+                        + "import com.codename1.ui.layouts.*;\n"
+                        + "\n"
+                        + "Container root = new Container(BoxLayout.y());\n"
+                        + "String text = \"Hello World\";\n"
+                        + "String sub = text.substring(0, 5);\n"
+                        + "String upper = text.toUpperCase();\n"
+                        + "int len = text.length();\n"
+                        + "ctx.log(\"substring: \" + sub);\n"
+                        + "ctx.log(\"upper: \" + upper);\n"
+                        + "ctx.log(\"len: \" + len);\n"
+                        + "root.add(new Label(sub));\n"
+                        + "root;\n",
+                context);
+
+        require(result.getComponent() != null,
+                "String methods script should produce a component: " + summarizeMessages(result));
+        require(log.size() >= 3,
+                "String methods script should log results");
+        require(containsMessage(result, "Preview updated."),
+                "String methods script should complete successfully");
     }
 }

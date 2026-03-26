@@ -172,6 +172,14 @@ public final class GeneratedAccess_com_codename1_db {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false);
                 typedTarget.execute((java.lang.String) adaptedArgs[0], (java.lang.String[]) adaptedArgs[1]); return null;
             }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true);
+                java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 1];
+                for (int i = 1; i < adaptedArgs.length; i++) {
+                    varArgs[i - 1] = (java.lang.Object) adaptedArgs[i];
+                }
+                typedTarget.execute((java.lang.String) adaptedArgs[0], varArgs); return null;
+            }
         }
         if ("executeQuery".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
@@ -181,6 +189,14 @@ public final class GeneratedAccess_com_codename1_db {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false);
                 return typedTarget.executeQuery((java.lang.String) adaptedArgs[0], (java.lang.String[]) adaptedArgs[1]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true);
+                java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 1];
+                for (int i = 1; i < adaptedArgs.length; i++) {
+                    varArgs[i - 1] = (java.lang.Object) adaptedArgs[i];
+                }
+                return typedTarget.executeQuery((java.lang.String) adaptedArgs[0], varArgs);
             }
         }
         if ("getThread".equals(name)) {
@@ -221,6 +237,14 @@ public final class GeneratedAccess_com_codename1_db {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false);
                 typedTarget.execute((java.lang.String) adaptedArgs[0], (java.lang.String[]) adaptedArgs[1]); return null;
             }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true);
+                java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 1];
+                for (int i = 1; i < adaptedArgs.length; i++) {
+                    varArgs[i - 1] = (java.lang.Object) adaptedArgs[i];
+                }
+                typedTarget.execute((java.lang.String) adaptedArgs[0], varArgs); return null;
+            }
         }
         if ("executeQuery".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
@@ -230,6 +254,14 @@ public final class GeneratedAccess_com_codename1_db {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String[].class}, false);
                 return typedTarget.executeQuery((java.lang.String) adaptedArgs[0], (java.lang.String[]) adaptedArgs[1]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object[].class}, true);
+                java.lang.Object[] varArgs = new java.lang.Object[adaptedArgs.length - 1];
+                for (int i = 1; i < adaptedArgs.length; i++) {
+                    varArgs[i - 1] = (java.lang.Object) adaptedArgs[i];
+                }
+                return typedTarget.executeQuery((java.lang.String) adaptedArgs[0], varArgs);
             }
         }
         if ("rollbackTransaction".equals(name)) {

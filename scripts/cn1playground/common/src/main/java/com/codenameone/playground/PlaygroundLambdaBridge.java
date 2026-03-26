@@ -13,4 +13,11 @@ public class PlaygroundLambdaBridge {
         }
         return CN1LambdaSupport.lambda(names, bodySource);
     }
+
+    public Object lambda(String[] parameterNames, String bodySource) {
+        if (parameterNames == null || parameterNames.length == 0) {
+            return CN1LambdaSupport.lambda(new String[0], bodySource);
+        }
+        return CN1LambdaSupport.lambda(parameterNames, bodySource);
+    }
 }

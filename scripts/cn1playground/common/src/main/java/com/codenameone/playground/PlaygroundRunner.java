@@ -88,7 +88,8 @@ final class PlaygroundRunner {
             PlaygroundContext.pushCurrent(context);
             CN1LambdaSupport.pushInterpreter(interpreter);
             try {
-                Object result = interpreter.eval(adaptScript(script));
+                String adapted = adaptScript(script);
+                Object result = interpreter.eval(adapted);
                 Component component = resolveComponent(interpreter, result, context);
                 inlineMessages.add(new InlineMessage(0, "Preview updated.", "success"));
                 return new RunResult(component, Collections.<Diagnostic>emptyList(), inlineMessages);
@@ -97,7 +98,13 @@ final class PlaygroundRunner {
                 PlaygroundContext.clearCurrent();
             }
         } catch (ParseException ex) {
-            return failure("Parse error: " + safeMessage(ex), ex.getErrorLineNumber(), extractColumn(ex.getMessage()), inlineMessages);
+            int errorLine = 1;
+            try {
+                errorLine = ex.getErrorLineNumber();
+            } catch (NullPointerException e) {
+                // currentToken can be null in some parse error cases
+            }
+            return failure("Parse error: " + safeMessage(ex), errorLine, extractColumn(ex.getMessage()), inlineMessages);
         } catch (TokenMgrException ex) {
             return failure("Lexer error: " + safeMessage(ex), extractLine(ex.getMessage()), extractColumn(ex.getMessage()), inlineMessages);
         } catch (TargetError ex) {
@@ -210,7 +217,8 @@ final class PlaygroundRunner {
         if (findSingleTopLevelClass(script, classBlock.bodyEnd + 1) != null) {
             return null;
         }
-        String prefix = script.substring(0, classBlock.classStart);
+        int classModifiersStart = findClassModifiersStart(script, classBlock.classStart);
+        String prefix = script.substring(0, classModifiersStart);
         String suffix = script.substring(classBlock.bodyEnd + 1);
         if (containsTopLevelTypeDeclaration(classBlock.body)) {
             return null;
@@ -218,7 +226,182 @@ final class PlaygroundRunner {
         if (containsNonWhitespace(suffix)) {
             return null;
         }
-        return prefix + classBlock.body;
+        String body = classBlock.body;
+        if (containsFieldDeclaration(body)) {
+            body = transformFieldDeclarations(body);
+        }
+        return prefix + body;
+    }
+
+    private int findClassModifiersStart(String script, int classKeywordPos) {
+        int i = classKeywordPos - 1;
+        while (i >= 0 && Character.isWhitespace(script.charAt(i))) {
+            i--;
+        }
+        if (i < 0) {
+            return 0;
+        }
+        int modifiersEnd = i + 1;
+        int modifiersStart = modifiersEnd;
+        while (i >= 0) {
+            while (i >= 0 && Character.isWhitespace(script.charAt(i))) {
+                i--;
+            }
+            if (i < 0) {
+                break;
+            }
+            int wordEnd = i + 1;
+            while (i >= 0 && isIdentifierPart(script.charAt(i))) {
+                i--;
+            }
+            int wordStart = i + 1;
+            String word = script.substring(wordStart, wordEnd);
+            if (!isClassModifier(word)) {
+                break;
+            }
+            modifiersStart = wordStart;
+            i--;
+        }
+        return modifiersStart;
+    }
+
+    private boolean isClassModifier(String word) {
+        return word.equals("public") || word.equals("private") || word.equals("protected")
+                || word.equals("static") || word.equals("final") || word.equals("abstract")
+                || word.equals("strictfp");
+    }
+
+    private String transformFieldDeclarations(String body) {
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        while (i < body.length()) {
+            int stmtStart = i;
+            int depth = 0;
+            while (i < body.length()) {
+                char ch = body.charAt(i);
+                if (ch == '"' || ch == '\'') {
+                    i = skipQuoted(body, i) + 1;
+                    continue;
+                }
+                if (startsLineComment(body, i)) {
+                    i = skipLineComment(body, i) + 1;
+                    continue;
+                }
+                if (startsBlockComment(body, i)) {
+                    i = skipBlockComment(body, i) + 1;
+                    continue;
+                }
+                if (ch == '{') {
+                    depth++;
+                } else if (ch == '}') {
+                    depth--;
+                } else if (depth == 0 && ch == ';') {
+                    int end = i;
+                    String stmt = body.substring(stmtStart, end + 1).trim();
+                    String transformed = transformFieldStatement(stmt);
+                    if (transformed != null) {
+                        out.append(transformed);
+                    } else {
+                        out.append(stmt);
+                    }
+                    i++;
+                    stmtStart = i;
+                    continue;
+                }
+                i++;
+            }
+            if (stmtStart < i) {
+                out.append(body.substring(stmtStart));
+            }
+            break;
+        }
+        return out.toString();
+    }
+
+    private String transformFieldStatement(String stmt) {
+        if (!startsWithAnyWord(stmt, 0, "public", "private", "protected", "static", "final")) {
+            return null;
+        }
+        int next = skipModifiers(stmt, 0);
+        if (next >= stmt.length()) {
+            return null;
+        }
+        if (isMethodDeclaration(stmt, next)) {
+            return null;
+        }
+        String afterModifiers = stmt.substring(next).trim();
+        if (afterModifiers.startsWith("class ")
+                || afterModifiers.startsWith("interface ")
+                || afterModifiers.startsWith("enum ")) {
+            return null;
+        }
+        int typeEnd = findTypeEnd(afterModifiers);
+        if (typeEnd < 0) {
+            return null;
+        }
+        String rest = afterModifiers.substring(typeEnd).trim();
+        int eqPos = rest.indexOf('=');
+        String varName;
+        String initValue = "null";
+        if (eqPos >= 0) {
+            varName = rest.substring(0, eqPos).trim();
+            initValue = rest.substring(eqPos + 1, rest.length() - 1).trim();
+        } else {
+            varName = rest.substring(0, rest.length() - 1).trim();
+        }
+        int bracketPos = varName.indexOf('[');
+        if (bracketPos >= 0) {
+            varName = varName.substring(0, bracketPos).trim();
+        }
+        if (varName.isEmpty() || !isIdentifierStart(varName.charAt(0))) {
+            return null;
+        }
+        return varName + " = " + initValue + ";\n";
+    }
+
+    private int findTypeEnd(String text) {
+        int i = skipWhitespace(text, 0);
+        if (i >= text.length() || !isIdentifierStart(text.charAt(i))) {
+            return -1;
+        }
+        while (i < text.length() && isIdentifierPart(text.charAt(i))) {
+            i++;
+        }
+        int typeEnd = i;
+        int afterType = skipWhitespace(text, i);
+        while (afterType < text.length() && (text.charAt(afterType) == '[' || text.charAt(afterType) == ']')) {
+            if (text.charAt(afterType) == '[') {
+                int j = afterType + 1;
+                while (j < text.length() && Character.isWhitespace(text.charAt(j))) {
+                    j++;
+                }
+                if (j < text.length() && text.charAt(j) == ']') {
+                    afterType = j + 1;
+                } else {
+                    break;
+                }
+            } else {
+                afterType++;
+            }
+            afterType = skipWhitespace(text, afterType);
+        }
+        int nameStart = afterType;
+        if (nameStart >= text.length() || !isIdentifierStart(text.charAt(nameStart))) {
+            return -1;
+        }
+        int nameEnd = nameStart;
+        while (nameEnd < text.length() && isIdentifierPart(text.charAt(nameEnd))) {
+            nameEnd++;
+        }
+        int afterName = skipWhitespace(text, nameEnd);
+        while (afterName < text.length() && (text.charAt(afterName) == '[' || text.charAt(afterName) == ']')) {
+            afterName++;
+            afterName = skipWhitespace(text, afterName);
+        }
+        if (afterName < text.length() && (text.charAt(afterName) == '=' || text.charAt(afterName) == ';')) {
+            return typeEnd;
+        }
+        return -1;
     }
 
     private int skipPackageDeclaration(String script, int start) {
@@ -385,6 +568,163 @@ final class PlaygroundRunner {
             }
         }
         return false;
+    }
+
+    private boolean containsFieldDeclaration(String body) {
+        int depth = 0;
+        int i = 0;
+        while (i < body.length()) {
+            char ch = body.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                i = skipQuoted(body, i) + 1;
+                continue;
+            }
+            if (startsLineComment(body, i)) {
+                i = skipLineComment(body, i) + 1;
+                continue;
+            }
+            if (startsBlockComment(body, i)) {
+                i = skipBlockComment(body, i) + 1;
+                continue;
+            }
+            if (ch == '{') {
+                depth++;
+                i++;
+                continue;
+            }
+            if (ch == '}') {
+                depth--;
+                i++;
+                continue;
+            }
+            if (depth == 0 && ch == ';') {
+                int stmtStart = findStatementStartBackwards(body, i);
+                if (isFieldDeclaration(body, stmtStart, i)) {
+                    return true;
+                }
+            }
+            i++;
+        }
+        return false;
+    }
+
+    private int findStatementStartBackwards(String text, int semiPos) {
+        int depth = 0;
+        for (int i = semiPos - 1; i >= 0; i--) {
+            char ch = text.charAt(i);
+            if (ch == '}') {
+                depth++;
+            } else if (ch == '{') {
+                if (depth == 0) {
+                    return i + 1;
+                }
+                depth--;
+            } else if (ch == ')') {
+                depth++;
+            } else if (ch == '(') {
+                depth--;
+            } else if (ch == '"' || ch == '\'') {
+                i = skipQuotedBackwards(text, i);
+            } else if (depth == 0 && ch == ';') {
+                return i + 1;
+            }
+        }
+        return 0;
+    }
+
+    private int skipQuotedBackwards(String text, int endQuotePos) {
+        char quote = text.charAt(endQuotePos);
+        int i = endQuotePos - 1;
+        while (i >= 0) {
+            char ch = text.charAt(i);
+            if (ch == '\\') {
+                i--;
+            } else if (ch == quote) {
+                return i;
+            }
+            i--;
+        }
+        return 0;
+    }
+
+    private boolean isFieldDeclaration(String text, int start, int end) {
+        String stmt = text.substring(start, end + 1).trim();
+        if (stmt.length() == 0) {
+            return false;
+        }
+        if (startsWithAnyWord(stmt, 0, "public", "private", "protected", "static", "final")) {
+            int next = skipModifiers(stmt, 0);
+            if (next >= stmt.length()) {
+                return false;
+            }
+            if (isMethodDeclaration(stmt, next)) {
+                return false;
+            }
+            if (stmt.substring(next).trim().startsWith("class ")
+                    || stmt.substring(next).trim().startsWith("interface ")
+                    || stmt.substring(next).trim().startsWith("enum ")) {
+                return false;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private int skipModifiers(String text, int start) {
+        int i = skipWhitespace(text, start);
+        while (i < text.length()) {
+            if (startsWithWord(text, i, "public")
+                    || startsWithWord(text, i, "private")
+                    || startsWithWord(text, i, "protected")
+                    || startsWithWord(text, i, "static")
+                    || startsWithWord(text, i, "final")
+                    || startsWithWord(text, i, "abstract")
+                    || startsWithWord(text, i, "synchronized")
+                    || startsWithWord(text, i, "volatile")
+                    || startsWithWord(text, i, "transient")
+                    || startsWithWord(text, i, "native")
+                    || startsWithWord(text, i, "strictfp")) {
+                i = skipWhitespace(text, i + indexOfWordEnd(text, i));
+            } else {
+                break;
+            }
+        }
+        return i;
+    }
+
+    private int indexOfWordEnd(String text, int start) {
+        int i = start;
+        while (i < text.length() && isIdentifierPart(text.charAt(i))) {
+            i++;
+        }
+        return i - start;
+    }
+
+    private boolean isMethodDeclaration(String text, int start) {
+        int i = skipWhitespace(text, start);
+        while (i < text.length() && isIdentifierPart(text.charAt(i))) {
+            i++;
+        }
+        i = skipWhitespace(text, i);
+        while (i < text.length() && (text.charAt(i) =='['|| text.charAt(i) == ']')) {
+            i++;
+            i = skipWhitespace(text, i);
+        }
+        if (i >= text.length() || !isIdentifierStart(text.charAt(i))) {
+            return false;
+        }
+        while (i < text.length() && isIdentifierPart(text.charAt(i))) {
+            i++;
+        }
+        i = skipWhitespace(text, i);
+        while (i < text.length() && (text.charAt(i) == '[' || text.charAt(i) == ']')) {
+            i++;
+            i = skipWhitespace(text, i);
+        }
+        if (i >= text.length() || text.charAt(i) != '(') {
+            return false;
+        }
+        return true;
     }
 
     private boolean startsWithWord(String text, int index, String word) {
@@ -1372,7 +1712,12 @@ final class PlaygroundRunner {
     }
 
     private String formatParseMessage(ParseException ex) {
-        int line = ex.getErrorLineNumber();
+        int line = -1;
+        try {
+            line = ex.getErrorLineNumber();
+        } catch (NullPointerException e) {
+            // currentToken can be null in some parse error cases
+        }
         String raw = ex.getMessage();
         StringBuilder out = new StringBuilder();
         out.append("Syntax error");

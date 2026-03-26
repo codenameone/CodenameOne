@@ -1,5 +1,7 @@
 package com.codenameone.playground;
 
+import com.codename1.io.Log;
+import com.codename1.io.NetworkEvent;
 import com.codename1.io.Util;
 import com.codename1.components.MultiButton;
 import com.codename1.components.SplitPane;
@@ -85,6 +87,11 @@ public class CN1Playground extends Lifecycle {
         initWebsiteThemeSync(form);
         form.show();
         notifyWebsiteUiReady();
+    }
+
+    @Override
+    protected void handleNetworkError(NetworkEvent err) {
+        Log.p("Networking error: " + err.toString());
     }
 
     private void handleSourceChanged(String source, int version) {

@@ -551,7 +551,7 @@ public final class GenerateCN1AccessRegistry {
         return sb.toString();
     }
 
-    private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, Map<String, List<String>> typeHierarchy) {
+private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, Map<String, List<String>> typeHierarchy) {
         Map<String, List<ApiMethod>> byName = new LinkedHashMap<String, List<ApiMethod>>();
         for (ApiMethod method : methods) {
             List<ApiMethod> list = byName.get(method.name);
@@ -562,7 +562,8 @@ public final class GenerateCN1AccessRegistry {
             list.add(method);
         }
         List<ApiMethod> result = new ArrayList<ApiMethod>();
-        for (List<ApiMethod> overloads : byName.values()) {
+        for (Map.Entry<String, List<ApiMethod>> entry : byName.entrySet()) {
+            List<ApiMethod> overloads = entry.getValue();
             if (overloads.size() == 1) {
                 result.add(overloads.get(0));
                 continue;
@@ -591,6 +592,9 @@ public final class GenerateCN1AccessRegistry {
         if (bridgeCandidate.paramTypes.size() != other.paramTypes.size()) {
             return false;
         }
+        if (isArrayOverload(bridgeCandidate, other)) {
+            return false;
+        }
         boolean hasLessSpecificParam = false;
         for (int i = 0; i < bridgeCandidate.paramTypes.size(); i++) {
             String bridgeParam = bridgeCandidate.paramTypes.get(i).baseName;
@@ -606,6 +610,20 @@ public final class GenerateCN1AccessRegistry {
             }
         }
         return hasLessSpecificParam;
+    }
+
+    private static boolean isArrayOverload(ApiMethod m1, ApiMethod m2) {
+        if (m1.paramTypes.size() != m2.paramTypes.size()) {
+            return false;
+        }
+        for (int i = 0; i < m1.paramTypes.size(); i++) {
+            ApiType p1 = m1.paramTypes.get(i);
+            ApiType p2 = m2.paramTypes.get(i);
+            if (p1.arrayDepth > 0 && p2.arrayDepth > 0 && !p1.baseName.equals(p2.baseName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isSubtype(String subTypeName, String superTypeName, Map<String, List<String>> typeHierarchy) {
