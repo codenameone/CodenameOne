@@ -998,7 +998,6 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         return packageName.startsWith("java.")
                 && !isPackageOrChild(packageName, "java.lang.annotation")
                 && !isPackageOrChild(packageName, "java.lang.invoke")
-                && !isPackageOrChild(packageName, "java.time")
                 && !isPackageOrChild(packageName, "java.util.function")
                 && !isPackageOrChild(packageName, "java.util.stream");
     }
@@ -1018,7 +1017,6 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
                 && !name.startsWith("java.lang.annotation.")
                 && !name.startsWith("java.lang.invoke.")
                 && !name.startsWith("java.lang.constant.")
-                && !isPackageOrChild(name, "java.time")
                 && !name.startsWith("java.io.")
                 && !name.startsWith("java.net.")
                 && !name.startsWith("java.nio.")
