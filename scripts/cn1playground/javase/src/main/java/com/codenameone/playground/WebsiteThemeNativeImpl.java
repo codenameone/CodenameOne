@@ -2,11 +2,11 @@ package com.codenameone.playground;
 
 public class WebsiteThemeNativeImpl implements WebsiteThemeNative {
     public boolean isDarkMode() {
-        return false;
+        return true;
     }
 
     public boolean isSupported() {
-        return false;
+        return true;
     }
 
     public void notifyUiReady() {

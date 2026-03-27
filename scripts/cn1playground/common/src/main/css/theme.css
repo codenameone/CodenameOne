@@ -215,3 +215,238 @@ PlaygroundMenuContainer {
 PlaygroundMenuContainerDark {
     background: #0f172a;
 }
+
+PlaygroundEmbeddedForm {
+    background: #f5f7fb;
+}
+
+PlaygroundEmbeddedFormDark {
+    background: #111827;
+}
+
+PlaygroundEmbeddedTitleArea {
+    background: #e5e7eb;
+}
+
+PlaygroundEmbeddedTitleAreaDark {
+    background: #1f2937;
+}
+
+PlaygroundInspectorRoot {
+    background: white;
+    padding: 1mm;
+}
+
+PlaygroundInspectorRootDark {
+    background: #1f2937;
+    padding: 1mm;
+}
+
+PlaygroundInspectorTree {
+    background: white;
+    color: #111827;
+    margin: 0;
+    padding: 0;
+}
+
+PlaygroundInspectorTreeDark {
+    background: #1f2937;
+    color: #e5e7eb;
+    margin: 0;
+    padding: 0;
+}
+
+PlaygroundPropRow {
+    background: transparent;
+    margin: 0 0 1mm 0;
+    padding: 0;
+}
+
+PlaygroundPropUnit {
+    color: #111827;
+    background: white;
+    border: 1px solid #d1d5db;
+}
+
+PlaygroundPropUnitDark {
+    color: #e5e7eb;
+    background: #111827;
+    border: 1px solid #334155;
+}
+
+PlaygroundPropEmpty {
+    color: #6b7280;
+    background: transparent;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+    padding: 1mm;
+}
+
+PlaygroundPropEmptyDark {
+    color: #94a3b8;
+    background: transparent;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+    padding: 1mm;
+}
+
+PlaygroundColorPreview {
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    padding: 0.5mm 1mm 0.5mm 1mm;
+}
+
+PlaygroundColorPreviewDark {
+    background: #111827;
+    border: 1px solid #334155;
+    padding: 0.5mm 1mm 0.5mm 1mm;
+}
+
+PlaygroundInspectorTreeNode {
+    color: #111827;
+    background: white;
+    border: none;
+    text-decoration: none;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    margin: 0;
+    padding: 0;
+}
+
+PlaygroundInspectorTreeNodeDark {
+    color: #e5e7eb;
+    background: #1f2937;
+    border: none;
+    text-decoration: none;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    margin: 0;
+    padding: 0;
+}
+
+Tab {
+    background: #e5e7eb;
+    color: #111827;
+    border: 1px solid #d1d5db;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+    text-align: center;
+}
+
+TabDark {
+    background: #111827;
+    color: #e5e7eb;
+    border: 1px solid #334155;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+    text-align: center;
+}
+
+TabsContainer {
+    background: #e5e7eb;
+}
+
+TabsContainerDark {
+    background: #111827;
+}
+PlaygroundSideCommandLine1 {
+    color: #111827;
+    background: transparent;
+    font-family: "native:MainLight";
+    font-size: 4mm;
+}
+
+PlaygroundSideCommandLine1Dark {
+    color: #e5e7eb;
+    background: transparent;
+    font-family: "native:MainLight";
+    font-size: 4mm;
+}
+
+PlaygroundSideCommandLine2 {
+    color: #6b7280;
+    background: transparent;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+}
+
+PlaygroundSideCommandLine2Dark {
+    color: #94a3b8;
+    background: transparent;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+}
+
+PlaygroundInspectorProps {
+    background: white;
+    padding: 1mm;
+    margin: 0;
+}
+
+PlaygroundInspectorPropsDark {
+    background: #1f2937;
+    padding: 1mm;
+    margin: 0;
+}
+
+PlaygroundPropName {
+    color: #6b7280;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 0.5mm 0mm 0.5mm 1.5mm;
+    margin: 0;
+}
+
+PlaygroundPropNameDark {
+    color: #94a3b8;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 0.5mm 0mm 0.5mm 1.5mm;
+    margin: 0;
+}
+
+PlaygroundPropValue {
+    color: #111827;
+    background: white;
+    border: 1px solid #d1d5db;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    padding: 0.5mm 1mm 0.5mm 1mm;
+    margin: 0.5mm 0.5mm 0.5mm 0;
+}
+
+PlaygroundPropValueDark {
+    color: #e5e7eb;
+    background: #111827;
+    border: 1px solid #334155;
+    font-family: "native:MainLight";
+    font-size: 2.8mm;
+    padding: 0.5mm 1mm 0.5mm 1mm;
+    margin: 0.5mm 0.5mm 0.5mm 0;
+}
+
+PlaygroundPropSmall {
+    color: #111827;
+    background: white;
+    border: 1px solid #d1d5db;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+    padding: 0.5mm;
+    margin: 0 0.5mm 0 0;
+}
+
+PlaygroundPropSmallDark {
+    color: #e5e7eb;
+    background: #111827;
+    border: 1px solid #334155;
+    font-family: "native:MainLight";
+    font-size: 2.6mm;
+    padding: 0.5mm;
+    margin: 0 0.5mm 0 0;
+}
+
+PlaygroundPropGroup {
+    background: transparent;
+    padding: 0.5mm 0 0.5mm 0;
+    margin: 0;
+}

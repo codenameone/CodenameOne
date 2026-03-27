@@ -66,11 +66,47 @@ final class PlaygroundInspector {
 
     void applyTheme(boolean darkMode) {
         this.darkMode = darkMode;
-        if (tree != null) {
-            Style treeStyle = tree.getAllStyles();
-            treeStyle.setBgTransparency(255);
-            treeStyle.setBgColor(darkMode ? 0x1f2937 : 0xffffff);
-            treeStyle.setFgColor(darkMode ? 0xe5e7eb : 0x111827);
+        applyThemeToInspectorComponent(component, darkMode);
+        rebuildTree();
+        updatePropertyPanel(selectedComponent);
+    }
+
+    private void applyThemeToInspectorComponent(Component cmp, boolean dark) {
+        if (cmp == null) {
+            return;
+        }
+
+        String uiid = cmp.getUIID();
+        if (uiid != null && supportsDarkVariant(uiid)) {
+            if (dark && !uiid.endsWith("Dark")) {
+                cmp.setUIID(uiid + "Dark");
+            } else if (!dark && uiid.endsWith("Dark")) {
+                cmp.setUIID(uiid.substring(0, uiid.length() - 4));
+            }
+        }
+
+        if (cmp instanceof Container) {
+            Container cnt = (Container) cmp;
+            for (int i = 0; i < cnt.getComponentCount(); i++) {
+                applyThemeToInspectorComponent(cnt.getComponentAt(i), dark);
+            }
+        }
+    }
+
+    private boolean supportsDarkVariant(String uiid) {
+        switch (uiid) {
+            case "PlaygroundInspectorRoot":
+            case "PlaygroundInspectorTree":
+            case "PlaygroundInspectorProps":
+            case "PlaygroundPropName":
+            case "PlaygroundPropValue":
+            case "PlaygroundPropSmall":
+            case "PlaygroundPropUnit":
+            case "PlaygroundPropEmpty":
+            case "PlaygroundColorPreview":
+                return true;
+            default:
+                return false;
         }
     }
 
@@ -95,13 +131,17 @@ final class PlaygroundInspector {
                     s.setPaddingRight(2);
                     s.setMarginTop(0);
                     s.setMarginBottom(0);
+
                     if (c instanceof Button) {
+                        c.setUIID(darkMode ? "PlaygroundInspectorTreeNodeDark" : "PlaygroundInspectorTreeNode");
                         final Object nodeObj = node;
                         ((Button) c).addActionListener(e -> {
                             if (nodeObj instanceof ComponentWrapper) {
                                 handleComponentSelected(((ComponentWrapper) nodeObj).component);
                             }
                         });
+                    } else {
+                        c.setUIID(darkMode ? "PlaygroundInspectorTreeNodeDark" : "PlaygroundInspectorTreeNode");
                     }
                 }
                 return c;
@@ -112,13 +152,17 @@ final class PlaygroundInspector {
     }
 
     private Container createPropertiesContainer() {
-        Container c = new Container(new TableLayout(1, 4));
+        Container c = new Container(new TableLayout(0, 4));
         c.setScrollableY(true);
+        c.setUIID("PlaygroundInspectorProps");
         return c;
     }
 
     private Container createLayout() {
-        return GridLayout.encloseIn(1, tree, propertiesContainer);
+        Container root = new Container(new GridLayout(2, 1));
+        root.setUIID("PlaygroundInspectorRoot");
+        root.addAll(tree, propertiesContainer);
+        return root;
     }
 
     private void rebuildTree() {
@@ -172,118 +216,117 @@ final class PlaygroundInspector {
     }
 
     private void updatePropertyPanel(Component comp) {
-        try {
-            propertiesContainer.removeAll();
-            
-            if (comp == null) {
-                Label empty = new Label("Select a component");
-                empty.setUIID("PlaygroundPropEmpty");
-                propertiesContainer.add(empty);
-                propertiesContainer.revalidate();
-                return;
-            }
-            
-            addRow("Type", comp.getClass().getSimpleName(), false, null);
-            addRow("UIID", comp.getUIID(), true, v -> {
-                comp.setUIID(v);
-                notifyChange(comp, "uiid");
-            });
-            
-            if (comp instanceof Label) {
-                addRow("Text", ((Label) comp).getText(), true, v -> {
-                    ((Label) comp).setText(v);
-                    notifyChange(comp, "text");
-                });
-            } else if (comp instanceof TextField) {
-                addRow("Text", ((TextField) comp).getText(), true, v -> {
-                    ((TextField) comp).setText(v);
-                    notifyChange(comp, "text");
-                });
-            } else if (comp instanceof TextArea) {
-                addRow("Text", ((TextArea) comp).getText(), true, v -> {
-                    ((TextArea) comp).setText(v);
-                    notifyChange(comp, "text");
-                });
-            }
-            
-            addBoundsRow(comp);
-            
-            Style s = comp.getUnselectedStyle();
-            addColorRow("Background", s.getBgColor(), s.getBgTransparency(), (color, alpha) -> {
-                Style a = comp.getAllStyles();
-                a.setBgColor(color);
-                a.setBgTransparency(alpha);
-                notifyChange(comp, "bg");
-            });
-            addColorRow("Foreground", s.getFgColor(), 255, (color, alpha) -> {
-                comp.getAllStyles().setFgColor(color);
-                notifyChange(comp, "fg");
-            });
+        propertiesContainer.removeAll();
 
-            String layoutName = "-";
-            if (comp instanceof Container cnt) {
-                if (cnt.getLayout() != null) {
-                    layoutName = cnt.getLayout().getClass().getSimpleName();
-                }
-            }
-            addRow("Layout", layoutName, false, null);
-
-            addPaddingMarginRow("Padding", s, true);
-            addPaddingMarginRow("Margin", s, false);
-
-            if (comp.getParent() instanceof Container) {
-                Container parent = comp.getParent();
-                if (parent.getLayout() instanceof BorderLayout) {
-                    Object constraint = comp.getClientProperty("layoutConstraint");
-                    String constraintStr = constraint == null ? "Center" : constraint.toString();
-                    addRow("Constraint", constraintStr, true, v -> {
-                        comp.putClientProperty("layoutConstraint", v);
-                        parent.revalidate();
-                        notifyChange(comp, "constraint");
-                    });
-                }
-            }
-            
-            addBooleanRow("Visible", comp.isVisible(), v -> {
-                comp.setVisible(v);
-                notifyChange(comp, "visible");
-            });
-            
+        if (comp == null) {
+            Label empty = new Label("Select a component");
+            empty.setUIID("PlaygroundPropEmpty");
+            propertiesContainer.add(empty);
             propertiesContainer.revalidate();
-        } finally {
+            return;
         }
+
+        addRow("Type", comp.getClass().getSimpleName(), false, null);
+        addRow("UIID", comp.getUIID(), true, v -> {
+            comp.setUIID(v);
+            notifyChange(comp, "uiid");
+        });
+
+        if (comp instanceof Label) {
+            addRow("Text", ((Label) comp).getText(), true, v -> {
+                ((Label) comp).setText(v);
+                notifyChange(comp, "text");
+            });
+        } else if (comp instanceof TextField) {
+            addRow("Text", ((TextField) comp).getText(), true, v -> {
+                ((TextField) comp).setText(v);
+                notifyChange(comp, "text");
+            });
+        } else if (comp instanceof TextArea) {
+            addRow("Text", ((TextArea) comp).getText(), true, v -> {
+                ((TextArea) comp).setText(v);
+                notifyChange(comp, "text");
+            });
+        }
+
+        addBoundsRow(comp);
+
+        Style s = comp.getUnselectedStyle();
+        addColorRow("Background", s.getBgColor(), s.getBgTransparency(), (color, alpha) -> {
+            Style a = comp.getAllStyles();
+            a.setBgColor(color);
+            a.setBgTransparency(alpha);
+            notifyChange(comp, "bg");
+        });
+        addColorRow("Foreground", s.getFgColor(), 255, (color, alpha) -> {
+            comp.getAllStyles().setFgColor(color);
+            notifyChange(comp, "fg");
+        });
+
+        String layoutName = "-";
+        if (comp instanceof Container cnt) {
+            if (cnt.getLayout() != null) {
+                layoutName = cnt.getLayout().getClass().getSimpleName();
+            }
+        }
+        addRow("Layout", layoutName, false, null);
+
+        addPaddingMarginRow("Padding", s, true);
+        addPaddingMarginRow("Margin", s, false);
+
+        if (comp.getParent() != null) {
+            Container parent = comp.getParent();
+            if (parent.getLayout() instanceof BorderLayout) {
+                Object constraint = comp.getClientProperty("layoutConstraint");
+                String constraintStr = constraint == null ? "Center" : constraint.toString();
+                addRow("Constraint", constraintStr, true, v -> {
+                    comp.putClientProperty("layoutConstraint", v);
+                    parent.revalidate();
+                    notifyChange(comp, "constraint");
+                });
+            }
+        }
+
+        addBooleanRow("Visible", comp.isVisible(), v -> {
+            comp.setVisible(v);
+            notifyChange(comp, "visible");
+        });
+
+        applyThemeToInspectorComponent(propertiesContainer, darkMode);
+        propertiesContainer.revalidate();
     }
 
     private void addRow(String name, String value, boolean editable, java.util.function.Consumer<String> callback) {
         Label nameLabel = new Label(name);
         nameLabel.setUIID("PlaygroundPropName");
         addProperty(nameLabel);
-        
+
         if (editable && callback != null) {
-            TextField field = new TextField(value);
+            TextField field = new TextField(value == null ? "" : value);
             field.setUIID("PlaygroundPropValue");
             field.setSingleLineTextArea(true);
             field.addDataChangedListener((type, index) -> callback.accept(field.getText()));
             addProperty(field);
         } else {
-            Label valueLabel = new Label(value);
+            Label valueLabel = new Label(value == null ? "" : value);
             valueLabel.setUIID("PlaygroundPropValue");
             addProperty(valueLabel);
         }
     }
 
     private void addBoundsRow(Component comp) {
-        Container fields = new Container(new GridLayout(1, 4));
-
         Label nameLabel = new Label("Bounds");
         nameLabel.setUIID("PlaygroundPropName");
         addProperty(nameLabel);
-        
+
+        Container fields = new Container(new GridLayout(1, 4));
+        fields.setUIID("PlaygroundPropGroup");
+
         TextField xField = addSmallField(fields, String.valueOf(comp.getX()), true);
         TextField yField = addSmallField(fields, String.valueOf(comp.getY()), true);
         TextField wField = addSmallField(fields, String.valueOf(comp.getWidth()), true);
         TextField hField = addSmallField(fields, String.valueOf(comp.getHeight()), true);
-        
+
         xField.addDataChangedListener((t, i) -> {
             comp.setX(parseInt(xField.getText(), comp.getX()));
             notifyChange(comp, "bounds");
@@ -323,8 +366,8 @@ final class PlaygroundInspector {
         Label nameLabel = new Label(name);
         nameLabel.setUIID("PlaygroundPropName");
         addProperty(nameLabel);
-        
-        TextField hexField = new TextField(formatColor(color), "Color", 1, 6);
+
+        TextField hexField = new TextField(formatColor(color), "Color", 1, 8);
         hexField.setUIID("PlaygroundPropSmall");
         hexField.setSingleLineTextArea(true);
 
@@ -334,29 +377,28 @@ final class PlaygroundInspector {
 
         Label preview = new Label("  ");
         preview.setUIID("PlaygroundColorPreview");
-        Style previewStyle = preview.getAllStyles();
-        previewStyle.setBgTransparency(safeAlpha);
-        previewStyle.setBgColor(color & 0xFFFFFF);
+        updateColorPreview(preview, color, safeAlpha);
 
-        hexField.addDataChangedListener((t, i) -> {
+        Runnable updater = () -> {
             Integer c = parseColor(hexField.getText());
             int a = clampAlpha(parseInt(alphaField.getText(), safeAlpha));
             if (c != null) {
                 callback.update(c, a);
-                previewStyle.setBgColor(c & 0xFFFFFF);
-                previewStyle.setBgTransparency(a);
+                updateColorPreview(preview, c, a);
             }
-        });
-        alphaField.addDataChangedListener((t, i) -> {
-            Integer c = parseColor(hexField.getText());
-            int a = clampAlpha(parseInt(alphaField.getText(), safeAlpha));
-            if (c != null) {
-                callback.update(c, a);
-                previewStyle.setBgTransparency(a);
-            }
-        });
+        };
 
-        addProperty(BoxLayout.encloseX(hexField, alphaField, preview));
+        hexField.addDataChangedListener((t, i) -> updater.run());
+        alphaField.addDataChangedListener((t, i) -> updater.run());
+
+        Container row = BoxLayout.encloseX(hexField, alphaField, preview);
+        row.setUIID("PlaygroundPropGroup");
+        addProperty(row);
+    }
+
+    private void updateColorPreview(Label preview, int color, int alpha) {
+        preview.getAllStyles().setBgTransparency(alpha);
+        preview.getAllStyles().setBgColor(color & 0xFFFFFF);
     }
 
     private int clampAlpha(int value) {
@@ -364,12 +406,9 @@ final class PlaygroundInspector {
     }
 
     private void addPaddingMarginRow(String name, Style s, boolean isPadding) {
-        Label nameLabel = new Label(name);
-        nameLabel.setUIID("PlaygroundPropName");
-        addProperty(nameLabel);
-        
         int t, b, l, r;
         byte unit;
+
         if (isPadding) {
             t = s.getPaddingTop();
             b = s.getPaddingBottom();
@@ -386,6 +425,10 @@ final class PlaygroundInspector {
             unit = units != null && units.length > 0 ? units[0] : Style.UNIT_TYPE_PIXELS;
         }
 
+        Label nameLabel = new Label(name);
+        nameLabel.setUIID("PlaygroundPropName");
+        addProperty(nameLabel);
+
         Container fields = new Container(new GridLayout(1, 4));
         TextField topF = addSmallField(fields, String.valueOf(t), true);
         TextField botF = addSmallField(fields, String.valueOf(b), true);
@@ -393,41 +436,34 @@ final class PlaygroundInspector {
         TextField rightF = addSmallField(fields, String.valueOf(r), true);
         addProperty(fields);
 
-        String unitName = unitToName(unit);
         Label unitNameLabel = new Label(name + " unit");
         unitNameLabel.setUIID("PlaygroundPropName");
         addProperty(unitNameLabel);
+
         ComboBox<String> unitBox = new ComboBox<>(UNIT_NAMES);
-        unitBox.setSelectedItem(unitName);
+        unitBox.setSelectedItem(unitToName(unit));
         unitBox.setUIID("PlaygroundPropUnit");
         addProperty(unitBox);
-        
-        unitBox.addActionListener(e -> {
-            byte newUnit = nameToUnit((String) unitBox.getSelectedItem());
-            applyPaddingMargin(s, isPadding, 
-                parseInt(topF.getText(), t),
-                parseInt(botF.getText(), b),
-                parseInt(leftF.getText(), l),
-                parseInt(rightF.getText(), r),
-                newUnit);
-            notifyChange(selectedComponent, isPadding ? "padding" : "margin");
-        });
-        
-        java.util.function.Consumer<String> updater = v -> {
+
+        Runnable updater = () -> {
             byte currentUnit = nameToUnit((String) unitBox.getSelectedItem());
-            applyPaddingMargin(s, isPadding,
-                parseInt(topF.getText(), t),
-                parseInt(botF.getText(), b),
-                parseInt(leftF.getText(), l),
-                parseInt(rightF.getText(), r),
-                currentUnit);
+            applyPaddingMargin(
+                    s,
+                    isPadding,
+                    parseInt(topF.getText(), t),
+                    parseInt(botF.getText(), b),
+                    parseInt(leftF.getText(), l),
+                    parseInt(rightF.getText(), r),
+                    currentUnit
+            );
             notifyChange(selectedComponent, isPadding ? "padding" : "margin");
         };
-        
-        topF.addDataChangedListener((t1, i) -> updater.accept(null));
-        botF.addDataChangedListener((t1, i) -> updater.accept(null));
-        leftF.addDataChangedListener((t1, i) -> updater.accept(null));
-        rightF.addDataChangedListener((t1, i) -> updater.accept(null));
+
+        unitBox.addActionListener(e -> updater.run());
+        topF.addDataChangedListener((t1, i) -> updater.run());
+        botF.addDataChangedListener((t1, i) -> updater.run());
+        leftF.addDataChangedListener((t1, i) -> updater.run());
+        rightF.addDataChangedListener((t1, i) -> updater.run());
     }
 
     private void applyPaddingMargin(Style s, boolean isPadding, int t, int b, int l, int r, byte unit) {
@@ -454,30 +490,26 @@ final class PlaygroundInspector {
         return Style.UNIT_TYPE_DIPS;
     }
 
-    private String[] unitToNames() {
-        return UNIT_NAMES;
-    }
-
     private void addBooleanRow(String name, boolean value, java.util.function.Consumer<Boolean> callback) {
-        Container row = new Container(new GridLayout(1, 2));
-        row.setUIID("PlaygroundPropRow");
-        
         Label nameLabel = new Label(name);
         nameLabel.setUIID("PlaygroundPropName");
-        row.add(nameLabel);
-        
+        addProperty(nameLabel);
+
         CheckBox cb = new CheckBox();
         cb.setSelected(value);
         cb.setUIID("PlaygroundPropCheckbox");
         cb.addActionListener(e -> callback.accept(cb.isSelected()));
-        row.add(cb);
-
-        addProperty(row);
+        addProperty(FlowLayout.encloseCenter(cb));
     }
 
     private void notifyChange(Component comp, String property) {
+        if (comp == null) {
+            return;
+        }
         if (comp.getParent() != null) {
             comp.getParent().revalidate();
+        } else {
+            comp.repaint();
         }
         listener.onComponentPropertyChanged(comp, property, null);
     }
