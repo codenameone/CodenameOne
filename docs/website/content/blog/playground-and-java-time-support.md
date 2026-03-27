@@ -111,6 +111,8 @@ LocalDateTime meeting = LocalDateTime.of(2026, 4, 2, 14, 30);
 ZonedDateTime localMeeting = ZonedDateTime.of(meeting, ZoneId.of("America/New_York"));
 ```
 
+[See it in the playground...](https://pr-4636-website-preview.codenameone.pages.dev/playground-app/?code=aW1wb3J0IGphdmEudGltZS5Mb2NhbERhdGU7CmltcG9ydCBqYXZhLnRpbWUuTG9jYWxEYXRlVGltZTsKaW1wb3J0IGphdmEudGltZS5ab25lSWQ7CmltcG9ydCBqYXZhLnRpbWUuWm9uZWREYXRlVGltZTsKCkxvY2FsRGF0ZSB0b2RheSA9IExvY2FsRGF0ZS5ub3coKTsKTG9jYWxEYXRlVGltZSBtZWV0aW5nID0gTG9jYWxEYXRlVGltZS5vZigyMDI2LCA0LCAyLCAxNCwgMzApOwpab25lZERhdGVUaW1lIGxvY2FsTWVldGluZyA9IFpvbmVkRGF0ZVRpbWUub2YobWVldGluZywgWm9uZUlkLm9mKCJBbWVyaWNhL05ld19Zb3JrIikpOwpMYWJlbCB0aW1lID0gbmV3IExhYmVsKGxvY2FsTWVldGluZy50b1N0cmluZygpKTsKdGltZTsK)
+
 And formatting/parsing flows look the way modern Java developers expect:
 
 ```java
@@ -122,6 +124,8 @@ LocalDateTime parsed = LocalDateTime.parse(
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 );
 ```
+
+[See it in the playground...](https://pr-4636-website-preview.codenameone.pages.dev/playground-app/?code=aW1wb3J0IGphdmEudGltZS5Mb2NhbERhdGVUaW1lOwppbXBvcnQgamF2YS50aW1lLmZvcm1hdC5EYXRlVGltZUZvcm1hdHRlcjsKCkxvY2FsRGF0ZVRpbWUgcGFyc2VkID0gTG9jYWxEYXRlVGltZS5wYXJzZSgKICAgICAgICAiMjAyNi0wMy0yNyAwOTo0NTowMCIsCiAgICAgICAgRGF0ZVRpbWVGb3JtYXR0ZXIub2ZQYXR0ZXJuKCJ5eXl5LU1NLWRkIEhIOm1tOnNzIikKKTsKCkxhYmVsIHRpbWUgPSBuZXcgTGFiZWwocGFyc2VkLnRvU3RyaW5nKCkpOwp0aW1lOwo)
 
 This is a meaningful compatibility milestone because it removes another obvious gap in the Java API surface available inside Codename One.
 
