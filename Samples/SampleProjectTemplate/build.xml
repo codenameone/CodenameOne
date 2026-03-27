@@ -350,7 +350,7 @@
 
     <target name="build-for-javascript" depends="clean,copy-javascript-override,copy-libs,jar,clean-override">
         <property name="javascript.targetType" value="javascript"/>
-        <echo message="Building iOS for target ${javascript.targetType}"/>
+        <echo message="Building JavaScript for target ${javascript.targetType}"/>
         <codeNameOne 
             jarFile="${dist.jar}"
             displayName="${codename1.displayName}"
