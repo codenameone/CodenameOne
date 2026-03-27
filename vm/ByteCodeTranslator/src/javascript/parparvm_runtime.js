@@ -15,6 +15,10 @@ const CN1_DATE_VALUE = "cn1_java_util_Date_date";
 const CN1_DATEFORMAT_DATE_STYLE = "cn1_java_text_DateFormat_dateStyle";
 const CN1_DATEFORMAT_TIME_STYLE = "cn1_java_text_DateFormat_timeStyle";
 const CN1_STRINGBUFFER_INTERNAL = "cn1_java_lang_StringBuffer_internal";
+const CN1_ENUM_NAME = "cn1_java_lang_Enum_name";
+const CN1_HASHMAP_ELEMENT_DATA = "cn1_java_util_HashMap_elementData";
+const CN1_HASHMAP_ENTRY_NEXT = "cn1_java_util_HashMap_Entry_next";
+const CN1_HASHMAP_ENTRY_KEY = "cn1_java_util_MapEntry_key";
 const PRIMITIVE_INFO = {
   JAVA_BOOLEAN: { javaName: "boolean", descriptor: "Z" },
   JAVA_CHAR: { javaName: "char", descriptor: "C" },
@@ -31,9 +35,11 @@ const jvm = {
   methodTailCache: Object.create(null),
   nextIdentity: 1,
   nextThreadId: 1,
+  nextHostCallId: 1,
   currentThread: null,
   runnable: [],
   threads: [],
+  pendingHostCalls: Object.create(null),
   mainClass: null,
   mainMethod: null,
   defineClass(def) {
@@ -300,6 +306,25 @@ const jvm = {
   fail(error) {
     global.postMessage({ type: "error", message: "" + error, stack: error && error.stack ? error.stack : null });
   },
+  invokeHostNative(symbol, args) {
+    return { op: "host-call", id: this.nextHostCallId++, symbol: symbol, args: args || [] };
+  },
+  resolveHostCall(id, success, value, error) {
+    const pending = this.pendingHostCalls[id];
+    if (!pending) {
+      return false;
+    }
+    delete this.pendingHostCalls[id];
+    if (success) {
+      this.enqueue(pending.thread, value);
+    } else {
+      pending.thread.waiting = null;
+      pending.thread.resumeError = error instanceof Error ? error : new Error(error == null ? "Host callback failed" : String(error));
+      this.runnable.push(pending.thread);
+      this.drain();
+    }
+    return true;
+  },
   spawn(threadObject, generator) {
     const thread = { id: this.nextThreadId++, object: threadObject, generator: generator, waiting: null, interrupted: false, done: false };
     this.threads.push(thread);
@@ -324,7 +349,14 @@ const jvm = {
           continue;
         }
         this.currentThread = thread;
-        const result = thread.generator.next(thread.resumeValue);
+        let result;
+        if (thread.resumeError) {
+          const resumeError = thread.resumeError;
+          thread.resumeError = null;
+          result = thread.generator.throw(resumeError);
+        } else {
+          result = thread.generator.next(thread.resumeValue);
+        }
         thread.resumeValue = undefined;
         if (result.done) {
           thread.done = true;
@@ -360,6 +392,12 @@ const jvm = {
         waiter.timer = setTimeout(() => this.resumeWaiter(waiter), yielded.timeout);
       }
       thread.waiting = { op: "wait", waiter: waiter };
+      return;
+    }
+    if (yielded.op === "host-call") {
+      thread.waiting = { op: "host-call", id: yielded.id };
+      this.pendingHostCalls[yielded.id] = { thread: thread };
+      global.postMessage({ type: "host-call", id: yielded.id, symbol: yielded.symbol, args: yielded.args || [] });
       return;
     }
     throw new Error("Unsupported yield op " + yielded.op);
@@ -494,7 +532,23 @@ const jvm = {
     const mainThread = this.spawn(mainThreadObject, global[this.mainMethod](mainArgs));
     this.currentThread = mainThread;
   },
-  handleMessage() {}
+  handleMessage(message) {
+    if (!message || !message.type) {
+      return false;
+    }
+    if (message.type === "host-callback") {
+      return this.resolveHostCall(message.id, !message.error, message.value, message.errorMessage || message.error);
+    }
+    if (message.type === "timer-wake") {
+      this.drain();
+      return true;
+    }
+    if (message.type === "event" || message.type === "ui-event") {
+      this.lastEvent = message;
+      return true;
+    }
+    return false;
+  }
 };
 
 global.jvm = jvm;
@@ -600,6 +654,16 @@ function nativeStringFromCharArray(chars) {
     out += String.fromCharCode(chars[i] | 0);
   }
   return out;
+}
+function* runtimeToNativeString(value) {
+  if (value == null || typeof value === "string" || value.__nativeString != null || value.__class === "java_lang_String") {
+    return jvm.toNativeString(value);
+  }
+  if (value && value.__class) {
+    const toStringMethod = jvm.resolveVirtual(value.__class, "cn1_java_lang_Object_toString_R_java_lang_String");
+    return jvm.toNativeString(yield* toStringMethod(value));
+  }
+  return String(value);
 }
 function sbEnsureCapacity(sb, size) {
   let data = sb[CN1_SB_VALUE];
@@ -939,15 +1003,21 @@ bindNative(["cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1A
 });
 bindNative(["cn1_java_lang_String_format_java_lang_String_java_lang_Object_1ARRAY_R_java_lang_String"], function*(format, args) {
   let index = 0;
+  const values = [];
+  if (args && args.__array) {
+    for (let i = 0; i < args.length; i++) {
+      values.push(yield* runtimeToNativeString(args[i]));
+    }
+  }
   const result = jvm.toNativeString(format).replace(/%[%sdifc]/g, function(token) {
     if (token === "%%") {
       return "%";
     }
-    const value = args[index++];
+    const value = values[index++];
     if (token === "%c") {
       return String.fromCharCode(value | 0);
     }
-    return jvm.toNativeString(value);
+    return value;
   });
   return createJavaString(result);
 });
@@ -956,10 +1026,41 @@ bindNative(["cn1_java_lang_StringToReal_parseDblImpl_java_lang_String_int_R_doub
   const parsed = Number(text);
   return isNaN(parsed) ? 0 : parsed;
 });
+bindNative(["cn1_java_lang_Enum_valueOf_java_lang_Class_java_lang_String_R_java_lang_Enum"], function*(enumType, name) {
+  if (!enumType || !enumType.__classDef) {
+    return null;
+  }
+  jvm.ensureClassInitialized(enumType.__classDef.name);
+  const matchName = jvm.toNativeString(name);
+  if (enumType.cn1_staticFields) {
+    const staticFieldNames = Object.keys(enumType.cn1_staticFields);
+    for (let i = 0; i < staticFieldNames.length; i++) {
+      const candidate = enumType.cn1_staticFields[staticFieldNames[i]];
+      if (candidate && candidate.__array) {
+        for (let j = 0; j < candidate.length; j++) {
+          const arrayEntry = candidate[j];
+          if (arrayEntry != null
+                  && arrayEntry.__class === enumType.__classDef.name
+                  && jvm.toNativeString(arrayEntry[CN1_ENUM_NAME]) === matchName) {
+            return arrayEntry;
+          }
+        }
+      }
+      if (candidate && candidate.__class === enumType.__classDef.name
+              && jvm.toNativeString(candidate[CN1_ENUM_NAME]) === matchName) {
+        return candidate;
+      }
+    }
+  }
+  return null;
+});
 bindNative(["cn1_java_lang_Class_forNameImpl_java_lang_String_R_java_lang_Class"], function*(className) {
   const runtimeName = runtimeTypeFromJavaName(jvm.toNativeString(className));
   const cls = jvm.classes[runtimeName];
   return cls ? cls.classObject : null;
+});
+bindNative(["cn1_java_lang_Class_getNameImpl_R_java_lang_String"], function*(__cn1ThisObject) {
+  return createJavaString(javaClassName(__cn1ThisObject.__classDef.name));
 });
 bindNative(["cn1_java_lang_Class_getName_R_java_lang_String"], function*(__cn1ThisObject) { return createJavaString(descriptorClassName(__cn1ThisObject.__classDef.name)); });
 bindNative(["cn1_java_lang_Class_isArray_R_boolean"], function*(__cn1ThisObject) { return __cn1ThisObject.__classDef && __cn1ThisObject.__classDef.name.indexOf("[]") > -1 ? 1 : 0; });
@@ -1027,6 +1128,28 @@ bindNative(["cn1_java_text_DateFormat_format_java_util_Date_java_lang_StringBuff
     sbAppendNativeString(toAppendTo[CN1_STRINGBUFFER_INTERNAL], jvm.toNativeString(formatted));
   }
   return formatted;
+});
+bindNative(["cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Object_R_boolean"], function*(key1, key2) {
+  if (key1 === key2) {
+    return 1;
+  }
+  if (key1 == null || key2 == null) {
+    return 0;
+  }
+  const equalsMethod = jvm.resolveVirtual(key1.__class, "cn1_java_lang_Object_equals_java_lang_Object_R_boolean");
+  return (yield* equalsMethod(key1, key2)) ? 1 : 0;
+});
+bindNative(["cn1_java_util_HashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry"], function*(__cn1ThisObject, key, index, keyHash) {
+  const buckets = __cn1ThisObject[CN1_HASHMAP_ELEMENT_DATA];
+  let entry = buckets == null ? null : buckets[index | 0];
+  while (entry != null) {
+    if (((entry.cn1_java_util_HashMap_Entry_origKeyHash | 0) === (keyHash | 0))
+            && (yield* cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Object_R_boolean(key, entry[CN1_HASHMAP_ENTRY_KEY]))) {
+      return entry;
+    }
+    entry = entry[CN1_HASHMAP_ENTRY_NEXT];
+  }
+  return null;
 });
 bindNative(["cn1_java_io_NSLogOutputStream_write_byte_1ARRAY_int_int"], function*(__cn1ThisObject, bytes, off, len) {
   const chars = yield* cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, createJavaString("utf-8"));

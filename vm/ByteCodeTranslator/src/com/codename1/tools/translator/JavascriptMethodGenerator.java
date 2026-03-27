@@ -297,7 +297,8 @@ final class JavascriptMethodGenerator {
 
     private static void appendNativeStubIfNeeded(StringBuilder out, ByteCodeClass cls, BytecodeMethod method) {
         String jsMethodName = jsMethodIdentifier(cls, method);
-        if (JavascriptNativeRegistry.hasRuntimeImplementation(jsMethodName)) {
+        JavascriptNativeRegistry.NativeCategory category = JavascriptNativeRegistry.categoryFor(jsMethodName);
+        if (category == JavascriptNativeRegistry.NativeCategory.RUNTIME_IMPLEMENTED) {
             return;
         }
         String reason = JavascriptNativeRegistry.unsupportedReason(jsMethodName);
@@ -316,13 +317,32 @@ final class JavascriptMethodGenerator {
             first = false;
             out.append("__cn1Arg").append(i + 1);
         }
-        out.append(") { throw new Error(\"");
-        if (reason == null) {
-            out.append("Missing javascript native method ").append(jsMethodName);
+        out.append(") { ");
+        if (category == JavascriptNativeRegistry.NativeCategory.HOST_HOOK) {
+            out.append("return yield jvm.invokeHostNative(\"").append(jsMethodName).append("\", [");
+            boolean firstArg = true;
+            if (!method.isStatic()) {
+                out.append("__cn1ThisObject");
+                firstArg = false;
+            }
+            for (int i = 0; i < arguments.size(); i++) {
+                if (!firstArg) {
+                    out.append(", ");
+                }
+                firstArg = false;
+                out.append("__cn1Arg").append(i + 1);
+            }
+            out.append("]);");
         } else {
-            out.append(JavascriptNameUtil.escapeJs(reason));
+            out.append("throw new Error(\"");
+            if (reason == null) {
+                out.append("Missing javascript native method ").append(jsMethodName);
+            } else {
+                out.append(JavascriptNameUtil.escapeJs(reason));
+            }
+            out.append("\");");
         }
-        out.append("\"); };\n");
+        out.append(" };\n");
         out.append("}\n");
     }
 
@@ -506,11 +526,27 @@ final class JavascriptMethodGenerator {
             case Opcodes.LMUL:
                 out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a * b); pc = ").append(index + 1).append("; break; }\n");
                 return;
+            case Opcodes.FADD:
+            case Opcodes.DADD:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a + b); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.FSUB:
+            case Opcodes.DSUB:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a - b); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.FMUL:
+            case Opcodes.DMUL:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a * b); pc = ").append(index + 1).append("; break; }\n");
+                return;
             case Opcodes.IDIV:
                 out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(((a|0) / (b|0)) | 0); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.LDIV:
                 out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(Math.trunc(a / b)); pc = ").append(index + 1).append("; break; }\n");
+                return;
+            case Opcodes.FDIV:
+            case Opcodes.DDIV:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a / b); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.IREM:
                 out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push((a|0) % (b|0)); pc = ").append(index + 1).append("; break; }\n");
@@ -518,10 +554,18 @@ final class JavascriptMethodGenerator {
             case Opcodes.LREM:
                 out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a % b); pc = ").append(index + 1).append("; break; }\n");
                 return;
+            case Opcodes.FREM:
+            case Opcodes.DREM:
+                out.append("        { const b = stack.pop(); const a = stack.pop(); stack.push(a % b); pc = ").append(index + 1).append("; break; }\n");
+                return;
             case Opcodes.INEG:
                 out.append("        stack.push(-(stack.pop()|0)); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.LNEG:
+                out.append("        stack.push(-stack.pop()); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.FNEG:
+            case Opcodes.DNEG:
                 out.append("        stack.push(-stack.pop()); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.ISHL:

@@ -5,9 +5,17 @@ import java.util.HashSet;
 import java.util.Set;
 
 final class JavascriptNativeRegistry {
+    enum NativeCategory {
+        RUNTIME_IMPLEMENTED,
+        HOST_HOOK,
+        UNSUPPORTED,
+        UNCATEGORIZED
+    }
+
     private static final Set<String> RUNTIME_IMPLEMENTED = new HashSet<String>(Arrays.asList(
             "cn1_java_io_InputStreamReader_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY",
             "cn1_java_io_NSLogOutputStream_write_byte_1ARRAY_int_int",
+            "cn1_java_lang_Class_getNameImpl_R_java_lang_String",
             "cn1_java_lang_Character_toLowerCase_char_R_char",
             "cn1_java_lang_Character_toLowerCase_int_R_int",
             "cn1_java_lang_Class_forNameImpl_java_lang_String_R_java_lang_Class",
@@ -27,6 +35,7 @@ final class JavascriptNativeRegistry {
             "cn1_java_lang_Double_doubleToLongBits_double_R_long",
             "cn1_java_lang_Double_longBitsToDouble_long_R_double",
             "cn1_java_lang_Double_toStringImpl_double_boolean_R_java_lang_String",
+            "cn1_java_lang_Enum_valueOf_java_lang_Class_java_lang_String_R_java_lang_Enum",
             "cn1_java_lang_Float_floatToIntBits_float_R_int",
             "cn1_java_lang_Float_intBitsToFloat_int_R_float",
             "cn1_java_lang_Float_toStringImpl_float_boolean_R_java_lang_String",
@@ -99,6 +108,8 @@ final class JavascriptNativeRegistry {
             "cn1_java_lang_Throwable_getStack_R_java_lang_String",
             "cn1_java_lang_reflect_Array_newInstanceImpl_java_lang_Class_int_R_java_lang_Object",
             "cn1_java_text_DateFormat_format_java_util_Date_java_lang_StringBuffer_R_java_lang_String",
+            "cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Object_R_boolean",
+            "cn1_java_util_HashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry",
             "cn1_java_util_Locale_getOSLanguage_R_java_lang_String",
             "cn1_java_util_TimeZone_getTimezoneId_R_java_lang_String",
             "cn1_java_util_TimeZone_getTimezoneOffset_java_lang_String_int_int_int_int_R_int",
@@ -106,11 +117,37 @@ final class JavascriptNativeRegistry {
             "cn1_java_util_TimeZone_isTimezoneDST_java_lang_String_long_R_boolean"
     ));
 
+    private static final Set<String> HOST_HOOK_PREFIXES = new HashSet<String>(Arrays.asList(
+            "cn1_com_codename1_impl_platform_js_VMHost_"
+    ));
+
     private JavascriptNativeRegistry() {
     }
 
     static boolean hasRuntimeImplementation(String symbol) {
         return RUNTIME_IMPLEMENTED.contains(symbol);
+    }
+
+    static boolean isHostHook(String symbol) {
+        for (String prefix : HOST_HOOK_PREFIXES) {
+            if (symbol.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static NativeCategory categoryFor(String symbol) {
+        if (hasRuntimeImplementation(symbol)) {
+            return NativeCategory.RUNTIME_IMPLEMENTED;
+        }
+        if (isHostHook(symbol)) {
+            return NativeCategory.HOST_HOOK;
+        }
+        if (unsupportedReason(symbol) != null) {
+            return NativeCategory.UNSUPPORTED;
+        }
+        return NativeCategory.UNCATEGORIZED;
     }
 
     static String unsupportedReason(String symbol) {

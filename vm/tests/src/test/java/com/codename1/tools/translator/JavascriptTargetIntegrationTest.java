@@ -118,6 +118,57 @@ class JavascriptTargetIntegrationTest {
                 "Representative JS bundles should not retain uncategorized native fallback stubs");
     }
 
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void broaderJavaApiBundleHasNoUncategorizedNativeFallbacks(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-javaapi-sources");
+        Path classesDir = Files.createTempDirectory("js-javaapi-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-javaapi-classes");
+
+        Files.write(sourceDir.resolve("JsJavaApiCoverageApp.java"), loadFixture("JsJavaApiCoverageApp.java").getBytes(StandardCharsets.UTF_8));
+
+        compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-javaapi-output");
+        runJavascriptTranslator(classesDir, outputDir, "JsJavaApiCoverageApp");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsJavaApiCoverageApp-js");
+        String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
+
+        assertTrue(!translatedApp.contains("Missing javascript native method "),
+                "Broader JavaAPI JS bundles should not retain uncategorized native fallback stubs");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void hostHookNativesGenerateVmHostCalls(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-host-hook-sources");
+        Path classesDir = Files.createTempDirectory("js-host-hook-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-host-hook-classes");
+
+        Path vmHostDir = sourceDir.resolve("com").resolve("codename1").resolve("impl").resolve("platform").resolve("js");
+        Files.createDirectories(vmHostDir);
+        Files.write(vmHostDir.resolve("VMHost.java"), loadFixture("com/codename1/impl/platform/js/VMHost.java").getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("JsHostCallbackApp.java"), loadFixture("JsHostCallbackApp.java").getBytes(StandardCharsets.UTF_8));
+
+        compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-host-hook-output");
+        runJavascriptTranslator(classesDir, outputDir, "JsHostCallbackApp");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsHostCallbackApp-js");
+        String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
+
+        assertTrue(translatedApp.contains("jvm.invokeHostNative(\"cn1_com_codename1_impl_platform_js_VMHost_echoInt_int_R_int\""),
+                "Host-hook natives should compile to VM host-call stubs");
+        assertTrue(!translatedApp.contains("Missing javascript native method cn1_com_codename1_impl_platform_js_VMHost_echoInt_int_R_int"),
+                "Host-hook natives should not compile to generic missing-native stubs");
+    }
+
     static void compileAgainstJavaApi(CompilerHelper.CompilerConfig config, Path sourceDir, Path classesDir, Path javaApiDir) throws Exception {
         assertTrue(CompilerHelper.isJavaApiCompatible(config),
                 "JDK " + config.jdkVersion + " must target matching bytecode level for JavaAPI");

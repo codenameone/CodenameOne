@@ -7,7 +7,10 @@ self.onmessage = function(event) {
   }
   if (event.data.type === 'start') {
     jvm.start();
-  } else if (event.data.type === 'ui-event') {
+  } else if (event.data.type === 'ui-event'
+          || event.data.type === 'event'
+          || event.data.type === 'host-callback'
+          || event.data.type === 'timer-wake') {
     jvm.handleMessage(event.data);
   }
 };
