@@ -1201,4 +1201,11 @@ bindNative(["cn1_java_io_NSLogOutputStream_write_byte_1ARRAY_int_int"], function
   jvm.log(nativeStringFromCharArray(chars));
   return null;
 });
+bindNative(["cn1_com_codename1_impl_platform_js_VMHost_getLastEventCode_R_int",
+            "cn1_com_codename1_impl_platform_js_VMHost_getLastEventCode___R_int"], function*() {
+  if (!jvm.lastEvent || jvm.lastEvent.code == null) {
+    return -1;
+  }
+  return jvm.lastEvent.code | 0;
+});
 })(self);

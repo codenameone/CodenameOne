@@ -114,7 +114,8 @@ final class JavascriptNativeRegistry {
             "cn1_java_util_TimeZone_getTimezoneId_R_java_lang_String",
             "cn1_java_util_TimeZone_getTimezoneOffset_java_lang_String_int_int_int_int_R_int",
             "cn1_java_util_TimeZone_getTimezoneRawOffset_java_lang_String_R_int",
-            "cn1_java_util_TimeZone_isTimezoneDST_java_lang_String_long_R_boolean"
+            "cn1_java_util_TimeZone_isTimezoneDST_java_lang_String_long_R_boolean",
+            "cn1_com_codename1_impl_platform_js_VMHost_getLastEventCode_R_int"
     ));
 
     private static final Set<String> HOST_HOOK_PREFIXES = new HashSet<String>(Arrays.asList(
