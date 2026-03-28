@@ -1942,7 +1942,15 @@ public class UIManager {
         if (prefix != null && prefix.length() > 0) {
             id += prefix;
         }
+        String requestedId = id;
+        if (shouldUseDarkStyle(id)) {
+            id = "$Dark" + id;
+        }
+
         String baseStyle = (String) themeProps.get(id + "derive");
+        if (baseStyle == null && id.startsWith("$Dark")) {
+            baseStyle = toDeriveStyleName(requestedId);
+        }
         if (baseStyle != null) {
             if (baseStyle.indexOf('.') > -1 && baseStyle.indexOf('#') < 0) {
                 baseStyle += "#";
@@ -2126,6 +2134,33 @@ public class UIManager {
         }
 
         return style;
+    }
+
+    private boolean shouldUseDarkStyle(String id) {
+        if (themeProps == null || id == null || id.length() == 0 || id.startsWith("$Dark")) {
+            return false;
+        }
+        Boolean darkMode = CN.isDarkMode();
+        return darkMode != null && darkMode.booleanValue() && hasStyleDefinition("$Dark" + id);
+    }
+
+    private boolean hasStyleDefinition(String styleId) {
+        for (String key : themeProps.keySet()) {
+            if (key.startsWith(styleId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String toDeriveStyleName(String styleId) {
+        if (styleId.endsWith(".")) {
+            return styleId.substring(0, styleId.length() - 1);
+        }
+        if (styleId.endsWith("#")) {
+            return styleId.substring(0, styleId.length() - 1);
+        }
+        return styleId;
     }
 
     /// This method is used to parse the margin and the padding
