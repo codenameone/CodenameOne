@@ -57,6 +57,7 @@ public class CN1Playground extends Lifecycle {
     private int autoRunSequence;
     private Tabs editorTabs;
     private WebsiteThemeNative websiteThemeNative;
+    private boolean websiteThemeInitialized;
 
     @Override
     public void runApp() {
@@ -531,10 +532,6 @@ public class CN1Playground extends Lifecycle {
 
     private void initWebsiteThemeSync(Form form) {
         websiteThemeNative = NativeLookup.create(WebsiteThemeNative.class);
-        if (websiteThemeNative == null || !websiteThemeNative.isSupported()) {
-            return;
-        }
-
         refreshWebsiteTheme(form);
         UITimer.timer(900, true, form, () -> refreshWebsiteTheme(form));
     }
@@ -564,17 +561,54 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void refreshWebsiteTheme(Form form) {
-        if (websiteThemeNative == null || !websiteThemeNative.isSupported()) {
+        if (Display.getInstance().isSimulator()) {
+            applyDarkMode(form, DEFAULT_DARK_MODE);
             return;
         }
 
-        boolean dark = Display.getInstance().isSimulator()
-                ? DEFAULT_DARK_MODE
-                : websiteThemeNative.isDarkMode();
+        if (websiteThemeNative != null && websiteThemeNative.isSupported()) {
+            applyDarkMode(form, websiteThemeNative.isDarkMode());
+            return;
+        }
 
-        if (dark != websiteDarkMode) {
+        BrowserComponent js = CN.getSharedJavascriptContext();
+        if (js == null) {
+            applyDarkMode(form, websiteDarkMode);
+            return;
+        }
+
+        js.execute(
+                "callback.onSuccess((function(){"
+                        + "var dark = false;"
+                        + "try {"
+                        + "var parentWindow = (window.parent && window.parent !== window) ? window.parent : null;"
+                        + "var parentDoc = parentWindow && parentWindow.document ? parentWindow.document : null;"
+                        + "var parentBody = parentDoc && parentDoc.body ? parentDoc.body : null;"
+                        + "var classes = parentBody && parentBody.classList ? parentBody.classList : null;"
+                        + "if (classes) {"
+                        + "if (classes.contains('dark') || classes.contains('cn1-initializr-dark')) { return 'true'; }"
+                        + "if (classes.contains('light') || classes.contains('cn1-initializr-light')) { return 'false'; }"
+                        + "}"
+                        + "if (parentWindow && parentWindow.localStorage) {"
+                        + "var pref = parentWindow.localStorage.getItem('pref-theme');"
+                        + "if (pref === 'dark') { return 'true'; }"
+                        + "if (pref === 'light') { return 'false'; }"
+                        + "}"
+                        + "var mediaWindow = parentWindow || window;"
+                        + "if (mediaWindow.matchMedia) { dark = mediaWindow.matchMedia('(prefers-color-scheme: dark)').matches; }"
+                        + "} catch (e) {}"
+                        + "if (!dark && window.matchMedia) { dark = window.matchMedia('(prefers-color-scheme: dark)').matches; }"
+                        + "return dark ? 'true' : 'false';"
+                        + "})())",
+                res -> applyDarkMode(form, "true".equals(String.valueOf(res)))
+        );
+    }
+
+    private void applyDarkMode(Form form, boolean dark) {
+        Display.getInstance().setDarkMode(dark);
+        if (!websiteThemeInitialized || dark != websiteDarkMode) {
             websiteDarkMode = dark;
-            Display.getInstance().setDarkMode(dark);
+            websiteThemeInitialized = true;
             applyWebsiteTheme(form, dark);
             applyTabsTheme(dark);
             form.refreshTheme();
