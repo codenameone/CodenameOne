@@ -28,8 +28,6 @@ import com.codename1.util.Base64;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.Hashtable;
 import java.util.List;
 
@@ -187,7 +185,7 @@ public class CN1Playground extends Lifecycle {
             replacePreview(result.getComponent());
             editor.setMarkers(result.getDiagnostics());
             editor.setInlineMessages(currentMessages);
-            editor.setUiidCompletions(collectVisibleUiids(appForm));
+            editor.setUiidCompletions(PlaygroundCssSupport.collectVisibleUiids(previewRoot));
             applyCurrentCss();
             persistCurrentState();
         });
@@ -437,12 +435,12 @@ public class CN1Playground extends Lifecycle {
         currentCssMessages = messages;
         cssEditor.setMarkers(diagnostics);
         cssEditor.setInlineMessages(messages);
-        cssEditor.setUiidCompletions(collectVisibleUiids(appForm));
+        cssEditor.setUiidCompletions(PlaygroundCssSupport.collectVisibleUiids(previewRoot));
         appForm.refreshTheme();
     }
 
     private void applyCssToPreview(Form form, String css) {
-        String normalized = normalizeCustomCss(css);
+        String normalized = PlaygroundCssSupport.normalizeCustomCss(css);
         if (normalized.length() == 0) {
             return;
         }
@@ -458,52 +456,6 @@ public class CN1Playground extends Lifecycle {
                 previewRoot.revalidate();
             } else {
                 form.refreshTheme();
-            }
-        }
-    }
-
-    private String normalizeCustomCss(String css) {
-        if (css == null) {
-            return "";
-        }
-        String trimmed = css.trim();
-        if (trimmed.length() == 0) {
-            return "";
-        }
-        String normalized = trimmed;
-        if (normalized.indexOf("--cn1-source-dpi:") < 0) {
-            normalized = "--cn1-source-dpi: 0;\n" + normalized;
-        }
-        if (normalized.indexOf("--cn1-densities:") < 0) {
-            normalized = "--cn1-densities: \"2x\", \"4k\";\n" + normalized;
-        }
-        if (normalized.indexOf("--cn1-include-native-theme:") < 0) {
-            normalized = "--cn1-include-native-theme: true;\n" + normalized;
-        }
-        return normalized;
-    }
-
-    private List<String> collectVisibleUiids(Component root) {
-        if (root == null) {
-            return Collections.emptyList();
-        }
-        LinkedHashSet<String> uiids = new LinkedHashSet<String>();
-        collectVisibleUiids(root, uiids);
-        return new ArrayList<String>(uiids);
-    }
-
-    private void collectVisibleUiids(Component component, LinkedHashSet<String> uiids) {
-        if (component == null || !component.isVisible()) {
-            return;
-        }
-        String uiid = component.getUIID();
-        if (uiid != null && uiid.trim().length() > 0) {
-            uiids.add(uiid.trim());
-        }
-        if (component instanceof Container) {
-            Container container = (Container) component;
-            for (int i = 0; i < container.getComponentCount(); i++) {
-                collectVisibleUiids(container.getComponentAt(i), uiids);
             }
         }
     }

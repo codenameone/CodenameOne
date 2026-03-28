@@ -15,8 +15,7 @@
     decorations: [],
     zoneId: null,
     changeTimer: 0,
-    lintTimer: 0
-    ,
+    lintTimer: 0,
     uiids: []
   };
 
@@ -118,8 +117,8 @@
       if (!uiid) {
         return;
       }
-      var selector = "." + uiid;
-      if (!matchesPrefix(selector, prefix) && !matchesPrefix(uiid, prefix)) {
+      var selector = uiid;
+      if (!matchesPrefix(selector, prefix)) {
         return;
       }
       suggestions.push({
@@ -130,7 +129,7 @@
         range: range
       });
       suggestions.push({
-        label: selector + " {  }",
+        label: selector + " { ... }",
         kind: monaco.languages.CompletionItemKind.Snippet,
         insertText: selector + " {\n\t$0\n}",
         insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
