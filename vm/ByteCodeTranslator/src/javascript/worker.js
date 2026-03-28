@@ -5,12 +5,14 @@ self.onmessage = function(event) {
   if (!event || !event.data) {
     return;
   }
-  if (event.data.type === 'start') {
+  const protocol = jvm.protocol.messages;
+  if (event.data.type === protocol.START) {
     jvm.start();
-  } else if (event.data.type === 'ui-event'
-          || event.data.type === 'event'
-          || event.data.type === 'host-callback'
-          || event.data.type === 'timer-wake') {
+  } else if (event.data.type === protocol.PROTOCOL_INFO
+          || event.data.type === protocol.UI_EVENT
+          || event.data.type === protocol.EVENT
+          || event.data.type === protocol.HOST_CALLBACK
+          || event.data.type === protocol.TIMER_WAKE) {
     jvm.handleMessage(event.data);
   }
 };

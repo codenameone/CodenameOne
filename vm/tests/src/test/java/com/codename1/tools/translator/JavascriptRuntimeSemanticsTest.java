@@ -103,6 +103,35 @@ class JavascriptRuntimeSemanticsTest {
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Generated worker bundle should not emit an error message");
     }
 
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void exposesStableVmProtocolHandshakeBeforeWorkerStart(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-worker-protocol-src");
+        Path classesDir = Files.createTempDirectory("js-worker-protocol-classes");
+        Path javaApiDir = Files.createTempDirectory("js-worker-protocol-javaapi");
+
+        Files.write(sourceDir.resolve("JsWorkerProtocolApp.java"),
+                JavascriptTargetIntegrationTest.loadFixture("JsWorkerProtocolApp.java").getBytes(StandardCharsets.UTF_8));
+
+        JavascriptTargetIntegrationTest.compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-worker-protocol-output");
+        JavascriptTargetIntegrationTest.runJavascriptTranslator(classesDir, outputDir, "JsWorkerProtocolApp");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsWorkerProtocolApp-js");
+        WorkerRunResult result = runGeneratedWorkerBundleWithProtocolHandshake(distDir);
+
+        assertEquals("protocol-check", result.type, "Generated worker bundle should expose the VM protocol before start");
+        assertEquals(1, result.protocolVersion, "VM protocol version should be stable and explicit");
+        assertEquals("start", result.protocolStartType, "VM protocol should document the start message");
+        assertEquals("host-callback", result.protocolHostCallbackType, "VM protocol should document host callback delivery");
+        assertEquals("timer-wake", result.protocolTimerWakeType, "VM protocol should document timer wake delivery");
+        assertEquals(321, result.result, "Worker should still execute normally after protocol handshake");
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message during protocol handshake");
+    }
+
     private static WorkerRunResult translateAndRunFixture(CompilerHelper.CompilerConfig config, String fixtureName, String appName) throws Exception {
         Parser.cleanup();
 
@@ -169,6 +198,28 @@ class JavascriptRuntimeSemanticsTest {
         out.type = extractJsonString(output, "type");
         String result = extractJsonNumber(output, "result");
         out.result = result == null ? Integer.MIN_VALUE : Integer.parseInt(result);
+        out.errorMessage = extractJsonString(output, "message");
+        return out;
+    }
+
+    private static WorkerRunResult runGeneratedWorkerBundleWithProtocolHandshake(Path distDir) throws Exception {
+        Path harness = Files.createTempFile("js-worker-protocol-handshake", ".js");
+        Files.write(harness, generatedWorkerHarnessSourceWithProtocolHandshake(distDir).getBytes(StandardCharsets.UTF_8));
+        Process process = new ProcessBuilder("node", harness.toString()).start();
+        String output = readAll(process.getInputStream());
+        String errors = readAll(process.getErrorStream());
+        int rc = process.waitFor();
+        assertEquals(0, rc, "Node worker-thread protocol handshake harness should exit cleanly. stderr: " + errors);
+        WorkerRunResult out = new WorkerRunResult();
+        out.rawMessage = output.trim();
+        out.type = extractJsonString(output, "type");
+        String result = extractJsonNumber(output, "result");
+        out.result = result == null ? Integer.MIN_VALUE : Integer.parseInt(result);
+        String version = extractJsonNumber(output, "version");
+        out.protocolVersion = version == null ? Integer.MIN_VALUE : Integer.parseInt(version);
+        out.protocolStartType = extractJsonString(output, "startType");
+        out.protocolHostCallbackType = extractJsonString(output, "hostCallbackType");
+        out.protocolTimerWakeType = extractJsonString(output, "timerWakeType");
         out.errorMessage = extractJsonString(output, "message");
         return out;
     }
@@ -402,6 +453,82 @@ class JavascriptRuntimeSemanticsTest {
                 + "}, 3000);\n";
     }
 
+    private static String generatedWorkerHarnessSourceWithProtocolHandshake(Path distDir) {
+        return ""
+                + "const fs = require('fs');\n"
+                + "const path = require('path');\n"
+                + "const { Worker } = require('worker_threads');\n"
+                + "const bootstrapPath = path.join(" + quoteJs(distDir.toString()) + ", '__node_worker_bootstrap_protocol.js');\n"
+                + "fs.writeFileSync(bootstrapPath, `\n"
+                + "const fs = require('fs');\n"
+                + "const path = require('path');\n"
+                + "const vm = require('vm');\n"
+                + "const { parentPort, workerData } = require('worker_threads');\n"
+                + "global.self = global;\n"
+                + "global.window = global;\n"
+                + "global.global = global;\n"
+                + "global.postMessage = function(msg) { parentPort.postMessage(msg); };\n"
+                + "global.importScripts = function() {\n"
+                + "  for (const script of arguments) {\n"
+                + "    const scriptPath = path.join(workerData.distDir, String(script));\n"
+                + "    const src = fs.readFileSync(scriptPath, 'utf8');\n"
+                + "    vm.runInThisContext(src, { filename: scriptPath });\n"
+                + "  }\n"
+                + "};\n"
+                + "parentPort.on('message', function(data) {\n"
+                + "  if (typeof self.onmessage === 'function') {\n"
+                + "    self.onmessage({ data: data });\n"
+                + "  }\n"
+                + "});\n"
+                + "const workerSrc = fs.readFileSync(path.join(workerData.distDir, 'worker.js'), 'utf8');\n"
+                + "vm.runInThisContext(workerSrc, { filename: path.join(workerData.distDir, 'worker.js') });\n"
+                + "`);\n"
+                + "const worker = new Worker(bootstrapPath, { workerData: { distDir: " + quoteJs(distDir.toString()) + " } });\n"
+                + "let done = false;\n"
+                + "let protocol = null;\n"
+                + "worker.on('message', function(msg) {\n"
+                + "  if (done) {\n"
+                + "    return;\n"
+                + "  }\n"
+                + "  if (msg && msg.type === 'protocol') {\n"
+                + "    protocol = msg;\n"
+                + "    worker.postMessage({ type: protocol.messages.START });\n"
+                + "    return;\n"
+                + "  }\n"
+                + "  if (msg && (msg.type === 'result' || msg.type === 'error')) {\n"
+                + "    done = true;\n"
+                + "    if (msg.type === 'error' || !protocol) {\n"
+                + "      console.log(JSON.stringify(msg));\n"
+                + "    } else {\n"
+                + "      console.log(JSON.stringify({\n"
+                + "        type: 'protocol-check',\n"
+                + "        version: protocol.version,\n"
+                + "        startType: protocol.messages.START,\n"
+                + "        hostCallbackType: protocol.messages.HOST_CALLBACK,\n"
+                + "        timerWakeType: protocol.messages.TIMER_WAKE,\n"
+                + "        result: msg.result\n"
+                + "      }));\n"
+                + "    }\n"
+                + "    worker.terminate().then(function() { process.exit(0); });\n"
+                + "  }\n"
+                + "});\n"
+                + "worker.on('error', function(err) {\n"
+                + "  if (done) {\n"
+                + "    return;\n"
+                + "  }\n"
+                + "  done = true;\n"
+                + "  console.log(JSON.stringify({ type: 'error', message: String(err) }));\n"
+                + "  process.exit(1);\n"
+                + "});\n"
+                + "worker.postMessage({ type: 'protocol-info' });\n"
+                + "setTimeout(function() {\n"
+                + "  if (!done) {\n"
+                + "    console.log(JSON.stringify({ type: 'error', message: 'Timed out waiting for worker protocol handshake' }));\n"
+                + "    worker.terminate().then(function() { process.exit(1); });\n"
+                + "  }\n"
+                + "}, 3000);\n";
+    }
+
     private static String quoteJs(String value) {
         return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
@@ -411,5 +538,9 @@ class JavascriptRuntimeSemanticsTest {
         int result;
         String errorMessage;
         String rawMessage;
+        int protocolVersion;
+        String protocolStartType;
+        String protocolHostCallbackType;
+        String protocolTimerWakeType;
     }
 }

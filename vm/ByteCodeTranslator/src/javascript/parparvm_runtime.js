@@ -19,6 +19,23 @@ const CN1_ENUM_NAME = "cn1_java_lang_Enum_name";
 const CN1_HASHMAP_ELEMENT_DATA = "cn1_java_util_HashMap_elementData";
 const CN1_HASHMAP_ENTRY_NEXT = "cn1_java_util_HashMap_Entry_next";
 const CN1_HASHMAP_ENTRY_KEY = "cn1_java_util_MapEntry_key";
+const VM_PROTOCOL_VERSION = 1;
+const VM_PROTOCOL = Object.freeze({
+  version: VM_PROTOCOL_VERSION,
+  messages: Object.freeze({
+    START: "start",
+    EVENT: "event",
+    UI_EVENT: "ui-event",
+    TIMER_WAKE: "timer-wake",
+    HOST_CALL: "host-call",
+    HOST_CALLBACK: "host-callback",
+    PROTOCOL_INFO: "protocol-info",
+    PROTOCOL: "protocol",
+    LOG: "log",
+    RESULT: "result",
+    ERROR: "error"
+  })
+});
 const PRIMITIVE_INFO = {
   JAVA_BOOLEAN: { javaName: "boolean", descriptor: "Z" },
   JAVA_CHAR: { javaName: "char", descriptor: "C" },
@@ -42,6 +59,7 @@ const jvm = {
   pendingHostCalls: Object.create(null),
   mainClass: null,
   mainMethod: null,
+  protocol: VM_PROTOCOL,
   defineClass(def) {
     def.staticFields = def.staticFields || {};
     def.instanceFields = def.instanceFields || [];
@@ -314,16 +332,16 @@ const jvm = {
     return "" + value;
   },
   log(message) {
-    global.postMessage({ type: "log", message: message });
+    global.postMessage({ type: this.protocol.messages.LOG, message: message });
   },
   finish(result) {
-    global.postMessage({ type: "result", result: result });
+    global.postMessage({ type: this.protocol.messages.RESULT, result: result });
   },
   fail(error) {
-    global.postMessage({ type: "error", message: "" + error, stack: error && error.stack ? error.stack : null });
+    global.postMessage({ type: this.protocol.messages.ERROR, message: "" + error, stack: error && error.stack ? error.stack : null });
   },
   invokeHostNative(symbol, args) {
-    return { op: "host-call", id: this.nextHostCallId++, symbol: symbol, args: args || [] };
+    return { op: this.protocol.messages.HOST_CALL, id: this.nextHostCallId++, symbol: symbol, args: args || [] };
   },
   resolveHostCall(id, success, value, error) {
     const pending = this.pendingHostCalls[id];
@@ -410,10 +428,10 @@ const jvm = {
       thread.waiting = { op: "wait", waiter: waiter };
       return;
     }
-    if (yielded.op === "host-call") {
-      thread.waiting = { op: "host-call", id: yielded.id };
+    if (yielded.op === this.protocol.messages.HOST_CALL) {
+      thread.waiting = { op: this.protocol.messages.HOST_CALL, id: yielded.id };
       this.pendingHostCalls[yielded.id] = { thread: thread };
-      global.postMessage({ type: "host-call", id: yielded.id, symbol: yielded.symbol, args: yielded.args || [] });
+      global.postMessage({ type: this.protocol.messages.HOST_CALL, id: yielded.id, symbol: yielded.symbol, args: yielded.args || [] });
       return;
     }
     throw new Error("Unsupported yield op " + yielded.op);
@@ -548,18 +566,29 @@ const jvm = {
     const mainThread = this.spawn(mainThreadObject, global[this.mainMethod](mainArgs));
     this.currentThread = mainThread;
   },
+  describeProtocol() {
+    return {
+      type: this.protocol.messages.PROTOCOL,
+      version: this.protocol.version,
+      messages: this.protocol.messages
+    };
+  },
   handleMessage(message) {
     if (!message || !message.type) {
       return false;
     }
-    if (message.type === "host-callback") {
+    if (message.type === this.protocol.messages.PROTOCOL_INFO) {
+      global.postMessage(this.describeProtocol());
+      return true;
+    }
+    if (message.type === this.protocol.messages.HOST_CALLBACK) {
       return this.resolveHostCall(message.id, !message.error, message.value, message.errorMessage || message.error);
     }
-    if (message.type === "timer-wake") {
+    if (message.type === this.protocol.messages.TIMER_WAKE) {
       this.drain();
       return true;
     }
-    if (message.type === "event" || message.type === "ui-event") {
+    if (message.type === this.protocol.messages.EVENT || message.type === this.protocol.messages.UI_EVENT) {
       this.lastEvent = message;
       return true;
     }
