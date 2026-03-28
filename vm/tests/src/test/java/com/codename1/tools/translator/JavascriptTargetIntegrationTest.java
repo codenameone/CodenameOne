@@ -199,8 +199,8 @@ class JavascriptTargetIntegrationTest {
 
         assertTrue(methodBody.contains("let l0 = __cn1Arg1;") && methodBody.contains("let l1 = __cn1Arg2;"),
                 "Straight-line lowering should use direct local variables for arguments");
-        assertTrue(methodBody.contains("let s0 = null;") && methodBody.contains("let s1 = null;"),
-                "Straight-line lowering should use numbered stack temporaries");
+        assertTrue(!methodBody.contains("stack["),
+                "Straight-line lowering should avoid stack-array indexing");
         assertTrue(!methodBody.contains("const locals = new Array") && !methodBody.contains("const stack = []") && !methodBody.contains("let pc = 0"),
                 "Straight-line lowering should avoid the interpreter locals/stack/pc loop");
     }

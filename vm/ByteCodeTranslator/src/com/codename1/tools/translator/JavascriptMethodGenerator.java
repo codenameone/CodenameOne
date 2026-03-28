@@ -284,17 +284,18 @@ final class JavascriptMethodGenerator {
         for (int i = 0; i < arguments.size(); i++) {
             body.append("  let l").append(localIndex).append(" = __cn1Arg").append(i + 1).append(";\n");
             ctx.localsInitialized[localIndex] = true;
+            ctx.localsUsed[localIndex] = true;
             localIndex++;
             if (arguments.get(i).isDoubleOrLong()) {
                 localIndex++;
             }
         }
         for (int i = 0; i < method.getMaxLocals(); i++) {
-            if (!ctx.localsInitialized[i]) {
+            if (!ctx.localsInitialized[i] && ctx.localsUsed[i]) {
                 body.append("  let l").append(i).append(" = null;\n");
             }
         }
-        for (int i = 0; i < method.getMaxStack(); i++) {
+        for (int i = 0; i < ctx.getMaxObservedStack(); i++) {
             body.append("  let s").append(i).append(" = null;\n");
         }
         if (method.isSynchronizedMethod()) {
@@ -358,6 +359,7 @@ final class JavascriptMethodGenerator {
         }
         if (instruction instanceof IInc) {
             IInc iinc = (IInc) instruction;
+            ctx.localsUsed[iinc.getVar()] = true;
             out.append("  l").append(iinc.getVar()).append(" = (l").append(iinc.getVar()).append(" || 0) + ")
                     .append(iinc.getAmount()).append(";\n");
             return true;
@@ -600,8 +602,14 @@ final class JavascriptMethodGenerator {
             case Opcodes.SALOAD: {
                 String idx = ctx.pop();
                 String arr = ctx.pop();
-                String valueExpr = "(function(__arr,__idx){ if (!__arr.__array) throw new Error(\"Array expected\"); if (__idx < 0 || __idx >= __arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); return __arr[__idx]; })(" + arr + ", " + idx + ")";
-                out.append("  ").append(ctx.push(valueExpr)).append(";\n");
+                String arrayTemp = ctx.nextTemp("__arr");
+                String indexTemp = ctx.nextTemp("__idx");
+                out.append("  { const ").append(arrayTemp).append(" = ").append(arr)
+                        .append("; const ").append(indexTemp).append(" = ").append(idx)
+                        .append("; if (!").append(arrayTemp).append(".__array) throw new Error(\"Array expected\"); if (")
+                        .append(indexTemp).append(" < 0 || ").append(indexTemp).append(" >= ").append(arrayTemp)
+                        .append(".length) throw new Error(\"ArrayIndexOutOfBoundsException\"); ")
+                        .append(ctx.push(arrayTemp + "[" + indexTemp + "]")).append("; }\n");
                 return true;
             }
             case Opcodes.AASTORE:
@@ -662,6 +670,7 @@ final class JavascriptMethodGenerator {
             case Opcodes.FLOAD:
             case Opcodes.DLOAD:
             case Opcodes.ALOAD:
+                ctx.localsUsed[instruction.getIndex()] = true;
                 out.append("  ").append(ctx.push("l" + instruction.getIndex())).append(";\n");
                 return true;
             case Opcodes.ISTORE:
@@ -669,6 +678,7 @@ final class JavascriptMethodGenerator {
             case Opcodes.FSTORE:
             case Opcodes.DSTORE:
             case Opcodes.ASTORE:
+                ctx.localsUsed[instruction.getIndex()] = true;
                 out.append("  l").append(instruction.getIndex()).append(" = ").append(ctx.pop()).append(";\n");
                 return true;
             default:
@@ -823,15 +833,24 @@ final class JavascriptMethodGenerator {
 
     private static final class StraightLineContext {
         private final boolean[] localsInitialized;
+        private final boolean[] localsUsed;
         private int sp;
+        private int maxObservedStack;
+        private int nextTempId;
 
         private StraightLineContext(int maxLocals, int maxStack) {
             this.localsInitialized = new boolean[Math.max(1, maxLocals)];
+            this.localsUsed = new boolean[Math.max(1, maxLocals)];
             this.sp = 0;
+            this.maxObservedStack = 0;
+            this.nextTempId = 0;
         }
 
         private String push(String expression) {
             String slot = "s" + sp++;
+            if (sp > maxObservedStack) {
+                maxObservedStack = sp;
+            }
             return slot + " = " + expression;
         }
 
@@ -849,6 +868,14 @@ final class JavascriptMethodGenerator {
                 throw new IllegalStateException("Straight-line JS lowering stack underflow");
             }
             return "s" + index;
+        }
+
+        private int getMaxObservedStack() {
+            return maxObservedStack;
+        }
+
+        private String nextTemp(String prefix) {
+            return prefix + (nextTempId++);
         }
     }
 
