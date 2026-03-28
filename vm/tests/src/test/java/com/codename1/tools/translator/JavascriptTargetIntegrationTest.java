@@ -207,6 +207,37 @@ class JavascriptTargetIntegrationTest {
                 "Straight-line lowering should avoid the interpreter locals/stack/pc loop");
     }
 
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void repeatedStaticAccessesOnlyEmitOneClassInitCheckInStraightLineMode(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-static-access-sources");
+        Path classesDir = Files.createTempDirectory("js-static-access-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-static-access-classes");
+
+        Files.write(sourceDir.resolve("JsStaticAccess.java"), loadFixture("JsStaticAccess.java").getBytes(StandardCharsets.UTF_8));
+
+        compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-static-access-output");
+        runJavascriptTranslator(classesDir, outputDir, "JsStaticAccess");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsStaticAccess-js");
+        String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
+
+        String marker = "function* cn1_JsStaticAccess_twice_R_int(){";
+        int start = translatedApp.indexOf(marker);
+        assertTrue(start >= 0, "Static access fixture should emit the twice() method");
+        int end = translatedApp.indexOf("\n}\n", start);
+        assertTrue(end > start, "Static access fixture should have a bounded method body");
+        String methodBody = translatedApp.substring(start, end);
+
+        String initCheck = "jvm.ensureClassInitialized(\"JsStaticAccess\");";
+        assertEquals(methodBody.indexOf(initCheck), methodBody.lastIndexOf(initCheck),
+                "Repeated static field access should only emit one class-init check in straight-line mode");
+    }
+
     static void compileAgainstJavaApi(CompilerHelper.CompilerConfig config, Path sourceDir, Path classesDir, Path javaApiDir) throws Exception {
         assertTrue(CompilerHelper.isJavaApiCompatible(config),
                 "JDK " + config.jdkVersion + " must target matching bytecode level for JavaAPI");

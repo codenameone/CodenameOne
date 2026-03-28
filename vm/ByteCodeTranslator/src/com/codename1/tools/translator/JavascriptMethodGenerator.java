@@ -16,8 +16,10 @@ import com.codename1.tools.translator.bytecodes.TryCatch;
 import com.codename1.tools.translator.bytecodes.TypeInstruction;
 import com.codename1.tools.translator.bytecodes.VarOp;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -277,6 +279,9 @@ final class JavascriptMethodGenerator {
         StringBuilder instructionBody = new StringBuilder();
         StringBuilder body = new StringBuilder();
         StraightLineContext ctx = new StraightLineContext(method.getMaxLocals(), method.getMaxStack());
+        if (method.isStatic() && !"__CLINIT__".equals(method.getMethodName())) {
+            ctx.initializedClasses.add(cls.getClsName());
+        }
         if (!method.isStatic()) {
             setup.append("  let l0 = __cn1ThisObject;\n");
             ctx.localsInitialized[0] = true;
@@ -628,7 +633,14 @@ final class JavascriptMethodGenerator {
                 String value = ctx.pop();
                 String idx = ctx.pop();
                 String arr = ctx.pop();
-                out.append("  { const __arr = ").append(arr).append("; const __idx = ").append(idx).append("; if (!__arr.__array) throw new Error(\"Array expected\"); if (__idx < 0 || __idx >= __arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); __arr[__idx] = ").append(value).append("; }\n");
+                String arrayTemp = ctx.nextTemp("__arr");
+                String indexTemp = ctx.nextTemp("__idx");
+                out.append("  { const ").append(arrayTemp).append(" = ").append(arr)
+                        .append("; const ").append(indexTemp).append(" = ").append(idx)
+                        .append("; if (!").append(arrayTemp).append(".__array) throw new Error(\"Array expected\"); if (")
+                        .append(indexTemp).append(" < 0 || ").append(indexTemp).append(" >= ").append(arrayTemp)
+                        .append(".length) throw new Error(\"ArrayIndexOutOfBoundsException\"); ")
+                        .append(arrayTemp).append("[").append(indexTemp).append("] = ").append(value).append("; }\n");
                 return true;
             }
             default:
@@ -744,11 +756,11 @@ final class JavascriptMethodGenerator {
         String propertyName = JavascriptNameUtil.fieldProperty(field.getOwner(), fieldName);
         switch (field.getOpcode()) {
             case Opcodes.GETSTATIC:
-                out.append("  jvm.ensureClassInitialized(\"").append(owner).append("\");\n");
+                appendStraightLineEnsureClassInitialized(out, ctx, owner);
                 out.append("  ").append(ctx.push("jvm.classes[\"" + owner + "\"].staticFields[\"" + fieldName + "\"]")).append(";\n");
                 return true;
             case Opcodes.PUTSTATIC:
-                out.append("  jvm.ensureClassInitialized(\"").append(owner).append("\");\n");
+                appendStraightLineEnsureClassInitialized(out, ctx, owner);
                 out.append("  jvm.classes[\"").append(owner).append("\"].staticFields[\"").append(fieldName).append("\"] = ")
                         .append(ctx.pop()).append(";\n");
                 return true;
@@ -765,6 +777,12 @@ final class JavascriptMethodGenerator {
             }
             default:
                 return false;
+        }
+    }
+
+    private static void appendStraightLineEnsureClassInitialized(StringBuilder out, StraightLineContext ctx, String owner) {
+        if (ctx.initializedClasses.add(owner)) {
+            out.append("  jvm.ensureClassInitialized(\"").append(owner).append("\");\n");
         }
     }
 
@@ -791,9 +809,8 @@ final class JavascriptMethodGenerator {
         if (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE) {
             out.append("  {\n");
             out.append("    const __target = ").append(target).append(";\n");
-            out.append("    const __class = jvm.classes[__target.__class];\n");
-            out.append("    const __method = (__class && __class.methods && __class.methods[\"").append(methodId)
-                    .append("\"]) || jvm.resolveVirtual(__target.__class, \"").append(methodId).append("\");\n");
+            out.append("    const __method = ((jvm.classes[__target.__class] && jvm.classes[__target.__class].methods) ? jvm.classes[__target.__class].methods[\"").append(methodId)
+                    .append("\"] : null) || jvm.resolveVirtual(__target.__class, \"").append(methodId).append("\");\n");
             if (hasReturn) {
                 out.append("    const __result = yield* __method(");
                 appendInvocationArgumentExpressions(out, "__target", argValues);
@@ -839,6 +856,7 @@ final class JavascriptMethodGenerator {
     private static final class StraightLineContext {
         private final boolean[] localsInitialized;
         private final boolean[] localsUsed;
+        private final Set<String> initializedClasses;
         private int sp;
         private int maxObservedStack;
         private int nextTempId;
@@ -846,6 +864,7 @@ final class JavascriptMethodGenerator {
         private StraightLineContext(int maxLocals, int maxStack) {
             this.localsInitialized = new boolean[Math.max(1, maxLocals)];
             this.localsUsed = new boolean[Math.max(1, maxLocals)];
+            this.initializedClasses = new HashSet<String>();
             this.sp = 0;
             this.maxObservedStack = 0;
             this.nextTempId = 0;
@@ -1575,9 +1594,8 @@ final class JavascriptMethodGenerator {
             out.append("        {\n");
             appendInvocationArgumentBindings(out, argCount, "          ", "stack.pop()");
             out.append("          const __target = stack.pop();\n");
-            out.append("          const __class = jvm.classes[__target.__class];\n");
-            out.append("          const __method = (__class && __class.methods && __class.methods[\"").append(methodId)
-                    .append("\"]) || jvm.resolveVirtual(__target.__class, \"").append(methodId).append("\");\n");
+            out.append("          const __method = ((jvm.classes[__target.__class] && jvm.classes[__target.__class].methods) ? jvm.classes[__target.__class].methods[\"").append(methodId)
+                    .append("\"] : null) || jvm.resolveVirtual(__target.__class, \"").append(methodId).append("\");\n");
             if (hasReturn) {
                 out.append("          const __result = yield* __method(");
                 appendInvocationArguments(out, true, argCount);
