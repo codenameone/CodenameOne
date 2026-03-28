@@ -22,10 +22,14 @@ import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 import com.codename1.ui.util.UITimer;
+import com.codename1.ui.css.CSSThemeCompiler;
+import com.codename1.ui.util.MutableResource;
 import com.codename1.util.Base64;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Hashtable;
 import java.util.List;
 
@@ -40,13 +44,16 @@ public class CN1Playground extends Lifecycle {
 
     private Form appForm;
     private PlaygroundBrowserEditor editor;
+    private PlaygroundBrowserEditor cssEditor;
     private PlaygroundInspector inspector;
     private Container previewRoot;
     private Container historyMenu;
     private Resources theme;
     private boolean websiteDarkMode = DEFAULT_DARK_MODE;
     private String currentScript;
+    private String currentCss;
     private List<PlaygroundRunner.InlineMessage> currentMessages = new ArrayList<>();
+    private List<PlaygroundRunner.InlineMessage> currentCssMessages = new ArrayList<>();
     private int editSequence;
     private int autoRunSequence;
     private Tabs editorTabs;
@@ -56,6 +63,7 @@ public class CN1Playground extends Lifecycle {
         CN.setProperty("platformHint.javascript.beforeUnloadMessage", null);
         theme = Resources.getGlobalResources();
         currentScript = resolveInitialScript();
+        currentCss = PlaygroundStateStore.loadCurrentCss();
 
         appForm = new Form("Playground", new BorderLayout());
         appForm.setUIID("PlaygroundForm");
@@ -67,7 +75,8 @@ public class CN1Playground extends Lifecycle {
             toolbar.getTitleComponent().setUIID("PlaygroundTitle");
         }
 
-        editor = new PlaygroundBrowserEditor(currentScript, websiteDarkMode, this::handleSourceChanged);
+        editor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.JAVA, currentScript, websiteDarkMode, this::handleSourceChanged);
+        cssEditor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.CSS, currentCss, websiteDarkMode, this::handleCssChanged);
         inspector = new PlaygroundInspector(websiteDarkMode, (component, property, value) -> handlePropertyChanged(component));
 
         previewRoot = createPreviewRoot();
@@ -75,11 +84,13 @@ public class CN1Playground extends Lifecycle {
         historyMenu.setUIID("PlaygroundMenuContainer");
 
         Container editorPanel = wrapPanel(editor.getComponent());
+        Container cssEditorPanel = wrapPanel(cssEditor.getComponent());
         Container inspectorPanel = wrapPanel(inspector.getComponent());
 
         editorTabs = new Tabs();
         editorTabs.setUIID("PlaygroundEditorTabs");
         editorTabs.addTab("Code", editorPanel);
+        editorTabs.addTab("CSS", cssEditorPanel);
         editorTabs.addTab("Inspector", inspectorPanel);
         applyTabsTheme(websiteDarkMode);
 
@@ -129,6 +140,12 @@ public class CN1Playground extends Lifecycle {
         scheduleAutoRun();
     }
 
+    private void handleCssChanged(String source, int version) {
+        currentCss = source == null ? "" : source;
+        persistCurrentState();
+        applyCurrentCss();
+    }
+
     private Container createPreviewRoot() {
         Container root = new Container(new BorderLayout());
         root.setScrollableY(true);
@@ -170,6 +187,8 @@ public class CN1Playground extends Lifecycle {
             replacePreview(result.getComponent());
             editor.setMarkers(result.getDiagnostics());
             editor.setInlineMessages(currentMessages);
+            editor.setUiidCompletions(collectVisibleUiids(appForm));
+            applyCurrentCss();
             persistCurrentState();
         });
     }
@@ -287,7 +306,7 @@ public class CN1Playground extends Lifecycle {
     private String resolveInitialScript() {
         String sharedScript = scriptFromUrl();
         if (sharedScript != null) {
-            PlaygroundStateStore.saveCurrentState(sharedScript, PlaygroundStateStore.loadCurrentOutput());
+            PlaygroundStateStore.saveCurrentState(sharedScript, PlaygroundStateStore.loadCurrentCss(), PlaygroundStateStore.loadCurrentOutput());
             return sharedScript;
         }
         return PlaygroundStateStore.loadCurrentScript();
@@ -399,12 +418,109 @@ public class CN1Playground extends Lifecycle {
         }
     }
 
-    private void persistCurrentState() {
-        PlaygroundStateStore.saveCurrentState(currentScript, joinMessages(currentMessages));
+    private void applyCurrentCss() {
+        if (appForm == null) {
+            return;
+        }
+        List<PlaygroundRunner.Diagnostic> diagnostics = new ArrayList<PlaygroundRunner.Diagnostic>();
+        List<PlaygroundRunner.InlineMessage> messages = new ArrayList<PlaygroundRunner.InlineMessage>();
+        try {
+            applyCssToPreview(appForm, currentCss);
+            if (currentCss != null && currentCss.trim().length() > 0) {
+                messages.add(new PlaygroundRunner.InlineMessage(0, "Custom CSS applied.", "success"));
+            }
+        } catch (RuntimeException ex) {
+            String error = ex.getMessage() == null ? "Invalid CSS" : ex.getMessage();
+            diagnostics.add(new PlaygroundRunner.Diagnostic(1, 1, 1, 2, error, "error"));
+            messages.add(new PlaygroundRunner.InlineMessage(1, error, "error"));
+        }
+        currentCssMessages = messages;
+        cssEditor.setMarkers(diagnostics);
+        cssEditor.setInlineMessages(messages);
+        cssEditor.setUiidCompletions(collectVisibleUiids(appForm));
+        appForm.refreshTheme();
     }
 
-    private String joinMessages(List<PlaygroundRunner.InlineMessage> messages) {
-        if (messages == null || messages.isEmpty()) {
+    private void applyCssToPreview(Form form, String css) {
+        String normalized = normalizeCustomCss(css);
+        if (normalized.length() == 0) {
+            return;
+        }
+        String wrappedCss = "\n/* Playground custom CSS */\n" + normalized + "\n";
+        CSSThemeCompiler compiler = new CSSThemeCompiler();
+        MutableResource resource = new MutableResource();
+        compiler.compile(wrappedCss, resource, "PlaygroundCustomTheme");
+        Hashtable customTheme = resource.getTheme("PlaygroundCustomTheme");
+        if (customTheme != null && !customTheme.isEmpty()) {
+            UIManager.getInstance().addThemeProps(customTheme);
+            if (previewRoot != null) {
+                previewRoot.refreshTheme();
+                previewRoot.revalidate();
+            } else {
+                form.refreshTheme();
+            }
+        }
+    }
+
+    private String normalizeCustomCss(String css) {
+        if (css == null) {
+            return "";
+        }
+        String trimmed = css.trim();
+        if (trimmed.length() == 0) {
+            return "";
+        }
+        String normalized = trimmed;
+        if (normalized.indexOf("--cn1-source-dpi:") < 0) {
+            normalized = "--cn1-source-dpi: 0;\n" + normalized;
+        }
+        if (normalized.indexOf("--cn1-densities:") < 0) {
+            normalized = "--cn1-densities: \"2x\", \"4k\";\n" + normalized;
+        }
+        if (normalized.indexOf("--cn1-include-native-theme:") < 0) {
+            normalized = "--cn1-include-native-theme: true;\n" + normalized;
+        }
+        return normalized;
+    }
+
+    private List<String> collectVisibleUiids(Component root) {
+        if (root == null) {
+            return Collections.emptyList();
+        }
+        LinkedHashSet<String> uiids = new LinkedHashSet<String>();
+        collectVisibleUiids(root, uiids);
+        return new ArrayList<String>(uiids);
+    }
+
+    private void collectVisibleUiids(Component component, LinkedHashSet<String> uiids) {
+        if (component == null || !component.isVisible()) {
+            return;
+        }
+        String uiid = component.getUIID();
+        if (uiid != null && uiid.trim().length() > 0) {
+            uiids.add(uiid.trim());
+        }
+        if (component instanceof Container) {
+            Container container = (Container) component;
+            for (int i = 0; i < container.getComponentCount(); i++) {
+                collectVisibleUiids(container.getComponentAt(i), uiids);
+            }
+        }
+    }
+
+    private void persistCurrentState() {
+        PlaygroundStateStore.saveCurrentState(currentScript, currentCss, joinMessages(currentMessages, currentCssMessages));
+    }
+
+    private String joinMessages(List<PlaygroundRunner.InlineMessage> scriptMessages, List<PlaygroundRunner.InlineMessage> cssMessages) {
+        List<PlaygroundRunner.InlineMessage> messages = new ArrayList<PlaygroundRunner.InlineMessage>();
+        if (scriptMessages != null) {
+            messages.addAll(scriptMessages);
+        }
+        if (cssMessages != null) {
+            messages.addAll(cssMessages);
+        }
+        if (messages.isEmpty()) {
             return "";
         }
 
@@ -508,6 +624,9 @@ public class CN1Playground extends Lifecycle {
 
                         if (editor != null) {
                             editor.applyTheme(dark);
+                        }
+                        if (cssEditor != null) {
+                            cssEditor.applyTheme(dark);
                         }
                         if (inspector != null) {
                             inspector.applyTheme(dark);

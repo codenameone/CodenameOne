@@ -1,6 +1,7 @@
 (function() {
   var state = {
     metadata: null,
+    language: "java",
     monacoReady: false,
     bootstrapped: false,
     editor: null,
@@ -15,6 +16,8 @@
     zoneId: null,
     changeTimer: 0,
     lintTimer: 0
+    ,
+    uiids: []
   };
 
   function post(payload) {
@@ -57,7 +60,7 @@
   }
 
   function createEditor() {
-    state.model = monaco.editor.createModel("", "java");
+    state.model = monaco.editor.createModel("", state.language || "java");
     state.editor = monaco.editor.create(document.getElementById("editor"), {
       model: state.model,
       automaticLayout: true,
@@ -75,7 +78,7 @@
       tabSize: 4,
       insertSpaces: true
     });
-    registerCompletionProvider();
+    registerCompletionProviders();
     state.editor.onDidChangeModelContent(function() {
       if (state.suppressChange) {
         return;
@@ -86,7 +89,7 @@
     });
   }
 
-  function registerCompletionProvider() {
+  function registerCompletionProviders() {
     monaco.languages.registerCompletionItemProvider("java", {
       triggerCharacters: [".", "(", ",", " "],
       provideCompletionItems: function(model, position) {
@@ -98,6 +101,44 @@
         return { suggestions: collectSuggestions(model, position, text, offset) };
       }
     });
+    monaco.languages.registerCompletionItemProvider("css", {
+      triggerCharacters: [".", "-", " "],
+      provideCompletionItems: function(model, position) {
+        return { suggestions: cssSuggestions(model, position) };
+      }
+    });
+  }
+
+  function cssSuggestions(model, position) {
+    var word = model.getWordUntilPosition(position);
+    var prefix = (word && word.word ? word.word : "");
+    var range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
+    var suggestions = [];
+    (state.uiids || []).forEach(function(uiid) {
+      if (!uiid) {
+        return;
+      }
+      var selector = "." + uiid;
+      if (!matchesPrefix(selector, prefix) && !matchesPrefix(uiid, prefix)) {
+        return;
+      }
+      suggestions.push({
+        label: selector,
+        kind: monaco.languages.CompletionItemKind.Class,
+        insertText: selector,
+        detail: "UIID selector",
+        range: range
+      });
+      suggestions.push({
+        label: selector + " {  }",
+        kind: monaco.languages.CompletionItemKind.Snippet,
+        insertText: selector + " {\n\t$0\n}",
+        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+        detail: "UIID rule",
+        range: range
+      });
+    });
+    return suggestions;
   }
 
   function collectSuggestions(model, position, text, offset) {
@@ -570,10 +611,15 @@
     });
   }
 
-  function bootstrap(metadataJson, source, darkMode, markers, messages) {
+  function bootstrap(metadataJson, source, language, darkMode, markers, messages, uiids) {
     ensureMonaco(function() {
       state.metadata = normalizeMetadata(JSON.parse(metadataJson));
+      state.language = language || "java";
+      state.uiids = uiids || [];
       state.bootstrapped = true;
+      if (state.model && state.model.getLanguageId && state.model.getLanguageId() !== state.language) {
+        monaco.editor.setModelLanguage(state.model, state.language);
+      }
       setSource(source || "");
       setMarkers(markers || []);
       setInlineMessages(messages || []);
@@ -612,6 +658,10 @@
     state.model.setValue(source);
     state.suppressChange = false;
     scheduleLocalLint();
+  }
+
+  function setUiids(uiids) {
+    state.uiids = uiids || [];
   }
 
   function setMarkers(markers) {
@@ -658,6 +708,7 @@
     setSource: setSource,
     setMarkers: setMarkers,
     setInlineMessages: setInlineMessages,
-    applyTheme: applyTheme
+    applyTheme: applyTheme,
+    setUiids: setUiids
   };
 })();

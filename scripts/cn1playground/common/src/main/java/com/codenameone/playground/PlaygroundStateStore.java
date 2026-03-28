@@ -33,6 +33,7 @@ final class PlaygroundStateStore {
     }
 
     private static final String CURRENT_SCRIPT_KEY = "cn1playground.currentScript";
+    private static final String CURRENT_CSS_KEY = "cn1playground.currentCss";
     private static final String CURRENT_OUTPUT_KEY = "cn1playground.currentOutput";
     private static final String HISTORY_KEY = "cn1playground.history";
     private static final int MAX_HISTORY = 10;
@@ -52,8 +53,14 @@ final class PlaygroundStateStore {
         return value instanceof String ? (String) value : "";
     }
 
-    static void saveCurrentState(String script, String output) {
+    static String loadCurrentCss() {
+        Object value = Storage.getInstance().readObject(CURRENT_CSS_KEY);
+        return value instanceof String ? (String) value : "";
+    }
+
+    static void saveCurrentState(String script, String css, String output) {
         Storage.getInstance().writeObject(CURRENT_SCRIPT_KEY, script == null ? "" : script);
+        Storage.getInstance().writeObject(CURRENT_CSS_KEY, css == null ? "" : css);
         Storage.getInstance().writeObject(CURRENT_OUTPUT_KEY, output == null ? "" : output);
     }
 

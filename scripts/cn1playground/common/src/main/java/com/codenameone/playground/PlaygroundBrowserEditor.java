@@ -22,19 +22,37 @@ final class PlaygroundBrowserEditor {
         void onSourceChanged(String source, int version);
     }
 
+    enum Mode {
+        JAVA("java"),
+        CSS("css");
+
+        private final String monacoLanguage;
+
+        Mode(String monacoLanguage) {
+            this.monacoLanguage = monacoLanguage;
+        }
+
+        String monacoLanguage() {
+            return monacoLanguage;
+        }
+    }
+
     private final Component component;
     private final Listener listener;
     private final String metadataJson;
+    private final Mode mode;
     private final BrowserComponent browser;
     private final TextArea fallbackEditor;
     private final TextArea fallbackMessages;
     private String pendingSource = "";
     private String pendingMarkersJson = "[]";
     private String pendingMessagesJson = "[]";
+    private String pendingUiidsJson = "[]";
     private boolean pendingDarkMode;
     private boolean ready;
 
-    PlaygroundBrowserEditor(String source, boolean darkMode, Listener listener) {
+    PlaygroundBrowserEditor(Mode mode, String source, boolean darkMode, Listener listener) {
+        this.mode = mode == null ? Mode.JAVA : mode;
         this.listener = listener;
         this.metadataJson = PlaygroundEditorMetadata.json();
         this.pendingSource = source == null ? "" : source;
@@ -133,6 +151,13 @@ final class PlaygroundBrowserEditor {
         }
     }
 
+    void setUiidCompletions(List<String> uiids) {
+        pendingUiidsJson = toUiidJson(uiids);
+        if (browser != null && ready) {
+            browser.execute("window.PlaygroundEditor && window.PlaygroundEditor.setUiids(" + pendingUiidsJson + ");");
+        }
+    }
+
     private void flush() {
         if (browser == null) {
             return;
@@ -140,9 +165,11 @@ final class PlaygroundBrowserEditor {
         browser.execute("window.PlaygroundEditor && window.PlaygroundEditor.bootstrap("
                 + asJsString(metadataJson) + ", "
                 + asJsString(pendingSource) + ", "
+                + asJsString(mode.monacoLanguage()) + ", "
                 + (pendingDarkMode ? "true" : "false") + ", "
                 + pendingMarkersJson + ", "
-                + pendingMessagesJson + ");");
+                + pendingMessagesJson + ", "
+                + pendingUiidsJson + ");");
     }
 
     private boolean shouldUseBrowserEditor() {
@@ -283,6 +310,26 @@ final class PlaygroundBrowserEditor {
             out.append(',');
             appendJsonField(out, "line", message.line);
             out.append('}');
+        }
+        out.append(']');
+        return out.toString();
+    }
+
+    private String toUiidJson(List<String> uiids) {
+        StringBuilder out = new StringBuilder();
+        out.append('[');
+        if (uiids != null) {
+            int j = 0;
+            for (int i = 0; i < uiids.size(); i++) {
+                String uiid = uiids.get(i);
+                if (uiid == null || uiid.trim().length() == 0) {
+                    continue;
+                }
+                if (j++ > 0) {
+                    out.append(',');
+                }
+                appendJsonString(out, uiid.trim());
+            }
         }
         out.append(']');
         return out.toString();
