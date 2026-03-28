@@ -273,16 +273,19 @@ final class JavascriptMethodGenerator {
         if (!isStraightLineEligible(method, instructions)) {
             return false;
         }
+        StringBuilder setup = new StringBuilder();
+        StringBuilder instructionBody = new StringBuilder();
         StringBuilder body = new StringBuilder();
         StraightLineContext ctx = new StraightLineContext(method.getMaxLocals(), method.getMaxStack());
         if (!method.isStatic()) {
-            body.append("  let l0 = __cn1ThisObject;\n");
+            setup.append("  let l0 = __cn1ThisObject;\n");
             ctx.localsInitialized[0] = true;
+            ctx.localsUsed[0] = true;
         }
         List<ByteCodeMethodArg> arguments = method.getArguments();
         int localIndex = method.isStatic() ? 0 : 1;
         for (int i = 0; i < arguments.size(); i++) {
-            body.append("  let l").append(localIndex).append(" = __cn1Arg").append(i + 1).append(";\n");
+            setup.append("  let l").append(localIndex).append(" = __cn1Arg").append(i + 1).append(";\n");
             ctx.localsInitialized[localIndex] = true;
             ctx.localsUsed[localIndex] = true;
             localIndex++;
@@ -290,6 +293,13 @@ final class JavascriptMethodGenerator {
                 localIndex++;
             }
         }
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction instruction = instructions.get(i);
+            if (!appendStraightLineInstruction(instructionBody, method, instruction, ctx)) {
+                return false;
+            }
+        }
+        body.append(setup);
         for (int i = 0; i < method.getMaxLocals(); i++) {
             if (!ctx.localsInitialized[i] && ctx.localsUsed[i]) {
                 body.append("  let l").append(i).append(" = null;\n");
@@ -303,12 +313,7 @@ final class JavascriptMethodGenerator {
             body.append("  jvm.monitorEnter(jvm.currentThread, __cn1Monitor);\n");
             body.append("  try {\n");
         }
-        for (int i = 0; i < instructions.size(); i++) {
-            Instruction instruction = instructions.get(i);
-            if (!appendStraightLineInstruction(body, method, instruction, ctx)) {
-                return false;
-            }
-        }
+        body.append(instructionBody);
         if (method.isSynchronizedMethod()) {
             body.append("  } finally {\n");
             body.append("    jvm.monitorExit(jvm.currentThread, __cn1Monitor);\n");
@@ -1568,10 +1573,7 @@ final class JavascriptMethodGenerator {
 
         if (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE) {
             out.append("        {\n");
-            out.append("          const __args = [];\n");
-            for (int i = argCount - 1; i >= 0; i--) {
-                out.append("          __args.unshift(stack.pop());\n");
-            }
+            appendInvocationArgumentBindings(out, argCount, "          ", "stack.pop()");
             out.append("          const __target = stack.pop();\n");
             out.append("          const __class = jvm.classes[__target.__class];\n");
             out.append("          const __method = (__class && __class.methods && __class.methods[\"").append(methodId)
@@ -1592,10 +1594,7 @@ final class JavascriptMethodGenerator {
         }
 
         out.append("        {\n");
-        out.append("          const __args = [];\n");
-        for (int i = argCount - 1; i >= 0; i--) {
-            out.append("          __args.unshift(stack.pop());\n");
-        }
+        appendInvocationArgumentBindings(out, argCount, "          ", "stack.pop()");
         if (invoke.getOpcode() != Opcodes.INVOKESTATIC) {
             out.append("          const __target = stack.pop();\n");
         }
@@ -1624,7 +1623,13 @@ final class JavascriptMethodGenerator {
                 out.append(", ");
             }
             first = false;
-            out.append("__args[").append(i).append("]");
+            out.append("__arg").append(i);
+        }
+    }
+
+    private static void appendInvocationArgumentBindings(StringBuilder out, int argCount, String indent, String sourceExpression) {
+        for (int i = argCount - 1; i >= 0; i--) {
+            out.append(indent).append("const __arg").append(i).append(" = ").append(sourceExpression).append(";\n");
         }
     }
 }

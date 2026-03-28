@@ -60,6 +60,8 @@ class JavascriptTargetIntegrationTest {
                 "Translated bundle should not emit generic fallback stubs for TimeZone natives");
         assertTrue(!translatedApp.contains("Missing javascript native method cn1_java_text_DateFormat_format_java_util_Date_java_lang_StringBuffer_R_java_lang_String"),
                 "Translated bundle should not emit generic fallback stubs for DateFormat natives");
+        assertTrue(!translatedApp.contains("__args.unshift(stack.pop())"),
+                "Translated invoke paths should avoid array unshift-based argument packing");
         assertTrue(!translatedApp.contains("cn1_java_io_File_")
                         || translatedApp.contains("java.io.File native filesystem access is not supported in javascript backend"),
                 "Unsupported filesystem natives should fail with an explicit JS-mode message when translated");
