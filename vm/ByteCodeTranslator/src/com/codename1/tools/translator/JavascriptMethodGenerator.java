@@ -10,6 +10,7 @@ import com.codename1.tools.translator.bytecodes.LabelInstruction;
 import com.codename1.tools.translator.bytecodes.Ldc;
 import com.codename1.tools.translator.bytecodes.LineNumber;
 import com.codename1.tools.translator.bytecodes.LocalVariable;
+import com.codename1.tools.translator.bytecodes.MultiArray;
 import com.codename1.tools.translator.bytecodes.SwitchInstruction;
 import com.codename1.tools.translator.bytecodes.TryCatch;
 import com.codename1.tools.translator.bytecodes.TypeInstruction;
@@ -403,8 +404,61 @@ final class JavascriptMethodGenerator {
             appendSwitchInstruction(out, (SwitchInstruction) instruction, labelToIndex, index);
             return;
         }
+        if (instruction instanceof MultiArray) {
+            appendMultiArrayInstruction(out, (MultiArray) instruction, index);
+            return;
+        }
         throw new IllegalArgumentException("Unsupported instruction type in javascript output: "
                 + instruction.getClass().getName() + " for " + method.getMethodIdentifier());
+    }
+
+    private static void appendMultiArrayInstruction(StringBuilder out, MultiArray instruction, int index) {
+        String desc = instruction.getDesc();
+        int totalDimensions = arrayDescriptorDimensions(desc);
+        String componentType = arrayDescriptorComponent(desc);
+        int allocatedDimensions = instruction.getDimensionsToAllocate();
+        out.append("        { const sizes = new Array(").append(totalDimensions).append(");");
+        out.append(" for (let i = ").append(allocatedDimensions - 1).append("; i >= 0; i--) { sizes[i] = stack.pop() | 0; }");
+        out.append(" for (let i = ").append(allocatedDimensions).append("; i < ").append(totalDimensions)
+                .append("; i++) { sizes[i] = -1; }");
+        out.append(" stack.push(jvm.newMultiArray(sizes, \"").append(componentType).append("\", ")
+                .append(totalDimensions).append(")); pc = ").append(index + 1).append("; break; }\n");
+    }
+
+    private static int arrayDescriptorDimensions(String desc) {
+        int dimensions = 0;
+        while (dimensions < desc.length() && desc.charAt(dimensions) == '[') {
+            dimensions++;
+        }
+        return dimensions;
+    }
+
+    private static String arrayDescriptorComponent(String desc) {
+        int dimensions = arrayDescriptorDimensions(desc);
+        char kind = desc.charAt(dimensions);
+        if (kind == 'L') {
+            return JavascriptNameUtil.sanitizeClassName(desc.substring(dimensions + 1, desc.length() - 1));
+        }
+        switch (kind) {
+            case 'Z':
+                return "JAVA_BOOLEAN";
+            case 'C':
+                return "JAVA_CHAR";
+            case 'F':
+                return "JAVA_FLOAT";
+            case 'D':
+                return "JAVA_DOUBLE";
+            case 'B':
+                return "JAVA_BYTE";
+            case 'S':
+                return "JAVA_SHORT";
+            case 'I':
+                return "JAVA_INT";
+            case 'J':
+                return "JAVA_LONG";
+            default:
+                throw new IllegalArgumentException("Unsupported MULTIANEWARRAY descriptor " + desc);
+        }
     }
 
     private static void appendSwitchInstruction(StringBuilder out, SwitchInstruction instruction, Map<Label, Integer> labelToIndex, int index) {

@@ -41,6 +41,14 @@ public class MultiArray extends Instruction {
         this.desc = desc;
         this.dims = dims;
     }
+
+    public String getDesc() {
+        return desc;
+    }
+
+    public int getDimensionsToAllocate() {
+        return dims;
+    }
     
     @Override
     public void addDependencies(List<String> dependencyList) {

@@ -137,6 +137,22 @@ const jvm = {
     array.__monitor = this.createMonitor();
     return array;
   },
+  newMultiArray(sizes, componentClass, dimensions, depth) {
+    const level = depth || 0;
+    const size = sizes[level] | 0;
+    const array = this.newArray(size, componentClass, dimensions - level);
+    if ((dimensions - level) <= 1) {
+      return array;
+    }
+    const nextSize = sizes[level + 1];
+    if (nextSize == null || nextSize < 0) {
+      return array;
+    }
+    for (let i = 0; i < size; i++) {
+      array[i] = this.newMultiArray(sizes, componentClass, dimensions, level + 1);
+    }
+    return array;
+  },
   arrayClassName(componentClass, dimensions) {
     let name = componentClass;
     for (let i = 0; i < dimensions; i++) {
