@@ -90,10 +90,18 @@ SideNavigationPanel {
     padding: 2mm 1mm 1mm 1mm;
 }
 
+SideNavigationPanelDark {
+    background: #0f172a;
+    padding: 2mm 1mm 1mm 1mm;
+}
+
 @media platform-ios {
     /** iOS Only styles for side menu. */
     SideNavigationPanel {
         /** Extra top padding to deal with notch on iPhoneX */
+        padding: 6mm 1mm 1mm 1mm;
+    }
+    SideNavigationPanelDark {
         padding: 6mm 1mm 1mm 1mm;
     }
 }
@@ -115,6 +123,11 @@ StatusBarSideMenu {
     padding: 0mm;
 }
 
+StatusBarSideMenuDark {
+    background: #0f172a;
+    padding: 0mm;
+}
+
 PlaygroundSideCommand {
     padding: 1mm;
     border: none;
@@ -126,12 +139,23 @@ PlaygroundSideCommand {
     border-bottom: 2px solid #cccccc;
 }
 
+PlaygroundSideCommandDark {
+    color: #e5e7eb;
+    background: #0f172a;
+    border-bottom: 2px solid #1f2937;
+}
+
 PlaygroundMenuSection {
     padding: 2mm 1mm 0.5mm 1mm;
     margin: 1mm 0 0 0;
     border: none;
     border-bottom: 1px solid #d1d5db;
     background: white;
+}
+
+PlaygroundMenuSectionDark {
+    border-bottom: 1px solid #334155;
+    background: #0f172a;
 }
 
 PlaygroundMenuSectionTitle {
@@ -142,6 +166,10 @@ PlaygroundMenuSectionTitle {
     padding: 0 0 1mm 0;
 }
 
+PlaygroundMenuSectionTitleDark {
+    color: #94a3b8;
+}
+
 PlaygroundMenuEmpty {
     color: #6b7280;
     font-family: "native:MainLight";
@@ -149,12 +177,24 @@ PlaygroundMenuEmpty {
     padding: 1mm;
 }
 
+PlaygroundMenuEmptyDark {
+    color: #94a3b8;
+    background: #0f172a;
+}
+
 PlaygroundMenuContainer {
     background: white;
 }
 
+PlaygroundMenuContainerDark {
+    background: #0f172a;
+}
+
 @media (prefers-color-scheme: dark) {
     SideNavigationPanel {
+        background: #0f172a;
+    }
+    SideNavigationPanelDark {
         background: #0f172a;
     }
 
@@ -167,8 +207,16 @@ PlaygroundMenuContainer {
     StatusBarSideMenu {
         background: #0f172a;
     }
+    StatusBarSideMenuDark {
+        background: #0f172a;
+    }
 
     PlaygroundSideCommand {
+        color: #e5e7eb;
+        background: #0f172a;
+        border-bottom: 2px solid #1f2937;
+    }
+    PlaygroundSideCommandDark {
         color: #e5e7eb;
         background: #0f172a;
         border-bottom: 2px solid #1f2937;
@@ -186,8 +234,15 @@ PlaygroundMenuContainer {
         border-bottom: 1px solid #334155;
         background: #0f172a;
     }
+    PlaygroundMenuSectionDark {
+        border-bottom: 1px solid #334155;
+        background: #0f172a;
+    }
 
     PlaygroundMenuSectionTitle {
+        color: #94a3b8;
+    }
+    PlaygroundMenuSectionTitleDark {
         color: #94a3b8;
     }
 
@@ -195,8 +250,15 @@ PlaygroundMenuContainer {
         color: #94a3b8;
         background: #0f172a;
     }
+    PlaygroundMenuEmptyDark {
+        color: #94a3b8;
+        background: #0f172a;
+    }
 
     PlaygroundMenuContainer {
+        background: #0f172a;
+    }
+    PlaygroundMenuContainerDark {
         background: #0f172a;
     }
 }
@@ -316,6 +378,14 @@ Tab {
     font-family: "native:MainLight";
     font-size: 3mm;
     text-align: center;
+}
+
+PlaygroundEditorTabs {
+    background: #e5e7eb;
+}
+
+PlaygroundEditorTabsDark {
+    background: #111827;
 }
 
 TabDark {

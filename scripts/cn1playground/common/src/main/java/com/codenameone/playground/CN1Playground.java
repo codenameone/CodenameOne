@@ -703,7 +703,10 @@ public class CN1Playground extends Lifecycle {
 
     private void applyTabsTheme(boolean dark) {
         if (editorTabs != null) {
+            editorTabs.setUIID(dark ? "PlaygroundEditorTabsDark" : "PlaygroundEditorTabs");
             editorTabs.setTabUIID(dark ? "TabDark" : "Tab");
+            editorTabs.refreshTheme();
+            editorTabs.revalidate();
         }
     }
 
