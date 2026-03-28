@@ -1174,6 +1174,27 @@ You can use media queries to target styles to specific platforms, devices, and d
 . `density-xxx` - Target a specific device density.  E.g. `density-very-low`, `density-low`, `density-medium`, `density-high`, `density-very-high`, `density-hd`, `density-2hd`, and `density-560`.
 . `device-xxx` - Target a specific device type.  E.g. `device-desktop`, `device-tablet`, `device-phone`.
 
+In addition to the Codename One specific media tokens above, the CSS compilers also recognize standard dark-mode media queries using `prefers-color-scheme: dark`. Rules inside these blocks are compiled into `$Dark` UIIDs automatically (e.g. `Button` becomes `$DarkButton`, `Button.selected` becomes `$DarkButton.selected`).
+
+.Example: Dark-mode overrides with standard CSS media query syntax
+[source,css]
+----
+Button {
+    color: #222222;
+}
+
+@media (prefers-color-scheme: dark) {
+    Button {
+        color: #f0f0f0;
+        background-color: #000000;
+    }
+
+    Button.selected {
+        color: #ff0000;
+    }
+}
+----
+
 .Example: Different font colors on Android and iOS.  On Android, labels will appear green.  On iOS, they will appear red.  On all other platforms, they will appear black.
 [source,css]
 ----
@@ -1329,7 +1350,6 @@ Label {
 ----
 
 IMPORTANT: All matching `font-scale` constants will be applied to the styles.  If you define 3 font-scale constants that all match the current runtime environment, they will all be applied.  E.g. If there are 3 matching font-scale constants with "2.0", "3.0", and "4.0", then fonts will be scaled by 2*3*4=24!
-
 
 
 

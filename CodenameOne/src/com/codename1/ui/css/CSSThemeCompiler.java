@@ -57,8 +57,9 @@ public class CSSThemeCompiler {
             theme = new Hashtable();
         }
 
-        compileConstants(css, theme);
-        Rule[] rules = parseRules(css);
+        String strippedCss = stripComments(css);
+        compileConstants(strippedCss, theme);
+        Rule[] rules = parseRulesWithMedia(strippedCss);
         for (Rule rule : rules) {
             applyRule(theme, resources, rule);
         }
@@ -81,20 +82,19 @@ public class CSSThemeCompiler {
     }
 
     private void compileConstants(String css, Hashtable theme) {
-        String stripped = stripComments(css);
-        int constantsStart = stripped.indexOf("@constants");
+        int constantsStart = css.indexOf("@constants");
         if (constantsStart < 0) {
             return;
         }
-        int open = stripped.indexOf('{', constantsStart);
+        int open = css.indexOf('{', constantsStart);
         if (open < 0) {
             return;
         }
-        int close = stripped.indexOf('}', open + 1);
+        int close = css.indexOf('}', open + 1);
         if (close <= open) {
             throw new CSSSyntaxException("Unterminated @constants block");
         }
-        Declaration[] declarations = parseDeclarations(stripped.substring(open + 1, close));
+        Declaration[] declarations = parseDeclarations(css.substring(open + 1, close));
         for (Declaration declaration : declarations) {
             theme.put("@" + declaration.property, declaration.value);
         }
@@ -500,31 +500,41 @@ public class CSSThemeCompiler {
         return out;
     }
 
-    private Rule[] parseRules(String css) {
-        String stripped = stripComments(css);
+    private Rule[] parseRulesWithMedia(String css) {
         ArrayList<Rule> out = new ArrayList<Rule>();
+        parseRulesInto(css, out, false);
+        return out.toArray(new Rule[out.size()]);
+    }
+
+    private void parseRulesInto(String css, ArrayList<Rule> out, boolean darkContext) {
         int pos = 0;
-        while (pos < stripped.length()) {
-            while (pos < stripped.length() && Character.isWhitespace(stripped.charAt(pos))) {
+        int len = css.length();
+        while (pos < len) {
+            while (pos < len && Character.isWhitespace(css.charAt(pos))) {
                 pos++;
             }
-            if (pos >= stripped.length()) {
+            if (pos >= len) {
                 break;
             }
-            int open = stripped.indexOf('{', pos);
+            int open = css.indexOf('{', pos);
             if (open < 0) {
-                throw new CSSSyntaxException("Missing '{' in CSS rule near: " + stripped.substring(pos));
-            }
-            int close = stripped.indexOf('}', open + 1);
-            if (close < 0) {
-                throw new CSSSyntaxException("Missing '}' for CSS rule: " + stripped.substring(pos, open).trim());
-            }
-            if (stripped.indexOf('{', open + 1) > -1 && stripped.indexOf('{', open + 1) < close) {
-                throw new CSSSyntaxException("Nested '{' is not supported in CSS block: " + stripped.substring(pos, open).trim());
+                throw new CSSSyntaxException("Missing '{' in CSS rule near: " + css.substring(pos));
             }
 
-            String selectors = stripped.substring(pos, open).trim();
+            String selectors = css.substring(pos, open).trim();
+            int close = findMatchingBrace(css, open);
+            if (close < 0) {
+                throw new CSSSyntaxException("Missing '}' for CSS rule: " + selectors);
+            }
+
             if (selectors.startsWith("@constants")) {
+                pos = close + 1;
+                continue;
+            }
+            if (selectors.startsWith("@media")) {
+                String mediaQuery = selectors.substring("@media".length()).trim();
+                boolean nextDarkContext = darkContext || isDarkModeMediaQuery(mediaQuery);
+                parseRulesInto(css.substring(open + 1, close), out, nextDarkContext);
                 pos = close + 1;
                 continue;
             }
@@ -532,7 +542,7 @@ public class CSSThemeCompiler {
                 throw new CSSSyntaxException("Missing selector before '{'");
             }
 
-            String body = stripped.substring(open + 1, close).trim();
+            String body = css.substring(open + 1, close).trim();
             Declaration[] declarations = parseDeclarations(body);
             String[] selectorsList = splitOnChar(selectors, ',');
             for (String selectorEntry : selectorsList) {
@@ -541,14 +551,62 @@ public class CSSThemeCompiler {
                     throw new CSSSyntaxException("Empty selector in selector list: " + selectors);
                 }
                 Rule rule = new Rule();
-                rule.selector = selector;
+                rule.selector = darkContext ? toDarkSelector(selector) : selector;
                 rule.declarations = declarations;
                 out.add(rule);
             }
 
             pos = close + 1;
         }
-        return out.toArray(new Rule[out.size()]);
+    }
+
+    private int findMatchingBrace(String css, int openPos) {
+        int depth = 0;
+        int len = css.length();
+        for (int i = openPos; i < len; i++) {
+            char c = css.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private boolean isDarkModeMediaQuery(String mediaQuery) {
+        String normalized = mediaQuery == null ? "" : mediaQuery.toLowerCase();
+        return normalized.indexOf("prefers-color-scheme") > -1 && normalized.indexOf("dark") > -1;
+    }
+
+    private String toDarkSelector(String selector) {
+        String trimmed = selector == null ? "" : selector.trim();
+        if (trimmed.length() == 0 || ":root".equals(trimmed)) {
+            return trimmed;
+        }
+        if (trimmed.startsWith("$Dark")) {
+            return trimmed;
+        }
+
+        int pseudoPos = trimmed.indexOf(':');
+        int classStatePos = trimmed.indexOf('.');
+        int statePos = -1;
+        if (pseudoPos > -1 && classStatePos > -1) {
+            statePos = Math.min(pseudoPos, classStatePos);
+        } else if (pseudoPos > -1) {
+            statePos = pseudoPos;
+        } else if (classStatePos > -1) {
+            statePos = classStatePos;
+        }
+        String baseSelector = statePos > -1 ? trimmed.substring(0, statePos) : trimmed;
+        String stateSelector = statePos > -1 ? trimmed.substring(statePos) : "";
+        if ("*".equals(baseSelector) || baseSelector.length() == 0) {
+            baseSelector = "Component";
+        }
+        return "$Dark" + baseSelector + stateSelector;
     }
 
     private String stripComments(String css) {

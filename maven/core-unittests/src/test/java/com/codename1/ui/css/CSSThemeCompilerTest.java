@@ -75,4 +75,27 @@ public class CSSThemeCompilerTest extends UITestBase {
         );
     }
 
+    @Test
+    public void testCompilesDarkModeMediaQueriesToDarkUiids() {
+        CSSThemeCompiler compiler = new CSSThemeCompiler();
+        MutableResource resource = new MutableResource();
+
+        compiler.compile(
+                "Button{color:#111111;}"
+                + "@media (prefers-color-scheme: dark){"
+                + "Button{color:#eeeeee;background-color:#000000;}"
+                + "Button:pressed{color:#ff0000;}"
+                + "}",
+                resource,
+                "Theme"
+        );
+
+        Hashtable theme = resource.getTheme("Theme");
+        assertEquals("111111", theme.get("Button.fgColor"));
+        assertEquals("eeeeee", theme.get("$DarkButton.fgColor"));
+        assertEquals("000000", theme.get("$DarkButton.bgColor"));
+        assertEquals("255", theme.get("$DarkButton.transparency"));
+        assertEquals("ff0000", theme.get("$DarkButton.press#fgColor"));
+    }
+
 }

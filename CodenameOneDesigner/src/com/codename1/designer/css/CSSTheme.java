@@ -6941,6 +6941,117 @@ public class CSSTheme {
         }
         return out;
     }
+
+    private static String transformDarkModeMediaQueries(String css) {
+        StringBuilder out = new StringBuilder();
+        int len = css.length();
+        int pos = 0;
+        while (pos < len) {
+            int mediaPos = css.indexOf("@media", pos);
+            if (mediaPos < 0) {
+                out.append(css.substring(pos));
+                break;
+            }
+            out.append(css.substring(pos, mediaPos));
+            int open = css.indexOf('{', mediaPos);
+            if (open < 0) {
+                out.append(css.substring(mediaPos));
+                break;
+            }
+            String query = css.substring(mediaPos + "@media".length(), open).trim().toLowerCase();
+            int close = findMatchingBrace(css, open);
+            if (close < 0) {
+                out.append(css.substring(mediaPos));
+                break;
+            }
+            String block = css.substring(open + 1, close);
+            if (query.indexOf("prefers-color-scheme") > -1 && query.indexOf("dark") > -1) {
+                out.append(prefixSelectorsWithDark(block));
+            } else {
+                out.append(css.substring(mediaPos, close + 1));
+            }
+            pos = close + 1;
+        }
+        return out.toString();
+    }
+
+    private static String prefixSelectorsWithDark(String block) {
+        StringBuilder out = new StringBuilder();
+        int len = block.length();
+        int pos = 0;
+        while (pos < len) {
+            while (pos < len && Character.isWhitespace(block.charAt(pos))) {
+                out.append(block.charAt(pos));
+                pos++;
+            }
+            if (pos >= len) {
+                break;
+            }
+            int open = block.indexOf('{', pos);
+            if (open < 0) {
+                out.append(block.substring(pos));
+                break;
+            }
+            int close = findMatchingBrace(block, open);
+            if (close < 0) {
+                out.append(block.substring(pos));
+                break;
+            }
+            String selectors = block.substring(pos, open);
+            out.append(toDarkSelectors(selectors)).append('{').append(block.substring(open + 1, close)).append('}');
+            pos = close + 1;
+        }
+        return out.toString();
+    }
+
+    private static String toDarkSelectors(String selectors) {
+        StringBuilder out = new StringBuilder();
+        String[] parts = selectors.split(",");
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) {
+                out.append(',');
+            }
+            String selector = parts[i].trim();
+            if (selector.length() == 0 || selector.startsWith("$Dark")) {
+                out.append(parts[i]);
+                continue;
+            }
+            int pseudoPos = selector.indexOf(':');
+            int classPos = selector.indexOf('.');
+            int statePos = -1;
+            if (pseudoPos > -1 && classPos > -1) {
+                statePos = Math.min(pseudoPos, classPos);
+            } else if (pseudoPos > -1) {
+                statePos = pseudoPos;
+            } else if (classPos > -1) {
+                statePos = classPos;
+            }
+            String base = statePos > -1 ? selector.substring(0, statePos) : selector;
+            String suffix = statePos > -1 ? selector.substring(statePos) : "";
+            if ("*".equals(base) || base.length() == 0) {
+                base = "Component";
+            }
+            out.append("$Dark").append(base).append(suffix);
+        }
+        return out.toString();
+    }
+
+    private static int findMatchingBrace(String css, int openPos) {
+        int depth = 0;
+        int len = css.length();
+        for (int i = openPos; i < len; i++) {
+            char c = css.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
     
     public static CSSTheme load(URL uri) throws IOException {
         try {
@@ -6948,6 +7059,8 @@ public class CSSTheme {
             InputSource source = new InputSource();
             InputStream stream = uri.openStream();
             String stringContents = Util.readToString(stream);
+
+            stringContents = transformDarkModeMediaQueries(stringContents);
 
             // The flute parser chokes on properties beginning with -- so we need to replace these with cn1 prefix
             // for CSS variable support.
