@@ -420,6 +420,7 @@ public class CN1Playground extends Lifecycle {
         if (appForm == null) {
             return;
         }
+        restoreThemeDefaults();
         List<PlaygroundRunner.Diagnostic> diagnostics = new ArrayList<PlaygroundRunner.Diagnostic>();
         List<PlaygroundRunner.InlineMessage> messages = new ArrayList<PlaygroundRunner.InlineMessage>();
         try {
@@ -437,6 +438,20 @@ public class CN1Playground extends Lifecycle {
         cssEditor.setInlineMessages(messages);
         cssEditor.setUiidCompletions(PlaygroundCssSupport.collectVisibleUiids(previewRoot));
         appForm.refreshTheme();
+    }
+
+    private void restoreThemeDefaults() {
+        if (theme == null) {
+            return;
+        }
+        String[] names = theme.getThemeResourceNames();
+        if (names == null || names.length == 0) {
+            return;
+        }
+        Hashtable baseTheme = theme.getTheme(names[0]);
+        if (baseTheme != null) {
+            UIManager.getInstance().setThemeProps(baseTheme);
+        }
     }
 
     private void applyCssToPreview(Form form, String css) {
