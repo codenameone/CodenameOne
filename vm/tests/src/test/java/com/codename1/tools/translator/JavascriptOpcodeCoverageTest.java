@@ -81,8 +81,8 @@ class JavascriptOpcodeCoverageTest {
                         && translatedApp.contains("\"JsTypeBase\": true")
                         && translatedApp.contains("\"JsTypeIface\": true"),
                 "Class metadata should include static assignability information");
-        assertTrue(translatedApp.contains("const __class = jvm.classes[__target.__class];")
-                        && translatedApp.contains("__class.methods && __class.methods["),
+        assertTrue(translatedApp.contains("jvm.classes[__target.__class] && jvm.classes[__target.__class].methods")
+                        && translatedApp.contains("jvm.classes[__target.__class].methods["),
                 "Virtual/interface dispatch should use an exact-class method-table fast path");
         assertTrue(translatedApp.contains("jvm.resolveVirtual(__target.__class"), "Dispatch should retain inheritance/interface fallback");
         assertTrue(runtime.contains("resolveVirtual(className, methodId)"), "Runtime should resolve virtual methods by class name");
