@@ -6,6 +6,7 @@ import com.codename1.io.Log;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.Util;
 import com.codename1.system.Lifecycle;
+import com.codename1.system.NativeLookup;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
@@ -55,6 +56,7 @@ public class CN1Playground extends Lifecycle {
     private int editSequence;
     private int autoRunSequence;
     private Tabs editorTabs;
+    private WebsiteThemeNative websiteThemeNative;
 
     @Override
     public void runApp() {
@@ -528,11 +530,21 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void initWebsiteThemeSync(Form form) {
+        websiteThemeNative = NativeLookup.create(WebsiteThemeNative.class);
+        if (websiteThemeNative == null || !websiteThemeNative.isSupported()) {
+            return;
+        }
+
         refreshWebsiteTheme(form);
         UITimer.timer(900, true, form, () -> refreshWebsiteTheme(form));
     }
 
     private void notifyWebsiteUiReady() {
+        if (websiteThemeNative != null && websiteThemeNative.isSupported()) {
+            websiteThemeNative.notifyUiReady();
+            return;
+        }
+
         BrowserComponent js = CN.getSharedJavascriptContext();
         if (js == null) {
             return;
@@ -552,55 +564,31 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void refreshWebsiteTheme(Form form) {
-        BrowserComponent js = CN.getSharedJavascriptContext();
-        if (js == null) {
+        if (websiteThemeNative == null || !websiteThemeNative.isSupported()) {
             return;
         }
 
-        js.execute(
-                "callback.onSuccess((function(){"
-                        + "var dark = false;"
-                        + "var explicit = false;"
-                        + "try {"
-                        + "var parentDoc = (window.parent && window.parent.document) ? window.parent.document : null;"
-                        + "if (parentDoc && parentDoc.body && parentDoc.body.classList) {"
-                        + "dark = parentDoc.body.classList.contains('dark') || parentDoc.body.classList.contains('cn1-initializr-dark');"
-                        + "}"
-                        + "if (!dark && window.parent && window.parent.localStorage) {"
-                        + "var pref = window.parent.localStorage.getItem('pref-theme');"
-                        + "if (pref === 'dark') { dark = true; explicit = true; }"
-                        + "else if (pref === 'light') { dark = false; explicit = true; }"
-                        + "}"
-                        + "} catch (e) {}"
-                        + "if (!explicit && !dark && window.matchMedia) {"
-                        + "dark = window.matchMedia('(prefers-color-scheme: dark)').matches;"
-                        + "}"
-                        + "return dark ? 'true' : 'false';"
-                        + "})())",
-                res -> {
-                    boolean dark = Display.getInstance().isSimulator()
-                            ? DEFAULT_DARK_MODE
-                            : "true".equals(String.valueOf(res));
+        boolean dark = Display.getInstance().isSimulator()
+                ? DEFAULT_DARK_MODE
+                : websiteThemeNative.isDarkMode();
 
-                    if (dark != websiteDarkMode) {
-                        websiteDarkMode = dark;
-                        Display.getInstance().setDarkMode(dark);
-                        applyWebsiteTheme(form, dark);
-                        applyTabsTheme(dark);
-                        form.refreshTheme();
+        if (dark != websiteDarkMode) {
+            websiteDarkMode = dark;
+            Display.getInstance().setDarkMode(dark);
+            applyWebsiteTheme(form, dark);
+            applyTabsTheme(dark);
+            form.refreshTheme();
 
-                        if (editor != null) {
-                            editor.applyTheme(dark);
-                        }
-                        if (cssEditor != null) {
-                            cssEditor.applyTheme(dark);
-                        }
-                        if (inspector != null) {
-                            inspector.applyTheme(dark);
-                        }
-                    }
-                }
-        );
+            if (editor != null) {
+                editor.applyTheme(dark);
+            }
+            if (cssEditor != null) {
+                cssEditor.applyTheme(dark);
+            }
+            if (inspector != null) {
+                inspector.applyTheme(dark);
+            }
+        }
     }
 
     private void applyWebsiteTheme(Component component, boolean dark) {
@@ -661,11 +649,6 @@ public class CN1Playground extends Lifecycle {
             case "PlaygroundTitle":
             case "PlaygroundPanel":
             case "PlaygroundPreview":
-            case "PlaygroundSideCommand":
-            case "PlaygroundMenuSection":
-            case "PlaygroundMenuSectionTitle":
-            case "PlaygroundMenuEmpty":
-            case "PlaygroundMenuContainer":
             case "PlaygroundEmbeddedForm":
             case "PlaygroundEmbeddedTitleArea":
             case "PlaygroundInspectorRoot":
@@ -677,12 +660,7 @@ public class CN1Playground extends Lifecycle {
             case "PlaygroundPropUnit":
             case "PlaygroundPropEmpty":
             case "PlaygroundColorPreview":
-            case "SideNavigationPanel":
-            case "SideCommand":
-            case "StatusBarSideMenu":
             case "PlaygroundInspectorTreeNode":
-            case "PlaygroundSideCommandLine1":
-            case "PlaygroundSideCommandLine2":
                 return true;
             default:
                 return false;

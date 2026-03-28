@@ -19,6 +19,7 @@ import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
@@ -490,12 +491,14 @@ public class Initializr extends Lifecycle {
             return;
         }
         websiteDarkMode = websiteThemeNative.isDarkMode();
+        Display.getInstance().setDarkMode(websiteDarkMode);
         applyWebsiteTheme(form, websiteDarkMode);
         form.refreshTheme();
         UITimer.timer(900, true, form, () -> {
             boolean dark = websiteThemeNative.isDarkMode();
             if (dark != websiteDarkMode) {
                 websiteDarkMode = dark;
+                Display.getInstance().setDarkMode(dark);
                 applyWebsiteTheme(form, dark);
                 form.refreshTheme();
             }

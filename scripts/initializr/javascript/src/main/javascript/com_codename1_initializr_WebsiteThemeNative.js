@@ -2,33 +2,49 @@
 
 var o = {};
 
-    o.isDarkMode_ = function(callback) {
-        var dark = false;
-        var hasExplicitPreference = false;
+    function readWebsiteThemePreference() {
         try {
-            var parentDoc = (window.parent && window.parent.document) ? window.parent.document : null;
-            if (parentDoc && parentDoc.body && parentDoc.body.classList) {
-                dark = parentDoc.body.classList.contains("dark") || parentDoc.body.classList.contains("cn1-initializr-dark");
-            }
-            if (!dark && window.parent && window.parent.localStorage) {
-                var pref = window.parent.localStorage.getItem("pref-theme");
-                if (pref === "dark") {
-                    dark = true;
-                    hasExplicitPreference = true;
-                } else if (pref === "light") {
-                    dark = false;
-                    hasExplicitPreference = true;
+            var parentWindow = (window.parent && window.parent !== window) ? window.parent : null;
+            var parentDoc = parentWindow && parentWindow.document ? parentWindow.document : null;
+            var parentBody = parentDoc && parentDoc.body ? parentDoc.body : null;
+            var classes = parentBody && parentBody.classList ? parentBody.classList : null;
+            if (classes) {
+                if (classes.contains("dark") || classes.contains("cn1-initializr-dark")) {
+                    return true;
                 }
+                if (classes.contains("light") || classes.contains("cn1-initializr-light")) {
+                    return false;
+                }
+            }
+
+            if (parentWindow && parentWindow.localStorage) {
+                var pref = parentWindow.localStorage.getItem("pref-theme");
+                if (pref === "dark") {
+                    return true;
+                }
+                if (pref === "light") {
+                    return false;
+                }
+            }
+
+            var mediaWindow = parentWindow || window;
+            if (mediaWindow.matchMedia) {
+                return mediaWindow.matchMedia("(prefers-color-scheme: dark)").matches;
             }
         } catch (ignored) {
             // Ignore parent access failures and fallback below.
         }
-        if (!hasExplicitPreference && !dark && window.matchMedia) {
-            dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        }
-        callback.complete(!!dark);
-    };
 
+        if (window.matchMedia) {
+            return window.matchMedia("(prefers-color-scheme: dark)").matches;
+        }
+
+        return false;
+    }
+
+    o.isDarkMode_ = function(callback) {
+        callback.complete(!!readWebsiteThemePreference());
+    };
 
     o.notifyUiReady_ = function(callback) {
         var sendReady = function() {
@@ -55,6 +71,6 @@ var o = {};
         callback.complete(true);
     };
 
-exports.com_codename1_initializr_WebsiteThemeNative= o;
+exports.com_codename1_initializr_WebsiteThemeNative = o;
 
 })(cn1_get_native_interfaces());

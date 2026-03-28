@@ -90,18 +90,10 @@ SideNavigationPanel {
     padding: 2mm 1mm 1mm 1mm;
 }
 
-SideNavigationPanelDark {
-    background: #0f172a;
-    padding: 2mm 1mm 1mm 1mm;
-}
-
 @media platform-ios {
     /** iOS Only styles for side menu. */
     SideNavigationPanel {
         /** Extra top padding to deal with notch on iPhoneX */
-        padding: 6mm 1mm 1mm 1mm;
-    }
-    SideNavigationPanelDark {
         padding: 6mm 1mm 1mm 1mm;
     }
 }
@@ -118,24 +110,8 @@ SideCommand {
     border-bottom: 2px solid #cccccc;
 }
 
-SideCommandDark {
-    padding: 1mm;
-    border: none;
-    text-decoration: none;
-    color: #e5e7eb;
-    background: #0f172a;
-    font-family: "native:MainLight";
-    font-size: 4mm;
-    border-bottom: 2px solid #1f2937;
-}
-
 StatusBarSideMenu {
     background: white;
-    padding: 0mm;
-}
-
-StatusBarSideMenuDark {
-    background: #0f172a;
     padding: 0mm;
 }
 
@@ -150,17 +126,6 @@ PlaygroundSideCommand {
     border-bottom: 2px solid #cccccc;
 }
 
-PlaygroundSideCommandDark {
-    padding: 1mm;
-    border: none;
-    text-decoration: none;
-    color: #e5e7eb;
-    background: #0f172a;
-    font-family: "native:MainLight";
-    font-size: 4mm;
-    border-bottom: 2px solid #1f2937;
-}
-
 PlaygroundMenuSection {
     padding: 2mm 1mm 0.5mm 1mm;
     margin: 1mm 0 0 0;
@@ -169,24 +134,8 @@ PlaygroundMenuSection {
     background: white;
 }
 
-PlaygroundMenuSectionDark {
-    padding: 2mm 1mm 0.5mm 1mm;
-    margin: 1mm 0 0 0;
-    border: none;
-    border-bottom: 1px solid #334155;
-    background: #0f172a;
-}
-
 PlaygroundMenuSectionTitle {
     color: #6b7280;
-    font-family: "native:MainBold";
-    font-size: 2.6mm;
-    text-decoration: none;
-    padding: 0 0 1mm 0;
-}
-
-PlaygroundMenuSectionTitleDark {
-    color: #94a3b8;
     font-family: "native:MainBold";
     font-size: 2.6mm;
     text-decoration: none;
@@ -200,20 +149,56 @@ PlaygroundMenuEmpty {
     padding: 1mm;
 }
 
-PlaygroundMenuEmptyDark {
-    color: #94a3b8;
-    font-family: "native:MainLight";
-    font-size: 3mm;
-    padding: 1mm;
-    background: #0f172a;
-}
-
 PlaygroundMenuContainer {
     background: white;
 }
 
-PlaygroundMenuContainerDark {
-    background: #0f172a;
+@media (prefers-color-scheme: dark) {
+    SideNavigationPanel {
+        background: #0f172a;
+    }
+
+    SideCommand {
+        color: #e5e7eb;
+        background: #0f172a;
+        border-bottom: 2px solid #1f2937;
+    }
+
+    StatusBarSideMenu {
+        background: #0f172a;
+    }
+
+    PlaygroundSideCommand {
+        color: #e5e7eb;
+        background: #0f172a;
+        border-bottom: 2px solid #1f2937;
+    }
+
+    PlaygroundSideCommandLine1 {
+        color: #f8fafc;
+    }
+
+    PlaygroundSideCommandLine2 {
+        color: #94a3b8;
+    }
+
+    PlaygroundMenuSection {
+        border-bottom: 1px solid #334155;
+        background: #0f172a;
+    }
+
+    PlaygroundMenuSectionTitle {
+        color: #94a3b8;
+    }
+
+    PlaygroundMenuEmpty {
+        color: #94a3b8;
+        background: #0f172a;
+    }
+
+    PlaygroundMenuContainer {
+        background: #0f172a;
+    }
 }
 
 PlaygroundEmbeddedForm {

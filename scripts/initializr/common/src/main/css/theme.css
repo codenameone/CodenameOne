@@ -53,6 +53,18 @@ SideCommand {
     border-bottom: 2px solid #cccccc;
 }
 
+@media (prefers-color-scheme: dark) {
+    SideNavigationPanel {
+        background: #0f172a;
+    }
+
+    SideCommand {
+        color: #e2e8f0;
+        background: #0f172a;
+        border-bottom: 2px solid #334155;
+    }
+}
+
 InitializrForm {
     background-color: #f3f6fb;
 }
