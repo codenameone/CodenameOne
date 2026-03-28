@@ -45,8 +45,7 @@ public class JsLocaleTimeZoneApp {
             score |= 128;
         }
 
-        StringBuffer buffer = new StringBuffer();
-        String formattedDate = DateFormat.getDateInstance(DateFormat.SHORT).format(sample, buffer);
+        String formattedDate = DateFormat.getDateInstance(DateFormat.SHORT).format(sample);
         if (formattedDate != null && formattedDate.length() > 0) {
             score |= 256;
         }

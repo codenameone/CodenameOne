@@ -68,7 +68,10 @@ public class Parser extends ClassVisitor {
             System.out.println("Parsing: " + sourceFile.getAbsolutePath());
         }
         BytecodeMethod.setDependencyGraph(dependencyGraph);
-        ClassReader r = new ClassReader(Files.newInputStream(sourceFile.toPath()));
+        ClassReader r;
+        try (InputStream in = Files.newInputStream(sourceFile.toPath())) {
+            r = new ClassReader(in);
+        }
         Parser p = new Parser();
         
         p.clsName = r.getClassName().replace('/', '_').replace('$', '_');

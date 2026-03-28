@@ -166,7 +166,9 @@ public class ByteCodeTranslator {
             System.out.println("Generating Unit Tests");
             ByteCodeClass.setSaveUnitTests(true);
         }
-        if(args[0].equalsIgnoreCase("csharp")) {
+        if(args[0].equalsIgnoreCase("ios")) {
+            output = OutputType.OUTPUT_TYPE_IOS;
+        } else if(args[0].equalsIgnoreCase("csharp")) {
             output = OutputType.OUTPUT_TYPE_CSHARP;
         } else if(args[0].equalsIgnoreCase("clean")) {
             output = OutputType.OUTPUT_TYPE_CLEAN;

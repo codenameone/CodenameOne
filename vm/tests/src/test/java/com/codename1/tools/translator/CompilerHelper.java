@@ -13,7 +13,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.TreeMap;
+import java.util.stream.Stream;
 
 /**
  * Helper class to manage external JDK compilers.
@@ -30,6 +32,9 @@ public class CompilerHelper {
         checkAndAddJdk("17", System.getenv("JDK_17_HOME"));
         checkAndAddJdk("21", System.getenv("JDK_21_HOME"));
         checkAndAddJdk("25", System.getenv("JDK_25_HOME"));
+        checkAndAddDetectedJdk(System.getenv("JAVA_HOME"));
+
+        discoverLocalJdks();
 
         // Fallback: If no env vars, assume current JVM is JDK 8 (or whatever is running)
         // This ensures tests pass locally or in environments not fully configured with all JDKs
@@ -47,6 +52,94 @@ public class CompilerHelper {
         if (path != null && !path.isEmpty() && new File(path).exists()) {
             availableJdks.put(version, Paths.get(path));
         }
+    }
+
+    private static void checkAndAddDetectedJdk(String path) {
+        if (path == null || path.isEmpty()) {
+            return;
+        }
+        Path jdkHome = normalizeJdkHome(Paths.get(path));
+        String version = detectJdkVersion(jdkHome);
+        if (version != null) {
+            availableJdks.put(version, jdkHome);
+        }
+    }
+
+    private static void discoverLocalJdks() {
+        Path userJdks = Paths.get(System.getProperty("user.home"), "Library", "Java", "JavaVirtualMachines");
+        Path systemJdks = Paths.get("/Library", "Java", "JavaVirtualMachines");
+        scanJdkDirectory(userJdks);
+        scanJdkDirectory(systemJdks);
+    }
+
+    private static void scanJdkDirectory(Path root) {
+        if (!Files.isDirectory(root)) {
+            return;
+        }
+        try (Stream<Path> paths = Files.list(root)) {
+            paths.forEach(candidate -> {
+                String version = detectJdkVersion(candidate);
+                if (version != null) {
+                    availableJdks.put(version, normalizeJdkHome(candidate));
+                }
+            });
+        } catch (IOException ignored) {
+        }
+    }
+
+    private static Path normalizeJdkHome(Path path) {
+        if (path == null) {
+            return null;
+        }
+        Path contentsHome = path.resolve("Contents").resolve("Home");
+        if (Files.exists(contentsHome.resolve("bin").resolve(executableName("javac")))) {
+            return contentsHome;
+        }
+        return path;
+    }
+
+    private static String detectJdkVersion(Path path) {
+        Path jdkHome = normalizeJdkHome(path);
+        if (jdkHome == null || !Files.exists(jdkHome.resolve("bin").resolve(executableName("javac")))) {
+            return null;
+        }
+
+        Path releaseFile = jdkHome.resolve("release");
+        if (Files.isRegularFile(releaseFile)) {
+            Properties props = new Properties();
+            try (InputStream in = Files.newInputStream(releaseFile)) {
+                props.load(in);
+                String version = props.getProperty("JAVA_VERSION");
+                if (version != null) {
+                    version = version.replace("\"", "").trim();
+                    int major = parseJavaMajor(version);
+                    if (major > 0) {
+                        return Integer.toString(major);
+                    }
+                }
+            } catch (IOException ignored) {
+            }
+        }
+
+        int major = parseJavaMajor(jdkHome.getFileName().toString());
+        if (major > 0) {
+            return Integer.toString(major);
+        }
+        Path parent = jdkHome.getParent();
+        if (parent != null) {
+            major = parseJavaMajor(parent.getFileName().toString());
+            if (major > 0) {
+                return Integer.toString(major);
+            }
+        }
+        return null;
+    }
+
+    private static String executableName(String base) {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return base + ".exe";
+        }
+        return base;
     }
 
     public static List<CompilerConfig> getAvailableCompilers(String targetVersion) {
@@ -275,9 +368,10 @@ public class CompilerHelper {
         Files.createDirectories(outputDir);
         Path javaApiRoot = Paths.get("..", "JavaAPI", "src").normalize().toAbsolutePath();
         List<String> sources = new ArrayList<>();
-        Files.walk(javaApiRoot)
-                .filter(p -> p.toString().endsWith(".java"))
-                .forEach(p -> sources.add(p.toString()));
+        try (Stream<Path> paths = Files.walk(javaApiRoot)) {
+            paths.filter(p -> p.toString().endsWith(".java"))
+                    .forEach(p -> sources.add(p.toString()));
+        }
 
         List<String> args = new ArrayList<>();
 
@@ -308,18 +402,20 @@ public class CompilerHelper {
     }
 
     public static void copyDirectory(Path sourceDir, Path targetDir) throws IOException {
-        Files.walk(sourceDir).forEach(source -> {
-            try {
-                Path destination = targetDir.resolve(sourceDir.relativize(source));
-                if (Files.isDirectory(source)) {
-                    Files.createDirectories(destination);
-                } else {
-                    Files.createDirectories(destination.getParent());
-                    Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
+        try (Stream<Path> paths = Files.walk(sourceDir)) {
+            paths.forEach(source -> {
+                try {
+                    Path destination = targetDir.resolve(sourceDir.relativize(source));
+                    if (Files.isDirectory(source)) {
+                        Files.createDirectories(destination);
+                    } else {
+                        Files.createDirectories(destination.getParent());
+                        Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        });
+            });
+        }
     }
 }

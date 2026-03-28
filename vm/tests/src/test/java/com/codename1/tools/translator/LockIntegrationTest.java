@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,7 +29,9 @@ class LockIntegrationTest {
 
         // 2. Compile Test App against JavaAPI
         List<String> sources = new ArrayList<>();
-        Files.walk(sourceDir).filter(p -> p.toString().endsWith(".java")).forEach(p -> sources.add(p.toString()));
+        try (Stream<Path> paths = Files.walk(sourceDir)) {
+            paths.filter(p -> p.toString().endsWith(".java")).forEach(p -> sources.add(p.toString()));
+        }
 
         List<String> compileArgs = new ArrayList<>();
         assertTrue(CompilerHelper.isJavaApiCompatible(config),

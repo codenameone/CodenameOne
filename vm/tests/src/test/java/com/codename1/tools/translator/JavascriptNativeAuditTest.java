@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -27,9 +28,10 @@ class JavascriptNativeAuditTest {
         CompilerHelper.compileJavaAPI(javaApiDir, config);
 
         final List<String> uncategorized = new ArrayList<String>();
-        Files.walk(javaApiDir)
-                .filter(path -> path.toString().endsWith(".class"))
-                .forEach(path -> inspectClass(path, uncategorized));
+        try (Stream<Path> paths = Files.walk(javaApiDir)) {
+            paths.filter(path -> path.toString().endsWith(".class"))
+                    .forEach(path -> inspectClass(path, uncategorized));
+        }
 
         Collections.sort(uncategorized);
         assertTrue(uncategorized.isEmpty(),

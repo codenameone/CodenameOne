@@ -7,9 +7,11 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -175,7 +177,9 @@ class JavascriptTargetIntegrationTest {
         CompilerHelper.compileJavaAPI(javaApiDir, config);
 
         List<String> sources = new ArrayList<String>();
-        Files.walk(sourceDir).filter(path -> path.toString().endsWith(".java")).forEach(path -> sources.add(path.toString()));
+        try (Stream<Path> paths = Files.walk(sourceDir)) {
+            paths.filter(path -> path.toString().endsWith(".java")).forEach(path -> sources.add(path.toString()));
+        }
 
         List<String> compileArgs = new ArrayList<String>();
         compileArgs.add("-source");
@@ -235,20 +239,31 @@ class JavascriptTargetIntegrationTest {
     }
 
     static String loadFixture(String name) throws Exception {
-        InputStream input = JavascriptTargetIntegrationTest.class.getResourceAsStream(name);
-        if (input == null) {
-            throw new IllegalStateException("Missing javascript test fixture " + name);
-        }
-        try {
-            byte[] buffer = new byte[8192];
-            StringBuilder out = new StringBuilder();
-            int len;
-            while ((len = input.read(buffer)) > -1) {
-                out.append(new String(buffer, 0, len, StandardCharsets.UTF_8));
+        InputStream input = JavascriptTargetIntegrationTest.class.getResourceAsStream("/com/codename1/tools/translator/" + name);
+        if (input != null) {
+            try {
+                byte[] buffer = new byte[8192];
+                StringBuilder out = new StringBuilder();
+                int len;
+                while ((len = input.read(buffer)) > -1) {
+                    out.append(new String(buffer, 0, len, StandardCharsets.UTF_8));
+                }
+                return out.toString();
+            } finally {
+                input.close();
             }
-            return out.toString();
-        } finally {
-            input.close();
         }
+
+        Path modulePath = Paths.get("src", "test", "resources", "com", "codename1", "tools", "translator", name);
+        if (Files.exists(modulePath)) {
+            return new String(Files.readAllBytes(modulePath), StandardCharsets.UTF_8);
+        }
+
+        Path repoPath = Paths.get("vm", "tests", "src", "test", "resources", "com", "codename1", "tools", "translator", name);
+        if (Files.exists(repoPath)) {
+            return new String(Files.readAllBytes(repoPath), StandardCharsets.UTF_8);
+        }
+
+        throw new IllegalStateException("Missing javascript test fixture " + name);
     }
 }
