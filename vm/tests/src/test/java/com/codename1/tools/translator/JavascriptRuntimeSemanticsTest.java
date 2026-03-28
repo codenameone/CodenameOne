@@ -109,6 +109,64 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void preservesHostEventQueueOrderingThroughWorkerProtocol(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-host-event-queue-src");
+        Path classesDir = Files.createTempDirectory("js-host-event-queue-classes");
+        Path javaApiDir = Files.createTempDirectory("js-host-event-queue-javaapi");
+
+        Path vmHostDir = sourceDir.resolve("com").resolve("codename1").resolve("impl").resolve("platform").resolve("js");
+        Files.createDirectories(vmHostDir);
+        Files.write(vmHostDir.resolve("VMHost.java"),
+                JavascriptTargetIntegrationTest.loadFixture("com/codename1/impl/platform/js/VMHost.java").getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("JsHostEventQueueApp.java"),
+                JavascriptTargetIntegrationTest.loadFixture("JsHostEventQueueApp.java").getBytes(StandardCharsets.UTF_8));
+
+        JavascriptTargetIntegrationTest.compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-host-event-queue-output");
+        JavascriptTargetIntegrationTest.runJavascriptTranslator(classesDir, outputDir, "JsHostEventQueueApp");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsHostEventQueueApp-js");
+        WorkerRunResult result = runGeneratedWorkerBundleWithQueuedEvents(distDir);
+
+        assertEquals("result", result.type, "Generated worker bundle should complete after queued host events");
+        assertEquals(4120, result.result, "Worker should preserve FIFO event ordering and return -1 when the queue is empty");
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Generated worker bundle should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void propagatesHostCallbackErrorsDeterministicallyThroughWorkerProtocol(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-host-error-src");
+        Path classesDir = Files.createTempDirectory("js-host-error-classes");
+        Path javaApiDir = Files.createTempDirectory("js-host-error-javaapi");
+
+        Path vmHostDir = sourceDir.resolve("com").resolve("codename1").resolve("impl").resolve("platform").resolve("js");
+        Files.createDirectories(vmHostDir);
+        Files.write(vmHostDir.resolve("VMHost.java"),
+                JavascriptTargetIntegrationTest.loadFixture("com/codename1/impl/platform/js/VMHost.java").getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("JsHostCallbackErrorApp.java"),
+                JavascriptTargetIntegrationTest.loadFixture("JsHostCallbackErrorApp.java").getBytes(StandardCharsets.UTF_8));
+
+        JavascriptTargetIntegrationTest.compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-host-error-output");
+        JavascriptTargetIntegrationTest.runJavascriptTranslator(classesDir, outputDir, "JsHostCallbackErrorApp");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsHostCallbackErrorApp-js");
+        WorkerRunResult result = runGeneratedWorkerBundleWithHostCallbackError(distDir);
+
+        assertEquals("error", result.type, "Generated worker bundle should surface host callback failures as worker errors");
+        assertTrue(result.errorMessage != null && result.errorMessage.contains("Injected host failure 7"),
+                "Worker should expose a deterministic host callback error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void executesGeneratedWorkerProtocolEndToEnd(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 
@@ -261,6 +319,40 @@ class JavascriptRuntimeSemanticsTest {
         String errors = readAll(process.getErrorStream());
         int rc = process.waitFor();
         assertEquals(0, rc, "Node worker-thread event harness should exit cleanly. stderr: " + errors);
+        WorkerRunResult out = new WorkerRunResult();
+        out.rawMessage = output.trim();
+        out.type = extractJsonString(output, "type");
+        String result = extractJsonNumber(output, "result");
+        out.result = result == null ? Integer.MIN_VALUE : Integer.parseInt(result);
+        out.errorMessage = extractJsonString(output, "message");
+        return out;
+    }
+
+    private static WorkerRunResult runGeneratedWorkerBundleWithQueuedEvents(Path distDir) throws Exception {
+        Path harness = Files.createTempFile("js-worker-queued-events", ".js");
+        Files.write(harness, generatedWorkerHarnessSourceWithQueuedEvents(distDir).getBytes(StandardCharsets.UTF_8));
+        Process process = new ProcessBuilder("node", harness.toString()).start();
+        String output = readAll(process.getInputStream());
+        String errors = readAll(process.getErrorStream());
+        int rc = process.waitFor();
+        assertEquals(0, rc, "Node worker-thread queued-event harness should exit cleanly. stderr: " + errors);
+        WorkerRunResult out = new WorkerRunResult();
+        out.rawMessage = output.trim();
+        out.type = extractJsonString(output, "type");
+        String result = extractJsonNumber(output, "result");
+        out.result = result == null ? Integer.MIN_VALUE : Integer.parseInt(result);
+        out.errorMessage = extractJsonString(output, "message");
+        return out;
+    }
+
+    private static WorkerRunResult runGeneratedWorkerBundleWithHostCallbackError(Path distDir) throws Exception {
+        Path harness = Files.createTempFile("js-worker-host-error", ".js");
+        Files.write(harness, generatedWorkerHarnessSourceWithHostCallbackError(distDir).getBytes(StandardCharsets.UTF_8));
+        Process process = new ProcessBuilder("node", harness.toString()).start();
+        String output = readAll(process.getInputStream());
+        String errors = readAll(process.getErrorStream());
+        int rc = process.waitFor();
+        assertEquals(0, rc, "Node worker-thread host-error harness should exit cleanly. stderr: " + errors);
         WorkerRunResult out = new WorkerRunResult();
         out.rawMessage = output.trim();
         out.type = extractJsonString(output, "type");
@@ -639,6 +731,130 @@ class JavascriptRuntimeSemanticsTest {
                 + "setTimeout(function() {\n"
                 + "  if (!done) {\n"
                 + "    console.log(JSON.stringify({ type: 'error', message: 'Timed out waiting for worker event injection result' }));\n"
+                + "    worker.terminate().then(function() { process.exit(1); });\n"
+                + "  }\n"
+                + "}, 3000);\n";
+    }
+
+    private static String generatedWorkerHarnessSourceWithQueuedEvents(Path distDir) {
+        return ""
+                + "const fs = require('fs');\n"
+                + "const path = require('path');\n"
+                + "const { Worker } = require('worker_threads');\n"
+                + "const bootstrapPath = path.join(" + quoteJs(distDir.toString()) + ", '__node_worker_bootstrap_queue.js');\n"
+                + "fs.writeFileSync(bootstrapPath, `\n"
+                + "const fs = require('fs');\n"
+                + "const path = require('path');\n"
+                + "const vm = require('vm');\n"
+                + "const { parentPort, workerData } = require('worker_threads');\n"
+                + "global.self = global;\n"
+                + "global.window = global;\n"
+                + "global.global = global;\n"
+                + "global.postMessage = function(msg) { parentPort.postMessage(msg); };\n"
+                + "global.importScripts = function() {\n"
+                + "  for (const script of arguments) {\n"
+                + "    const scriptPath = path.join(workerData.distDir, String(script));\n"
+                + "    const src = fs.readFileSync(scriptPath, 'utf8');\n"
+                + "    vm.runInThisContext(src, { filename: scriptPath });\n"
+                + "  }\n"
+                + "};\n"
+                + "parentPort.on('message', function(data) {\n"
+                + "  if (typeof self.onmessage === 'function') {\n"
+                + "    self.onmessage({ data: data });\n"
+                + "  }\n"
+                + "});\n"
+                + "const workerSrc = fs.readFileSync(path.join(workerData.distDir, 'worker.js'), 'utf8');\n"
+                + "vm.runInThisContext(workerSrc, { filename: path.join(workerData.distDir, 'worker.js') });\n"
+                + "`);\n"
+                + "const worker = new Worker(bootstrapPath, { workerData: { distDir: " + quoteJs(distDir.toString()) + " } });\n"
+                + "let done = false;\n"
+                + "worker.on('message', function(msg) {\n"
+                + "  if (done) {\n"
+                + "    return;\n"
+                + "  }\n"
+                + "  if (msg && (msg.type === 'result' || msg.type === 'error')) {\n"
+                + "    done = true;\n"
+                + "    console.log(JSON.stringify(msg));\n"
+                + "    worker.terminate().then(function() { process.exit(0); });\n"
+                + "  }\n"
+                + "});\n"
+                + "worker.on('error', function(err) {\n"
+                + "  if (done) {\n"
+                + "    return;\n"
+                + "  }\n"
+                + "  done = true;\n"
+                + "  console.log(JSON.stringify({ type: 'error', message: String(err) }));\n"
+                + "  process.exit(1);\n"
+                + "});\n"
+                + "worker.postMessage({ type: 'event', code: 4 });\n"
+                + "worker.postMessage({ type: 'ui-event', code: 12 });\n"
+                + "worker.postMessage({ type: 'start' });\n"
+                + "setTimeout(function() {\n"
+                + "  if (!done) {\n"
+                + "    console.log(JSON.stringify({ type: 'error', message: 'Timed out waiting for queued event result' }));\n"
+                + "    worker.terminate().then(function() { process.exit(1); });\n"
+                + "  }\n"
+                + "}, 3000);\n";
+    }
+
+    private static String generatedWorkerHarnessSourceWithHostCallbackError(Path distDir) {
+        return ""
+                + "const fs = require('fs');\n"
+                + "const path = require('path');\n"
+                + "const { Worker } = require('worker_threads');\n"
+                + "const bootstrapPath = path.join(" + quoteJs(distDir.toString()) + ", '__node_worker_bootstrap_host_error.js');\n"
+                + "fs.writeFileSync(bootstrapPath, `\n"
+                + "const fs = require('fs');\n"
+                + "const path = require('path');\n"
+                + "const vm = require('vm');\n"
+                + "const { parentPort, workerData } = require('worker_threads');\n"
+                + "global.self = global;\n"
+                + "global.window = global;\n"
+                + "global.global = global;\n"
+                + "global.postMessage = function(msg) { parentPort.postMessage(msg); };\n"
+                + "global.importScripts = function() {\n"
+                + "  for (const script of arguments) {\n"
+                + "    const scriptPath = path.join(workerData.distDir, String(script));\n"
+                + "    const src = fs.readFileSync(scriptPath, 'utf8');\n"
+                + "    vm.runInThisContext(src, { filename: scriptPath });\n"
+                + "  }\n"
+                + "};\n"
+                + "parentPort.on('message', function(data) {\n"
+                + "  if (typeof self.onmessage === 'function') {\n"
+                + "    self.onmessage({ data: data });\n"
+                + "  }\n"
+                + "});\n"
+                + "const workerSrc = fs.readFileSync(path.join(workerData.distDir, 'worker.js'), 'utf8');\n"
+                + "vm.runInThisContext(workerSrc, { filename: path.join(workerData.distDir, 'worker.js') });\n"
+                + "`);\n"
+                + "const worker = new Worker(bootstrapPath, { workerData: { distDir: " + quoteJs(distDir.toString()) + " } });\n"
+                + "let done = false;\n"
+                + "worker.on('message', function(msg) {\n"
+                + "  if (done) {\n"
+                + "    return;\n"
+                + "  }\n"
+                + "  if (msg && msg.type === 'host-call') {\n"
+                + "    worker.postMessage({ type: 'host-callback', id: msg.id, error: true, errorMessage: 'Injected host failure ' + (msg.args && msg.args.length ? msg.args[0] : '?') });\n"
+                + "    return;\n"
+                + "  }\n"
+                + "  if (msg && (msg.type === 'result' || msg.type === 'error')) {\n"
+                + "    done = true;\n"
+                + "    console.log(JSON.stringify(msg));\n"
+                + "    worker.terminate().then(function() { process.exit(0); });\n"
+                + "  }\n"
+                + "});\n"
+                + "worker.on('error', function(err) {\n"
+                + "  if (done) {\n"
+                + "    return;\n"
+                + "  }\n"
+                + "  done = true;\n"
+                + "  console.log(JSON.stringify({ type: 'error', message: String(err) }));\n"
+                + "  process.exit(1);\n"
+                + "});\n"
+                + "worker.postMessage({ type: 'start' });\n"
+                + "setTimeout(function() {\n"
+                + "  if (!done) {\n"
+                + "    console.log(JSON.stringify({ type: 'error', message: 'Timed out waiting for host error result' }));\n"
                 + "    worker.terminate().then(function() { process.exit(1); });\n"
                 + "  }\n"
                 + "}, 3000);\n";

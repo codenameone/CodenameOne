@@ -57,6 +57,7 @@ const jvm = {
   runnable: [],
   threads: [],
   pendingHostCalls: Object.create(null),
+  eventQueue: [],
   mainClass: null,
   mainMethod: null,
   protocol: VM_PROTOCOL,
@@ -590,6 +591,7 @@ const jvm = {
     }
     if (message.type === this.protocol.messages.EVENT || message.type === this.protocol.messages.UI_EVENT) {
       this.lastEvent = message;
+      this.eventQueue.push(message);
       return true;
     }
     return false;
@@ -1207,5 +1209,13 @@ bindNative(["cn1_com_codename1_impl_platform_js_VMHost_getLastEventCode_R_int",
     return -1;
   }
   return jvm.lastEvent.code | 0;
+});
+bindNative(["cn1_com_codename1_impl_platform_js_VMHost_pollEventCode_R_int",
+            "cn1_com_codename1_impl_platform_js_VMHost_pollEventCode___R_int"], function*() {
+  if (!jvm.eventQueue.length) {
+    return -1;
+  }
+  const event = jvm.eventQueue.shift();
+  return event && event.code != null ? (event.code | 0) : -1;
 });
 })(self);

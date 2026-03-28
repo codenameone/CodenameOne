@@ -208,6 +208,9 @@ final class JavascriptMethodGenerator {
         if (method.isStatic() && !"__CLINIT__".equals(method.getMethodName())) {
             out.append("  jvm.ensureClassInitialized(\"").append(cls.getClsName()).append("\");\n");
         }
+        if (appendStraightLineMethodBody(out, cls, method, instructions, jsMethodName)) {
+            return;
+        }
         out.append("  const locals = new Array(").append(Math.max(1, method.getMaxLocals())).append(").fill(null);\n");
         out.append("  const stack = [];\n");
         out.append("  let pc = 0;\n");
@@ -262,6 +265,590 @@ final class JavascriptMethodGenerator {
         if (!method.isStatic() && !method.isConstructor()) {
             out.append("jvm.addVirtualMethod(\"").append(cls.getClsName()).append("\", \"")
                     .append(jsMethodName).append("\", ").append(jsMethodName).append(");\n");
+        }
+    }
+
+    private static boolean appendStraightLineMethodBody(StringBuilder out, ByteCodeClass cls, BytecodeMethod method,
+            List<Instruction> instructions, String jsMethodName) {
+        if (!isStraightLineEligible(method, instructions)) {
+            return false;
+        }
+        StringBuilder body = new StringBuilder();
+        StraightLineContext ctx = new StraightLineContext(method.getMaxLocals(), method.getMaxStack());
+        if (!method.isStatic()) {
+            body.append("  let l0 = __cn1ThisObject;\n");
+            ctx.localsInitialized[0] = true;
+        }
+        List<ByteCodeMethodArg> arguments = method.getArguments();
+        int localIndex = method.isStatic() ? 0 : 1;
+        for (int i = 0; i < arguments.size(); i++) {
+            body.append("  let l").append(localIndex).append(" = __cn1Arg").append(i + 1).append(";\n");
+            ctx.localsInitialized[localIndex] = true;
+            localIndex++;
+            if (arguments.get(i).isDoubleOrLong()) {
+                localIndex++;
+            }
+        }
+        for (int i = 0; i < method.getMaxLocals(); i++) {
+            if (!ctx.localsInitialized[i]) {
+                body.append("  let l").append(i).append(" = null;\n");
+            }
+        }
+        for (int i = 0; i < method.getMaxStack(); i++) {
+            body.append("  let s").append(i).append(" = null;\n");
+        }
+        if (method.isSynchronizedMethod()) {
+            body.append("  const __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
+            body.append("  jvm.monitorEnter(jvm.currentThread, __cn1Monitor);\n");
+            body.append("  try {\n");
+        }
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction instruction = instructions.get(i);
+            if (!appendStraightLineInstruction(body, method, instruction, ctx)) {
+                return false;
+            }
+        }
+        if (method.isSynchronizedMethod()) {
+            body.append("  } finally {\n");
+            body.append("    jvm.monitorExit(jvm.currentThread, __cn1Monitor);\n");
+            body.append("  }\n");
+        }
+        out.append(body);
+        out.append("}\n");
+        if ("__CLINIT__".equals(method.getMethodName())) {
+            out.append("jvm.classes[\"").append(cls.getClsName()).append("\"].clinit = ").append(jsMethodName).append(";\n");
+        }
+        if (!method.isStatic() && !method.isConstructor()) {
+            out.append("jvm.addVirtualMethod(\"").append(cls.getClsName()).append("\", \"")
+                    .append(jsMethodName).append("\", ").append(jsMethodName).append(");\n");
+        }
+        return true;
+    }
+
+    private static boolean isStraightLineEligible(BytecodeMethod method, List<Instruction> instructions) {
+        if (method.isSynchronizedMethod()) {
+            return false;
+        }
+        for (int i = 0; i < instructions.size(); i++) {
+            Instruction instruction = instructions.get(i);
+            if (instruction instanceof Jump || instruction instanceof SwitchInstruction || instruction instanceof TryCatch
+                    || instruction instanceof MultiArray) {
+                return false;
+            }
+            if (instruction instanceof BasicInstruction) {
+                int opcode = ((BasicInstruction) instruction).getOpcode();
+                if (opcode == Opcodes.MONITORENTER || opcode == Opcodes.MONITOREXIT || opcode == Opcodes.ATHROW) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean appendStraightLineInstruction(StringBuilder out, BytecodeMethod method, Instruction instruction,
+            StraightLineContext ctx) {
+        if (instruction instanceof LabelInstruction || instruction instanceof LineNumber || instruction instanceof LocalVariable) {
+            return true;
+        }
+        if (instruction instanceof BasicInstruction) {
+            return appendStraightLineBasicInstruction(out, method, (BasicInstruction) instruction, ctx);
+        }
+        if (instruction instanceof VarOp) {
+            return appendStraightLineVarInstruction(out, (VarOp) instruction, ctx);
+        }
+        if (instruction instanceof IInc) {
+            IInc iinc = (IInc) instruction;
+            out.append("  l").append(iinc.getVar()).append(" = (l").append(iinc.getVar()).append(" || 0) + ")
+                    .append(iinc.getAmount()).append(";\n");
+            return true;
+        }
+        if (instruction instanceof Ldc) {
+            return appendStraightLineLdcInstruction(out, (Ldc) instruction, ctx);
+        }
+        if (instruction instanceof TypeInstruction) {
+            return appendStraightLineTypeInstruction(out, (TypeInstruction) instruction, ctx);
+        }
+        if (instruction instanceof Field) {
+            return appendStraightLineFieldInstruction(out, (Field) instruction, ctx);
+        }
+        if (instruction instanceof Invoke) {
+            return appendStraightLineInvokeInstruction(out, (Invoke) instruction, ctx);
+        }
+        return false;
+    }
+
+    private static boolean appendStraightLineBasicInstruction(StringBuilder out, BytecodeMethod method, BasicInstruction instruction,
+            StraightLineContext ctx) {
+        switch (instruction.getOpcode()) {
+            case Opcodes.NOP:
+                return true;
+            case Opcodes.ACONST_NULL:
+                out.append("  ").append(ctx.push("null")).append(";\n");
+                return true;
+            case Opcodes.ICONST_M1:
+                out.append("  ").append(ctx.push("-1")).append(";\n");
+                return true;
+            case Opcodes.ICONST_0:
+            case Opcodes.ICONST_1:
+            case Opcodes.ICONST_2:
+            case Opcodes.ICONST_3:
+            case Opcodes.ICONST_4:
+            case Opcodes.ICONST_5:
+                out.append("  ").append(ctx.push(Integer.toString(instruction.getOpcode() - Opcodes.ICONST_0))).append(";\n");
+                return true;
+            case Opcodes.LCONST_0:
+                out.append("  ").append(ctx.push("0")).append(";\n");
+                return true;
+            case Opcodes.LCONST_1:
+                out.append("  ").append(ctx.push("1")).append(";\n");
+                return true;
+            case Opcodes.FCONST_0:
+            case Opcodes.DCONST_0:
+                out.append("  ").append(ctx.push("0.0")).append(";\n");
+                return true;
+            case Opcodes.FCONST_1:
+            case Opcodes.DCONST_1:
+                out.append("  ").append(ctx.push("1.0")).append(";\n");
+                return true;
+            case Opcodes.FCONST_2:
+                out.append("  ").append(ctx.push("2.0")).append(";\n");
+                return true;
+            case Opcodes.BIPUSH:
+            case Opcodes.SIPUSH:
+                out.append("  ").append(ctx.push(Integer.toString(instruction.getValue()))).append(";\n");
+                return true;
+            case Opcodes.POP:
+                ctx.pop();
+                return true;
+            case Opcodes.POP2:
+                ctx.pop();
+                ctx.pop();
+                return true;
+            case Opcodes.DUP: {
+                String value = ctx.peek(0);
+                out.append("  ").append(ctx.push(value)).append(";\n");
+                return true;
+            }
+            case Opcodes.DUP_X1: {
+                String v1 = ctx.pop();
+                String v2 = ctx.pop();
+                out.append("  ").append(ctx.push(v1)).append(";\n");
+                out.append("  ").append(ctx.push(v2)).append(";\n");
+                out.append("  ").append(ctx.push(v1)).append(";\n");
+                return true;
+            }
+            case Opcodes.DUP_X2: {
+                String v1 = ctx.pop();
+                String v2 = ctx.pop();
+                String v3 = ctx.pop();
+                out.append("  ").append(ctx.push(v1)).append(";\n");
+                out.append("  ").append(ctx.push(v3)).append(";\n");
+                out.append("  ").append(ctx.push(v2)).append(";\n");
+                out.append("  ").append(ctx.push(v1)).append(";\n");
+                return true;
+            }
+            case Opcodes.DUP2: {
+                String v1 = ctx.pop();
+                String v2 = ctx.pop();
+                out.append("  ").append(ctx.push(v2)).append(";\n");
+                out.append("  ").append(ctx.push(v1)).append(";\n");
+                out.append("  ").append(ctx.push(v2)).append(";\n");
+                out.append("  ").append(ctx.push(v1)).append(";\n");
+                return true;
+            }
+            case Opcodes.DUP2_X1: {
+                String v1 = ctx.pop();
+                String v2 = ctx.pop();
+                String v3 = ctx.pop();
+                out.append("  ").append(ctx.push(v2)).append(";\n");
+                out.append("  ").append(ctx.push(v1)).append(";\n");
+                out.append("  ").append(ctx.push(v3)).append(";\n");
+                out.append("  ").append(ctx.push(v2)).append(";\n");
+                out.append("  ").append(ctx.push(v1)).append(";\n");
+                return true;
+            }
+            case Opcodes.DUP2_X2: {
+                String v1 = ctx.pop();
+                String v2 = ctx.pop();
+                String v3 = ctx.pop();
+                String v4 = ctx.pop();
+                out.append("  ").append(ctx.push(v2)).append(";\n");
+                out.append("  ").append(ctx.push(v1)).append(";\n");
+                out.append("  ").append(ctx.push(v4)).append(";\n");
+                out.append("  ").append(ctx.push(v3)).append(";\n");
+                out.append("  ").append(ctx.push(v2)).append(";\n");
+                out.append("  ").append(ctx.push(v1)).append(";\n");
+                return true;
+            }
+            case Opcodes.SWAP: {
+                String v1 = ctx.pop();
+                String v2 = ctx.pop();
+                out.append("  ").append(ctx.push(v1)).append(";\n");
+                out.append("  ").append(ctx.push(v2)).append(";\n");
+                return true;
+            }
+            case Opcodes.IADD:
+                return emitBinary(out, ctx, "((%s|0) + (%s|0))");
+            case Opcodes.ISUB:
+                return emitBinary(out, ctx, "((%s|0) - (%s|0))");
+            case Opcodes.IMUL:
+                return emitBinary(out, ctx, "((%s|0) * (%s|0))");
+            case Opcodes.LADD:
+            case Opcodes.FADD:
+            case Opcodes.DADD:
+                return emitBinary(out, ctx, "(%s + %s)");
+            case Opcodes.LSUB:
+            case Opcodes.FSUB:
+            case Opcodes.DSUB:
+                return emitBinary(out, ctx, "(%s - %s)");
+            case Opcodes.LMUL:
+            case Opcodes.FMUL:
+            case Opcodes.DMUL:
+                return emitBinary(out, ctx, "(%s * %s)");
+            case Opcodes.IDIV:
+                return emitBinary(out, ctx, "(((%s|0) / (%s|0)) | 0)");
+            case Opcodes.LDIV:
+                return emitBinary(out, ctx, "Math.trunc(%s / %s)");
+            case Opcodes.FDIV:
+            case Opcodes.DDIV:
+                return emitBinary(out, ctx, "(%s / %s)");
+            case Opcodes.IREM:
+                return emitBinary(out, ctx, "((%s|0) %% (%s|0))");
+            case Opcodes.LREM:
+            case Opcodes.FREM:
+            case Opcodes.DREM:
+                return emitBinary(out, ctx, "(%s %% %s)");
+            case Opcodes.INEG:
+                return emitUnary(out, ctx, "-(%s|0)");
+            case Opcodes.LNEG:
+            case Opcodes.FNEG:
+            case Opcodes.DNEG:
+                return emitUnary(out, ctx, "-%s");
+            case Opcodes.ISHL:
+                return emitBinary(out, ctx, "((%s|0) << (%s & 31))");
+            case Opcodes.LSHL:
+                return emitBinary(out, ctx, "(%s * Math.pow(2, %s & 63))");
+            case Opcodes.ISHR:
+                return emitBinary(out, ctx, "((%s|0) >> (%s & 31))");
+            case Opcodes.LSHR:
+                return emitBinary(out, ctx, "Math.trunc(%s / Math.pow(2, %s & 63))");
+            case Opcodes.IUSHR:
+                return emitBinary(out, ctx, "((%s >>> (%s & 31)) | 0)");
+            case Opcodes.LUSHR:
+                return emitBinary(out, ctx, "Math.floor((%s < 0 ? %s + 18446744073709551616 : %s) / Math.pow(2, %s & 63))",
+                        true);
+            case Opcodes.IAND:
+                return emitBinary(out, ctx, "((%s|0) & (%s|0))");
+            case Opcodes.LAND:
+                return emitBinary(out, ctx, "(%s & %s)");
+            case Opcodes.IOR:
+                return emitBinary(out, ctx, "((%s|0) | (%s|0))");
+            case Opcodes.LOR:
+                return emitBinary(out, ctx, "(%s | %s)");
+            case Opcodes.IXOR:
+                return emitBinary(out, ctx, "((%s|0) ^ (%s|0))");
+            case Opcodes.LXOR:
+                return emitBinary(out, ctx, "(%s ^ %s)");
+            case Opcodes.I2L:
+            case Opcodes.I2F:
+            case Opcodes.I2D:
+            case Opcodes.L2F:
+            case Opcodes.L2D:
+            case Opcodes.F2D:
+            case Opcodes.D2F:
+                return true;
+            case Opcodes.I2B:
+                return emitUnary(out, ctx, "((%s << 24) >> 24)");
+            case Opcodes.I2C:
+                return emitUnary(out, ctx, "(%s & 65535)");
+            case Opcodes.I2S:
+                return emitUnary(out, ctx, "((%s << 16) >> 16)");
+            case Opcodes.L2I:
+            case Opcodes.F2I:
+            case Opcodes.D2I:
+                return emitUnary(out, ctx, "(%s | 0)");
+            case Opcodes.F2L:
+            case Opcodes.D2L:
+                return true;
+            case Opcodes.LCMP:
+                return emitBinary(out, ctx, "(%s < %s ? -1 : (%s > %s ? 1 : 0))", true);
+            case Opcodes.FCMPL:
+            case Opcodes.DCMPL:
+                return emitBinary(out, ctx, "((isNaN(%s) || isNaN(%s)) ? -1 : (%s < %s ? -1 : (%s > %s ? 1 : 0)))", true);
+            case Opcodes.FCMPG:
+            case Opcodes.DCMPG:
+                return emitBinary(out, ctx, "((isNaN(%s) || isNaN(%s)) ? 1 : (%s < %s ? -1 : (%s > %s ? 1 : 0)))", true);
+            case Opcodes.IRETURN:
+            case Opcodes.ARETURN:
+            case Opcodes.LRETURN:
+            case Opcodes.FRETURN:
+            case Opcodes.DRETURN:
+                out.append("  return ").append(ctx.pop()).append(";\n");
+                return true;
+            case Opcodes.RETURN:
+                out.append("  return null;\n");
+                return true;
+            case Opcodes.ARRAYLENGTH:
+                return emitUnary(out, ctx, "%s.length");
+            case Opcodes.AALOAD:
+            case Opcodes.IALOAD:
+            case Opcodes.LALOAD:
+            case Opcodes.FALOAD:
+            case Opcodes.DALOAD:
+            case Opcodes.BALOAD:
+            case Opcodes.CALOAD:
+            case Opcodes.SALOAD: {
+                String idx = ctx.pop();
+                String arr = ctx.pop();
+                String valueExpr = "(function(__arr,__idx){ if (!__arr.__array) throw new Error(\"Array expected\"); if (__idx < 0 || __idx >= __arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); return __arr[__idx]; })(" + arr + ", " + idx + ")";
+                out.append("  ").append(ctx.push(valueExpr)).append(";\n");
+                return true;
+            }
+            case Opcodes.AASTORE:
+            case Opcodes.IASTORE:
+            case Opcodes.LASTORE:
+            case Opcodes.FASTORE:
+            case Opcodes.DASTORE:
+            case Opcodes.BASTORE:
+            case Opcodes.CASTORE:
+            case Opcodes.SASTORE: {
+                String value = ctx.pop();
+                String idx = ctx.pop();
+                String arr = ctx.pop();
+                out.append("  { const __arr = ").append(arr).append("; const __idx = ").append(idx).append("; if (!__arr.__array) throw new Error(\"Array expected\"); if (__idx < 0 || __idx >= __arr.length) throw new Error(\"ArrayIndexOutOfBoundsException\"); __arr[__idx] = ").append(value).append("; }\n");
+                return true;
+            }
+            default:
+                return false;
+        }
+    }
+
+    private static boolean emitBinary(StringBuilder out, StraightLineContext ctx, String format) {
+        return emitBinary(out, ctx, format, false);
+    }
+
+    private static boolean emitBinary(StringBuilder out, StraightLineContext ctx, String format, boolean repeatedArgs) {
+        String b = ctx.pop();
+        String a = ctx.pop();
+        String expr;
+        if (repeatedArgs) {
+            expr = String.format(format, a, b, a, b, a, b);
+        } else {
+            expr = String.format(format, a, b);
+        }
+        out.append("  ").append(ctx.push(expr)).append(";\n");
+        return true;
+    }
+
+    private static boolean emitUnary(StringBuilder out, StraightLineContext ctx, String format) {
+        String value = ctx.pop();
+        out.append("  ").append(ctx.push(String.format(format, value))).append(";\n");
+        return true;
+    }
+
+    private static boolean appendStraightLineVarInstruction(StringBuilder out, VarOp instruction, StraightLineContext ctx) {
+        switch (instruction.getOpcode()) {
+            case Opcodes.BIPUSH:
+            case Opcodes.SIPUSH:
+                out.append("  ").append(ctx.push(Integer.toString(instruction.getIndex()))).append(";\n");
+                return true;
+            case Opcodes.NEWARRAY: {
+                String size = ctx.pop();
+                out.append("  ").append(ctx.push("jvm.newArray(" + size + ", \"" + primitiveArrayType(instruction.getIndex()) + "\", 1)")).append(";\n");
+                return true;
+            }
+            case Opcodes.ILOAD:
+            case Opcodes.LLOAD:
+            case Opcodes.FLOAD:
+            case Opcodes.DLOAD:
+            case Opcodes.ALOAD:
+                out.append("  ").append(ctx.push("l" + instruction.getIndex())).append(";\n");
+                return true;
+            case Opcodes.ISTORE:
+            case Opcodes.LSTORE:
+            case Opcodes.FSTORE:
+            case Opcodes.DSTORE:
+            case Opcodes.ASTORE:
+                out.append("  l").append(instruction.getIndex()).append(" = ").append(ctx.pop()).append(";\n");
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static boolean appendStraightLineLdcInstruction(StringBuilder out, Ldc instruction, StraightLineContext ctx) {
+        Object value = instruction.getValue();
+        if (value instanceof String) {
+            out.append("  ").append(ctx.push("jvm.createStringLiteral(\"" + JavascriptNameUtil.escapeJs((String) value) + "\")")).append(";\n");
+            return true;
+        }
+        if (value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Double) {
+            out.append("  ").append(ctx.push(value.toString())).append(";\n");
+            return true;
+        }
+        if (value instanceof Type) {
+            Type type = (Type) value;
+            if (type.getSort() == Type.OBJECT) {
+                out.append("  ").append(ctx.push("jvm.getClassObject(\"" + JavascriptNameUtil.sanitizeClassName(type.getInternalName()) + "\")")).append(";\n");
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean appendStraightLineTypeInstruction(StringBuilder out, TypeInstruction instruction, StraightLineContext ctx) {
+        String typeName = JavascriptNameUtil.runtimeTypeName(instruction.getTypeName());
+        switch (instruction.getOpcode()) {
+            case Opcodes.NEW:
+                out.append("  ").append(ctx.push("jvm.newObject(\"" + typeName + "\")")).append(";\n");
+                return true;
+            case Opcodes.ANEWARRAY: {
+                String size = ctx.pop();
+                out.append("  ").append(ctx.push("jvm.newArray(" + size + ", \"" + typeName + "\", 1)")).append(";\n");
+                return true;
+            }
+            case Opcodes.CHECKCAST: {
+                String value = ctx.peek(0);
+                out.append("  if (").append(value).append(" != null && !jvm.instanceOf(").append(value).append(", \"")
+                        .append(typeName).append("\")) throw new Error(\"ClassCastException\");\n");
+                return true;
+            }
+            case Opcodes.INSTANCEOF: {
+                String value = ctx.pop();
+                out.append("  ").append(ctx.push("(jvm.instanceOf(" + value + ", \"" + typeName + "\") ? 1 : 0)")).append(";\n");
+                return true;
+            }
+            default:
+                return false;
+        }
+    }
+
+    private static boolean appendStraightLineFieldInstruction(StringBuilder out, Field field, StraightLineContext ctx) {
+        String owner = JavascriptNameUtil.sanitizeClassName(field.getOwner());
+        String fieldName = field.getFieldName();
+        String propertyName = JavascriptNameUtil.fieldProperty(field.getOwner(), fieldName);
+        switch (field.getOpcode()) {
+            case Opcodes.GETSTATIC:
+                out.append("  jvm.ensureClassInitialized(\"").append(owner).append("\");\n");
+                out.append("  ").append(ctx.push("jvm.classes[\"" + owner + "\"].staticFields[\"" + fieldName + "\"]")).append(";\n");
+                return true;
+            case Opcodes.PUTSTATIC:
+                out.append("  jvm.ensureClassInitialized(\"").append(owner).append("\");\n");
+                out.append("  jvm.classes[\"").append(owner).append("\"].staticFields[\"").append(fieldName).append("\"] = ")
+                        .append(ctx.pop()).append(";\n");
+                return true;
+            case Opcodes.GETFIELD: {
+                String target = ctx.pop();
+                out.append("  ").append(ctx.push(target + "[\"" + propertyName + "\"]")).append(";\n");
+                return true;
+            }
+            case Opcodes.PUTFIELD: {
+                String value = ctx.pop();
+                String target = ctx.pop();
+                out.append("  ").append(target).append("[\"").append(propertyName).append("\"] = ").append(value).append(";\n");
+                return true;
+            }
+            default:
+                return false;
+        }
+    }
+
+    private static boolean appendStraightLineInvokeInstruction(StringBuilder out, Invoke invoke, StraightLineContext ctx) {
+        String methodId = JavascriptNameUtil.methodIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        List<String> args = JavascriptNameUtil.argumentTypes(invoke.getDesc());
+        boolean hasReturn = invoke.getDesc().charAt(invoke.getDesc().length() - 1) != 'V';
+        String[] argValues = new String[args.size()];
+        for (int i = args.size() - 1; i >= 0; i--) {
+            argValues[i] = ctx.pop();
+        }
+        String target = null;
+        switch (invoke.getOpcode()) {
+            case Opcodes.INVOKEVIRTUAL:
+            case Opcodes.INVOKEINTERFACE:
+            case Opcodes.INVOKESPECIAL:
+                target = ctx.pop();
+                break;
+            case Opcodes.INVOKESTATIC:
+                break;
+            default:
+                return false;
+        }
+        if (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE) {
+            out.append("  {\n");
+            out.append("    const __target = ").append(target).append(";\n");
+            out.append("    const __class = jvm.classes[__target.__class];\n");
+            out.append("    const __method = (__class && __class.methods && __class.methods[\"").append(methodId)
+                    .append("\"]) || jvm.resolveVirtual(__target.__class, \"").append(methodId).append("\");\n");
+            if (hasReturn) {
+                out.append("    const __result = yield* __method(");
+                appendInvocationArgumentExpressions(out, "__target", argValues);
+                out.append(");\n");
+                out.append("    ").append(ctx.push("__result")).append(";\n");
+            } else {
+                out.append("    yield* __method(");
+                appendInvocationArgumentExpressions(out, "__target", argValues);
+                out.append(");\n");
+            }
+            out.append("  }\n");
+            return true;
+        }
+        if (hasReturn) {
+            out.append("  { const __result = yield* ").append(methodId).append("(");
+        } else {
+            out.append("  { yield* ").append(methodId).append("(");
+        }
+        appendInvocationArgumentExpressions(out, target, argValues);
+        out.append(");");
+        if (hasReturn) {
+            out.append(" ").append(ctx.push("__result")).append(";");
+        }
+        out.append(" }\n");
+        return true;
+    }
+
+    private static void appendInvocationArgumentExpressions(StringBuilder out, String target, String[] args) {
+        boolean first = true;
+        if (target != null) {
+            out.append(target);
+            first = false;
+        }
+        for (int i = 0; i < args.length; i++) {
+            if (!first) {
+                out.append(", ");
+            }
+            first = false;
+            out.append(args[i]);
+        }
+    }
+
+    private static final class StraightLineContext {
+        private final boolean[] localsInitialized;
+        private int sp;
+
+        private StraightLineContext(int maxLocals, int maxStack) {
+            this.localsInitialized = new boolean[Math.max(1, maxLocals)];
+            this.sp = 0;
+        }
+
+        private String push(String expression) {
+            String slot = "s" + sp++;
+            return slot + " = " + expression;
+        }
+
+        private String pop() {
+            sp--;
+            if (sp < 0) {
+                throw new IllegalStateException("Straight-line JS lowering stack underflow");
+            }
+            return "s" + sp;
+        }
+
+        private String peek(int depth) {
+            int index = sp - 1 - depth;
+            if (index < 0) {
+                throw new IllegalStateException("Straight-line JS lowering stack underflow");
+            }
+            return "s" + index;
         }
     }
 
