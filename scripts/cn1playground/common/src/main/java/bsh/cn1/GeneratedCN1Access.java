@@ -78,6 +78,9 @@ import bsh.cn1.gen.GeneratedAccess_java_lang_reflect;
 import bsh.cn1.gen.GeneratedAccess_java_net;
 import bsh.cn1.gen.GeneratedAccess_java_nio_charset;
 import bsh.cn1.gen.GeneratedAccess_java_text;
+import bsh.cn1.gen.GeneratedAccess_java_time;
+import bsh.cn1.gen.GeneratedAccess_java_time_format;
+import bsh.cn1.gen.GeneratedAccess_java_time_temporal;
 import bsh.cn1.gen.GeneratedAccess_java_util;
 import bsh.cn1.gen.GeneratedAccess_java_util_concurrent;
 
@@ -735,6 +738,20 @@ public final class GeneratedCN1Access implements CN1Access {
         "java.text.Format",
         "java.text.ParseException",
         "java.text.SimpleDateFormat",
+        "java.time.Clock",
+        "java.time.Duration",
+        "java.time.Instant",
+        "java.time.LocalDate",
+        "java.time.LocalDateTime",
+        "java.time.LocalTime",
+        "java.time.OffsetDateTime",
+        "java.time.Period",
+        "java.time.ZoneId",
+        "java.time.ZoneOffset",
+        "java.time.ZonedDateTime",
+        "java.time.format.DateTimeFormatter",
+        "java.time.format.DateTimeParseException",
+        "java.time.temporal.TemporalAccessor",
         "java.util.AbstractCollection",
         "java.util.AbstractList",
         "java.util.AbstractMap",
@@ -1491,6 +1508,20 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.text.Format", java.text.Format.class);
         index.put("java.text.ParseException", java.text.ParseException.class);
         index.put("java.text.SimpleDateFormat", java.text.SimpleDateFormat.class);
+        index.put("java.time.Clock", java.time.Clock.class);
+        index.put("java.time.Duration", java.time.Duration.class);
+        index.put("java.time.Instant", java.time.Instant.class);
+        index.put("java.time.LocalDate", java.time.LocalDate.class);
+        index.put("java.time.LocalDateTime", java.time.LocalDateTime.class);
+        index.put("java.time.LocalTime", java.time.LocalTime.class);
+        index.put("java.time.OffsetDateTime", java.time.OffsetDateTime.class);
+        index.put("java.time.Period", java.time.Period.class);
+        index.put("java.time.ZoneId", java.time.ZoneId.class);
+        index.put("java.time.ZoneOffset", java.time.ZoneOffset.class);
+        index.put("java.time.ZonedDateTime", java.time.ZonedDateTime.class);
+        index.put("java.time.format.DateTimeFormatter", java.time.format.DateTimeFormatter.class);
+        index.put("java.time.format.DateTimeParseException", java.time.format.DateTimeParseException.class);
+        index.put("java.time.temporal.TemporalAccessor", java.time.temporal.TemporalAccessor.class);
         index.put("java.util.AbstractCollection", java.util.AbstractCollection.class);
         index.put("java.util.AbstractList", java.util.AbstractList.class);
         index.put("java.util.AbstractMap", java.util.AbstractMap.class);
@@ -2244,6 +2275,20 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.text.Format", splitMembers(""));
         index.put("java.text.ParseException", splitMembers(""));
         index.put("java.text.SimpleDateFormat", splitMembers(""));
+        index.put("java.time.Clock", splitMembers(""));
+        index.put("java.time.Duration", splitMembers(""));
+        index.put("java.time.Instant", splitMembers(""));
+        index.put("java.time.LocalDate", splitMembers(""));
+        index.put("java.time.LocalDateTime", splitMembers(""));
+        index.put("java.time.LocalTime", splitMembers(""));
+        index.put("java.time.OffsetDateTime", splitMembers(""));
+        index.put("java.time.Period", splitMembers(""));
+        index.put("java.time.ZoneId", splitMembers(""));
+        index.put("java.time.ZoneOffset", splitMembers(""));
+        index.put("java.time.ZonedDateTime", splitMembers(""));
+        index.put("java.time.format.DateTimeFormatter", splitMembers(""));
+        index.put("java.time.format.DateTimeParseException", splitMembers(""));
+        index.put("java.time.temporal.TemporalAccessor", splitMembers(""));
         index.put("java.util.AbstractCollection", splitMembers(""));
         index.put("java.util.AbstractList", splitMembers(""));
         index.put("java.util.AbstractMap", splitMembers(""));
@@ -2997,6 +3042,20 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("java.text.Format", splitMembers(""));
         index.put("java.text.ParseException", splitMembers(""));
         index.put("java.text.SimpleDateFormat", splitMembers(""));
+        index.put("java.time.Clock", splitMembers(""));
+        index.put("java.time.Duration", splitMembers(""));
+        index.put("java.time.Instant", splitMembers(""));
+        index.put("java.time.LocalDate", splitMembers(""));
+        index.put("java.time.LocalDateTime", splitMembers(""));
+        index.put("java.time.LocalTime", splitMembers(""));
+        index.put("java.time.OffsetDateTime", splitMembers(""));
+        index.put("java.time.Period", splitMembers(""));
+        index.put("java.time.ZoneId", splitMembers(""));
+        index.put("java.time.ZoneOffset", splitMembers(""));
+        index.put("java.time.ZonedDateTime", splitMembers(""));
+        index.put("java.time.format.DateTimeFormatter", splitMembers(""));
+        index.put("java.time.format.DateTimeParseException", splitMembers(""));
+        index.put("java.time.temporal.TemporalAccessor", splitMembers(""));
         index.put("java.util.AbstractCollection", splitMembers(""));
         index.put("java.util.AbstractList", splitMembers(""));
         index.put("java.util.AbstractMap", splitMembers(""));
@@ -3305,6 +3364,15 @@ public final class GeneratedCN1Access implements CN1Access {
         if ("java.text".equals(packageName)) {
             return GeneratedAccess_java_text.construct(type, args);
         }
+        if ("java.time".equals(packageName)) {
+            return GeneratedAccess_java_time.construct(type, args);
+        }
+        if ("java.time.format".equals(packageName)) {
+            return GeneratedAccess_java_time_format.construct(type, args);
+        }
+        if ("java.time.temporal".equals(packageName)) {
+            return GeneratedAccess_java_time_temporal.construct(type, args);
+        }
         if ("java.util".equals(packageName)) {
             return GeneratedAccess_java_util.construct(type, args);
         }
@@ -3538,6 +3606,15 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         if ("java.text".equals(packageName)) {
             return GeneratedAccess_java_text.invokeStatic(type, name, args);
+        }
+        if ("java.time".equals(packageName)) {
+            return GeneratedAccess_java_time.invokeStatic(type, name, args);
+        }
+        if ("java.time.format".equals(packageName)) {
+            return GeneratedAccess_java_time_format.invokeStatic(type, name, args);
+        }
+        if ("java.time.temporal".equals(packageName)) {
+            return GeneratedAccess_java_time_temporal.invokeStatic(type, name, args);
         }
         if ("java.util".equals(packageName)) {
             return GeneratedAccess_java_util.invokeStatic(type, name, args);
@@ -3925,6 +4002,21 @@ public final class GeneratedCN1Access implements CN1Access {
             unsupported = ex;
         }
         try {
+            return GeneratedAccess_java_time.invoke(target, name, args);
+        } catch (CN1AccessException ex) {
+            unsupported = ex;
+        }
+        try {
+            return GeneratedAccess_java_time_format.invoke(target, name, args);
+        } catch (CN1AccessException ex) {
+            unsupported = ex;
+        }
+        try {
+            return GeneratedAccess_java_time_temporal.invoke(target, name, args);
+        } catch (CN1AccessException ex) {
+            unsupported = ex;
+        }
+        try {
             return GeneratedAccess_java_util.invoke(target, name, args);
         } catch (CN1AccessException ex) {
             unsupported = ex;
@@ -4176,6 +4268,15 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         if ("java.text".equals(packageName)) {
             return GeneratedAccess_java_text.getStaticField(type, name);
+        }
+        if ("java.time".equals(packageName)) {
+            return GeneratedAccess_java_time.getStaticField(type, name);
+        }
+        if ("java.time.format".equals(packageName)) {
+            return GeneratedAccess_java_time_format.getStaticField(type, name);
+        }
+        if ("java.time.temporal".equals(packageName)) {
+            return GeneratedAccess_java_time_temporal.getStaticField(type, name);
         }
         if ("java.util".equals(packageName)) {
             return GeneratedAccess_java_util.getStaticField(type, name);
@@ -4560,6 +4661,21 @@ public final class GeneratedCN1Access implements CN1Access {
             unsupported = ex;
         }
         try {
+            return GeneratedAccess_java_time.getField(target, name);
+        } catch (CN1AccessException ex) {
+            unsupported = ex;
+        }
+        try {
+            return GeneratedAccess_java_time_format.getField(target, name);
+        } catch (CN1AccessException ex) {
+            unsupported = ex;
+        }
+        try {
+            return GeneratedAccess_java_time_temporal.getField(target, name);
+        } catch (CN1AccessException ex) {
+            unsupported = ex;
+        }
+        try {
             return GeneratedAccess_java_util.getField(target, name);
         } catch (CN1AccessException ex) {
             unsupported = ex;
@@ -4872,6 +4988,18 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         if ("java.text".equals(packageName)) {
             GeneratedAccess_java_text.setStaticField(type, name, value);
+            return;
+        }
+        if ("java.time".equals(packageName)) {
+            GeneratedAccess_java_time.setStaticField(type, name, value);
+            return;
+        }
+        if ("java.time.format".equals(packageName)) {
+            GeneratedAccess_java_time_format.setStaticField(type, name, value);
+            return;
+        }
+        if ("java.time.temporal".equals(packageName)) {
+            GeneratedAccess_java_time_temporal.setStaticField(type, name, value);
             return;
         }
         if ("java.util".equals(packageName)) {
@@ -5328,6 +5456,24 @@ public final class GeneratedCN1Access implements CN1Access {
         }
         try {
             GeneratedAccess_java_text.setField(target, name, value);
+            return;
+        } catch (CN1AccessException ex) {
+            unsupported = ex;
+        }
+        try {
+            GeneratedAccess_java_time.setField(target, name, value);
+            return;
+        } catch (CN1AccessException ex) {
+            unsupported = ex;
+        }
+        try {
+            GeneratedAccess_java_time_format.setField(target, name, value);
+            return;
+        } catch (CN1AccessException ex) {
+            unsupported = ex;
+        }
+        try {
+            GeneratedAccess_java_time_temporal.setField(target, name, value);
             return;
         } catch (CN1AccessException ex) {
             unsupported = ex;
