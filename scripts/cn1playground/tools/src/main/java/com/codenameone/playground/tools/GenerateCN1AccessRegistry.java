@@ -62,18 +62,23 @@ public final class GenerateCN1AccessRegistry {
         }
         File rootOutput = new File(args[0]);
         File projectRoot = projectRoot(rootOutput);
-        File cn1Root = locateCn1Root(projectRoot);
-        Discovery discovery = discover(projectRoot, cn1Root);
+        Discovery discovery = discover(projectRoot);
         File helperDir = new File(rootOutput.getParentFile(), "gen");
         recreateDir(helperDir);
         writeRootRegistry(rootOutput, discovery);
         writePackageHelpers(helperDir, discovery);
     }
 
-    private static Discovery discover(File projectRoot, File cn1Root) throws Exception {
+    private static Discovery discover(File projectRoot) throws Exception {
         List<File> sourceRoots = new ArrayList<File>();
-        sourceRoots.add(new File(cn1Root, "CodenameOne/src"));
-        sourceRoots.add(new File(cn1Root, "Ports/CLDC11/src"));
+        List<File> configuredRoots = configuredCn1SourceRoots();
+        if (!configuredRoots.isEmpty()) {
+            sourceRoots.addAll(configuredRoots);
+        } else {
+            File cn1Root = locateCn1Root(projectRoot);
+            sourceRoots.add(new File(cn1Root, "CodenameOne/src"));
+            sourceRoots.add(new File(cn1Root, "Ports/CLDC11/src"));
+        }
         sourceRoots.add(new File(projectRoot, "common/src/main/java"));
 
         List<File> sourceFiles = new ArrayList<File>();
@@ -140,6 +145,25 @@ public final class GenerateCN1AccessRegistry {
         }
 
         return new Discovery(indexedClassNames, packages);
+    }
+
+    private static List<File> configuredCn1SourceRoots() {
+        String env = System.getenv("CN1_SOURCE_ROOTS");
+        if (env == null || env.trim().length() == 0) {
+            return Collections.emptyList();
+        }
+        List<File> out = new ArrayList<File>();
+        String[] entries = env.split(File.pathSeparator);
+        for (String entry : entries) {
+            if (entry == null || entry.trim().length() == 0) {
+                continue;
+            }
+            File root = new File(entry.trim());
+            if (root.isDirectory()) {
+                out.add(root);
+            }
+        }
+        return out;
     }
 
     private static List<SourceUnit> parseSourceUnits(List<File> sourceFiles) throws IOException {

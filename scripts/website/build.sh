@@ -23,6 +23,7 @@ WEBSITE_INCLUDE_DEVGUIDE="${WEBSITE_INCLUDE_DEVGUIDE:-auto}"
 WEBSITE_INCLUDE_INITIALIZR="${WEBSITE_INCLUDE_INITIALIZR:-false}"
 WEBSITE_INCLUDE_PLAYGROUND="${WEBSITE_INCLUDE_PLAYGROUND:-false}"
 WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS="${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS:-auto}"
+WEBSITE_CN1_VERSION="${WEBSITE_CN1_VERSION:-auto}"
 CN1_USER="${CN1_USER:-}"
 CN1_TOKEN="${CN1_TOKEN:-}"
 
@@ -73,10 +74,14 @@ if [ "${WEBSITE_INCLUDE_PLAYGROUND}" = "auto" ]; then
 fi
 
 if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" = "auto" ]; then
-  if [ "${WEBSITE_INCLUDE_PLAYGROUND}" = "true" ]; then
-    WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS="true"
-  else
-    WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS="false"
+  WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS="false"
+fi
+
+if [ "${WEBSITE_CN1_VERSION}" = "auto" ]; then
+  WEBSITE_CN1_VERSION="$(perl -0777 -ne 'if (m|<properties>.*?<cn1\.version>([^<]+)</cn1\.version>|s) { print $1; }' "${REPO_ROOT}/scripts/cn1playground/pom.xml")"
+  if [ -z "${WEBSITE_CN1_VERSION}" ]; then
+    echo "Unable to determine cn1.version from scripts/cn1playground/pom.xml" >&2
+    exit 1
   fi
 fi
 
@@ -612,6 +617,7 @@ build_playground_for_site() {
   echo "Building Playground JavaScript bundle for website..." >&2
   (
     cd "${REPO_ROOT}/scripts/cn1playground"
+    sh ./update-cn1-version.sh "${WEBSITE_CN1_VERSION}"
     activate_bootstrapped_java17
 
     run_playground_mvn() {
@@ -623,7 +629,13 @@ build_playground_for_site() {
     }
 
     set_cn1_user_token "Playground"
+    local playground_workspace_args=()
+    if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" = "true" ]; then
+      playground_workspace_args+=(-Dcn1.localWorkspace=true)
+    fi
+
     run_playground_mvn -q -U -pl javascript -am \
+      "${playground_workspace_args[@]}" \
       -DskipTests \
       -Dautomated=true \
       -Dcodename1.platform=javascript \

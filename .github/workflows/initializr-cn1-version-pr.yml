@@ -1,4 +1,4 @@
-name: Initializr CN1 Version PR
+name: Website CN1 Version PR
 
 on:
   push:
@@ -13,7 +13,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  update-initializr-versions:
+  update-website-cn1-versions:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -22,24 +22,30 @@ jobs:
       - name: Update Initializr Codename One versions
         run: ./scripts/initializr/update-cn1-version.sh "${{ github.event.release.tag_name || github.ref_name }}"
 
+      - name: Update Playground Codename One versions
+        run: ./scripts/cn1playground/update-cn1-version.sh "${{ github.event.release.tag_name || github.ref_name }}"
+
       - name: Create pull request
         uses: peter-evans/create-pull-request@v6
         with:
           base: ${{ github.event.repository.default_branch }}
-          commit-message: "scripts/initializr: bump Codename One versions to ${{ github.event.release.tag_name || github.ref_name }}"
-          title: "scripts/initializr: bump Codename One versions to ${{ github.event.release.tag_name || github.ref_name }}"
+          commit-message: "scripts/website: bump Codename One versions to ${{ github.event.release.tag_name || github.ref_name }}"
+          title: "scripts/website: bump Codename One versions to ${{ github.event.release.tag_name || github.ref_name }}"
           body: |
-            Automated update of Codename One versions in `scripts/initializr` after release `${{ github.event.release.tag_name || github.ref_name }}`.
+            Automated update of website Codename One versions after release `${{ github.event.release.tag_name || github.ref_name }}`.
 
             Updated:
             - All `scripts/initializr/**/pom.xml` files containing `cn1.plugin.version`
             - `scripts/initializr/common/src/main/java/com/codename1/initializr/model/GeneratorModel.java`
             - `scripts/initializr/common/src/test/java/com/codename1/initializr/model/GeneratorModelMatrixTest.java`
             - Embedded root `pom.xml` in `scripts/initializr/common/src/main/resources/common.zip`
-          branch: automation/initializr-cn1-version-${{ github.event.release.tag_name || github.ref_name }}
+            - `scripts/cn1playground/pom.xml`
+          branch: automation/website-cn1-version-${{ github.event.release.tag_name || github.ref_name }}
           delete-branch: true
           labels: |
             automation
             initializr
+            website
           add-paths: |
             scripts/initializr
+            scripts/cn1playground
