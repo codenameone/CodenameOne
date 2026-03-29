@@ -36639,12 +36639,6 @@ public final class GeneratedAccess_com_codename1_components {
                 typedTarget.setDialogStyle((com.codename1.ui.plaf.Style) adaptedArgs[0]); return null;
             }
         }
-        if ("setDialogType".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
-                typedTarget.setDialogType(((Number) adaptedArgs[0]).intValue()); return null;
-            }
-        }
         if ("setDialogUIID".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -37140,12 +37134,6 @@ public final class GeneratedAccess_com_codename1_components {
                 typedTarget.setTensileLength(((Number) adaptedArgs[0]).intValue()); return null;
             }
         }
-        if ("setTimeout".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
-                typedTarget.setTimeout(((Number) adaptedArgs[0]).longValue()); return null;
-            }
-        }
         if ("setTintColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
@@ -37288,11 +37276,6 @@ public final class GeneratedAccess_com_codename1_components {
         if ("showBack".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.showBack(); return null;
-            }
-        }
-        if ("showDialog".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.showDialog();
             }
         }
         if ("showModeless".equals(name)) {
