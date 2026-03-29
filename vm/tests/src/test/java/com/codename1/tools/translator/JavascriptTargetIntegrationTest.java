@@ -192,7 +192,7 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsStraightLine-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        String marker = "function* cn1_JsStraightLine_add_int_int_R_int(__cn1Arg1, __cn1Arg2){";
+        String marker = "function* cn1_JsStraightLine_add_int_int_R_int__impl(__cn1Arg1, __cn1Arg2){";
         int start = translatedApp.indexOf(marker);
         assertTrue(start >= 0, "Straight-line fixture should emit the add() method");
         int end = translatedApp.indexOf("\n}\n", start);
@@ -226,7 +226,7 @@ class JavascriptTargetIntegrationTest {
         Path distDir = outputDir.resolve("dist").resolve("JsStaticAccess-js");
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
 
-        String marker = "function* cn1_JsStaticAccess_twice_R_int(){";
+        String marker = "function* cn1_JsStaticAccess_twice_R_int__impl(){";
         int start = translatedApp.indexOf(marker);
         assertTrue(start >= 0, "Static access fixture should emit the twice() method");
         int end = translatedApp.indexOf("\n}\n", start);
@@ -236,6 +236,82 @@ class JavascriptTargetIntegrationTest {
         String initCheck = "jvm.ensureClassInitialized(\"JsStaticAccess\");";
         assertEquals(methodBody.indexOf(initCheck), methodBody.lastIndexOf(initCheck),
                 "Repeated static field access should only emit one class-init check in straight-line mode");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void repeatedStaticAccessesUseMethodLevelInitCacheInInterpreterMode(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-static-flow-sources");
+        Path classesDir = Files.createTempDirectory("js-static-flow-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-static-flow-classes");
+
+        Files.write(sourceDir.resolve("JsStaticAccessFlow.java"), loadFixture("JsStaticAccessFlow.java").getBytes(StandardCharsets.UTF_8));
+
+        compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-static-flow-output");
+        runJavascriptTranslator(classesDir, outputDir, "JsStaticAccessFlow");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsStaticAccessFlow-js");
+        String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
+
+        String marker = "function* cn1_JsStaticAccessFlow_pick_int_R_int__impl(__cn1Arg1){";
+        int start = translatedApp.indexOf(marker);
+        assertTrue(start >= 0, "Interpreter static access fixture should emit the pick() method");
+        int end = translatedApp.indexOf("\n}\n", start);
+        assertTrue(end > start, "Interpreter static access fixture should have a bounded method body");
+        String methodBody = translatedApp.substring(start, end);
+
+        assertTrue(methodBody.contains("const __cn1Init = Object.create(null);"),
+                "Interpreter mode should allocate a method-level static init cache when static fields are used");
+        assertTrue(methodBody.contains("if (!__cn1Init[\"JsStaticAccessFlow\"]) { jvm.ensureClassInitialized(\"JsStaticAccessFlow\"); __cn1Init[\"JsStaticAccessFlow\"] = true; }"),
+                "Interpreter mode should guard repeated static field access behind the method-level init cache");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void repeatedStaticInvokesUseMethodLevelInitCacheAndInternalImpls(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-static-invoke-sources");
+        Path classesDir = Files.createTempDirectory("js-static-invoke-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-static-invoke-classes");
+
+        Files.write(sourceDir.resolve("JsStaticInvokeFlow.java"), loadFixture("JsStaticInvokeFlow.java").getBytes(StandardCharsets.UTF_8));
+
+        compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-static-invoke-output");
+        runJavascriptTranslator(classesDir, outputDir, "JsStaticInvokeFlow");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsStaticInvokeFlow-js");
+        String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
+
+        String callerMarker = "function* cn1_JsStaticInvokeFlow_pick_int_R_int__impl(__cn1Arg1){";
+        int callerStart = translatedApp.indexOf(callerMarker);
+        assertTrue(callerStart >= 0, "Static invoke fixture should emit an internal implementation for pick()");
+        int callerEnd = translatedApp.indexOf("\n}\n", callerStart);
+        assertTrue(callerEnd > callerStart, "Static invoke fixture should have a bounded pick() body");
+        String callerBody = translatedApp.substring(callerStart, callerEnd);
+
+        assertTrue(callerBody.contains("const __cn1Init = Object.create(null);"),
+                "Interpreter static invoke caller should allocate a method-level init cache");
+        assertTrue(callerBody.contains("typeof cn1_JsStaticInvokeFlow_helper_R_int__impl === \"function\" ? cn1_JsStaticInvokeFlow_helper_R_int__impl : cn1_JsStaticInvokeFlow_helper_R_int"),
+                "Static invoke caller should target the internal implementation when available");
+        assertTrue(callerBody.contains("if (!__cn1Init[\"JsStaticInvokeFlow\"]) { jvm.ensureClassInitialized(\"JsStaticInvokeFlow\"); __cn1Init[\"JsStaticInvokeFlow\"] = true; }"),
+                "Static invoke caller should guard repeated class init through the method-level cache");
+
+        String calleeMarker = "function* cn1_JsStaticInvokeFlow_helper_R_int__impl(){";
+        int calleeStart = translatedApp.indexOf(calleeMarker);
+        assertTrue(calleeStart >= 0, "Static invoke fixture should emit an internal implementation for helper()");
+        int calleeEnd = translatedApp.indexOf("\n}\n", calleeStart);
+        assertTrue(calleeEnd > calleeStart, "Static invoke fixture should have a bounded helper() body");
+        String calleeBody = translatedApp.substring(calleeStart, calleeEnd);
+
+        assertTrue(!calleeBody.contains("jvm.ensureClassInitialized(\"JsStaticInvokeFlow\")"),
+                "Internal static method implementations should not repeat class-init guards");
     }
 
     static void compileAgainstJavaApi(CompilerHelper.CompilerConfig config, Path sourceDir, Path classesDir, Path javaApiDir) throws Exception {

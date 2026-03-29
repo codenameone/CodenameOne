@@ -192,7 +192,9 @@ final class JavascriptMethodGenerator {
         List<Instruction> instructions = method.getInstructions();
         Map<Label, Integer> labelToIndex = buildLabelMap(instructions);
         String jsMethodName = jsMethodIdentifier(cls, method);
-        out.append("function* ").append(jsMethodName).append("(");
+        String jsMethodBodyName = jsMethodBodyIdentifier(cls, method);
+        boolean wrappedStaticMethod = isWrappedStaticMethod(method);
+        out.append("function* ").append(wrappedStaticMethod ? jsMethodBodyName : jsMethodName).append("(");
         boolean first = true;
         if (!method.isStatic()) {
             out.append("__cn1ThisObject");
@@ -207,15 +209,25 @@ final class JavascriptMethodGenerator {
             out.append("__cn1Arg").append(i + 1);
         }
         out.append("){\n");
-        if (method.isStatic() && !"__CLINIT__".equals(method.getMethodName())) {
+        if (!wrappedStaticMethod && method.isStatic() && !"__CLINIT__".equals(method.getMethodName())) {
             out.append("  jvm.ensureClassInitialized(\"").append(cls.getClsName()).append("\");\n");
         }
-        if (appendStraightLineMethodBody(out, cls, method, instructions, jsMethodName)) {
+        if (appendStraightLineMethodBody(out, cls, method, instructions, wrappedStaticMethod ? jsMethodBodyName : jsMethodName)) {
+            if (wrappedStaticMethod) {
+                appendWrappedStaticMethod(out, cls, method, jsMethodName, jsMethodBodyName);
+            }
             return;
         }
+        boolean usesClassInitCache = hasClassInitSensitiveAccess(instructions);
         out.append("  const locals = new Array(").append(Math.max(1, method.getMaxLocals())).append(").fill(null);\n");
         out.append("  const stack = [];\n");
         out.append("  let pc = 0;\n");
+        if (usesClassInitCache) {
+            out.append("  const __cn1Init = Object.create(null);\n");
+            if (method.isStatic() && !"__CLINIT__".equals(method.getMethodName())) {
+                out.append("  __cn1Init[\"").append(cls.getClsName()).append("\"] = true;\n");
+            }
+        }
         if (!method.isStatic()) {
             out.append("  locals[0] = __cn1ThisObject;\n");
         }
@@ -239,7 +251,7 @@ final class JavascriptMethodGenerator {
         for (int i = 0; i < instructions.size(); i++) {
             Instruction instruction = instructions.get(i);
             out.append("      case ").append(i).append(": {\n");
-            appendInstruction(out, method, instructions, labelToIndex, instruction, i);
+            appendInstruction(out, method, instructions, labelToIndex, instruction, i, usesClassInitCache);
             out.append("      }\n");
         }
         out.append("      default:\n");
@@ -261,12 +273,63 @@ final class JavascriptMethodGenerator {
             out.append("  }\n");
         }
         out.append("}\n");
+        if (wrappedStaticMethod) {
+            appendWrappedStaticMethod(out, cls, method, jsMethodName, jsMethodBodyName);
+        }
         if ("__CLINIT__".equals(method.getMethodName())) {
-            out.append("jvm.classes[\"").append(cls.getClsName()).append("\"].clinit = ").append(jsMethodName).append(";\n");
+            out.append("jvm.classes[\"").append(cls.getClsName()).append("\"].clinit = ")
+                    .append(wrappedStaticMethod ? jsMethodBodyName : jsMethodName).append(";\n");
         }
         if (!method.isStatic() && !method.isConstructor()) {
             out.append("jvm.addVirtualMethod(\"").append(cls.getClsName()).append("\", \"")
                     .append(jsMethodName).append("\", ").append(jsMethodName).append(");\n");
+        }
+    }
+
+    private static boolean isWrappedStaticMethod(BytecodeMethod method) {
+        return method.isStatic() && !"__CLINIT__".equals(method.getMethodName());
+    }
+
+    private static void appendWrappedStaticMethod(StringBuilder out, ByteCodeClass cls, BytecodeMethod method, String wrapperName, String bodyName) {
+        out.append("function* ").append(wrapperName).append("(");
+        appendMethodParameters(out, method);
+        out.append("){\n");
+        out.append("  jvm.ensureClassInitialized(\"").append(cls.getClsName()).append("\");\n");
+        out.append("  return yield* ").append(bodyName).append("(");
+        appendMethodParameterArguments(out, method);
+        out.append(");\n");
+        out.append("}\n");
+    }
+
+    private static void appendMethodParameters(StringBuilder out, BytecodeMethod method) {
+        boolean first = true;
+        if (!method.isStatic()) {
+            out.append("__cn1ThisObject");
+            first = false;
+        }
+        List<ByteCodeMethodArg> arguments = method.getArguments();
+        for (int i = 0; i < arguments.size(); i++) {
+            if (!first) {
+                out.append(", ");
+            }
+            first = false;
+            out.append("__cn1Arg").append(i + 1);
+        }
+    }
+
+    private static void appendMethodParameterArguments(StringBuilder out, BytecodeMethod method) {
+        boolean first = true;
+        if (!method.isStatic()) {
+            out.append("__cn1ThisObject");
+            first = false;
+        }
+        List<ByteCodeMethodArg> arguments = method.getArguments();
+        for (int i = 0; i < arguments.size(); i++) {
+            if (!first) {
+                out.append(", ");
+            }
+            first = false;
+            out.append("__cn1Arg").append(i + 1);
         }
     }
 
@@ -279,7 +342,7 @@ final class JavascriptMethodGenerator {
         StringBuilder instructionBody = new StringBuilder();
         StringBuilder body = new StringBuilder();
         StraightLineContext ctx = new StraightLineContext(method.getMaxLocals(), method.getMaxStack());
-        if (method.isStatic() && !"__CLINIT__".equals(method.getMethodName())) {
+        if (isWrappedStaticMethod(method)) {
             ctx.initializedClasses.add(cls.getClsName());
         }
         if (!method.isStatic()) {
@@ -787,7 +850,9 @@ final class JavascriptMethodGenerator {
     }
 
     private static boolean appendStraightLineInvokeInstruction(StringBuilder out, Invoke invoke, StraightLineContext ctx) {
+        String owner = JavascriptNameUtil.sanitizeClassName(invoke.getOwner());
         String methodId = JavascriptNameUtil.methodIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        String methodBodyId = jsStaticMethodBodyIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
         List<String> args = JavascriptNameUtil.argumentTypes(invoke.getDesc());
         boolean hasReturn = invoke.getDesc().charAt(invoke.getDesc().length() - 1) != 'V';
         String[] argValues = new String[args.size()];
@@ -824,10 +889,16 @@ final class JavascriptMethodGenerator {
             out.append("  }\n");
             return true;
         }
+        if (invoke.getOpcode() == Opcodes.INVOKESTATIC) {
+            appendStraightLineEnsureClassInitialized(out, ctx, owner);
+        }
+        String invokedName = invoke.getOpcode() == Opcodes.INVOKESTATIC
+                ? "(" + staticInvocationTargetExpression(methodId, methodBodyId) + ")"
+                : methodId;
         if (hasReturn) {
-            out.append("  { const __result = yield* ").append(methodId).append("(");
+            out.append("  { const __result = yield* ").append(invokedName).append("(");
         } else {
-            out.append("  { yield* ").append(methodId).append("(");
+            out.append("  { yield* ").append(invokedName).append("(");
         }
         appendInvocationArgumentExpressions(out, target, argValues);
         out.append(");");
@@ -934,6 +1005,17 @@ final class JavascriptMethodGenerator {
         return JavascriptNameUtil.methodIdentifier(cls.getClsName(), method.getMethodName(), method.getSignature());
     }
 
+    private static String jsMethodBodyIdentifier(ByteCodeClass cls, BytecodeMethod method) {
+        if (isWrappedStaticMethod(method)) {
+            return jsStaticMethodBodyIdentifier(cls.getClsName(), method.getMethodName(), method.getSignature());
+        }
+        return jsMethodIdentifier(cls, method);
+    }
+
+    private static String jsStaticMethodBodyIdentifier(String owner, String name, String desc) {
+        return JavascriptNameUtil.methodIdentifier(owner, name, desc) + "__impl";
+    }
+
     private static void appendNativeStubIfNeeded(StringBuilder out, ByteCodeClass cls, BytecodeMethod method) {
         String jsMethodName = jsMethodIdentifier(cls, method);
         JavascriptNativeRegistry.NativeCategory category = JavascriptNativeRegistry.categoryFor(jsMethodName);
@@ -997,7 +1079,7 @@ final class JavascriptMethodGenerator {
     }
 
     private static void appendInstruction(StringBuilder out, BytecodeMethod method, List<Instruction> allInstructions,
-            Map<Label, Integer> labelToIndex, Instruction instruction, int index) {
+            Map<Label, Integer> labelToIndex, Instruction instruction, int index, boolean usesClassInitCache) {
         if (instruction instanceof LabelInstruction || instruction instanceof LineNumber || instruction instanceof LocalVariable
                 || instruction instanceof TryCatch) {
             out.append("        pc = ").append(index + 1).append("; break;\n");
@@ -1027,7 +1109,7 @@ final class JavascriptMethodGenerator {
             return;
         }
         if (instruction instanceof Field) {
-            appendFieldInstruction(out, (Field) instruction, index);
+            appendFieldInstruction(out, (Field) instruction, index, usesClassInitCache);
             return;
         }
         if (instruction instanceof Jump) {
@@ -1035,7 +1117,7 @@ final class JavascriptMethodGenerator {
             return;
         }
         if (instruction instanceof Invoke) {
-            appendInvokeInstruction(out, (Invoke) instruction, index);
+            appendInvokeInstruction(out, (Invoke) instruction, index, usesClassInitCache);
             return;
         }
         if (instruction instanceof SwitchInstruction) {
@@ -1483,20 +1565,20 @@ final class JavascriptMethodGenerator {
         }
     }
 
-    private static void appendFieldInstruction(StringBuilder out, Field field, int index) {
+    private static void appendFieldInstruction(StringBuilder out, Field field, int index, boolean usesStaticFieldInitCache) {
         String owner = JavascriptNameUtil.sanitizeClassName(field.getOwner());
         String fieldName = field.getFieldName();
         String propertyName = JavascriptNameUtil.fieldProperty(field.getOwner(), fieldName);
         switch (field.getOpcode()) {
             case Opcodes.GETSTATIC:
-                out.append("        jvm.ensureClassInitialized(\"").append(owner).append("\"); stack.push(jvm.classes[\"")
-                        .append(owner).append("\"].staticFields[\"").append(fieldName).append("\"]); pc = ")
-                        .append(index + 1).append("; break;\n");
+                appendInterpreterEnsureClassInitialized(out, owner, usesStaticFieldInitCache);
+                out.append("        stack.push(jvm.classes[\"").append(owner).append("\"].staticFields[\"")
+                        .append(fieldName).append("\"]); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.PUTSTATIC:
-                out.append("        jvm.ensureClassInitialized(\"").append(owner).append("\"); jvm.classes[\"")
-                        .append(owner).append("\"].staticFields[\"").append(fieldName).append("\"] = stack.pop(); pc = ")
-                        .append(index + 1).append("; break;\n");
+                appendInterpreterEnsureClassInitialized(out, owner, usesStaticFieldInitCache);
+                out.append("        jvm.classes[\"").append(owner).append("\"].staticFields[\"").append(fieldName)
+                        .append("\"] = stack.pop(); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.GETFIELD:
                 out.append("        { const target = stack.pop(); stack.push(target[\"").append(propertyName)
@@ -1509,6 +1591,30 @@ final class JavascriptMethodGenerator {
             default:
                 throw new IllegalArgumentException("Unsupported field opcode " + field.getOpcode());
         }
+    }
+
+    private static void appendInterpreterEnsureClassInitialized(StringBuilder out, String owner, boolean usesStaticFieldInitCache) {
+        if (usesStaticFieldInitCache) {
+            out.append("        if (!__cn1Init[\"").append(owner).append("\"]) { jvm.ensureClassInitialized(\"")
+                    .append(owner).append("\"); __cn1Init[\"").append(owner).append("\"] = true; }\n");
+            return;
+        }
+        out.append("        jvm.ensureClassInitialized(\"").append(owner).append("\");\n");
+    }
+
+    private static boolean hasClassInitSensitiveAccess(List<Instruction> instructions) {
+        for (Instruction instruction : instructions) {
+            if (instruction instanceof Field) {
+                int opcode = instruction.getOpcode();
+                if (opcode == Opcodes.GETSTATIC || opcode == Opcodes.PUTSTATIC) {
+                    return true;
+                }
+            }
+            if (instruction instanceof Invoke && instruction.getOpcode() == Opcodes.INVOKESTATIC) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void appendJumpInstruction(StringBuilder out, Jump jump, Map<Label, Integer> labelToIndex, int index) {
@@ -1573,9 +1679,10 @@ final class JavascriptMethodGenerator {
         }
     }
 
-    private static void appendInvokeInstruction(StringBuilder out, Invoke invoke, int index) {
+    private static void appendInvokeInstruction(StringBuilder out, Invoke invoke, int index, boolean usesClassInitCache) {
         String owner = JavascriptNameUtil.sanitizeClassName(invoke.getOwner());
         String methodId = JavascriptNameUtil.methodIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
+        String methodBodyId = jsStaticMethodBodyIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
         List<String> args = JavascriptNameUtil.argumentTypes(invoke.getDesc());
         boolean hasReturn = invoke.getDesc().charAt(invoke.getDesc().length() - 1) != 'V';
         int argCount = args.size();
@@ -1615,11 +1722,16 @@ final class JavascriptMethodGenerator {
         appendInvocationArgumentBindings(out, argCount, "          ", "stack.pop()");
         if (invoke.getOpcode() != Opcodes.INVOKESTATIC) {
             out.append("          const __target = stack.pop();\n");
-        }
-        if (hasReturn) {
-            out.append("          const __result = yield* ").append(methodId).append("(");
         } else {
-            out.append("          yield* ").append(methodId).append("(");
+            appendInterpreterEnsureClassInitialized(out, owner, usesClassInitCache);
+        }
+        String invokedName = invoke.getOpcode() == Opcodes.INVOKESTATIC
+                ? "(" + staticInvocationTargetExpression(methodId, methodBodyId) + ")"
+                : methodId;
+        if (hasReturn) {
+            out.append("          const __result = yield* ").append(invokedName).append("(");
+        } else {
+            out.append("          yield* ").append(invokedName).append("(");
         }
         appendInvocationArguments(out, invoke.getOpcode() != Opcodes.INVOKESTATIC, argCount);
         out.append(");\n");
@@ -1649,5 +1761,9 @@ final class JavascriptMethodGenerator {
         for (int i = argCount - 1; i >= 0; i--) {
             out.append(indent).append("const __arg").append(i).append(" = ").append(sourceExpression).append(";\n");
         }
+    }
+
+    private static String staticInvocationTargetExpression(String methodId, String methodBodyId) {
+        return "typeof " + methodBodyId + " === \"function\" ? " + methodBodyId + " : " + methodId;
     }
 }
