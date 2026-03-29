@@ -1,12 +1,12 @@
 package com.codenameone.playground;
 
 import com.codename1.util.Base64;
-import net.sf.zipme.ZipEntry;
-import net.sf.zipme.ZipOutputStream;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.LinkedHashSet;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
