@@ -617,7 +617,7 @@ build_playground_for_site() {
   echo "Building Playground JavaScript bundle for website..." >&2
   (
     cd "${REPO_ROOT}/scripts/cn1playground"
-    sh ./update-cn1-version.sh "${WEBSITE_CN1_VERSION}"
+    ./update-cn1-version.sh "${WEBSITE_CN1_VERSION}"
     activate_bootstrapped_java17
 
     run_playground_mvn() {
