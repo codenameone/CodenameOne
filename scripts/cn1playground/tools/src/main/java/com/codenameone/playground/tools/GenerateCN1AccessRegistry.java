@@ -857,7 +857,8 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
                 && !"java.lang.AbstractMethodError".equals(qualifiedName)
                 && !"java.lang.IllegalThreadStateException".equals(qualifiedName)
                 && !"java.lang.SuppressWarnings".equals(qualifiedName)
-                && !"java.util.EventListenerProxy".equals(qualifiedName);
+                && !"java.util.EventListenerProxy".equals(qualifiedName)
+                && !qualifiedName.startsWith("java.time.");
     }
 
     private static boolean isSupportedJavaMethod(String qualifiedName, ApiMethod method) {
