@@ -1012,7 +1012,8 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     }
 
     private static boolean isDispatchClass(ApiClass apiClass) {
-        return apiClass.packageName.startsWith("com.codename1.")
+        return (apiClass.packageName.startsWith("com.codename1.")
+                && !isPackageOrChild(apiClass.packageName, "com.codename1.impl"))
                 || isSupportedJavaDispatchPackage(apiClass.packageName)
                 || "com.codenameone.playground".equals(apiClass.packageName)
                 || apiClass.packageName.startsWith("com.codenameone.playground.");
@@ -1041,6 +1042,7 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
                 && !name.startsWith("java.lang.annotation.")
                 && !name.startsWith("java.lang.invoke.")
                 && !name.startsWith("java.lang.constant.")
+                && !name.startsWith("com.codename1.impl.")
                 && !name.startsWith("java.io.")
                 && !name.startsWith("java.net.")
                 && !name.startsWith("java.nio.")
