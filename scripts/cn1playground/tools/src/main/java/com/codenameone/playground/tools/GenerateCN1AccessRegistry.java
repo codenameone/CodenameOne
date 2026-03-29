@@ -52,6 +52,11 @@ public final class GenerateCN1AccessRegistry {
             "com.codenameone.playground.",
             "java."
     };
+    private static final String[] RUNTIME_VALIDATED_PACKAGE_PREFIXES = new String[]{
+            "java.",
+            "com.codename1."
+    };
+    private static final boolean VALIDATE_CN1_RUNTIME = Boolean.getBoolean("cn1playground.validateCn1Runtime");
 
     private GenerateCN1AccessRegistry() {
     }
@@ -368,10 +373,10 @@ public final class GenerateCN1AccessRegistry {
     }
 
     private static ApiClass validateAgainstRuntime(ApiClass apiClass) {
-        if (apiClass == null || !apiClass.packageName.startsWith("java.")) {
+        if (apiClass == null || !shouldValidateAgainstRuntime(apiClass.packageName)) {
             return apiClass;
         }
-        if (!isSupportedJavaClass(apiClass.qualifiedName)) {
+        if (apiClass.packageName.startsWith("java.") && !isSupportedJavaClass(apiClass.qualifiedName)) {
             return null;
         }
         Class<?> runtimeClass = loadRuntimeClass(apiClass.qualifiedName);
@@ -428,9 +433,12 @@ public final class GenerateCN1AccessRegistry {
     }
 
     private static ApiClass validateMethodsAgainstRuntime(ApiClass apiClass) {
+        if (apiClass == null || !shouldValidateAgainstRuntime(apiClass.packageName)) {
+            return apiClass;
+        }
         Class<?> runtimeClass = loadRuntimeClass(apiClass.qualifiedName);
         if (runtimeClass == null) {
-            return apiClass;
+            return null;
         }
         
         List<ApiMethod> staticMethods = new ArrayList<ApiMethod>();
@@ -466,6 +474,21 @@ public final class GenerateCN1AccessRegistry {
             resolveInheritedMembers(apiClass, classIndex, resolved, new LinkedHashSet<String>(), typeHierarchy);
         }
         return new ArrayList<ApiClass>(resolved.values());
+    }
+
+    private static boolean shouldValidateAgainstRuntime(String packageName) {
+        if (packageName == null) {
+            return false;
+        }
+        for (String prefix : RUNTIME_VALIDATED_PACKAGE_PREFIXES) {
+            if ("com.codename1.".equals(prefix) && !VALIDATE_CN1_RUNTIME) {
+                continue;
+            }
+            if (packageName.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static ApiClass resolveInheritedMembers(ApiClass apiClass, Map<String, ApiClass> classIndex,
