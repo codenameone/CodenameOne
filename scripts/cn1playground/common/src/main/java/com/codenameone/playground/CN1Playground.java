@@ -13,6 +13,7 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.Tabs;
@@ -75,6 +76,7 @@ public class CN1Playground extends Lifecycle {
         if (toolbar.getTitleComponent() != null) {
             toolbar.getTitleComponent().setUIID("PlaygroundTitle");
         }
+        toolbar.addMaterialCommandToRightBar("", FontImage.MATERIAL_DOWNLOAD, e -> downloadProject());
 
         editor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.JAVA, currentScript, websiteDarkMode, this::handleSourceChanged);
         cssEditor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.CSS, currentCss, websiteDarkMode, this::handleCssChanged);
@@ -155,12 +157,70 @@ public class CN1Playground extends Lifecycle {
     }
 
     private Component createMainContent(Tabs tabs, Container previewPanel) {
-        if (CN.getDisplayWidth() >= 900) {
+        int width = CN.getDisplayWidth();
+        if (width >= 900) {
             return new SplitPane(SplitPane.HORIZONTAL_SPLIT, tabs, previewPanel, "25%", "50%", "75%");
+        }
+        if (CN.isPortrait()) {
+            Tabs mobileTabs = new Tabs();
+            mobileTabs.setUIID("PlaygroundEditorTabs");
+            mobileTabs.addTab("Editor", tabs);
+            mobileTabs.addTab("Preview", previewPanel);
+            applyWebsiteTheme(mobileTabs, websiteDarkMode);
+            return mobileTabs;
         }
         Container stacked = new Container(new GridLayout(2, 1));
         stacked.addAll(tabs, previewPanel);
         return stacked;
+    }
+
+    private void downloadProject() {
+        try {
+            String script = currentScript == null ? "" : currentScript;
+            String css = currentCss == null ? "" : currentCss;
+            PlaygroundProjectExporter.ExportedProject project = PlaygroundProjectExporter.build(script, css);
+            triggerBrowserDownload(project.fileName, project.base64Zip);
+        } catch (RuntimeException ex) {
+            Log.e(ex);
+        }
+    }
+
+    private void triggerBrowserDownload(String fileName, String base64Zip) {
+        BrowserComponent js = CN.getSharedJavascriptContext();
+        if (js == null) {
+            Display.getInstance().copyToClipboard(base64Zip);
+            return;
+        }
+        String safeName = escapeJsString(fileName);
+        String safeData = escapeJsString(base64Zip);
+        js.execute(
+                "callback.onSuccess((function(){"
+                        + "try {"
+                        + "var data = '" + safeData + "';"
+                        + "var bytes = atob(data);"
+                        + "var arr = new Uint8Array(bytes.length);"
+                        + "for (var i = 0; i < bytes.length; i++) { arr[i] = bytes.charCodeAt(i); }"
+                        + "var blob = new Blob([arr], {type:'application/zip'});"
+                        + "var url = URL.createObjectURL(blob);"
+                        + "var link = document.createElement('a');"
+                        + "link.href = url;"
+                        + "link.download = '" + safeName + "';"
+                        + "document.body.appendChild(link);"
+                        + "link.click();"
+                        + "document.body.removeChild(link);"
+                        + "setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);"
+                        + "return true;"
+                        + "} catch (e) { return false; }"
+                        + "})())",
+                res -> {}
+        );
+    }
+
+    private String escapeJsString(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "");
     }
 
     private void runScript(Form form) {
