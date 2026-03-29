@@ -181,17 +181,29 @@ final class PlaygroundProjectExporter {
     }
 
     private static String indent(String text, String indent) {
-        String[] lines = text.split("\\n");
         StringBuilder out = new StringBuilder();
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i];
+        int start = 0;
+        while (start <= text.length()) {
+            int end = text.indexOf('\n', start);
+            if (end < 0) {
+                end = text.length();
+            }
+            String line = text.substring(start, end);
             if (line.trim().length() == 0) {
+                if (end >= text.length()) {
+                    break;
+                }
+                start = end + 1;
                 continue;
             }
             out.append(indent).append(line.trim());
-            if (i < lines.length - 1) {
+            if (end < text.length()) {
                 out.append("\n");
             }
+            if (end >= text.length()) {
+                break;
+            }
+            start = end + 1;
         }
         return out.toString();
     }
