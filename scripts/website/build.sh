@@ -618,7 +618,9 @@ build_playground_for_site() {
   (
     cd "${REPO_ROOT}/scripts/cn1playground"
     ./update-cn1-version.sh "${WEBSITE_CN1_VERSION}"
-    activate_bootstrapped_java17
+    if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" = "true" ]; then
+      activate_bootstrapped_java17
+    fi
 
     run_playground_mvn() {
       if command -v xvfb-run >/dev/null 2>&1; then
