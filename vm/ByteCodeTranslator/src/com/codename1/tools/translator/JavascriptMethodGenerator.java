@@ -219,6 +219,7 @@ final class JavascriptMethodGenerator {
             return;
         }
         boolean usesClassInitCache = hasClassInitSensitiveAccess(instructions);
+        boolean usesVirtualDispatchCache = hasVirtualDispatchAccess(instructions);
         out.append("  const locals = new Array(").append(Math.max(1, method.getMaxLocals())).append(").fill(null);\n");
         out.append("  const stack = [];\n");
         out.append("  let pc = 0;\n");
@@ -227,6 +228,9 @@ final class JavascriptMethodGenerator {
             if (method.isStatic() && !"__CLINIT__".equals(method.getMethodName())) {
                 out.append("  __cn1Init[\"").append(cls.getClsName()).append("\"] = true;\n");
             }
+        }
+        if (usesVirtualDispatchCache) {
+            out.append("  const __cn1Virtual = Object.create(null);\n");
         }
         if (!method.isStatic()) {
             out.append("  locals[0] = __cn1ThisObject;\n");
@@ -251,7 +255,7 @@ final class JavascriptMethodGenerator {
         for (int i = 0; i < instructions.size(); i++) {
             Instruction instruction = instructions.get(i);
             out.append("      case ").append(i).append(": {\n");
-            appendInstruction(out, method, instructions, labelToIndex, instruction, i, usesClassInitCache);
+            appendInstruction(out, method, instructions, labelToIndex, instruction, i, usesClassInitCache, usesVirtualDispatchCache);
             out.append("      }\n");
         }
         out.append("      default:\n");
@@ -799,13 +803,12 @@ final class JavascriptMethodGenerator {
             }
             case Opcodes.CHECKCAST: {
                 String value = ctx.peek(0);
-                out.append("  if (").append(value).append(" != null && !jvm.instanceOf(").append(value).append(", \"")
-                        .append(typeName).append("\")) throw new Error(\"ClassCastException\");\n");
+                appendDirectCheckCast(out, "  ", value, typeName, "throw new Error(\"ClassCastException\")");
                 return true;
             }
             case Opcodes.INSTANCEOF: {
                 String value = ctx.pop();
-                out.append("  ").append(ctx.push("(jvm.instanceOf(" + value + ", \"" + typeName + "\") ? 1 : 0)")).append(";\n");
+                out.append("  ").append(ctx.push(directInstanceOfExpression(value, typeName) + " ? 1 : 0")).append(";\n");
                 return true;
             }
             default:
@@ -874,7 +877,8 @@ final class JavascriptMethodGenerator {
         if (invoke.getOpcode() == Opcodes.INVOKEVIRTUAL || invoke.getOpcode() == Opcodes.INVOKEINTERFACE) {
             out.append("  {\n");
             out.append("    const __target = ").append(target).append(";\n");
-            out.append("    const __method = ((jvm.classes[__target.__class] && jvm.classes[__target.__class].methods) ? jvm.classes[__target.__class].methods[\"").append(methodId)
+            out.append("    const __classDef = __target.__classDef;\n");
+            out.append("    const __method = ((__classDef && __classDef.methods) ? __classDef.methods[\"").append(methodId)
                     .append("\"] : null) || jvm.resolveVirtual(__target.__class, \"").append(methodId).append("\");\n");
             if (hasReturn) {
                 out.append("    const __result = yield* __method(");
@@ -1079,7 +1083,8 @@ final class JavascriptMethodGenerator {
     }
 
     private static void appendInstruction(StringBuilder out, BytecodeMethod method, List<Instruction> allInstructions,
-            Map<Label, Integer> labelToIndex, Instruction instruction, int index, boolean usesClassInitCache) {
+            Map<Label, Integer> labelToIndex, Instruction instruction, int index, boolean usesClassInitCache,
+            boolean usesVirtualDispatchCache) {
         if (instruction instanceof LabelInstruction || instruction instanceof LineNumber || instruction instanceof LocalVariable
                 || instruction instanceof TryCatch) {
             out.append("        pc = ").append(index + 1).append("; break;\n");
@@ -1117,7 +1122,7 @@ final class JavascriptMethodGenerator {
             return;
         }
         if (instruction instanceof Invoke) {
-            appendInvokeInstruction(out, (Invoke) instruction, index, usesClassInitCache);
+            appendInvokeInstruction(out, (Invoke) instruction, index, usesClassInitCache, usesVirtualDispatchCache);
             return;
         }
         if (instruction instanceof SwitchInstruction) {
@@ -1552,17 +1557,30 @@ final class JavascriptMethodGenerator {
                         .append("\", 1)); pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.CHECKCAST:
-                out.append("        { const value = stack[stack.length - 1]; if (value != null && !jvm.instanceOf(value, \"")
-                        .append(typeName)
-                        .append("\")) throw new Error(\"ClassCastException\"); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { const value = stack[stack.length - 1]; ");
+                appendDirectCheckCast(out, "", "value", typeName, "throw new Error(\"ClassCastException\")");
+                out.append(" pc = ").append(index + 1).append("; break; }\n");
                 return;
             case Opcodes.INSTANCEOF:
-                out.append("        { const value = stack.pop(); stack.push(jvm.instanceOf(value, \"").append(typeName)
-                        .append("\") ? 1 : 0); pc = ").append(index + 1).append("; break; }\n");
+                out.append("        { const value = stack.pop(); stack.push(").append(directInstanceOfExpression("value", typeName))
+                        .append(" ? 1 : 0); pc = ").append(index + 1).append("; break; }\n");
                 return;
             default:
                 throw new IllegalArgumentException("Unsupported type opcode " + instruction.getOpcode());
         }
+    }
+
+    private static void appendDirectCheckCast(StringBuilder out, String indent, String valueExpression, String typeName, String failureStatement) {
+        out.append(indent).append("if (").append(valueExpression).append(" != null) { const __classDef = ").append(valueExpression)
+                .append(".__classDef; if (").append(valueExpression).append(".__class !== \"").append(typeName)
+                .append("\" && !(__classDef && __classDef.assignableTo && __classDef.assignableTo[\"").append(typeName)
+                .append("\"])) ").append(failureStatement).append("; }\n");
+    }
+
+    private static String directInstanceOfExpression(String valueExpression, String typeName) {
+        return "(" + valueExpression + " != null && (" + valueExpression + ".__class === \"" + typeName
+                + "\" || (" + valueExpression + ".__classDef && " + valueExpression + ".__classDef.assignableTo && "
+                + valueExpression + ".__classDef.assignableTo[\"" + typeName + "\"])))";
     }
 
     private static void appendFieldInstruction(StringBuilder out, Field field, int index, boolean usesStaticFieldInitCache) {
@@ -1612,6 +1630,18 @@ final class JavascriptMethodGenerator {
             }
             if (instruction instanceof Invoke && instruction.getOpcode() == Opcodes.INVOKESTATIC) {
                 return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasVirtualDispatchAccess(List<Instruction> instructions) {
+        for (Instruction instruction : instructions) {
+            if (instruction instanceof Invoke) {
+                int opcode = instruction.getOpcode();
+                if (opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKEINTERFACE) {
+                    return true;
+                }
             }
         }
         return false;
@@ -1679,7 +1709,8 @@ final class JavascriptMethodGenerator {
         }
     }
 
-    private static void appendInvokeInstruction(StringBuilder out, Invoke invoke, int index, boolean usesClassInitCache) {
+    private static void appendInvokeInstruction(StringBuilder out, Invoke invoke, int index, boolean usesClassInitCache,
+            boolean usesVirtualDispatchCache) {
         String owner = JavascriptNameUtil.sanitizeClassName(invoke.getOwner());
         String methodId = JavascriptNameUtil.methodIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
         String methodBodyId = jsStaticMethodBodyIdentifier(invoke.getOwner(), invoke.getName(), invoke.getDesc());
@@ -1701,8 +1732,21 @@ final class JavascriptMethodGenerator {
             out.append("        {\n");
             appendInvocationArgumentBindings(out, argCount, "          ", "stack.pop()");
             out.append("          const __target = stack.pop();\n");
-            out.append("          const __method = ((jvm.classes[__target.__class] && jvm.classes[__target.__class].methods) ? jvm.classes[__target.__class].methods[\"").append(methodId)
-                    .append("\"] : null) || jvm.resolveVirtual(__target.__class, \"").append(methodId).append("\");\n");
+            out.append("          const __classDef = __target.__classDef;\n");
+            out.append("          let __method = (__classDef && __classDef.methods) ? __classDef.methods[\"").append(methodId)
+                    .append("\"] : null;\n");
+            if (usesVirtualDispatchCache) {
+                out.append("          if (!__method) {\n");
+                out.append("            const __cacheKey = __target.__class + \"|").append(methodId).append("\";\n");
+                out.append("            __method = __cn1Virtual[__cacheKey];\n");
+                out.append("            if (!__method) {\n");
+                out.append("              __method = jvm.resolveVirtual(__target.__class, \"").append(methodId).append("\");\n");
+                out.append("              __cn1Virtual[__cacheKey] = __method;\n");
+                out.append("            }\n");
+                out.append("          }\n");
+            } else {
+                out.append("          if (!__method) __method = jvm.resolveVirtual(__target.__class, \"").append(methodId).append("\");\n");
+            }
             if (hasReturn) {
                 out.append("          const __result = yield* __method(");
                 appendInvocationArguments(out, true, argCount);

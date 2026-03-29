@@ -81,12 +81,22 @@ class JavascriptOpcodeCoverageTest {
                         && translatedApp.contains("\"JsTypeBase\": true")
                         && translatedApp.contains("\"JsTypeIface\": true"),
                 "Class metadata should include static assignability information");
-        assertTrue(translatedApp.contains("jvm.classes[__target.__class] && jvm.classes[__target.__class].methods")
-                        && translatedApp.contains("jvm.classes[__target.__class].methods["),
+        assertTrue(translatedApp.contains("const __classDef = __target.__classDef;")
+                        && translatedApp.contains("(__classDef && __classDef.methods) ? __classDef.methods["),
                 "Virtual/interface dispatch should use an exact-class method-table fast path");
         assertTrue(translatedApp.contains("jvm.resolveVirtual(__target.__class"), "Dispatch should retain inheritance/interface fallback");
+        assertTrue(translatedApp.contains("__class !== \"JsTypeImpl\"")
+                        && translatedApp.contains("__classDef.assignableTo[\"JsTypeImpl\"]"),
+                "CHECKCAST should inline the exact-class and assignability check");
+        assertTrue(translatedApp.contains("__class === \"JsTypeImpl\"")
+                        && translatedApp.contains(".__classDef.assignableTo[\"JsTypeImpl\"]"),
+                "INSTANCEOF should inline the exact-class and assignability check");
+        assertTrue(!translatedApp.contains("jvm.instanceOf("),
+                "Translated object/type checks should avoid the generic runtime instanceof helper");
         assertTrue(runtime.contains("resolveVirtual(className, methodId)"), "Runtime should resolve virtual methods by class name");
         assertTrue(runtime.contains("obj.__classDef.assignableTo[className]"), "Runtime instanceof should use emitted class assignability tables");
+        assertTrue(runtime.contains("errorClass === entry.type || (errorClassDef && errorClassDef.assignableTo && errorClassDef.assignableTo[entry.type])"),
+                "Runtime exception matching should use direct class and assignability checks");
         assertTrue(runtime.contains("arrayAssignableTo(componentClass, dimensions)") && runtime.contains("isPrimitiveComponent(componentClass)"),
                 "Runtime should keep array assignability limited to CN1-relevant cases");
     }

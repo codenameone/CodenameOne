@@ -279,6 +279,8 @@ const jvm = {
     if (!entries || !entries.length) {
       return null;
     }
+    const errorClass = error == null ? null : error.__class;
+    const errorClassDef = error == null ? null : error.__classDef;
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
       if (pc < entry.start || pc >= entry.end) {
@@ -287,7 +289,7 @@ const jvm = {
       if (entry.type == null) {
         return entry;
       }
-      if (this.instanceOf(error, entry.type)) {
+      if (errorClass === entry.type || (errorClassDef && errorClassDef.assignableTo && errorClassDef.assignableTo[entry.type])) {
         return entry;
       }
     }
