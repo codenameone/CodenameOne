@@ -35,13 +35,13 @@ resolve_runtime_classpath() {
 
 RUNTIME_CP="$(resolve_runtime_classpath)"
 TOOL_CP="$BUILD_DIR"
-if [ -n "$RUNTIME_CP" ]; then
-  TOOL_CP="$TOOL_CP:$RUNTIME_CP"
+if [ -z "$RUNTIME_CP" ]; then
+  echo "ERROR: No CN1 runtime classpath found." >&2
+  echo "Set CN1_RUNTIME_CLASSPATH or install codenameone-core/CodenameOne.jar locally before regenerating." >&2
+  exit 1
 fi
+TOOL_CP="$TOOL_CP:$RUNTIME_CP"
 
-echo "Using runtime validation classpath: ${RUNTIME_CP:-<none>}" >&2
-JAVA_OPTS=""
-if [ -n "$RUNTIME_CP" ]; then
-  JAVA_OPTS="-Dcn1playground.validateCn1Runtime=true"
-fi
+echo "Using runtime validation classpath: $RUNTIME_CP" >&2
+JAVA_OPTS="-Dcn1playground.validateCn1Runtime=true"
 java $JAVA_OPTS -cp "$TOOL_CP" com.codenameone.playground.tools.GenerateCN1AccessRegistry "$OUT"

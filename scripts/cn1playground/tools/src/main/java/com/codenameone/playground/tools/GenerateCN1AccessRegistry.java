@@ -29,7 +29,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.HashSet;
 
 import javax.lang.model.element.Modifier;
 import javax.tools.JavaCompiler;
@@ -58,9 +57,6 @@ public final class GenerateCN1AccessRegistry {
             "com.codename1."
     };
     private static final boolean VALIDATE_CN1_RUNTIME = Boolean.getBoolean("cn1playground.validateCn1Runtime");
-    private static final String[] DISABLED_CN1_CLASSES = new String[]{
-            "com.codename1.ui.AbstractDialog"
-    };
 
     private GenerateCN1AccessRegistry() {
     }
@@ -95,9 +91,6 @@ public final class GenerateCN1AccessRegistry {
         for (SourceUnit unit : units) {
             for (SourceClass sourceClass : unit.topLevelClasses) {
                 if (matchesPrefix(sourceClass.qualifiedName, INDEX_PACKAGE_PREFIXES)) {
-                    if (isDisabledClass(sourceClass.qualifiedName)) {
-                        continue;
-                    }
                     indexedClasses.put(sourceClass.qualifiedName, sourceClass);
                 }
             }
@@ -112,7 +105,6 @@ public final class GenerateCN1AccessRegistry {
         for (SourceClass sourceClass : indexedClasses.values()) {
             ApiClass apiClass = buildApiClass(sourceClass, knownTypes);
             apiClass = validateAgainstRuntime(apiClass);
-            apiClass = applyCompatibilityBlacklist(apiClass);
             if (apiClass != null) {
                 apiClasses.add(apiClass);
             }
@@ -435,7 +427,7 @@ public final class GenerateCN1AccessRegistry {
     private static List<ApiClass> validateInheritedAgainstRuntime(List<ApiClass> apiClasses) {
         List<ApiClass> result = new ArrayList<ApiClass>();
         for (ApiClass apiClass : apiClasses) {
-            result.add(applyCompatibilityBlacklist(validateMethodsAgainstRuntime(apiClass)));
+            result.add(validateMethodsAgainstRuntime(apiClass));
         }
         return result;
     }
@@ -482,74 +474,6 @@ public final class GenerateCN1AccessRegistry {
             resolveInheritedMembers(apiClass, classIndex, resolved, new LinkedHashSet<String>(), typeHierarchy);
         }
         return new ArrayList<ApiClass>(resolved.values());
-    }
-
-    private static ApiClass applyCompatibilityBlacklist(ApiClass apiClass) {
-        if (apiClass == null) {
-            return null;
-        }
-        if ("com.codename1.ui.Dialog".equals(apiClass.qualifiedName)) {
-            return withMethodsRemoved(apiClass,
-                    "isDefaultInteractionDialogMode",
-                    "setDefaultInteractionDialogMode",
-                    "configureCommands",
-                    "isInteractionDialogMode",
-                    "setInteractionDialogMode",
-                    "setTransitions",
-                    "setDialogType",
-                    "setTimeout",
-                    "showDialog",
-                    "setDefaultCommand");
-        }
-        if ("com.codename1.components.InteractionDialog".equals(apiClass.qualifiedName)) {
-            return withMethodsRemoved(apiClass,
-                    "configureCommands",
-                    "setDefaultCommand",
-                    "setDialogType",
-                    "setTimeout",
-                    "setTransitions",
-                    "showDialog");
-        }
-        if ("com.codename1.components.Progress".equals(apiClass.qualifiedName)) {
-            return withMethodsRemoved(apiClass,
-                    "configureCommands",
-                    "isInteractionDialogMode",
-                    "setInteractionDialogMode",
-                    "setTransitions");
-        }
-        return apiClass;
-    }
-
-    private static ApiClass withMethodsRemoved(ApiClass apiClass, String... methodNames) {
-        Set<String> blocked = new HashSet<String>();
-        Collections.addAll(blocked, methodNames);
-        List<ApiMethod> staticMethods = new ArrayList<ApiMethod>();
-        for (ApiMethod method : apiClass.staticMethods) {
-            if (!blocked.contains(method.name)) {
-                staticMethods.add(method);
-            }
-        }
-        List<ApiMethod> instanceMethods = new ArrayList<ApiMethod>();
-        for (ApiMethod method : apiClass.instanceMethods) {
-            if (!blocked.contains(method.name)) {
-                instanceMethods.add(method);
-            }
-        }
-        return new ApiClass(apiClass.packageName, apiClass.simpleName, apiClass.qualifiedName, apiClass.superTypes,
-                apiClass.isInterface, apiClass.isAbstract, apiClass.constructors, staticMethods, instanceMethods,
-                apiClass.staticFields, apiClass.instanceFields);
-    }
-
-    private static boolean isDisabledClass(String qualifiedName) {
-        if (qualifiedName == null) {
-            return false;
-        }
-        for (String disabled : DISABLED_CN1_CLASSES) {
-            if (disabled.equals(qualifiedName)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static boolean shouldValidateAgainstRuntime(String packageName) {
