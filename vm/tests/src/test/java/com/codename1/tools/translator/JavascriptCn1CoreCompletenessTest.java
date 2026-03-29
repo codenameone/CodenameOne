@@ -29,40 +29,32 @@ class JavascriptCn1CoreCompletenessTest {
         assertTrue(CompilerHelper.isJavaApiCompatible(config),
                 "JDK " + config.jdkVersion + " must target matching bytecode level for JavaAPI");
 
-        Path sourceDir = Files.createTempDirectory("js-cn1-core-src");
-        Path classesDir = Files.createTempDirectory("js-cn1-core-classes");
-        Path javaApiDir = Files.createTempDirectory("js-cn1-core-javaapi");
-
-        Files.write(sourceDir.resolve("JsCodenameOneCoreSliceApp.java"),
-                JavascriptTargetIntegrationTest.loadFixture("JsCodenameOneCoreSliceApp.java").getBytes(StandardCharsets.UTF_8));
-
-        Path coreJar = findDependencyJar("codenameone-core");
-        assertNotNull(coreJar, "codenameone-core dependency jar should be available in target/benchmark-dependencies");
-
-        CompilerHelper.compileJavaAPI(javaApiDir, config);
-        compileFixtureAgainstJavaApiAndCore(config, sourceDir, classesDir, javaApiDir, coreJar);
-
-        CompilerHelper.copyDirectory(javaApiDir, classesDir);
-        unzipMatching(coreJar, classesDir,
-                "com/codename1/io/",
-                "com/codename1/util/",
-                "com/codename1/compat/java/",
-                "com/codename1/l10n/",
-                "com/codename1/ui/events/",
-                "com/codename1/xml/");
-
-        Path outputDir = Files.createTempDirectory("js-cn1-core-output");
-        JavascriptTargetIntegrationTest.runJavascriptTranslator(classesDir, outputDir, "JsCodenameOneCoreSliceApp");
-
-        Path distDir = outputDir.resolve("dist").resolve("JsCodenameOneCoreSliceApp-js");
+        Path distDir = translateCn1CoreSlice(config);
         assertTrue(Files.exists(distDir.resolve("translated_app.js")),
                 "Translator should emit translated JS for the Codename One core slice");
+        assertTrue(Files.exists(distDir.resolve("vm_protocol.md")),
+                "Translator should emit the VM protocol artifact for the Codename One core slice");
 
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
         assertTrue(translatedApp.contains("JsCodenameOneCoreSliceApp"),
                 "Translated bundle should contain the CN1 core slice app entrypoint");
         assertFalse(translatedApp.contains("Missing javascript native method "),
                 "CN1 core slice translation should not retain uncategorized javascript native fallback stubs");
+    }
+
+    @Test
+    void executesMeaningfulCodenameOneCoreSliceInWorkerRuntime() throws Exception {
+        Parser.cleanup();
+
+        CompilerHelper.CompilerConfig config = selectRepresentativeCompiler();
+        Path distDir = translateCn1CoreSlice(config);
+
+        JavascriptRuntimeSemanticsTest.WorkerRunResult result = JavascriptRuntimeSemanticsTest.runGeneratedWorkerBundle(distDir);
+        assertEquals("result", result.type,
+                "CN1 core slice should complete through the generated worker protocol. Raw worker payload: " + result.rawMessage);
+        assertEquals(7, result.result, "CN1 core slice should execute JSON and StringUtil behavior correctly");
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(),
+                "CN1 core slice should not emit a worker error. Raw worker payload: " + result.rawMessage);
     }
 
     private static CompilerHelper.CompilerConfig selectRepresentativeCompiler() {
@@ -103,6 +95,34 @@ class JavascriptCn1CoreCompletenessTest {
         int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
         assertEquals(0, compileResult,
                 "Compilation failed for Codename One core slice fixture with " + config + ": " + CompilerHelper.getLastErrorLog());
+    }
+
+    private static Path translateCn1CoreSlice(CompilerHelper.CompilerConfig config) throws Exception {
+        Path sourceDir = Files.createTempDirectory("js-cn1-core-src");
+        Path classesDir = Files.createTempDirectory("js-cn1-core-classes");
+        Path javaApiDir = Files.createTempDirectory("js-cn1-core-javaapi");
+
+        Files.write(sourceDir.resolve("JsCodenameOneCoreSliceApp.java"),
+                JavascriptTargetIntegrationTest.loadFixture("JsCodenameOneCoreSliceApp.java").getBytes(StandardCharsets.UTF_8));
+
+        Path coreJar = findDependencyJar("codenameone-core");
+        assertNotNull(coreJar, "codenameone-core dependency jar should be available in target/benchmark-dependencies");
+
+        CompilerHelper.compileJavaAPI(javaApiDir, config);
+        compileFixtureAgainstJavaApiAndCore(config, sourceDir, classesDir, javaApiDir, coreJar);
+
+        CompilerHelper.copyDirectory(javaApiDir, classesDir);
+        unzipMatching(coreJar, classesDir,
+                "com/codename1/io/",
+                "com/codename1/util/",
+                "com/codename1/compat/java/",
+                "com/codename1/l10n/",
+                "com/codename1/ui/events/",
+                "com/codename1/xml/");
+
+        Path outputDir = Files.createTempDirectory("js-cn1-core-output");
+        JavascriptTargetIntegrationTest.runJavascriptTranslator(classesDir, outputDir, "JsCodenameOneCoreSliceApp");
+        return outputDir.resolve("dist").resolve("JsCodenameOneCoreSliceApp-js");
     }
 
     private static Path findDependencyJar(String namePart) throws IOException {

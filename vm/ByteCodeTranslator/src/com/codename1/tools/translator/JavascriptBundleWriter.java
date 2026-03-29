@@ -19,6 +19,7 @@ final class JavascriptBundleWriter {
         writeTranslatedClasses(outputDirectory, classes);
         writeWorker(outputDirectory);
         writeIndex(outputDirectory);
+        writeProtocol(outputDirectory);
     }
 
     private static void writeRuntime(File outputDirectory) throws IOException {
@@ -69,6 +70,10 @@ final class JavascriptBundleWriter {
 
     private static void writeIndex(File outputDirectory) throws IOException {
         writeResource(outputDirectory, "index.html", "index.html");
+    }
+
+    private static void writeProtocol(File outputDirectory) throws IOException {
+        writeResource(outputDirectory, "vm_protocol.md", "vm_protocol.md");
     }
 
     private static void writeResource(File outputDirectory, String targetName, String resourceName) throws IOException {

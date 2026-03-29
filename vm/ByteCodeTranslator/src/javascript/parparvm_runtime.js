@@ -50,6 +50,8 @@ const jvm = {
   classes: {},
   literalStrings: Object.create(null),
   methodTailCache: Object.create(null),
+  remappedMethodIdCache: Object.create(null),
+  resolvedVirtualCache: Object.create(null),
   nextIdentity: 1,
   nextThreadId: 1,
   nextHostCallId: 1,
@@ -123,6 +125,7 @@ const jvm = {
     const classDef = this.classes[className];
     const obj = { __class: className, __classDef: classDef, __id: this.nextIdentity++, __monitor: this.createMonitor() };
     this.initInstanceFields(obj, className);
+    this.initFieldAliases(obj, className);
     return obj;
   },
   initInstanceFields(obj, className) {
@@ -139,6 +142,41 @@ const jvm = {
         obj[field.prop || (field.owner + "_" + field.name)] = 0;
       }
     }
+  },
+  initFieldAliases(obj, className) {
+    const hierarchy = [];
+    let current = className;
+    while (current) {
+      hierarchy.push(current);
+      const cls = this.classes[current];
+      current = cls ? cls.baseClass : null;
+    }
+    for (let i = hierarchy.length - 1; i >= 0; i--) {
+      const owner = hierarchy[i];
+      const cls = this.classes[owner];
+      if (!cls || !cls.instanceFields) {
+        continue;
+      }
+      for (let j = 0; j < cls.instanceFields.length; j++) {
+        const field = cls.instanceFields[j];
+        const canonicalProp = field.prop || this.fieldProperty(field.owner, field.name);
+        for (let k = 0; k < i; k++) {
+          const aliasProp = this.fieldProperty(hierarchy[k], field.name);
+          if (aliasProp === canonicalProp || Object.prototype.hasOwnProperty.call(obj, aliasProp)) {
+            continue;
+          }
+          Object.defineProperty(obj, aliasProp, {
+            configurable: true,
+            enumerable: false,
+            get: function() { return obj[canonicalProp]; },
+            set: function(value) { obj[canonicalProp] = value; }
+          });
+        }
+      }
+    }
+  },
+  fieldProperty(owner, name) {
+    return "cn1_" + owner + "_" + name;
   },
   newArray(size, componentClass, dimensions) {
     size = size | 0;
@@ -233,18 +271,27 @@ const jvm = {
     return componentClass.indexOf("JAVA_") === 0;
   },
   resolveVirtual(className, methodId) {
+    const cacheKey = className + "|" + methodId;
+    let cached = this.resolvedVirtualCache[cacheKey];
+    if (cached) {
+      return cached;
+    }
     const tail = this.methodTail(methodId);
     let current = className;
     while (current) {
       const cls = this.classes[current];
       if (cls && cls.methods) {
         if (cls.methods[methodId]) {
-          return cls.methods[methodId];
+          cached = cls.methods[methodId];
+          this.resolvedVirtualCache[cacheKey] = cached;
+          return cached;
         }
         if (tail) {
-          const remappedId = "cn1_" + current + tail;
+          const remappedId = this.remappedMethodId(current, methodId, tail);
           if (cls.methods[remappedId]) {
-            return cls.methods[remappedId];
+            cached = cls.methods[remappedId];
+            this.resolvedVirtualCache[cacheKey] = cached;
+            return cached;
           }
         }
       }
@@ -271,6 +318,16 @@ const jvm = {
     }
     this.methodTailCache[methodId] = null;
     return null;
+  },
+  remappedMethodId(className, methodId, tail) {
+    const cacheKey = className + "|" + methodId;
+    let cached = this.remappedMethodIdCache[cacheKey];
+    if (cached !== undefined) {
+      return cached;
+    }
+    cached = tail ? "cn1_" + className + tail : null;
+    this.remappedMethodIdCache[cacheKey] = cached;
+    return cached;
   },
   instanceOf(obj, className) {
     return !!(obj && obj.__classDef && obj.__classDef.assignableTo && obj.__classDef.assignableTo[className]);

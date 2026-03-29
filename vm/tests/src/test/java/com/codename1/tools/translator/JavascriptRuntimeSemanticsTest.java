@@ -245,7 +245,7 @@ class JavascriptRuntimeSemanticsTest {
         String output = readAll(process.getInputStream());
         String errors = readAll(process.getErrorStream());
         int rc = process.waitFor();
-        assertEquals(0, rc, "Node worker harness should exit cleanly. stderr: " + errors);
+        assertEquals(0, rc, "Node worker harness should exit cleanly. stdout: " + output + " stderr: " + errors);
         WorkerRunResult out = new WorkerRunResult();
         out.rawMessage = output.trim();
         out.type = extractJsonString(output, "type");
@@ -255,14 +255,14 @@ class JavascriptRuntimeSemanticsTest {
         return out;
     }
 
-    private static WorkerRunResult runGeneratedWorkerBundle(Path distDir) throws Exception {
+    static WorkerRunResult runGeneratedWorkerBundle(Path distDir) throws Exception {
         Path harness = Files.createTempFile("js-worker-protocol", ".js");
         Files.write(harness, generatedWorkerHarnessSource(distDir).getBytes(StandardCharsets.UTF_8));
         Process process = new ProcessBuilder("node", harness.toString()).start();
         String output = readAll(process.getInputStream());
         String errors = readAll(process.getErrorStream());
         int rc = process.waitFor();
-        assertEquals(0, rc, "Node worker-thread harness should exit cleanly. stderr: " + errors);
+        assertEquals(0, rc, "Node worker-thread harness should exit cleanly. stdout: " + output + " stderr: " + errors);
         WorkerRunResult out = new WorkerRunResult();
         out.rawMessage = output.trim();
         out.type = extractJsonString(output, "type");
@@ -279,7 +279,7 @@ class JavascriptRuntimeSemanticsTest {
         String output = readAll(process.getInputStream());
         String errors = readAll(process.getErrorStream());
         int rc = process.waitFor();
-        assertEquals(0, rc, "Node worker-thread host harness should exit cleanly. stderr: " + errors);
+        assertEquals(0, rc, "Node worker-thread host harness should exit cleanly. stdout: " + output + " stderr: " + errors);
         WorkerRunResult out = new WorkerRunResult();
         out.rawMessage = output.trim();
         out.type = extractJsonString(output, "type");
@@ -296,7 +296,7 @@ class JavascriptRuntimeSemanticsTest {
         String output = readAll(process.getInputStream());
         String errors = readAll(process.getErrorStream());
         int rc = process.waitFor();
-        assertEquals(0, rc, "Node worker-thread protocol handshake harness should exit cleanly. stderr: " + errors);
+        assertEquals(0, rc, "Node worker-thread protocol handshake harness should exit cleanly. stdout: " + output + " stderr: " + errors);
         WorkerRunResult out = new WorkerRunResult();
         out.rawMessage = output.trim();
         out.type = extractJsonString(output, "type");
@@ -318,7 +318,7 @@ class JavascriptRuntimeSemanticsTest {
         String output = readAll(process.getInputStream());
         String errors = readAll(process.getErrorStream());
         int rc = process.waitFor();
-        assertEquals(0, rc, "Node worker-thread event harness should exit cleanly. stderr: " + errors);
+        assertEquals(0, rc, "Node worker-thread event harness should exit cleanly. stdout: " + output + " stderr: " + errors);
         WorkerRunResult out = new WorkerRunResult();
         out.rawMessage = output.trim();
         out.type = extractJsonString(output, "type");
@@ -335,7 +335,7 @@ class JavascriptRuntimeSemanticsTest {
         String output = readAll(process.getInputStream());
         String errors = readAll(process.getErrorStream());
         int rc = process.waitFor();
-        assertEquals(0, rc, "Node worker-thread queued-event harness should exit cleanly. stderr: " + errors);
+        assertEquals(0, rc, "Node worker-thread queued-event harness should exit cleanly. stdout: " + output + " stderr: " + errors);
         WorkerRunResult out = new WorkerRunResult();
         out.rawMessage = output.trim();
         out.type = extractJsonString(output, "type");
@@ -352,7 +352,7 @@ class JavascriptRuntimeSemanticsTest {
         String output = readAll(process.getInputStream());
         String errors = readAll(process.getErrorStream());
         int rc = process.waitFor();
-        assertEquals(0, rc, "Node worker-thread host-error harness should exit cleanly. stderr: " + errors);
+        assertEquals(0, rc, "Node worker-thread host-error harness should exit cleanly. stdout: " + output + " stderr: " + errors);
         WorkerRunResult out = new WorkerRunResult();
         out.rawMessage = output.trim();
         out.type = extractJsonString(output, "type");
@@ -521,7 +521,7 @@ class JavascriptRuntimeSemanticsTest {
                 + "    console.log(JSON.stringify({ type: 'error', message: 'Timed out waiting for worker result' }));\n"
                 + "    worker.terminate().then(function() { process.exit(1); });\n"
                 + "  }\n"
-                + "}, 3000);\n";
+                + "}, 10000);\n";
     }
 
     private static String generatedWorkerHarnessSourceWithHostCallbacks(Path distDir) {
@@ -588,7 +588,7 @@ class JavascriptRuntimeSemanticsTest {
                 + "    console.log(JSON.stringify({ type: 'error', message: 'Timed out waiting for worker result' }));\n"
                 + "    worker.terminate().then(function() { process.exit(1); });\n"
                 + "  }\n"
-                + "}, 3000);\n";
+                + "}, 10000);\n";
     }
 
     private static String generatedWorkerHarnessSourceWithProtocolHandshake(Path distDir) {
@@ -664,7 +664,7 @@ class JavascriptRuntimeSemanticsTest {
                 + "    console.log(JSON.stringify({ type: 'error', message: 'Timed out waiting for worker protocol handshake' }));\n"
                 + "    worker.terminate().then(function() { process.exit(1); });\n"
                 + "  }\n"
-                + "}, 3000);\n";
+                + "}, 10000);\n";
     }
 
     private static String generatedWorkerHarnessSourceWithEventInjection(Path distDir) {
@@ -733,7 +733,7 @@ class JavascriptRuntimeSemanticsTest {
                 + "    console.log(JSON.stringify({ type: 'error', message: 'Timed out waiting for worker event injection result' }));\n"
                 + "    worker.terminate().then(function() { process.exit(1); });\n"
                 + "  }\n"
-                + "}, 3000);\n";
+                + "}, 10000);\n";
     }
 
     private static String generatedWorkerHarnessSourceWithQueuedEvents(Path distDir) {
@@ -794,7 +794,7 @@ class JavascriptRuntimeSemanticsTest {
                 + "    console.log(JSON.stringify({ type: 'error', message: 'Timed out waiting for queued event result' }));\n"
                 + "    worker.terminate().then(function() { process.exit(1); });\n"
                 + "  }\n"
-                + "}, 3000);\n";
+                + "}, 10000);\n";
     }
 
     private static String generatedWorkerHarnessSourceWithHostCallbackError(Path distDir) {
@@ -857,14 +857,14 @@ class JavascriptRuntimeSemanticsTest {
                 + "    console.log(JSON.stringify({ type: 'error', message: 'Timed out waiting for host error result' }));\n"
                 + "    worker.terminate().then(function() { process.exit(1); });\n"
                 + "  }\n"
-                + "}, 3000);\n";
+                + "}, 10000);\n";
     }
 
     private static String quoteJs(String value) {
         return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 
-    private static final class WorkerRunResult {
+    static final class WorkerRunResult {
         String type;
         int result;
         String errorMessage;

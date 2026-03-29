@@ -94,6 +94,12 @@ class JavascriptOpcodeCoverageTest {
         assertTrue(!translatedApp.contains("jvm.instanceOf("),
                 "Translated object/type checks should avoid the generic runtime instanceof helper");
         assertTrue(runtime.contains("resolveVirtual(className, methodId)"), "Runtime should resolve virtual methods by class name");
+        assertTrue(runtime.contains("resolvedVirtualCache: Object.create(null)")
+                        && runtime.contains("remappedMethodIdCache: Object.create(null)"),
+                "Runtime virtual dispatch should keep per-method caches for resolved and remapped ids");
+        assertTrue(runtime.contains("const cacheKey = className + \"|\" + methodId;")
+                        && runtime.contains("const remappedId = this.remappedMethodId(current, methodId, tail);"),
+                "Runtime virtual dispatch should cache both resolved lookups and remapped owner-specific ids");
         assertTrue(runtime.contains("obj.__classDef.assignableTo[className]"), "Runtime instanceof should use emitted class assignability tables");
         assertTrue(runtime.contains("errorClass === entry.type || (errorClassDef && errorClassDef.assignableTo && errorClassDef.assignableTo[entry.type])"),
                 "Runtime exception matching should use direct class and assignability checks");

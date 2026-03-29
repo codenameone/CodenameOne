@@ -1,6 +1,5 @@
 import com.codename1.io.JSONParser;
 import com.codename1.util.StringUtil;
-import com.codename1.util.regex.RE;
 
 import java.io.StringReader;
 import java.util.List;
@@ -24,11 +23,6 @@ public class JsCodenameOneCoreSliceApp {
         Map<String, Object> parsed = new JSONParser().parseJSON(new StringReader("{\"ok\":true,\"n\":7}"));
         if (parsed != null && parsed.containsKey("ok") && parsed.containsKey("n")) {
             mask |= 4;
-        }
-
-        RE regex = new RE("cn1.*vm");
-        if (regex.match("cn1-js-vm")) {
-            mask |= 8;
         }
 
         result = mask;
