@@ -1,8 +1,5 @@
 package bsh.cn1;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 /**
  * Indirection point for generated access code.
  *
@@ -11,7 +8,6 @@ import java.util.Map;
  */
 public final class CN1AccessRegistry {
     private static CN1Access instance = GeneratedCN1Access.INSTANCE;
-    private static volatile Map<String, Class<?>> generatedSimpleClassIndex;
 
     private CN1AccessRegistry() {
     }
@@ -22,70 +18,6 @@ public final class CN1AccessRegistry {
 
     public static void setInstance(CN1Access access) {
         instance = access == null ? GeneratedCN1Access.INSTANCE : access;
-        generatedSimpleClassIndex = null;
-    }
-
-    public static Class<?> findClass(String name) {
-        if (name == null) {
-            return null;
-        }
-        String normalized = normalizeClassName(name);
-        Class<?> found = instance.findClass(normalized);
-        if (found != null) {
-            return found;
-        }
-        int lastDot = normalized.lastIndexOf('.');
-        String simpleName = lastDot < 0 ? normalized : normalized.substring(lastDot + 1);
-        found = instance.findClass(simpleName);
-        if (found != null) {
-            return found;
-        }
-        if (instance instanceof GeneratedCN1Access) {
-            return findBySimpleNameFromGeneratedIndex((GeneratedCN1Access) instance, simpleName);
-        }
-        return null;
-    }
-
-    private static Class<?> findBySimpleNameFromGeneratedIndex(GeneratedCN1Access access, String simpleName) {
-        Map<String, Class<?>> index = generatedSimpleClassIndex;
-        if (index == null) {
-            synchronized (CN1AccessRegistry.class) {
-                index = generatedSimpleClassIndex;
-                if (index == null) {
-                    index = buildSimpleClassIndex(access);
-                    generatedSimpleClassIndex = index;
-                }
-            }
-        }
-        return index.get(simpleName);
-    }
-
-    private static Map<String, Class<?>> buildSimpleClassIndex(GeneratedCN1Access access) {
-        Map<String, Class<?>> index = new LinkedHashMap<String, Class<?>>();
-        String[] indexed = access.getIndexedClassNames();
-        for (int i = 0; i < indexed.length; i++) {
-            String qualified = indexed[i];
-            int lastDot = qualified.lastIndexOf('.');
-            String simple = lastDot < 0 ? qualified : qualified.substring(lastDot + 1);
-            if (!index.containsKey(simple)) {
-                Class<?> resolved = access.findClass(qualified);
-                if (resolved != null) {
-                    index.put(simple, resolved);
-                }
-            }
-        }
-        return index;
-    }
-
-    private static String normalizeClassName(String name) {
-        String normalized = name.trim();
-        if (normalized.startsWith("class ")) {
-            normalized = normalized.substring("class ".length()).trim();
-        }
-        if (normalized.endsWith(".class")) {
-            normalized = normalized.substring(0, normalized.length() - ".class".length());
-        }
-        return normalized;
     }
 
     private static final class UnsupportedCN1Access implements CN1Access {

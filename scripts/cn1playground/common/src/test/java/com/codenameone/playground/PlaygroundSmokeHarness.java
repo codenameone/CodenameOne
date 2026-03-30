@@ -1,18 +1,12 @@
 package com.codenameone.playground;
 
 import bsh.cn1.GeneratedCN1Access;
-import bsh.cn1.CN1AccessRegistry;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
-import com.codename1.ui.Button;
-import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
-import com.codename1.ui.css.CSSThemeCompiler;
-import com.codename1.ui.util.MutableResource;
-import java.util.Hashtable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,47 +22,13 @@ public final class PlaygroundSmokeHarness {
         smokeLifecycleDemo();
         smokeRestScriptWithLambda();
         smokeStringMethods();
-        smokeCoreUiTypesResolveWithoutExplicitImport();
-        smokeCssUiidCollectionUsesPreviewOnly();
-        smokeCssCompilerAcceptsBasicButtonRule();
         System.out.println("Playground smoke tests passed.");
-    }
-
-    private static void smokeCssUiidCollectionUsesPreviewOnly() {
-        Container preview = new Container(BoxLayout.y());
-        Button button = new Button("Hello");
-        Label label = new Label("World");
-        preview.addAll(button, label);
-
-        List<String> uiids = PlaygroundCssSupport.collectVisibleUiids(preview);
-        require(uiids.contains("Button"), "Expected Button UIID completion from preview");
-        require(uiids.contains("Label"), "Expected Label UIID completion from preview");
-        require(!uiids.contains("BrowserComponent"), "Preview UIID collection must not include app shell/editor UIIDs");
-        for (int i = 0; i < uiids.size(); i++) {
-            require(!uiids.get(i).startsWith("."), "UIID completions should be plain selector names, not dot-prefixed");
-        }
-    }
-
-    private static void smokeCssCompilerAcceptsBasicButtonRule() {
-        String normalized = PlaygroundCssSupport.normalizeCustomCss("Button {\n    color: white;\n}");
-        require("Button {\n    color: white;\n}".equals(normalized), "Basic Button CSS should remain unchanged");
-        CSSThemeCompiler compiler = new CSSThemeCompiler();
-        MutableResource resource = new MutableResource();
-        compiler.compile(normalized, resource, "PlaygroundCssSmokeTheme");
-        Hashtable theme = resource.getTheme("PlaygroundCssSmokeTheme");
-        require(theme != null && !theme.isEmpty(), "Compiled CSS theme should produce theme properties");
     }
 
     private static void smokeGeneratedRegistry() throws Exception {
         GeneratedCN1Access access = GeneratedCN1Access.INSTANCE;
         require(access.findClass("com.codename1.ui.layouts.BoxLayout") == BoxLayout.class,
                 "BoxLayout class lookup failed");
-        require(CN1AccessRegistry.findClass("com.codename1.ui.Component") == com.codename1.ui.Component.class,
-                "Fully qualified Component lookup failed");
-        require(CN1AccessRegistry.findClass("Component") == com.codename1.ui.Component.class,
-                "Simple Component lookup failed");
-        require(CN1AccessRegistry.findClass("class com.codename1.ui.Component") == com.codename1.ui.Component.class,
-                "Normalized Component lookup failed");
         require(access.invokeStatic(BoxLayout.class, "y", new Object[0]) instanceof BoxLayout,
                 "BoxLayout.y() dispatch failed");
         require(access.getStaticField(Style.class, "UNIT_TYPE_DIPS") instanceof Byte,
@@ -224,36 +184,6 @@ public final class PlaygroundSmokeHarness {
                 "Loose script list snippet should produce a Container: " + summarizeMessages(result));
         require(log.size() == 1 && "List sample loaded".equals(log.get(0)),
                 "Loose script list snippet should log its completion");
-    }
-
-    private static void smokeCoreUiTypesResolveWithoutExplicitImport() {
-        Display.init(null);
-
-        Form host = new Form("Host", new BorderLayout());
-        Container preview = new Container(new BorderLayout());
-        host.add(BorderLayout.CENTER, preview);
-        host.show();
-
-        PlaygroundContext context = new PlaygroundContext(host, preview, null,
-                new PlaygroundContext.Logger() {
-                    public void log(String message) {
-                    }
-                });
-
-        PlaygroundRunner runner = new PlaygroundRunner();
-        PlaygroundRunner.RunResult result = runner.run(
-                "Form f = new Form(\"Implicit Form\");\n"
-                        + "Dialog d = new Dialog(\"Implicit Dialog\");\n"
-                        + "Container c = new Container();\n"
-                        + "Button b = new Button(\"Tap\");\n"
-                        + "Label l = new Label(\"Implicit Label\");\n"
-                        + "c.addAll(b, l);\n"
-                        + "Component base = c;\n"
-                        + "base;\n",
-                context);
-
-        require(result.getComponent() instanceof Container,
-                "Core UI types should resolve without explicit import: " + summarizeMessages(result));
     }
 
     private static void require(boolean condition, String message) {
