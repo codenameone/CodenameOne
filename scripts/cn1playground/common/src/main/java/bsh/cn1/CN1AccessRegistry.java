@@ -1,5 +1,8 @@
 package bsh.cn1;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
  * Indirection point for generated access code.
  *
@@ -8,6 +11,7 @@ package bsh.cn1;
  */
 public final class CN1AccessRegistry {
     private static CN1Access instance = GeneratedCN1Access.INSTANCE;
+    private static volatile Map<String, Class<?>> generatedSimpleClassIndex;
 
     private CN1AccessRegistry() {
     }
@@ -18,6 +22,7 @@ public final class CN1AccessRegistry {
 
     public static void setInstance(CN1Access access) {
         instance = access == null ? GeneratedCN1Access.INSTANCE : access;
+        generatedSimpleClassIndex = null;
     }
 
     public static Class<?> findClass(String name) {
@@ -42,16 +47,34 @@ public final class CN1AccessRegistry {
     }
 
     private static Class<?> findBySimpleNameFromGeneratedIndex(GeneratedCN1Access access, String simpleName) {
+        Map<String, Class<?>> index = generatedSimpleClassIndex;
+        if (index == null) {
+            synchronized (CN1AccessRegistry.class) {
+                index = generatedSimpleClassIndex;
+                if (index == null) {
+                    index = buildSimpleClassIndex(access);
+                    generatedSimpleClassIndex = index;
+                }
+            }
+        }
+        return index.get(simpleName);
+    }
+
+    private static Map<String, Class<?>> buildSimpleClassIndex(GeneratedCN1Access access) {
+        Map<String, Class<?>> index = new LinkedHashMap<String, Class<?>>();
         String[] indexed = access.getIndexedClassNames();
         for (int i = 0; i < indexed.length; i++) {
             String qualified = indexed[i];
             int lastDot = qualified.lastIndexOf('.');
-            String candidate = lastDot < 0 ? qualified : qualified.substring(lastDot + 1);
-            if (simpleName.equals(candidate)) {
-                return access.findClass(qualified);
+            String simple = lastDot < 0 ? qualified : qualified.substring(lastDot + 1);
+            if (!index.containsKey(simple)) {
+                Class<?> resolved = access.findClass(qualified);
+                if (resolved != null) {
+                    index.put(simple, resolved);
+                }
             }
         }
-        return null;
+        return index;
     }
 
     private static String normalizeClassName(String name) {
