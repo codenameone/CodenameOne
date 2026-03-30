@@ -49,9 +49,14 @@ import com.codename1.ui.layouts.FlowLayout;
 ///     EncodedImage placeholder = EncodedImage.createFromImage(p.scaled(p.getWidth() * 3, p.getHeight() * 3), false);
 ///
 ///     InfiniteScrollAdapter.createInfiniteScroll(hi.getContentPane(), () -> {
-///         java.util.List> data = fetchPropertyData("Leeds");
+///         java.util.List<Map<String, Object>> data = fetchPropertyData("Leeds");
+///         if(data == null) {
+///             InfiniteScrollAdapter.addMoreComponents(hi.getContentPane(), new Component[0], false);
+///             return;
+///         }
 ///         MultiButton[] cmps = new MultiButton[data.size()];
-///         for(int iter = 0 ; iter  currentListing = data.get(iter);
+///         for(int iter = 0 ; iter < data.size() ; iter++) {
+///             Map<String, Object> currentListing = data.get(iter);
 ///             if(currentListing == null) {
 ///                 InfiniteScrollAdapter.addMoreComponents(hi.getContentPane(), new Component[0], false);
 ///                 return;
@@ -67,7 +72,7 @@ import com.codename1.ui.layouts.FlowLayout;
 ///     hi.show();
 /// }
 /// int pageNumber = 1;
-/// java.util.List> fetchPropertyData(String text) {
+/// java.util.List<Map<String, Object>> fetchPropertyData(String text) {
 ///     try {
 ///         ConnectionRequest r = new ConnectionRequest();
 ///         r.setPost(false);
@@ -83,7 +88,7 @@ import com.codename1.ui.layouts.FlowLayout;
 ///         NetworkManager.getInstance().addToQueueAndWait(r);
 ///         Map result = new JSONParser().parseJSON(new InputStreamReader(new ByteArrayInputStream(r.getResponseData()), "UTF-8"));
 ///         Map response = (Map)result.get("response");
-///         return (java.util.List>)response.get("listings");
+///         return (java.util.List<Map<String, Object>>)response.get("listings");
 ///     } catch(Exception err) {
 ///         Log.e(err);
 ///         return null;

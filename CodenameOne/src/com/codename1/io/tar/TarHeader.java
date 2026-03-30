@@ -18,7 +18,7 @@ package com.codename1.io.tar;
 
 /// Header
 ///
-/// ```java
+/// ```text
 /// Offset  Size     Field
 /// 0       100      File name
 /// 100     8        File mode
@@ -33,7 +33,7 @@ package com.codename1.io.tar;
 ///
 /// File Types
 ///
-/// ```java
+/// ```text
 /// Value        Meaning
 /// '0'          Normal file
 /// (ASCII NUL)  Normal file (now obsolete)
@@ -48,7 +48,7 @@ package com.codename1.io.tar;
 ///
 /// Ustar header
 ///
-/// ```java
+/// ```text
 /// Offset  Size    Field
 /// 257     6       UStar indicator "ustar"
 /// 263     2       UStar version "00"

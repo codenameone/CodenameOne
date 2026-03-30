@@ -48,7 +48,7 @@ import java.util.Vector;
 /// // File: MultipartClientSample.java
 /// MultipartRequest request = new MultipartRequest();
 /// request.setUrl(url);
-/// request.addData("myFileName", fullPathToFile, "text/plain")
+/// request.addData("myFileName", fullPathToFile, "text/plain");
 /// NetworkManager.getInstance().addToQueue(request);
 /// ```
 ///
