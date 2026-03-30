@@ -81,54 +81,26 @@ import java.util.Map;
 /// we use `URLImage` to fetch the icon.
 ///
 /// ```java
-/// public void showForm() {
-///     Form hi = new Form("InfiniteScrollAdapter", new BoxLayout(BoxLayout.Y_AXIS));
+/// Form hi = new Form("InfiniteScrollAdapter", BoxLayout.y());
 ///
-///     Style s = UIManager.getInstance().getComponentStyle("MultiLine1");
-///     FontImage p = FontImage.createMaterial(FontImage.MATERIAL_PORTRAIT, s);
-///     EncodedImage placeholder = EncodedImage.createFromImage(p.scaled(p.getWidth() * 3, p.getHeight() * 3), false);
+/// Style s = UIManager.getInstance().getComponentStyle("MultiLine1");
+/// FontImage p = FontImage.createMaterial(FontImage.MATERIAL_PORTRAIT, s);
+/// EncodedImage placeholder = EncodedImage.createFromImage(
+///         p.scaled(p.getWidth() * 3, p.getHeight() * 3),
+///         false);
 ///
-///     InfiniteScrollAdapter.createInfiniteScroll(hi.getContentPane(), () -> {
-///         java.util.List> data = fetchPropertyData("Leeds");
-///         MultiButton[] cmps = new MultiButton[data.size()];
-///         for(int iter = 0 ; iter  currentListing = data.get(iter);
-///             if(currentListing == null) {
-///                 InfiniteScrollAdapter.addMoreComponents(hi.getContentPane(), new Component[0], false);
-///                 return;
-///             }
-///             String thumb_url = (String)currentListing.get("thumb_url");
-///             String guid = (String)currentListing.get("guid");
-///             String summary = (String)currentListing.get("summary");
-///             cmps[iter] = new MultiButton(summary);
-///             cmps[iter].setIcon(URLImage.createToStorage(placeholder, guid, thumb_url));
-///         }
-///         InfiniteScrollAdapter.addMoreComponents(hi.getContentPane(), cmps, true);
-///     }, true);
-///     hi.show();
-/// }
-/// int pageNumber = 1;
-/// java.util.List> fetchPropertyData(String text) {
-///     try {
-///         ConnectionRequest r = new ConnectionRequest();
-///         r.setPost(false);
-///         r.setUrl("http://api.nestoria.co.uk/api");
-///         r.addArgument("pretty", "0");
-///         r.addArgument("action", "search_listings");
-///         r.addArgument("encoding", "json");
-///         r.addArgument("listing_type", "buy");
-///         r.addArgument("page", "" + pageNumber);
-///         pageNumber++;
-///         r.addArgument("country", "uk");
-///         r.addArgument("place_name", text);
-///         NetworkManager.getInstance().addToQueueAndWait(r);
-///         Map result = new JSONParser().parseJSON(new InputStreamReader(new ByteArrayInputStream(r.getResponseData()), "UTF-8"));
-///         Map response = (Map)result.get("response");
-///         return (java.util.List>)response.get("listings");
-///     } catch(Exception err) {
-///         Log.e(err);
-///         return null;
+/// InfiniteScrollAdapter.createInfiniteScroll(hi.getContentPane(), () -> {
+///     MultiButton[] cmps = new MultiButton[10];
+///     for (int i = 0; i < cmps.length; i++) {
+///         String imageKey = "listing-" + i;
+///         String imageUrl = "https://example.com/images/" + i + ".png";
+///         MultiButton row = new MultiButton("Listing " + i);
+///         row.setIcon(URLImage.createToStorage(placeholder, imageKey, imageUrl));
+///         cmps[i] = row;
 ///     }
-/// }
+///     InfiniteScrollAdapter.addMoreComponents(hi.getContentPane(), cmps, true);
+/// }, true);
+/// hi.show();
 /// ```
 ///
 /// You can use adapters with masks using syntax similar to this to create a round image mask for a `URLImage`:

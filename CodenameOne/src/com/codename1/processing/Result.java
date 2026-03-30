@@ -379,7 +379,7 @@ public final class Result {
     ///
     /// For example: **JSON**
     ///
-    /// ```java
+    /// ```json
     /// {
     /// "settings" : [
     /// {
@@ -423,7 +423,7 @@ public final class Result {
     ///
     /// For example: **JSON**
     ///
-    /// ```java
+    /// ```json
     /// {
     /// "settings"
     /// {
@@ -469,7 +469,7 @@ public final class Result {
     ///
     /// For example: **JSON**
     ///
-    /// ```java
+    /// ```json
     /// {
     /// "settings"
     /// {
@@ -511,7 +511,7 @@ public final class Result {
     ///
     /// For example: **JSON**
     ///
-    /// ```java
+    /// ```json
     /// {
     ///  "geometry" : {
     ///    "bounds" : {
@@ -578,7 +578,7 @@ public final class Result {
     ///
     /// For example: **JSON**
     ///
-    /// ```java
+    /// ```json
     /// {
     /// "profile"
     /// {
@@ -670,7 +670,7 @@ public final class Result {
     ///
     /// For example: **JSON**
     ///
-    /// ```java
+    /// ```json
     /// {
     ///    "results" : [
     ///       {
@@ -726,7 +726,7 @@ public final class Result {
     ///
     /// For example: **JSON**
     ///
-    /// ```java
+    /// ```json
     /// {
     ///    "results" : [
     ///       {
@@ -792,7 +792,7 @@ public final class Result {
     ///
     /// For example: **JSON**
     ///
-    /// ```java
+    /// ```json
     /// {
     ///    "results" : [
     ///       {
@@ -1075,7 +1075,7 @@ public final class Result {
     ///
     /// For example: **JSON**
     ///
-    /// ```java
+    /// ```json
     /// {
     ///    "results" : [
     ///       {

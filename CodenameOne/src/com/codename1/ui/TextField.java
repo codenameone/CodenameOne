@@ -90,36 +90,35 @@ import java.util.Vector;
 ///
 /// ```java
 /// Toolbar.setGlobalToolbar(true);
+/// Form hi = new Form("Toolbar", BoxLayout.y());
 /// Style s = UIManager.getInstance().getComponentStyle("Title");
 ///
-/// Form hi = new Form("Toolbar", new BoxLayout(BoxLayout.Y_AXIS));
-/// TextField searchField = new TextField("", "Toolbar Search"); //
+/// TextField searchField = new TextField("", "Toolbar Search");
 /// searchField.getHintLabel().setUIID("Title");
 /// searchField.setUIID("Title");
 /// searchField.getAllStyles().setAlignment(Component.LEFT);
 /// hi.getToolbar().setTitleComponent(searchField);
+///
 /// FontImage searchIcon = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, s);
-/// searchField.addDataChangeListener((i1, i2) -> { //
-///     String t = searchField.getText();
-///     if(t.length()  -1;
-///             cmp.setHidden(!show); //
-///             cmp.setVisible(show);
-///         }
+/// hi.getToolbar().addCommandToRightBar("", searchIcon, e -> searchField.startEditingAsync());
+///
+/// hi.addAll(
+///         new Label("A Game of Thrones"),
+///         new Label("A Clash Of Kings"),
+///         new Label("A Storm Of Swords"),
+///         new Label("A Feast For Crows"),
+///         new Label("A Dance With Dragons"));
+///
+/// searchField.addDataChangedListener((type, index) -> {
+///     String text = searchField.getText().toLowerCase();
+///     for (Component cmp : hi.getContentPane()) {
+///         String value = ((Label) cmp).getText().toLowerCase();
+///         boolean show = text.length() == 0 || value.indexOf(text) > -1;
+///         cmp.setHidden(!show);
+///         cmp.setVisible(show);
 ///     }
 ///     hi.getContentPane().animateLayout(250);
 /// });
-/// hi.getToolbar().addCommandToRightBar("", searchIcon, (e) -> {
-///     searchField.startEditingAsync(); //
-/// });
-///
-/// hi.add("A Game of Thrones").
-///         add("A Clash Of Kings").
-///         add("A Storm Of Swords").
-///         add("A Feast For Crows").
-///         add("A Dance With Dragons").
-///         add("The Winds of Winter").
-///         add("A Dream of Spring");
-/// hi.show();
 /// ```
 ///
 /// @author Shai Almog

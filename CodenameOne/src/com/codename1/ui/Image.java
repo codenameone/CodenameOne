@@ -423,7 +423,8 @@ public class Image implements ActionSource {
     /// hi.addAll(cameraBtn, galleryBtn, FlowLayout.encloseCenter(imageLbl));
     /// hi.show();
     ///
-    /// SuccessCallback callback = (String capturedPhoto) -> {
+    /// SuccessCallback<String> callback = new SuccessCallback<String>() {
+    ///     public void onSucess(String capturedPhoto) {
     ///     String rotatedPhoto = FileSystemStorage.getInstance().getAppHomePath() + "rotatedPhoto.jpg";
     ///     if (capturedPhoto != null) {
     ///         try {
@@ -435,7 +436,8 @@ public class Image implements ActionSource {
     ///         } catch (IOException ex) {
     ///             Log.e(ex);
     ///         }
-    ///     };
+    ///     }
+    ///     }
     /// };
     /// cameraBtn.addActionListener(a -> Capture.capturePhoto(l -> {
     ///     if (l != null && l.getSource() != null) {
@@ -489,7 +491,8 @@ public class Image implements ActionSource {
     /// hi.addAll(cameraBtn, galleryBtn, FlowLayout.encloseCenter(imageLbl));
     /// hi.show();
     ///
-    /// SuccessCallback callback = (String capturedPhoto) -> {
+    /// SuccessCallback<String> callback = new SuccessCallback<String>() {
+    ///     public void onSucess(String capturedPhoto) {
     ///     String rotatedPhoto = FileSystemStorage.getInstance().getAppHomePath() + "rotatedPhoto.jpg";
     ///     if (capturedPhoto != null) {
     ///         try {
@@ -501,7 +504,8 @@ public class Image implements ActionSource {
     ///         } catch (IOException ex) {
     ///             Log.e(ex);
     ///         }
-    ///     };
+    ///     }
+    ///     }
     /// };
     /// cameraBtn.addActionListener(a -> Capture.capturePhoto(l -> {
     ///     if (l != null && l.getSource() != null) {
@@ -564,7 +568,8 @@ public class Image implements ActionSource {
     /// hi.addAll(cameraBtn, galleryBtn, FlowLayout.encloseCenter(imageLbl));
     /// hi.show();
     ///
-    /// SuccessCallback callback = (String capturedPhoto) -> {
+    /// SuccessCallback<String> callback = new SuccessCallback<String>() {
+    ///     public void onSucess(String capturedPhoto) {
     ///     String rotatedPhoto = FileSystemStorage.getInstance().getAppHomePath() + "rotatedPhoto.jpg";
     ///     if (capturedPhoto != null) {
     ///         try {
@@ -576,7 +581,8 @@ public class Image implements ActionSource {
     ///         } catch (IOException ex) {
     ///             Log.e(ex);
     ///         }
-    ///     };
+    ///     }
+    ///     }
     /// };
     /// cameraBtn.addActionListener(a -> Capture.capturePhoto(l -> {
     ///     if (l != null && l.getSource() != null) {

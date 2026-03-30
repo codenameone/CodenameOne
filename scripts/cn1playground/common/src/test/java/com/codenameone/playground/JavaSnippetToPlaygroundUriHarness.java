@@ -39,7 +39,12 @@ public final class JavaSnippetToPlaygroundUriHarness {
             int line = diagnostic == null ? 1 : Math.max(1, diagnostic.line);
             int column = diagnostic == null ? 1 : Math.max(1, diagnostic.column);
             String message = diagnostic == null ? "Script execution failed" : diagnostic.message;
-            emitError(classifyErrorType(message), message, line, column);
+            String errorType = classifyErrorType(message);
+            if (!"PARSE_ERROR".equals(errorType) && !"LEXER_ERROR".equals(errorType)) {
+                System.out.println(PREFIX + encodeLikePlayground(source));
+                return;
+            }
+            emitError(errorType, message, line, column);
         } catch (Throwable ex) {
             String message = ex.getMessage();
             if (message == null || message.length() == 0) {

@@ -535,7 +535,7 @@
 /// // File: MultipartClientSample.java
 /// MultipartRequest request = new MultipartRequest();
 /// request.setUrl(url);
-/// request.addData("myFileName", fullPathToFile, "text/plain")
+/// request.addData("myFileName", fullPathToFile, "text/plain");
 /// NetworkManager.getInstance().addToQueue(request);
 /// ```
 ///
@@ -616,7 +616,7 @@
 /// returned from the API for the query
 /// [http://www.anapioficeandfire.com/api/characters?page=5&pageSize=3](http://www.anapioficeandfire.com/api/characters?page=5&pageSize=3):
 ///
-/// ```java
+/// ```json
 /// [
 ///   {
 ///     "url": "http://www.anapioficeandfire.com/api/characters/13",
@@ -853,7 +853,7 @@
 /// Developers need to write the data of the object in the externalize method using the methods in the
 /// data output stream and read the data of the object in the internalize method e.g.:
 ///
-/// ```java
+/// ```text
 /// public void externalize(DataOutputStream out) throws IOException {
 ///     out.writeUTF(name);
 ///     if(value != null) {
@@ -887,7 +887,7 @@
 /// externalization. This effectively writes a boolean before writing the UTF to indicate whether the string
 /// is null:
 ///
-/// ```java
+/// ```text
 /// public void externalize(DataOutputStream out) throws IOException {
 ///     Util.writeUTF(name, out);
 ///     Util.writeUTF(value, out);
