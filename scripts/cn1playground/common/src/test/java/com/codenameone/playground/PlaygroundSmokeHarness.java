@@ -27,6 +27,7 @@ public final class PlaygroundSmokeHarness {
         smokeLifecycleDemo();
         smokeRestScriptWithLambda();
         smokeStringMethods();
+        smokeCoreUiTypesResolveWithoutExplicitImport();
         smokeCssUiidCollectionUsesPreviewOnly();
         smokeCssCompilerAcceptsBasicButtonRule();
         System.out.println("Playground smoke tests passed.");
@@ -61,6 +62,12 @@ public final class PlaygroundSmokeHarness {
         GeneratedCN1Access access = GeneratedCN1Access.INSTANCE;
         require(access.findClass("com.codename1.ui.layouts.BoxLayout") == BoxLayout.class,
                 "BoxLayout class lookup failed");
+        require(access.findClass("com.codename1.ui.Component") == com.codename1.ui.Component.class,
+                "Fully qualified Component lookup failed");
+        require(access.findClass("Component") == com.codename1.ui.Component.class,
+                "Simple Component lookup failed");
+        require(access.findClass("class com.codename1.ui.Component") == com.codename1.ui.Component.class,
+                "Normalized Component lookup failed");
         require(access.invokeStatic(BoxLayout.class, "y", new Object[0]) instanceof BoxLayout,
                 "BoxLayout.y() dispatch failed");
         require(access.getStaticField(Style.class, "UNIT_TYPE_DIPS") instanceof Byte,
@@ -216,6 +223,36 @@ public final class PlaygroundSmokeHarness {
                 "Loose script list snippet should produce a Container: " + summarizeMessages(result));
         require(log.size() == 1 && "List sample loaded".equals(log.get(0)),
                 "Loose script list snippet should log its completion");
+    }
+
+    private static void smokeCoreUiTypesResolveWithoutExplicitImport() {
+        Display.init(null);
+
+        Form host = new Form("Host", new BorderLayout());
+        Container preview = new Container(new BorderLayout());
+        host.add(BorderLayout.CENTER, preview);
+        host.show();
+
+        PlaygroundContext context = new PlaygroundContext(host, preview, null,
+                new PlaygroundContext.Logger() {
+                    public void log(String message) {
+                    }
+                });
+
+        PlaygroundRunner runner = new PlaygroundRunner();
+        PlaygroundRunner.RunResult result = runner.run(
+                "Form f = new Form(\"Implicit Form\");\n"
+                        + "Dialog d = new Dialog(\"Implicit Dialog\");\n"
+                        + "Container c = new Container();\n"
+                        + "Button b = new Button(\"Tap\");\n"
+                        + "Label l = new Label(\"Implicit Label\");\n"
+                        + "c.addAll(b, l);\n"
+                        + "Component base = c;\n"
+                        + "base;\n",
+                context);
+
+        require(result.getComponent() instanceof Container,
+                "Core UI types should resolve without explicit import: " + summarizeMessages(result));
     }
 
     private static void require(boolean condition, String message) {
