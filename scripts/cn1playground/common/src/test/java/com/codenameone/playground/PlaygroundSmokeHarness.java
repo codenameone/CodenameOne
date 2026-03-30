@@ -1,6 +1,7 @@
 package com.codenameone.playground;
 
 import bsh.cn1.GeneratedCN1Access;
+import bsh.cn1.CN1AccessRegistry;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -62,11 +63,11 @@ public final class PlaygroundSmokeHarness {
         GeneratedCN1Access access = GeneratedCN1Access.INSTANCE;
         require(access.findClass("com.codename1.ui.layouts.BoxLayout") == BoxLayout.class,
                 "BoxLayout class lookup failed");
-        require(access.findClass("com.codename1.ui.Component") == com.codename1.ui.Component.class,
+        require(CN1AccessRegistry.findClass("com.codename1.ui.Component") == com.codename1.ui.Component.class,
                 "Fully qualified Component lookup failed");
-        require(access.findClass("Component") == com.codename1.ui.Component.class,
+        require(CN1AccessRegistry.findClass("Component") == com.codename1.ui.Component.class,
                 "Simple Component lookup failed");
-        require(access.findClass("class com.codename1.ui.Component") == com.codename1.ui.Component.class,
+        require(CN1AccessRegistry.findClass("class com.codename1.ui.Component") == com.codename1.ui.Component.class,
                 "Normalized Component lookup failed");
         require(access.invokeStatic(BoxLayout.class, "y", new Object[0]) instanceof BoxLayout,
                 "BoxLayout.y() dispatch failed");

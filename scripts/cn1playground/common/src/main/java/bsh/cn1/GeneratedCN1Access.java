@@ -794,8 +794,6 @@ public final class GeneratedCN1Access implements CN1Access {
 
     private static final Map<String, Class<?>> CLASS_INDEX = buildClassIndex();
 
-    private static final Map<String, Class<?>> SIMPLE_CLASS_INDEX = buildSimpleClassIndex();
-
     private static final Map<String, String[]> METHOD_INDEX = buildMethodIndex();
 
     private static final Map<String, String[]> FIELD_INDEX = buildFieldIndex();
@@ -813,19 +811,6 @@ public final class GeneratedCN1Access implements CN1Access {
         fillClassIndex8(index);
         fillClassIndex9(index);
         fillClassIndex10(index);
-        return index;
-    }
-
-    private static Map<String, Class<?>> buildSimpleClassIndex() {
-        Map<String, Class<?>> index = new LinkedHashMap<String, Class<?>>();
-        for (Map.Entry<String, Class<?>> entry : CLASS_INDEX.entrySet()) {
-            String qualifiedName = entry.getKey();
-            int lastDot = qualifiedName.lastIndexOf('.');
-            String simpleName = lastDot < 0 ? qualifiedName : qualifiedName.substring(lastDot + 1);
-            if (!index.containsKey(simpleName)) {
-                index.put(simpleName, entry.getValue());
-            }
-        }
         return index;
     }
 
@@ -3068,25 +3053,7 @@ public final class GeneratedCN1Access implements CN1Access {
         if (name == null) {
             return null;
         }
-        String normalized = normalizeClassName(name);
-        Class<?> found = CLASS_INDEX.get(normalized);
-        if (found != null) {
-            return found;
-        }
-        int lastDot = normalized.lastIndexOf('.');
-        String simpleName = lastDot < 0 ? normalized : normalized.substring(lastDot + 1);
-        return SIMPLE_CLASS_INDEX.get(simpleName);
-    }
-
-    private String normalizeClassName(String name) {
-        String normalized = name.trim();
-        if (normalized.startsWith("class ")) {
-            normalized = normalized.substring("class ".length()).trim();
-        }
-        if (normalized.endsWith(".class")) {
-            normalized = normalized.substring(0, normalized.length() - ".class".length());
-        }
-        return normalized;
+        return CLASS_INDEX.get(name);
     }
 
     public String[] getIndexedClassNames() {

@@ -50,7 +50,7 @@ public class BshClassManager {
         if (absoluteClassCache.containsKey(name)) {
             return absoluteClassCache.get(name);
         }
-        Class<?> found = CN1AccessRegistry.getInstance().findClass(name);
+        Class<?> found = CN1AccessRegistry.findClass(name);
         if (found == null) {
             try {
                 found = plainClassForName(name);

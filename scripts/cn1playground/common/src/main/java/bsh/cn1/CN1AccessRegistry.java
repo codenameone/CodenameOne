@@ -20,6 +20,51 @@ public final class CN1AccessRegistry {
         instance = access == null ? GeneratedCN1Access.INSTANCE : access;
     }
 
+    public static Class<?> findClass(String name) {
+        if (name == null) {
+            return null;
+        }
+        String normalized = normalizeClassName(name);
+        Class<?> found = instance.findClass(normalized);
+        if (found != null) {
+            return found;
+        }
+        int lastDot = normalized.lastIndexOf('.');
+        String simpleName = lastDot < 0 ? normalized : normalized.substring(lastDot + 1);
+        found = instance.findClass(simpleName);
+        if (found != null) {
+            return found;
+        }
+        if (instance instanceof GeneratedCN1Access) {
+            return findBySimpleNameFromGeneratedIndex((GeneratedCN1Access) instance, simpleName);
+        }
+        return null;
+    }
+
+    private static Class<?> findBySimpleNameFromGeneratedIndex(GeneratedCN1Access access, String simpleName) {
+        String[] indexed = access.getIndexedClassNames();
+        for (int i = 0; i < indexed.length; i++) {
+            String qualified = indexed[i];
+            int lastDot = qualified.lastIndexOf('.');
+            String candidate = lastDot < 0 ? qualified : qualified.substring(lastDot + 1);
+            if (simpleName.equals(candidate)) {
+                return access.findClass(qualified);
+            }
+        }
+        return null;
+    }
+
+    private static String normalizeClassName(String name) {
+        String normalized = name.trim();
+        if (normalized.startsWith("class ")) {
+            normalized = normalized.substring("class ".length()).trim();
+        }
+        if (normalized.endsWith(".class")) {
+            normalized = normalized.substring(0, normalized.length() - ".class".length());
+        }
+        return normalized;
+    }
+
     private static final class UnsupportedCN1Access implements CN1Access {
         private CN1AccessException unsupported(String operation) {
             return new CN1AccessException(
