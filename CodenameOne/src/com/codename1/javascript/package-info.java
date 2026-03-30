@@ -372,7 +372,7 @@
 ///
 /// If you execute this code in the simulator, you'll see the following output in the console:
 ///
-/// ```java
+/// ```text
 /// [EDT] 0:0:0,0 - [Javascript Logger] This is a test message
 /// ```
 ///

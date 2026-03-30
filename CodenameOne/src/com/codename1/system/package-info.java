@@ -27,7 +27,7 @@
 ///
 /// E.g. to create a simple hello world interface do something like:
 ///
-/// ```java
+/// ```text
 ///             package com.my.code;
 ///             public interface MyNative extends NativeInteface {
 ///                   String helloWorld(String hi);

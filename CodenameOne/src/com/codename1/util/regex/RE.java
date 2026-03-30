@@ -69,14 +69,14 @@ import java.util.ArrayList;
 /// denoted by \1, the second by \2 and so on.  So the expression:
 ///
 /// ```java
-///  ([0-9]+)=\1
+///  String pattern = "([0-9]+)=\\1";
 /// ```
 ///
 /// will match any string of the form n=n (like 0=0 or 2=2).
 ///
 /// The full regular expression syntax accepted by RE is described here:
 ///
-/// ```java
+/// ```text
 ///  **Characters**
 ///
 ///    *unicodeChar*   Matches any identical unicode character
@@ -103,7 +103,7 @@ import java.util.ArrayList;
 /// I.e. [-a] is the same as [\\u0000-a], and [a-] is the same as [a-\\uFFFF],
 /// [-] means "all characters".
 ///
-/// ```java
+/// ```text
 ///  **Standard POSIX Character Classes**
 ///
 ///    [:alnum:]            Alphanumeric characters.
@@ -413,10 +413,9 @@ public class RE {
     ///
     ///
     /// ```java
-    ///                                       MATCH_NORMAL              // Normal (case-sensitive) matching
-    ///                                       MATCH_CASEINDEPENDENT     // Case folded comparisons
-    ///                                       MATCH_MULTILINE           // Newline matches as BOL/EOL
-    ///
+    /// int matchFlags = RE.MATCH_NORMAL;
+    /// matchFlags |= RE.MATCH_CASEINDEPENDENT;
+    /// matchFlags |= RE.MATCH_MULTILINE;
     /// ```
     ///
     /// #### See also
@@ -496,9 +495,9 @@ public class RE {
     /// @return Current match behaviour flags (RE.MATCH_*).
     ///
     /// ```java
-    ///   MATCH_NORMAL              // Normal (case-sensitive) matching
-    ///   MATCH_CASEINDEPENDENT     // Case folded comparisons
-    ///   MATCH_MULTILINE           // Newline matches as BOL/EOL
+    /// int matchFlags = RE.MATCH_NORMAL;
+    /// matchFlags |= RE.MATCH_CASEINDEPENDENT;
+    /// matchFlags |= RE.MATCH_MULTILINE;
     /// ```
     ///
     /// #### See also
@@ -516,10 +515,9 @@ public class RE {
     ///
     ///
     /// ```java
-    ///                                       MATCH_NORMAL              // Normal (case-sensitive) matching
-    ///                                       MATCH_CASEINDEPENDENT     // Case folded comparisons
-    ///                                       MATCH_MULTILINE           // Newline matches as BOL/EOL
-    ///
+    /// int matchFlags = RE.MATCH_NORMAL;
+    /// matchFlags |= RE.MATCH_CASEINDEPENDENT;
+    /// matchFlags |= RE.MATCH_MULTILINE;
     /// ```
     public void setMatchFlags(int matchFlags) {
         this.matchFlags = matchFlags;

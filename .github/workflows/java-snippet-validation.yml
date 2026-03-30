@@ -1,0 +1,79 @@
+name: Java snippet validation
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/extract-javadoc-java-snippets.sh'
+      - 'scripts/java-snippet-to-playground-uri.sh'
+      - 'scripts/validate-extracted-javadoc-snippets.sh'
+      - 'scripts/java-snippet-validation-exclusions.jsonl'
+      - '.github/workflows/java-snippet-validation.yml'
+
+jobs:
+  validate-snippets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure workflow runs only for script-only changes
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+
+          mapfile -t changed < <(git diff --name-only "$base" "$head")
+          if [[ ${#changed[@]} -eq 0 ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          allowed=(
+            "scripts/extract-javadoc-java-snippets.sh"
+            "scripts/java-snippet-to-playground-uri.sh"
+            "scripts/validate-extracted-javadoc-snippets.sh"
+            "scripts/java-snippet-validation-exclusions.jsonl"
+            ".github/workflows/java-snippet-validation.yml"
+          )
+
+          only_allowed=true
+          for file in "${changed[@]}"; do
+            ok=false
+            for allow in "${allowed[@]}"; do
+              if [[ "$file" == "$allow" ]]; then
+                ok=true
+                break
+              fi
+            done
+            if [[ "$ok" == false ]]; then
+              only_allowed=false
+              break
+            fi
+          done
+
+          echo "Changed files:"; printf ' - %s\n' "${changed[@]}"
+          echo "run=$only_allowed" >> "$GITHUB_OUTPUT"
+
+      - name: Skip because non-script files changed
+        if: steps.changes.outputs.run != 'true'
+        run: echo "Skipping snippet validation because additional files changed."
+
+      - name: Validate extracted Java snippets
+        if: steps.changes.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp_jsonl="$(mktemp)"
+          scripts/extract-javadoc-java-snippets.sh CodenameOne/src > "$tmp_jsonl"
+          scripts/validate-extracted-javadoc-snippets.sh "$tmp_jsonl"
