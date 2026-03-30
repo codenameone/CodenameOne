@@ -39,7 +39,7 @@ import java.util.Comparator;
 /// You can also track location in the foreground using API calls like this:
 ///
 /// ```java
-/// public MyListener implements LocationListener {
+/// public class MyListener implements LocationListener {
 ///     public void locationUpdated(Location location) {
 ///         // update UI etc.
 ///     }

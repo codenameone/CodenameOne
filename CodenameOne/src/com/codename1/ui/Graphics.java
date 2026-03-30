@@ -321,7 +321,8 @@ public final class Graphics {
     /// path.lineTo(20,0);
     ///
     /// Stroke stroke = new Stroke(0.5f, Stroke.CAP_ROUND, Stroke.JOIN_ROUND, 4);
-    /// hi.getContentPane().getUnselectedStyle().setBgPainter((Graphics g, Rectangle rect) -> {
+    /// hi.getContentPane().getUnselectedStyle().setBgPainter(new Painter() {
+    ///     public void paint(Graphics g, Rectangle rect) {
     ///     g.setColor(0xff);
     ///     float widthRatio = ((float)rect.getWidth()) / 50f;
     ///     float heightRatio = ((float)rect.getHeight()) / 100f;
@@ -334,6 +335,7 @@ public final class Graphics {
     ///     g.drawShape(path, stroke);
     ///     g.translate(-(int)(((float)rect.getX()) / widthRatio), -(int)(((float)rect.getY()) / heightRatio));
     ///     g.resetAffine();
+    ///     }
     /// });
     ///
     /// hi.show();
@@ -916,7 +918,8 @@ public final class Graphics {
     /// path.lineTo(5, 25);
     /// path.lineTo(20,0);
     ///
-    /// hi.getContentPane().getUnselectedStyle().setBgPainter((Graphics g, Rectangle rect) -> {
+    /// hi.getContentPane().getUnselectedStyle().setBgPainter(new Painter() {
+    ///     public void paint(Graphics g, Rectangle rect) {
     ///     g.setColor(0xff);
     ///     float widthRatio = ((float)rect.getWidth()) / 50f;
     ///     float heightRatio = ((float)rect.getHeight()) / 100f;
@@ -924,6 +927,7 @@ public final class Graphics {
     ///     g.translate((int)(((float)rect.getX()) / widthRatio), (int)(((float)rect.getY()) / heightRatio));
     ///     g.fillShape(path);
     ///     g.resetAffine();
+    ///     }
     /// });
     ///
     /// hi.show();
@@ -972,7 +976,8 @@ public final class Graphics {
     /// path.lineTo(5, 25);
     /// path.lineTo(20,0);
     ///
-    /// hi.getContentPane().getUnselectedStyle().setBgPainter((Graphics g, Rectangle rect) -> {
+    /// hi.getContentPane().getUnselectedStyle().setBgPainter(new Painter() {
+    ///     public void paint(Graphics g, Rectangle rect) {
     ///     g.setColor(0xff);
     ///     float widthRatio = ((float)rect.getWidth()) / 50f;
     ///     float heightRatio = ((float)rect.getHeight()) / 100f;
@@ -980,6 +985,7 @@ public final class Graphics {
     ///     g.translate((int)(((float)rect.getX()) / widthRatio), (int)(((float)rect.getY()) / heightRatio));
     ///     g.fillShape(path);
     ///     g.resetAffine();
+    ///     }
     /// });
     ///
     /// hi.show();

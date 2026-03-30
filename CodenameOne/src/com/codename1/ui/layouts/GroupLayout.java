@@ -53,7 +53,11 @@ import java.util.Iterator;
 /// one column, followed by two textfields in the next column:
 ///
 /// ```java
-///   Container panel = ...;
+///   Container panel = new Container();
+///   Label label1 = new Label("First Name");
+///   Label label2 = new Label("Last Name");
+///   TextField tf1 = new TextField();
+///   TextField tf2 = new TextField();
 ///   GroupLayout layout = new GroupLayout(panel);
 ///   panel.setLayout(layout);
 ///   layout.setAutocreateGaps(true);

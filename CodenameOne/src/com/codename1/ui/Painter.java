@@ -32,26 +32,23 @@ import com.codename1.ui.geom.Rectangle;
 /// A simple example of a background painter is shown here to draw a circle background:
 ///
 /// ```java
-/// Painter p = new Painter(cmp) {
+/// Component cmp = new Label("Round Background");
+/// Painter p = new Painter() {
 ///     public void paint(Graphics g, Rectangle rect) {
 ///         boolean antiAliased = g.isAntiAliased();
 ///         g.setAntiAliased(true);
-///         int r = Math.min(rect.getWidth(), rect.getHeight())/2;
-///         int x = rect.getX() + rect.getWidth()/2 - r;
-///         int y = rect.getY() + rect.getHeight()/2 - r;
-///         switch (style) {
-///             case CircleButtonStrokedDark:
-///             case CircleButtonStrokedLight: {
-///                 if (cmp.getStyle().getBgTransparency() != 0) {
-///                     int alpha = cmp.getStyle().getBgTransparency();
-///                     if (alpha  {
-///     int x = tf1.getAbsoluteX() + tf1.getWidth();
-///     int y = tf1.getAbsoluteY();
-///     x -= warningImage.getWidth() / 2;
-///     y += (tf1.getHeight() / 2 - warningImage.getHeight() / 2);
-///     g.drawImage(warningImage, x, y);
-/// });
-/// hi.show();
+///         try {
+///             int r = Math.min(rect.getWidth(), rect.getHeight()) / 2;
+///             int x = rect.getX() + rect.getWidth() / 2 - r;
+///             int y = rect.getY() + rect.getHeight() / 2 - r;
+///             g.setColor(0x3f51b5);
+///             g.fillArc(x, y, r * 2, r * 2, 0, 360);
+///         } finally {
+///             g.setAntiAliased(antiAliased);
+///         }
+///     }
+/// };
+/// cmp.getStyle().setBgPainter(p);
 /// ```
 ///
 /// @author Chen Fishbein
