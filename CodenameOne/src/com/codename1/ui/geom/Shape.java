@@ -41,14 +41,16 @@ import com.codename1.ui.Transform;
 /// path.lineTo(5, 25);
 /// path.lineTo(20,0);
 ///
-/// hi.getContentPane().getUnselectedStyle().setBgPainter((Graphics g, Rectangle rect) -> {
-///     g.setColor(0xff);
-///     float widthRatio = ((float)rect.getWidth()) / 50f;
-///     float heightRatio = ((float)rect.getHeight()) / 100f;
-///     g.scale(widthRatio, heightRatio);
-///     g.translate((int)(((float)rect.getX()) / widthRatio), (int)(((float)rect.getY()) / heightRatio));
-///     g.fillShape(path);
-///     g.resetAffine();
+/// hi.getContentPane().getUnselectedStyle().setBgPainter(new Painter() {
+///     public void paint(Graphics g, Rectangle rect) {
+///         g.setColor(0xff);
+///         float widthRatio = ((float) rect.getWidth()) / 50f;
+///         float heightRatio = ((float) rect.getHeight()) / 100f;
+///         g.scale(widthRatio, heightRatio);
+///         g.translate((int) (((float) rect.getX()) / widthRatio), (int) (((float) rect.getY()) / heightRatio));
+///         g.fillShape(path);
+///         g.resetAffine();
+///     }
 /// });
 ///
 /// hi.show();
@@ -80,19 +82,21 @@ import com.codename1.ui.Transform;
 /// path.lineTo(20,0);
 ///
 /// Stroke stroke = new Stroke(0.5f, Stroke.CAP_ROUND, Stroke.JOIN_ROUND, 4);
-/// hi.getContentPane().getUnselectedStyle().setBgPainter((Graphics g, Rectangle rect) -> {
-///     g.setColor(0xff);
-///     float widthRatio = ((float)rect.getWidth()) / 50f;
-///     float heightRatio = ((float)rect.getHeight()) / 100f;
-///     g.scale(widthRatio, heightRatio);
-///     g.translate((int)(((float)rect.getX()) / widthRatio), (int)(((float)rect.getY()) / heightRatio));
-///     g.setClip(path);
-///     g.setAntiAliased(true);
-///     g.drawImage(finalDuke, 0, 0, 50, 100);
-///     g.setClip(path.getBounds());
-///     g.drawShape(path, stroke);
-///     g.translate(-(int)(((float)rect.getX()) / widthRatio), -(int)(((float)rect.getY()) / heightRatio));
-///     g.resetAffine();
+/// hi.getContentPane().getUnselectedStyle().setBgPainter(new Painter() {
+///     public void paint(Graphics g, Rectangle rect) {
+///         g.setColor(0xff);
+///         float widthRatio = ((float) rect.getWidth()) / 50f;
+///         float heightRatio = ((float) rect.getHeight()) / 100f;
+///         g.scale(widthRatio, heightRatio);
+///         g.translate((int) (((float) rect.getX()) / widthRatio), (int) (((float) rect.getY()) / heightRatio));
+///         g.setClip(path);
+///         g.setAntiAliased(true);
+///         g.drawImage(finalDuke, 0, 0, 50, 100);
+///         g.setClip(path.getBounds());
+///         g.drawShape(path, stroke);
+///         g.translate(-(int) (((float) rect.getX()) / widthRatio), -(int) (((float) rect.getY()) / heightRatio));
+///         g.resetAffine();
+///     }
 /// });
 ///
 /// hi.show();

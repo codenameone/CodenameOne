@@ -65,7 +65,9 @@ import java.util.HashMap;
 /// val.addConstraint(phone, new Constraint() {
 ///   public  boolean isValid(Object value) {
 ///     String v = (String)value;
-///     for(int i = 0 ; i = '0' && c <= '9' || c == '+' || c == '-') {
+///     for (int i = 0; i < v.length(); i++) {
+///       char c = v.charAt(i);
+///       if ((c >= '0' && c <= '9') || c == '+' || c == '-') {
 ///         continue;
 ///       }
 ///       return false;

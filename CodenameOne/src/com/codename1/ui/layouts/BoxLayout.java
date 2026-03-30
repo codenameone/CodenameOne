@@ -51,7 +51,7 @@ import com.codename1.ui.plaf.Style;
 ///         new Label("Second"),
 ///         new Label("Third"),
 ///         new Label("Fourth"),
-///         new Label("Fifth")));
+///         new Label("Fifth"));
 /// ```
 ///
 /// The `BoxLayout` keeps the preferred size of its destination orientation and scales elements on the other axis.

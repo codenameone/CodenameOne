@@ -5,6 +5,7 @@ ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 BUILD_DIR="${TMPDIR:-/tmp}/cn1-snippet-cli"
 CLASSES_DIR="$BUILD_DIR/classes"
 SOURCES_FILE="$BUILD_DIR/sources.txt"
+STAMP_FILE="$BUILD_DIR/.compiled.ok"
 
 usage() {
   cat <<'USAGE'
@@ -89,6 +90,20 @@ done < <(find \
 
 printf '%s\n' "$ROOT_DIR/scripts/cn1playground/common/src/test/java/com/codenameone/playground/JavaSnippetToPlaygroundUriHarness.java" >> "$SOURCES_FILE"
 
-javac -encoding UTF-8 -d "$CLASSES_DIR" @"$SOURCES_FILE" >/dev/null 2>&1
+rebuild=true
+if [[ -f "$STAMP_FILE" ]]; then
+  rebuild=false
+  while IFS= read -r src; do
+    if [[ "$src" -nt "$STAMP_FILE" ]]; then
+      rebuild=true
+      break
+    fi
+  done < "$SOURCES_FILE"
+fi
+
+if [[ "$rebuild" == "true" ]]; then
+  javac -encoding UTF-8 -d "$CLASSES_DIR" @"$SOURCES_FILE" >/dev/null 2>&1
+  touch "$STAMP_FILE"
+fi
 
 java -cp "$CLASSES_DIR" com.codenameone.playground.JavaSnippetToPlaygroundUriHarness --file "$TMP_INPUT"

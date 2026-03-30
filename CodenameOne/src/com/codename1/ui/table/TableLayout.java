@@ -70,7 +70,7 @@ import java.util.Vector;
 ///                 new Label("Second"),
 ///                 new Label("Third"),
 ///                 new Label("Fourth"),
-///                 new Label("Fifth")));
+///                 new Label("Fifth"));
 /// ```
 ///
 /// The Full Potential
@@ -250,7 +250,7 @@ public class TableLayout extends Layout {
     ///                 new Label("Second"),
     ///                 new Label("Third"),
     ///                 new Label("Fourth"),
-    ///                 new Label("Fifth")));
+    ///                 new Label("Fifth"));
     /// ```
     ///
     /// #### Parameters
@@ -274,7 +274,7 @@ public class TableLayout extends Layout {
     ///                 new Label("Second"),
     ///                 new Label("Third"),
     ///                 new Label("Fourth"),
-    ///                 new Label("Fifth")));
+    ///                 new Label("Fifth"));
     /// ```
     ///
     /// #### Parameters

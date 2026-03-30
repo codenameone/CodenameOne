@@ -49,7 +49,7 @@ import com.codename1.ui.util.EventDispatcher;
 ///
 /// The Margin and Padding is inspired by [W3 Box Model](http://www.w3.org/TR/REC-CSS2/box.html)
 ///
-/// ```java
+/// ```text
 ///       **************************
 ///       *         Margin         *
 ///       *  ********************  *

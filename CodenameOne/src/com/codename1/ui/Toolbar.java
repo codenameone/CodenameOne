@@ -137,33 +137,27 @@ import java.util.Vector;
 /// Toolbar.setGlobalToolbar(true);
 /// Style s = UIManager.getInstance().getComponentStyle("Title");
 ///
-/// Form hi = new Form("Toolbar", new BoxLayout(BoxLayout.Y_AXIS));
-/// TextField searchField = new TextField("", "Toolbar Search"); //
+/// Form hi = new Form("Toolbar", BoxLayout.y());
+/// TextField searchField = new TextField("", "Toolbar Search");
 /// searchField.getHintLabel().setUIID("Title");
 /// searchField.setUIID("Title");
 /// searchField.getAllStyles().setAlignment(Component.LEFT);
 /// hi.getToolbar().setTitleComponent(searchField);
+///
 /// FontImage searchIcon = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, s);
-/// searchField.addDataChangeListener((i1, i2) -> { //
-///     String t = searchField.getText();
-///     if(t.length()  -1;
-///             cmp.setHidden(!show); //
-///             cmp.setVisible(show);
-///         }
+/// hi.getToolbar().addCommandToRightBar("", searchIcon, e -> searchField.startEditingAsync());
+///
+/// hi.addAll(new Label("A Game of Thrones"), new Label("A Clash Of Kings"), new Label("A Storm Of Swords"));
+/// searchField.addDataChangedListener((type, index) -> {
+///     String text = searchField.getText().toLowerCase();
+///     for (Component cmp : hi.getContentPane()) {
+///         Label l = (Label) cmp;
+///         boolean show = text.length() == 0 || l.getText().toLowerCase().indexOf(text) > -1;
+///         cmp.setHidden(!show);
+///         cmp.setVisible(show);
 ///     }
 ///     hi.getContentPane().animateLayout(250);
 /// });
-/// hi.getToolbar().addCommandToRightBar("", searchIcon, (e) -> {
-///     searchField.startEditingAsync(); //
-/// });
-///
-/// hi.add("A Game of Thrones").
-///         add("A Clash Of Kings").
-///         add("A Storm Of Swords").
-///         add("A Feast For Crows").
-///         add("A Dance With Dragons").
-///         add("The Winds of Winter").
-///         add("A Dream of Spring");
 /// hi.show();
 /// ```
 ///
