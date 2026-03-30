@@ -8,7 +8,7 @@
 /// [Google Reverse Geocoder API](https://developers.google.com/maps/documentation/geocoding/).
 /// Lets start with this XML snippet:
 ///
-/// ```java
+/// ```xml
 ///
 ///   OK
 ///
@@ -104,7 +104,7 @@
 ///
 /// The returned JSON looks something like this (notice it's snipped because the data is too long):
 ///
-/// ```java
+/// ```json
 /// {
 ///   "status": "OK",
 ///   "results": [
@@ -226,7 +226,7 @@
 /// It also possible to do some more complex expressions. We'll use the following XML fragment for the next batch of
 /// examples:
 ///
-/// ```java
+/// ```xml
 ///
 ///
 ///         Bernard

@@ -220,11 +220,12 @@ public class UIManager {
     /// where we would be out of options if something like that happens. Effectively this is the same as writing:
     ///
     /// ```java
+    /// Resources theme = null;
     /// try {
-    /// theme = Resources.openLayered(resourceFile);
-    /// UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));
-    /// } catch(IOException e){
-    /// e.printStackTrace();
+    ///     theme = Resources.openLayered(resourceFile);
+    ///     UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));
+    /// } catch (IOException e) {
+    ///     Log.e(e);
     /// }
     /// ```
     ///

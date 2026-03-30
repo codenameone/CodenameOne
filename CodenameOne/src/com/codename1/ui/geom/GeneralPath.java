@@ -65,14 +65,16 @@ import java.util.Arrays;
 /// path.lineTo(5, 25);
 /// path.lineTo(20,0);
 ///
-/// hi.getContentPane().getUnselectedStyle().setBgPainter((Graphics g, Rectangle rect) -> {
-///     g.setColor(0xff);
-///     float widthRatio = ((float)rect.getWidth()) / 50f;
-///     float heightRatio = ((float)rect.getHeight()) / 100f;
-///     g.scale(widthRatio, heightRatio);
-///     g.translate((int)(((float)rect.getX()) / widthRatio), (int)(((float)rect.getY()) / heightRatio));
-///     g.fillShape(path);
-///     g.resetAffine();
+/// hi.getContentPane().getUnselectedStyle().setBgPainter(new Painter() {
+///     public void paint(Graphics g, Rectangle rect) {
+///         g.setColor(0xff);
+///         float widthRatio = ((float) rect.getWidth()) / 50f;
+///         float heightRatio = ((float) rect.getHeight()) / 100f;
+///         g.scale(widthRatio, heightRatio);
+///         g.translate((int) (((float) rect.getX()) / widthRatio), (int) (((float) rect.getY()) / heightRatio));
+///         g.fillShape(path);
+///         g.resetAffine();
+///     }
 /// });
 ///
 /// hi.show();

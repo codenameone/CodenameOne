@@ -36,22 +36,22 @@ import com.codename1.ui.Component;
 /// An instance of a renderer can be developed as such:
 ///
 /// ```java
-/// **public** **class** MyYesNoRenderer **extends** Label **implements** ListCellRenderer **{**
-/// **public** Component getListCellRendererComponent**(**List list, Object value, **int** index, **boolean** isSelected**)** **{**
-/// **if****(** **(****(**Boolean**)**value**)**.booleanValue**(****)** **)** **{**
-/// setText**(**"Yes"**)**;
-/// **}** **else** **{**
-/// setText**(**"No"**)**;
-/// **}**
-/// **return** **this**;
-/// **}**
-/// **public** Component getListFocusComponent**(**List list**)** **{**
-/// Label label = new label**("");**
-/// label.getStyle().setBgTransparency(100);
-/// **
-/// **return** label;
-/// **}**
-/// **}**
+/// public class MyYesNoRenderer extends Label implements ListCellRenderer {
+///     public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
+///         if (((Boolean) value).booleanValue()) {
+///             setText("Yes");
+///         } else {
+///             setText("No");
+///         }
+///         return this;
+///     }
+///
+///     public Component getListFocusComponent(List list) {
+///         Label label = new Label("");
+///         label.getStyle().setBgTransparency(100);
+///         return label;
+///     }
+/// }
 /// ```
 ///
 /// It is recommended that the component whose values are manipulated would not

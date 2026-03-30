@@ -53,7 +53,7 @@ import java.util.Vector;
 ///
 /// ```java
 /// int pageNumber = 1;
-/// java.util.List> fetchPropertyData(String text) {
+/// java.util.List<Map<String, Object>> fetchPropertyData(String text) {
 ///     try {
 ///         ConnectionRequest r = new ConnectionRequest();
 ///         r.setPost(false);
@@ -69,7 +69,7 @@ import java.util.Vector;
 ///         NetworkManager.getInstance().addToQueueAndWait(r);
 ///         Map result = new JSONParser().parseJSON(new InputStreamReader(new ByteArrayInputStream(r.getResponseData()), "UTF-8"));
 ///         Map response = (Map)result.get("response");
-///         return (java.util.List>)response.get("listings");
+///         return (java.util.List<Map<String, Object>>)response.get("listings");
 ///     } catch(Exception err) {
 ///         Log.e(err);
 ///         return null;

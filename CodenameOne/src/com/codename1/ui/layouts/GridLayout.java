@@ -65,7 +65,7 @@ import com.codename1.ui.plaf.Style;
 ///     new Label("Second"),
 ///     new Label("Third"),
 ///     new Label("Fourth"),
-///     new Label("Fifth")));
+///     new Label("Fifth"));
 /// ```
 ///
 /// @author Chen Fishbein

@@ -4529,7 +4529,8 @@ public final class Display extends CN1Constants {
     /// The sample below demonstrates the use case for this property:
     ///
     /// ```java
-    /// switch(Display.getInstance().getSMSSupport()) {
+    /// void sendMessage(String phone, String data) {
+    ///     switch(Display.getInstance().getSMSSupport()) {
     ///     case Display.SMS_NOT_SUPPORTED:
     ///         return;
     ///     case Display.SMS_SEAMLESS:
@@ -4539,6 +4540,7 @@ public final class Display extends CN1Constants {
     ///     default:
     ///         Display.getInstance().sendSMS(phone, data);
     ///         return;
+    ///     }
     /// }
     /// ```
     ///
@@ -4564,7 +4566,8 @@ public final class Display extends CN1Constants {
     /// of detecting platform behavior for sending SMS.
     ///
     /// ```java
-    /// switch(Display.getInstance().getSMSSupport()) {
+    /// void sendMessage(String phone, String data) {
+    ///     switch(Display.getInstance().getSMSSupport()) {
     ///     case Display.SMS_NOT_SUPPORTED:
     ///         return;
     ///     case Display.SMS_SEAMLESS:
@@ -4574,6 +4577,7 @@ public final class Display extends CN1Constants {
     ///     default:
     ///         Display.getInstance().sendSMS(phone, data);
     ///         return;
+    ///     }
     /// }
     /// ```
     ///
