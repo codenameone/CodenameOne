@@ -46,6 +46,7 @@ public final class GenerateCN1AccessRegistry {
     private static final String HELPER_CLASS_PREFIX = "GeneratedAccess_";
     private static final int FIND_CLASS_CHUNK_SIZE = 64;
     private static final char MEMBER_SEPARATOR = '\u001f';
+    private static final Map<String, Boolean> RUNTIME_PUBLIC_TYPE_CACHE = new HashMap<String, Boolean>();
 
     private static final String[] INDEX_PACKAGE_PREFIXES = new String[]{
             "com.codename1.",
@@ -1038,6 +1039,11 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         if ("void".equals(name)) {
             return true;
         }
+        if (name.startsWith("com.codename1.")) {
+            if (!isPublicRuntimeType(name)) {
+                return false;
+            }
+        }
         return !name.startsWith("java.lang.reflect.")
                 && !name.startsWith("java.lang.annotation.")
                 && !name.startsWith("java.lang.invoke.")
@@ -1050,6 +1056,17 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
                 && !name.startsWith("java.util.concurrent.")
                 && !name.startsWith("java.util.function.")
                 && !name.startsWith("java.util.stream.");
+    }
+
+    private static boolean isPublicRuntimeType(String className) {
+        Boolean cached = RUNTIME_PUBLIC_TYPE_CACHE.get(className);
+        if (cached != null) {
+            return cached.booleanValue();
+        }
+        Class<?> runtimeClass = loadRuntimeClass(className);
+        boolean supported = runtimeClass != null && java.lang.reflect.Modifier.isPublic(runtimeClass.getModifiers());
+        RUNTIME_PUBLIC_TYPE_CACHE.put(className, Boolean.valueOf(supported));
+        return supported;
     }
 
     private static boolean isPackageOrChild(String name, String packageName) {
