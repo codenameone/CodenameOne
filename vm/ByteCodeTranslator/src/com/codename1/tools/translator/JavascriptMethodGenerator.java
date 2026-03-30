@@ -50,6 +50,7 @@ final class JavascriptMethodGenerator {
                         .append(jsMethodName).append(");\n");
             }
         }
+        appendSyntheticClinitIfNeeded(out, cls);
         return out.toString();
     }
 
@@ -103,7 +104,7 @@ final class JavascriptMethodGenerator {
             }
             first = false;
             out.append("\"").append(field.getFieldName()).append("\": ")
-                    .append(field.getValue() == null ? JavascriptNameUtil.defaultValue(field.getType()) : renderStaticConstant(field));
+                    .append(renderStaticFieldInitialValue(field));
         }
         out.append("},\n");
         out.append("  methods: {},\n");
@@ -188,6 +189,57 @@ final class JavascriptMethodGenerator {
         return JavascriptNameUtil.defaultValue(field.getType());
     }
 
+    private static String renderStaticFieldInitialValue(ByteCodeField field) {
+        if (requiresDeferredStaticInitialization(field)) {
+            return JavascriptNameUtil.defaultValue(field.getType());
+        }
+        return field.getValue() == null ? JavascriptNameUtil.defaultValue(field.getType()) : renderStaticConstant(field);
+    }
+
+    private static boolean requiresDeferredStaticInitialization(ByteCodeField field) {
+        return field.getValue() instanceof String;
+    }
+
+    private static boolean hasDeferredStaticInitialization(ByteCodeClass cls) {
+        for (ByteCodeField field : cls.getFields()) {
+            if (field.isStaticField() && requiresDeferredStaticInitialization(field)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void appendDeferredStaticFieldInitialization(StringBuilder out, ByteCodeClass cls) {
+        for (ByteCodeField field : cls.getFields()) {
+            if (!field.isStaticField() || !requiresDeferredStaticInitialization(field)) {
+                continue;
+            }
+            out.append("  jvm.classes[\"").append(cls.getClsName()).append("\"].staticFields[\"")
+                    .append(field.getFieldName()).append("\"] = ").append(renderStaticConstant(field)).append(";\n");
+        }
+    }
+
+    private static boolean hasExplicitClinit(ByteCodeClass cls) {
+        for (BytecodeMethod method : cls.getMethods()) {
+            if (!method.isEliminated() && "__CLINIT__".equals(method.getMethodName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void appendSyntheticClinitIfNeeded(StringBuilder out, ByteCodeClass cls) {
+        if (!hasDeferredStaticInitialization(cls) || hasExplicitClinit(cls)) {
+            return;
+        }
+        String fn = "cn1_" + cls.getClsName() + "___CLINIT___deferred";
+        out.append("function* ").append(fn).append("(){\n");
+        appendDeferredStaticFieldInitialization(out, cls);
+        out.append("  return null;\n");
+        out.append("}\n");
+        out.append("jvm.classes[\"").append(cls.getClsName()).append("\"].clinit = ").append(fn).append(";\n");
+    }
+
     private static void appendMethod(StringBuilder out, ByteCodeClass cls, BytecodeMethod method) {
         List<Instruction> instructions = method.getInstructions();
         Map<Label, Integer> labelToIndex = buildLabelMap(instructions);
@@ -211,6 +263,9 @@ final class JavascriptMethodGenerator {
         out.append("){\n");
         if (!wrappedStaticMethod && method.isStatic() && !"__CLINIT__".equals(method.getMethodName())) {
             out.append("  jvm.ensureClassInitialized(\"").append(cls.getClsName()).append("\");\n");
+        }
+        if ("__CLINIT__".equals(method.getMethodName())) {
+            appendDeferredStaticFieldInitialization(out, cls);
         }
         if (appendStraightLineMethodBody(out, cls, method, instructions, wrappedStaticMethod ? jsMethodBodyName : jsMethodName)) {
             if (wrappedStaticMethod) {

@@ -6,6 +6,8 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 final class JavascriptBundleWriter {
@@ -28,7 +30,18 @@ final class JavascriptBundleWriter {
 
     private static void writeTranslatedClasses(File outputDirectory, List<ByteCodeClass> classes) throws IOException {
         StringBuilder out = new StringBuilder();
-        for (ByteCodeClass cls : classes) {
+        List<ByteCodeClass> sorted = new ArrayList<ByteCodeClass>(classes);
+        Collections.sort(sorted, new Comparator<ByteCodeClass>() {
+            @Override
+            public int compare(ByteCodeClass a, ByteCodeClass b) {
+                int priorityDiff = bootstrapPriority(a) - bootstrapPriority(b);
+                if (priorityDiff != 0) {
+                    return priorityDiff;
+                }
+                return a.getClsName().compareTo(b.getClsName());
+            }
+        });
+        for (ByteCodeClass cls : sorted) {
             out.append(cls.generateJavascriptCode(classes)).append('\n');
         }
         ByteCodeClass mainClass = ByteCodeClass.getMainClass();
@@ -39,6 +52,29 @@ final class JavascriptBundleWriter {
         }
         Files.write(new File(outputDirectory, "translated_app.js").toPath(),
                 out.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static int bootstrapPriority(ByteCodeClass cls) {
+        String name = cls.getClsName();
+        if ("java_lang_Object".equals(name)) {
+            return 0;
+        }
+        if ("java_lang_Class".equals(name)) {
+            return 1;
+        }
+        if ("java_lang_String".equals(name)) {
+            return 2;
+        }
+        if ("java_lang_Throwable".equals(name)) {
+            return 3;
+        }
+        if (name.startsWith("java_lang_String_")) {
+            return 4;
+        }
+        if (name.startsWith("java_lang_")) {
+            return 5;
+        }
+        return 10;
     }
 
     private static void writeWorker(File outputDirectory) throws IOException {

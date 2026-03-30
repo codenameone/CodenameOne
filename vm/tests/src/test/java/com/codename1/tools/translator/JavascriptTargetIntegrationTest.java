@@ -56,6 +56,8 @@ class JavascriptTargetIntegrationTest {
                 "Runtime should provide JS native implementations for wait()");
         assertTrue(!translatedApp.contains("Missing javascript native method cn1_java_lang_Object_wait_long_int"),
                 "Translated bundle should not emit generic fallback stubs for runtime-implemented natives");
+        assertTrue(!translatedApp.contains("staticFields: {\"CRLF\": jvm.createStringLiteral("),
+                "Static string constants should be materialized during class initialization, not at top-level class registration");
         assertTrue(!translatedApp.contains("Missing javascript native method cn1_java_util_Locale_getOSLanguage_R_java_lang_String"),
                 "Translated bundle should not emit generic fallback stubs for Locale natives");
         assertTrue(!translatedApp.contains("Missing javascript native method cn1_java_util_TimeZone_getTimezoneId_R_java_lang_String"),
