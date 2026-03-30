@@ -16,6 +16,8 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.util.CheckClassAdapter;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -27,15 +29,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import static com.codename1.maven.PathUtil.path;
 
@@ -110,7 +111,8 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         List<Violation> violations = scanProjectClasses(outputDir, allowedIndex, projectAndDependencyIndex);
         if (!violations.isEmpty()) {
             writeComplianceReport(violations, outputDir, dependencyJars, rewrittenClassCount);
-            throw new MojoExecutionException(buildFailureSummary(violations));
+            logViolationSummary(violations);
+            throw new MojoFailureException(buildFailureSummary(violations));
         }
 
         writeComplianceSuccess("Completed compliance check on " + project.getName(), rewrittenClassCount);
@@ -187,16 +189,23 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         if (violations.size() != 1) {
             sb.append("s");
         }
-        sb.append(". See ").append(complianceOutputFile.getAbsolutePath()).append(" for full report.");
-        sb.append(" First ").append(maxInMessage).append(" violation(s): ");
+        sb.append(".\n");
+        sb.append("See ").append(complianceOutputFile.getAbsolutePath()).append(" for the full report.\n");
+        sb.append("First ").append(maxInMessage).append(" violation(s):");
         for (int i = 0; i < maxInMessage; i++) {
-            if (i > 0) {
-                sb.append(" | ");
-            }
             Violation v = violations.get(i);
-            sb.append(v.sourceClass).append("#").append(v.sourceMethod).append(" -> ").append(v.referencedMember);
+            sb.append("\n - ").append(v.renderInline());
         }
         return sb.toString();
+    }
+
+    private void logViolationSummary(List<Violation> violations) {
+        int maxToLog = Math.min(5, violations.size());
+        getLog().error("Bytecode compliance check found " + violations.size() + " violation(s).");
+        getLog().error("Detailed report written to " + complianceOutputFile.getAbsolutePath());
+        for (int i = 0; i < maxToLog; i++) {
+            getLog().error("[" + (i + 1) + "] " + violations.get(i).renderInline());
+        }
     }
 
 
@@ -386,46 +395,67 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
                         throw new MojoExecutionException("Failed reading class metadata from " + classFile, ex);
                     }
                 }
-            } else if (root.getName().endsWith(".jar")) {
-                JarFile jarFile = null;
+            } else if (isClassArchive(root)) {
                 try {
-                    jarFile = new JarFile(root);
-                    Enumeration<JarEntry> entries = jarFile.entries();
-                    while (entries.hasMoreElements()) {
-                        JarEntry entry = entries.nextElement();
-                        if (shouldSkipJarClassEntry(entry)) {
-                            continue;
-                        }
-                        InputStream inputStream = jarFile.getInputStream(entry);
-                        try {
-                            ClassMetadata metadata = readClassMetadata(inputStream, root + "!" + entry.getName());
-                            if (metadata != null) {
-                                index.put(metadata.name, metadata);
-                            }
-                        } finally {
-                            inputStream.close();
-                        }
-                    }
+                    indexArchive(root, index);
                 } catch (IOException ex) {
                     throw new MojoExecutionException("Failed reading jar metadata from " + root, ex);
-                } finally {
-                    if (jarFile != null) {
-                        try {
-                            jarFile.close();
-                        } catch (IOException ignored) {
-                        }
-                    }
                 }
             }
         }
         return index;
     }
 
-    private boolean shouldSkipJarClassEntry(JarEntry entry) {
-        if (entry.isDirectory()) {
+    private void indexArchive(File archive, Map<String, ClassMetadata> index) throws IOException {
+        InputStream fis = new BufferedInputStream(new FileInputStream(archive));
+        try {
+            indexArchiveStream(fis, archive.getAbsolutePath(), index);
+        } finally {
+            fis.close();
+        }
+    }
+
+    private void indexArchiveStream(InputStream archiveStream, String sourcePrefix, Map<String, ClassMetadata> index) throws IOException {
+        ZipInputStream zip = new ZipInputStream(archiveStream);
+        try {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                if (entry.isDirectory()) {
+                    continue;
+                }
+                String entryName = entry.getName();
+                if (shouldSkipArchiveClassEntry(entryName)) {
+                    continue;
+                }
+                byte[] bytes = readAllBytes(zip);
+                if (entryName.endsWith(".class")) {
+                    ClassMetadata metadata = readClassMetadata(new ByteArrayInputStream(bytes), sourcePrefix + "!" + entryName);
+                    if (metadata != null) {
+                        index.put(metadata.name, metadata);
+                    }
+                } else if (isClassArchiveName(entryName)) {
+                    indexArchiveStream(new ByteArrayInputStream(bytes), sourcePrefix + "!" + entryName, index);
+                }
+            }
+        } finally {
+            zip.close();
+        }
+    }
+
+    private byte[] readAllBytes(InputStream input) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int len;
+        while ((len = input.read(buffer)) != -1) {
+            out.write(buffer, 0, len);
+        }
+        return out.toByteArray();
+    }
+
+    private boolean shouldSkipArchiveClassEntry(String name) {
+        if (name == null || name.isEmpty()) {
             return true;
         }
-        String name = entry.getName();
         if (!name.endsWith(".class")) {
             return true;
         }
@@ -433,6 +463,21 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
             return true;
         }
         return name.startsWith("META-INF/versions/");
+    }
+
+    private boolean isClassArchive(File file) {
+        if (file == null || !file.isFile()) {
+            return false;
+        }
+        return isClassArchiveName(file.getName());
+    }
+
+    private boolean isClassArchiveName(String name) {
+        if (name == null) {
+            return false;
+        }
+        String lower = name.toLowerCase();
+        return lower.endsWith(".jar") || lower.endsWith(".cn1lib") || lower.endsWith(".zip");
     }
 
     private ClassMetadata readClassMetadata(InputStream inputStream, String sourceDescription) throws IOException {
@@ -478,9 +523,13 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
             if (artifact.getGroupId().equals("com.codenameone") && artifact.getArtifactId().equals("java-runtime")) {
                 continue;
             }
-            if ("compile".equals(artifact.getScope()) || "system".equals(artifact.getScope()) || "test".equals(artifact.getScope())) {
+            if ("compile".equals(artifact.getScope())
+                    || "provided".equals(artifact.getScope())
+                    || "system".equals(artifact.getScope())
+                    || "runtime".equals(artifact.getScope())
+                    || "test".equals(artifact.getScope())) {
                 File jar = getJar(artifact);
-                if (jar != null && jar.exists() && jar.getName().endsWith(".jar")) {
+                if (isClassArchive(jar)) {
                     jars.add(jar);
                 }
             }
@@ -655,6 +704,9 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
             if (isArrayDescriptor(owner)) {
                 return;
             }
+            if (isInternalRewriteHelper(owner)) {
+                return;
+            }
             if (projectAndDependencyIndex.containsKey(owner) || allowedIndex.containsKey(owner)) {
                 return;
             }
@@ -673,11 +725,17 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
             if (isArrayDescriptor(owner)) {
                 return true;
             }
+            if (isInternalRewriteHelper(owner)) {
+                return true;
+            }
             return resolveMember(owner, memberKey(name, descriptor), true);
         }
 
         private boolean shouldAllowField(String owner, String name, String descriptor) {
             if (isArrayDescriptor(owner)) {
+                return true;
+            }
+            if (isInternalRewriteHelper(owner)) {
                 return true;
             }
             return resolveMember(owner, memberKey(name, descriptor), false);
@@ -721,6 +779,10 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         return type != null && type.startsWith("[");
     }
 
+    private static boolean isInternalRewriteHelper(String owner) {
+        return JDK_API_REWRITE_HELPER_INTERNAL_NAME.equals(owner);
+    }
+
     private static String replacementFor(String referencedMember) {
         String direct = SUGGESTED_REPLACEMENTS.get(referencedMember);
         if (direct != null) {
@@ -759,6 +821,17 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
             sb.append("Forbidden reference: ").append(referencedMember);
             if (suggestion != null && !suggestion.isEmpty()) {
                 sb.append("\nSuggested replacement: ").append(suggestion);
+            }
+            return sb.toString();
+        }
+
+        private String renderInline() {
+            StringBuilder sb = new StringBuilder();
+            sb.append(sourceClass).append("#").append(sourceMethod)
+                    .append(" -> ").append(referencedMember)
+                    .append(" (").append(sourcePath).append(")");
+            if (suggestion != null && !suggestion.isEmpty()) {
+                sb.append(" Suggestion: ").append(suggestion);
             }
             return sb.toString();
         }

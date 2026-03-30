@@ -6,6 +6,11 @@ on:
       - master
     paths-ignore:
       - 'CodenameOneDesigner/**'
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - 'CodenameOneDesigner/**'
 
 jobs:
   build-linux-jdk8:
