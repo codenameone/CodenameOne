@@ -1066,7 +1066,7 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
             return cached.booleanValue();
         }
         Class<?> runtimeClass = loadRuntimeClass(className);
-        boolean supported = runtimeClass != null && java.lang.reflect.Modifier.isPublic(runtimeClass.getModifiers());
+        boolean supported = runtimeClass == null || java.lang.reflect.Modifier.isPublic(runtimeClass.getModifiers());
         RUNTIME_PUBLIC_TYPE_CACHE.put(className, Boolean.valueOf(supported));
         return supported;
     }

@@ -124,8 +124,8 @@ final class PlaygroundRunner {
         interpreter.set("theme", context.getTheme());
         interpreter.set("hostForm", context.getHostForm());
         interpreter.set("previewRoot", context.getPreviewRoot());
-        interpreter.set("Display", resolveDisplayBinding());
-        interpreter.set("UIManager", resolveUiManagerBinding());
+        interpreter.set("Display", Display.getInstance());
+        interpreter.set("UIManager", UIManager.getInstance());
         interpreter.set("FontImage", FontImage.class);
         interpreter.set("CN", com.codename1.ui.CN.class);
         interpreter.set("BoxLayout", BoxLayout.class);
@@ -134,27 +134,13 @@ final class PlaygroundRunner {
         interpreter.set("GridLayout", GridLayout.class);
         interpreter.set("LayeredLayout", LayeredLayout.class);
         interpreter.set("Style", Style.class);
+        interpreter.set("Component", Component.class);
         namespace.importPackage("com.codename1.ui");
         namespace.importPackage("com.codename1.ui.layouts");
         namespace.importPackage("com.codename1.components");
         namespace.importPackage("com.codename1.ui.geom");
+        namespace.importClass("com.codename1.ui.Component");
         namespace.importClass("com.codenameone.playground.PlaygroundContext");
-    }
-
-    private Object resolveDisplayBinding() {
-        try {
-            return Display.getInstance();
-        } catch (Throwable ex) {
-            return Display.class;
-        }
-    }
-
-    private Object resolveUiManagerBinding() {
-        try {
-            return UIManager.getInstance();
-        } catch (Throwable ex) {
-            return UIManager.class;
-        }
     }
 
     private String adaptScript(String script) {
@@ -839,7 +825,7 @@ final class PlaygroundRunner {
         String body = script.substring(bodyStart);
         String rewrittenBody = rewriteLooseScriptBody(body);
         return prefix
-                + "com.codename1.ui.Component build(com.codenameone.playground.PlaygroundContext ctx) {\n"
+                + "Component build(PlaygroundContext ctx) {\n"
                 + rewrittenBody
                 + "\n}\n"
                 + "build(ctx);";
