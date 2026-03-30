@@ -101,6 +101,7 @@ public final class GenerateCN1AccessRegistry {
         for (SourceClass sourceClass : indexedClasses.values()) {
             knownTypes.addAll(sourceClass.nestedTypes.values());
         }
+        knownTypes = filterKnownTypes(knownTypes);
 
         List<ApiClass> apiClasses = new ArrayList<ApiClass>();
         for (SourceClass sourceClass : indexedClasses.values()) {
@@ -1015,6 +1016,7 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     private static boolean isDispatchClass(ApiClass apiClass) {
         return (apiClass.packageName.startsWith("com.codename1.")
                 && !isPackageOrChild(apiClass.packageName, "com.codename1.impl"))
+                && isPublicRuntimeType(apiClass.qualifiedName)
                 || isSupportedJavaDispatchPackage(apiClass.packageName)
                 || "com.codenameone.playground".equals(apiClass.packageName)
                 || apiClass.packageName.startsWith("com.codenameone.playground.");
@@ -1067,6 +1069,17 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         boolean supported = runtimeClass != null && java.lang.reflect.Modifier.isPublic(runtimeClass.getModifiers());
         RUNTIME_PUBLIC_TYPE_CACHE.put(className, Boolean.valueOf(supported));
         return supported;
+    }
+
+    private static LinkedHashSet<String> filterKnownTypes(LinkedHashSet<String> knownTypes) {
+        LinkedHashSet<String> filtered = new LinkedHashSet<String>();
+        for (String knownType : knownTypes) {
+            if (knownType.startsWith("com.codename1.") && !isPublicRuntimeType(knownType)) {
+                continue;
+            }
+            filtered.add(knownType);
+        }
+        return filtered;
     }
 
     private static boolean isPackageOrChild(String name, String packageName) {
