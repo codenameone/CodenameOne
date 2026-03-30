@@ -15,6 +15,22 @@ document.addEventListener('DOMContentLoaded', () => {
     return className.includes('language-java') || className.includes('lang-java');
   };
 
+  const encodePlaygroundCode = (codeText) => {
+    try {
+      if (typeof TextEncoder !== 'undefined') {
+        const bytes = new TextEncoder().encode(codeText);
+        let binary = '';
+        bytes.forEach((byte) => {
+          binary += String.fromCharCode(byte);
+        });
+        return btoa(binary);
+      }
+    } catch (e) {
+      // Fall through to the URI-encoding based fallback below.
+    }
+    return btoa(unescape(encodeURIComponent(codeText)));
+  };
+
   const addPlaygroundLink = (pre, codeText) => {
     if (!codeText || pre.nextElementSibling?.classList.contains('cn1-open-playground-link')) {
       return;
@@ -25,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     linkContainer.style.margin = '6px 0 14px 0';
 
     const link = document.createElement('a');
-    link.href = `${playgroundBase}${encodeURIComponent(codeText)}`;
+    link.href = `${playgroundBase}${encodePlaygroundCode(codeText)}`;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.textContent = 'Open in playground';
