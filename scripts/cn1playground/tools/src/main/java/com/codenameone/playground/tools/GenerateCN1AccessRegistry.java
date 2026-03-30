@@ -46,7 +46,6 @@ public final class GenerateCN1AccessRegistry {
     private static final String HELPER_CLASS_PREFIX = "GeneratedAccess_";
     private static final int FIND_CLASS_CHUNK_SIZE = 64;
     private static final char MEMBER_SEPARATOR = '\u001f';
-    private static final Map<String, Boolean> RUNTIME_PUBLIC_TYPE_CACHE = new HashMap<String, Boolean>();
 
     private static final String[] INDEX_PACKAGE_PREFIXES = new String[]{
             "com.codename1.",
@@ -101,7 +100,6 @@ public final class GenerateCN1AccessRegistry {
         for (SourceClass sourceClass : indexedClasses.values()) {
             knownTypes.addAll(sourceClass.nestedTypes.values());
         }
-        knownTypes = filterKnownTypes(knownTypes);
 
         List<ApiClass> apiClasses = new ArrayList<ApiClass>();
         for (SourceClass sourceClass : indexedClasses.values()) {
@@ -1016,7 +1014,6 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
     private static boolean isDispatchClass(ApiClass apiClass) {
         return (apiClass.packageName.startsWith("com.codename1.")
                 && !isPackageOrChild(apiClass.packageName, "com.codename1.impl"))
-                && isPublicRuntimeType(apiClass.qualifiedName)
                 || isSupportedJavaDispatchPackage(apiClass.packageName)
                 || "com.codenameone.playground".equals(apiClass.packageName)
                 || apiClass.packageName.startsWith("com.codenameone.playground.");
@@ -1041,11 +1038,6 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         if ("void".equals(name)) {
             return true;
         }
-        if (name.startsWith("com.codename1.")) {
-            if (!isPublicRuntimeType(name)) {
-                return false;
-            }
-        }
         return !name.startsWith("java.lang.reflect.")
                 && !name.startsWith("java.lang.annotation.")
                 && !name.startsWith("java.lang.invoke.")
@@ -1058,28 +1050,6 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
                 && !name.startsWith("java.util.concurrent.")
                 && !name.startsWith("java.util.function.")
                 && !name.startsWith("java.util.stream.");
-    }
-
-    private static boolean isPublicRuntimeType(String className) {
-        Boolean cached = RUNTIME_PUBLIC_TYPE_CACHE.get(className);
-        if (cached != null) {
-            return cached.booleanValue();
-        }
-        Class<?> runtimeClass = loadRuntimeClass(className);
-        boolean supported = runtimeClass != null && java.lang.reflect.Modifier.isPublic(runtimeClass.getModifiers());
-        RUNTIME_PUBLIC_TYPE_CACHE.put(className, Boolean.valueOf(supported));
-        return supported;
-    }
-
-    private static LinkedHashSet<String> filterKnownTypes(LinkedHashSet<String> knownTypes) {
-        LinkedHashSet<String> filtered = new LinkedHashSet<String>();
-        for (String knownType : knownTypes) {
-            if (knownType.startsWith("com.codename1.") && !isPublicRuntimeType(knownType)) {
-                continue;
-            }
-            filtered.add(knownType);
-        }
-        return filtered;
     }
 
     private static boolean isPackageOrChild(String name, String packageName) {
