@@ -72,6 +72,11 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-m2
+      - name: Set up Node
+        if: ${{ matrix.java-version == 8 }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - name: Run Unit Tests
         run: |
           MVN_ARGS=""
@@ -110,6 +115,10 @@ jobs:
       - name: Run SpotBugs for ByteCodeTranslator
         if: ${{ matrix.java-version == 8 }}
         run: mvn -B -DskipTests=true -f vm/ByteCodeTranslator/pom.xml verify
+      - name: Run JavaScript Port smoke integration
+        if: ${{ matrix.java-version == 8 }}
+        working-directory: vm
+        run: mvn -B test -pl tests -am -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false -Dtest=JavaScriptPortSmokeIntegrationTest
       - name: Generate static analysis HTML summaries
         if: ${{ always() && matrix.java-version == 8 }}
         env:

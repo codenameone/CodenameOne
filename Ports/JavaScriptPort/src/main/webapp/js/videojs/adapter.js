@@ -4535,10 +4535,88 @@ module.exports = function(window, edgeVersion) {
 // SDP helpers.
 var SDPUtils = {};
 
+SDPUtils.getCrypto = function() {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto &&
+      typeof globalThis.crypto.getRandomValues === 'function') {
+    return globalThis.crypto;
+  }
+  if (typeof self !== 'undefined' && self.crypto &&
+      typeof self.crypto.getRandomValues === 'function') {
+    return self.crypto;
+  }
+  if (typeof window !== 'undefined' && window.crypto &&
+      typeof window.crypto.getRandomValues === 'function') {
+    return window.crypto;
+  }
+  return null;
+};
+
+SDPUtils._fallbackCounter = 0;
+
+SDPUtils.generateFallbackDigits = function(length) {
+  var seed = String(Date.now()) +
+      String(typeof performance !== 'undefined' &&
+          typeof performance.now === 'function'
+          ? performance.now() : 0) +
+      String(SDPUtils._fallbackCounter++);
+  var chars = '';
+  var i;
+  for (i = 0; chars.length < length; i++) {
+    chars += seed.charAt(i % seed.length);
+  }
+  return chars.substr(0, length);
+};
+
+SDPUtils.generateFallbackIdentifier = function(length) {
+  var alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  var seed = SDPUtils.generateFallbackDigits(length * 2);
+  var chars = '';
+  var i;
+  for (i = 0; i < length; i++) {
+    chars += alphabet.charAt(parseInt(seed.charAt(i), 10) % alphabet.length);
+  }
+  return chars;
+};
+
+SDPUtils.generateSecureDigits = function(length) {
+  var crypto = SDPUtils.getCrypto();
+  var chars = '';
+  var values;
+  var i;
+
+  if (crypto) {
+    values = new Uint32Array(length);
+    crypto.getRandomValues(values);
+    for (i = 0; i < length; i++) {
+      chars += (values[i] % 10).toString();
+    }
+    return chars;
+  }
+  return SDPUtils.generateFallbackDigits(length);
+};
+
+SDPUtils.generateSecureIdentifier = function(length) {
+  var crypto = SDPUtils.getCrypto();
+  var alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  var chars = '';
+  var values;
+  var i;
+
+  if (crypto) {
+    values = new Uint8Array(length);
+    crypto.getRandomValues(values);
+    for (i = 0; i < length; i++) {
+      chars += alphabet.charAt(values[i] % alphabet.length);
+    }
+    return chars;
+  }
+  return SDPUtils.generateFallbackIdentifier(length);
+};
+
 // Generate an alphanumeric identifier for cname or mids.
 // TODO: use UUIDs instead? https://gist.github.com/jed/982883
 SDPUtils.generateIdentifier = function() {
-  return Math.random().toString(36).substr(2, 10);
+  return SDPUtils.generateSecureIdentifier(10);
 };
 
 // The RTCP CNAME used by all peerconnections from the same JS.
@@ -5084,10 +5162,9 @@ SDPUtils.parseMsid = function(mediaSection) {
 
 // Generate a session ID for SDP.
 // https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-20#section-5.2.1
-// recommends using a cryptographically random +ve 64-bit value
-// but right now this should be acceptable and within the right range
+// recommends using a cryptographically random +ve 64-bit value.
 SDPUtils.generateSessionId = function() {
-  return Math.random().toString().substr(2, 21);
+  return SDPUtils.generateSecureDigits(21);
 };
 
 // Write boilder plate for start of SDP

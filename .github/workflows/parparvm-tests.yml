@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'vm/**'
+      - 'Ports/JavaScriptPort/**'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -11,6 +12,7 @@ on:
     branches: [ master, main ]
     paths:
       - 'vm/**'
+      - 'Ports/JavaScriptPort/**'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -78,6 +80,11 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
       - name: Run ParparVM JVM tests
         working-directory: vm
