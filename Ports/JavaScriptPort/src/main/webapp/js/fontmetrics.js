@@ -29,7 +29,7 @@ setTimeout(function() {
 })();
 
 window.cn1_escape_single_quotes = function(str) {
-    return str.replace(/'/g, "\\'");
+    return String(str).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 };
 window.cn1NativeBacksideHooks = [];
 window.cn1RunOnMainThread = function(callback) {
