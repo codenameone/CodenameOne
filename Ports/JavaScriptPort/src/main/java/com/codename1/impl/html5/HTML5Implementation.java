@@ -157,8 +157,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     private L10NManager l10n;
     private int density;
-    private static final String STORAGE_KEY_PREFIX = "storage/";
-    private static final String FILE_SYSTEM_PREFIX = "cn1fs/";
+    private static final String STORAGE_KEY_PREFIX = JavaScriptRuntimeFacade.STORAGE_KEY_PREFIX;
+    private static final String FILE_SYSTEM_PREFIX = JavaScriptRuntimeFacade.FILE_SYSTEM_PREFIX;
     private static HTML5Implementation instance;
     private boolean shiftKeyDown;
     private BufferedGraphics graphics;
@@ -6091,30 +6091,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     private String wrapStorageKey(String name){
-        return STORAGE_KEY_PREFIX + name;
+        return JavaScriptRuntimeFacade.wrapStorageKey(name);
     }
     
     private String unwrapStorageKey(String name){
-        if (name.indexOf(STORAGE_KEY_PREFIX) == 0) {
-            return name.substring(STORAGE_KEY_PREFIX.length());
-        } else {
-            return null;
-        }
+        return JavaScriptRuntimeFacade.unwrapStorageKey(name);
     }
     
     private String wrapFile(String path){
-        if (path.indexOf("file://") == 0) {
-            path = path.substring(7);
-        }
-        while (path.indexOf("/") == 0) {
-            path = path.substring(1);
-        }
-        return FILE_SYSTEM_PREFIX + path;
+        return JavaScriptRuntimeFacade.wrapFile(path);
     }
     
     private String unwrapFile(String path){
-        int prefixLen = FILE_SYSTEM_PREFIX.length();
-        return "file:///" + path.substring(prefixLen);
+        return JavaScriptRuntimeFacade.unwrapFile(path);
     }
     
     @Override
@@ -6165,17 +6154,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public String[] listStorageEntries() {
         try {
-            int prefixLen = STORAGE_KEY_PREFIX.length();
-            List<String> out = new ArrayList<>();
-            String[] keys = getLocalForage().keys();
-            for (String key : keys){
-                if (!key.startsWith(STORAGE_KEY_PREFIX)){
-                    continue;
-                }
-                out.add(key.substring(prefixLen));
-            }
-
-            return out.toArray(new String[out.size()]);
+            return JavaScriptRuntimeFacade.unwrapStorageEntries(getLocalForage().keys());
         } catch (IOException ex) {
             //Log.e(ex);
             consoleLog("Error in listStorageEntries");
@@ -6465,10 +6444,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     private static String stripTrailingSlash(String path) {
-        while (path.endsWith("/")) {
-            path = path.substring(0, path.length()-1);
-        }
-        return path;
+        return JavaScriptRuntimeFacade.stripTrailingSlash(path);
     }
     @Override
     public boolean isDirectory(String file) {
@@ -6506,7 +6482,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     private boolean isRootFile(String file) {
-        return wrapFile(file).equals(wrapFile("/"));
+        return JavaScriptRuntimeFacade.isRootFile(file);
     }
     
     /**

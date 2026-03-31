@@ -40,11 +40,16 @@ class JavascriptTargetIntegrationTest {
         assertTrue(Files.exists(distDir.resolve("parparvm_runtime.js")), "Translator should emit a JS runtime");
         assertTrue(Files.exists(distDir.resolve("translated_app.js")), "Translator should emit translated classes");
         assertTrue(Files.exists(distDir.resolve("vm_protocol.md")), "Translator should emit the VM protocol contract artifact");
+        assertTrue(Files.exists(distDir.resolve("browser_bridge.js")), "Translator should emit a browser bootstrap bridge");
+        assertTrue(Files.exists(distDir.resolve(Paths.get("js", "fontmetrics.js"))), "Translator should copy JavaScript port font metrics support");
+        assertTrue(Files.exists(distDir.resolve("style.css")), "Translator should copy the JavaScript port stylesheet");
 
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
         String runtime = new String(Files.readAllBytes(distDir.resolve("parparvm_runtime.js")), StandardCharsets.UTF_8);
         String worker = new String(Files.readAllBytes(distDir.resolve("worker.js")), StandardCharsets.UTF_8);
         String protocolDoc = new String(Files.readAllBytes(distDir.resolve("vm_protocol.md")), StandardCharsets.UTF_8);
+        String index = new String(Files.readAllBytes(distDir.resolve("index.html")), StandardCharsets.UTF_8);
+        String browserBridge = new String(Files.readAllBytes(distDir.resolve("browser_bridge.js")), StandardCharsets.UTF_8);
 
         assertTrue(translatedApp.contains("function*") && translatedApp.contains("JsHello"),
                 "Main class should contribute translated JS generator functions");
@@ -71,6 +76,10 @@ class JavascriptTargetIntegrationTest {
                 "Unsupported filesystem natives should fail with an explicit JS-mode message when translated");
         assertTrue(worker.contains("importScripts('parparvm_runtime.js');"),
                 "Worker bootstrap should load the runtime first");
+        assertTrue(index.contains("browser_bridge.js") && index.contains("js/fontmetrics.js") && index.contains("codenameone-canvas"),
+                "Generated host page should use the JavaScript port browser shell assets");
+        assertTrue(browserBridge.contains("cn1HostBridge") && browserBridge.contains("host-callback") && browserBridge.contains("host-call"),
+                "Browser bridge should expose host-call plumbing for the JavaScript port shell");
         assertTrue(protocolDoc.contains("Version: 1")
                         && protocolDoc.contains("host-call")
                         && protocolDoc.contains("host-callback")
