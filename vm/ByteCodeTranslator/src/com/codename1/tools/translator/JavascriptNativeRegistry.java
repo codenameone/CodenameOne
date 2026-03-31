@@ -120,7 +120,8 @@ final class JavascriptNativeRegistry {
     ));
 
     private static final Set<String> HOST_HOOK_PREFIXES = new HashSet<String>(Arrays.asList(
-            "cn1_com_codename1_impl_platform_js_VMHost_"
+            "cn1_com_codename1_impl_platform_js_VMHost_",
+            "cn1_com_codename1_impl_platform_js_JavaScriptPortHost_"
     ));
 
     private JavascriptNativeRegistry() {

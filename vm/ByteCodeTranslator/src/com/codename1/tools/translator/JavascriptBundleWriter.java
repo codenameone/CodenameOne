@@ -4,7 +4,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -20,6 +24,8 @@ final class JavascriptBundleWriter {
         writeRuntime(outputDirectory);
         writeTranslatedClasses(outputDirectory, classes);
         writeWorker(outputDirectory);
+        copyJavaScriptPortWebAppAssets(outputDirectory);
+        writeBrowserBridge(outputDirectory);
         writeIndex(outputDirectory);
         writeProtocol(outputDirectory);
     }
@@ -108,8 +114,63 @@ final class JavascriptBundleWriter {
         writeResource(outputDirectory, "index.html", "index.html");
     }
 
+    private static void writeBrowserBridge(File outputDirectory) throws IOException {
+        writeResource(outputDirectory, "browser_bridge.js", "browser_bridge.js");
+    }
+
     private static void writeProtocol(File outputDirectory) throws IOException {
         writeResource(outputDirectory, "vm_protocol.md", "vm_protocol.md");
+    }
+
+    private static void copyJavaScriptPortWebAppAssets(File outputDirectory) throws IOException {
+        Path webApp = locateJavaScriptPortWebApp();
+        if (webApp == null) {
+            return;
+        }
+        copyPathIfPresent(webApp.resolve("js"), outputDirectory.toPath().resolve("js"));
+        copyPathIfPresent(webApp.resolve("css"), outputDirectory.toPath().resolve("css"));
+        copyPathIfPresent(webApp.resolve("assets"), outputDirectory.toPath().resolve("assets"));
+        copyPathIfPresent(webApp.resolve("style.css"), outputDirectory.toPath().resolve("style.css"));
+        copyPathIfPresent(webApp.resolve("progress.gif"), outputDirectory.toPath().resolve("progress.gif"));
+        copyPathIfPresent(webApp.resolve("manifest.json"), outputDirectory.toPath().resolve("manifest.json"));
+        copyPathIfPresent(webApp.resolve("sw.js"), outputDirectory.toPath().resolve("sw.js"));
+    }
+
+    private static Path locateJavaScriptPortWebApp() {
+        String override = System.getProperty("codename1.javascriptport.webapp");
+        if (override != null && !override.trim().isEmpty()) {
+            Path path = Paths.get(override.trim());
+            if (Files.isDirectory(path)) {
+                return path;
+            }
+        }
+
+        Path current = Paths.get("").toAbsolutePath().normalize();
+        while (current != null) {
+            Path candidate = current.resolve(Paths.get("Ports", "JavaScriptPort", "src", "main", "webapp"));
+            if (Files.isDirectory(candidate)) {
+                return candidate;
+            }
+            current = current.getParent();
+        }
+        return null;
+    }
+
+    private static void copyPathIfPresent(Path source, Path target) throws IOException {
+        if (!Files.exists(source)) {
+            return;
+        }
+        if (Files.isDirectory(source)) {
+            Files.createDirectories(target);
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(source)) {
+                for (Path child : stream) {
+                    copyPathIfPresent(child, target.resolve(child.getFileName().toString()));
+                }
+            }
+            return;
+        }
+        Files.createDirectories(target.getParent());
+        Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
     }
 
     private static void writeResource(File outputDirectory, String targetName, String resourceName) throws IOException {

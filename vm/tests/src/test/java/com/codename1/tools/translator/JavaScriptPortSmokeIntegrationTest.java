@@ -18,17 +18,25 @@ class JavaScriptPortSmokeIntegrationTest {
     private static final Path REPO_ROOT = Paths.get("..", "..").normalize();
     private static final Path FIXTURE_ROOT = REPO_ROOT.resolve(Paths.get("Ports", "JavaScriptPort", "tests", "fixtures"));
     private static final Path LICENSE_ROOT = REPO_ROOT.resolve(Paths.get("Ports", "JavaScriptPort"));
+    private static final Path HOST_BRIDGE_SOURCE = REPO_ROOT.resolve(Paths.get("Ports", "JavaScriptPort", "src", "main", "java",
+            "com", "codename1", "impl", "platform", "js", "JavaScriptPortHost.java"));
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
-    @org.junit.jupiter.api.Disabled("Pending ParparVM host-native bridge support for JavaScriptPort smoke fixtures")
     void executesJavaScriptPortSmokeFixtureThroughParparVmHostBridge(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 
         Path classesDir = Files.createTempDirectory("js-port-smoke-classes");
         Path javaApiDir = Files.createTempDirectory("js-port-smoke-javaapi");
+        Path hostBridgeDir = classesDir.resolveSibling("js-port-smoke-host-source");
 
-        JavascriptTargetIntegrationTest.compileAgainstJavaApi(config, FIXTURE_ROOT, classesDir, javaApiDir);
+        Files.createDirectories(hostBridgeDir.resolve(Paths.get("com", "codename1", "impl", "platform", "js")));
+        Files.write(hostBridgeDir.resolve(Paths.get("com", "codename1", "impl", "platform", "js", "JavaScriptPortHost.java")),
+                Files.readAllBytes(HOST_BRIDGE_SOURCE));
+        Files.write(hostBridgeDir.resolve("JavaScriptPortSmokeApp.java"),
+                Files.readAllBytes(FIXTURE_ROOT.resolve("JavaScriptPortSmokeApp.java")));
+
+        JavascriptTargetIntegrationTest.compileAgainstJavaApi(config, hostBridgeDir, classesDir, javaApiDir);
 
         Path outputDir = Files.createTempDirectory("js-port-smoke-output");
         JavascriptTargetIntegrationTest.runJavascriptTranslator(classesDir, outputDir, "JavaScriptPortSmokeApp");

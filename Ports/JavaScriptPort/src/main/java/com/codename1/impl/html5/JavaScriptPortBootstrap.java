@@ -7,7 +7,6 @@
 package com.codename1.impl.html5;
 
 import com.codename1.io.Log;
-import com.codename1.io.Util;
 import com.codename1.system.Lifecycle;
 import com.codename1.ui.Display;
 import org.teavm.jso.JSBody;
@@ -48,23 +47,15 @@ public final class JavaScriptPortBootstrap implements Runnable {
 
     public static String proxifyUrl(Display display, String url) {
         String doNotProxyList = display.getProperty("javascript.noProxyForDomains", "");
-        if (!doNotProxyList.isEmpty()) {
-            for (String domain : Util.split(doNotProxyList, " ")) {
-                domain = domain.trim();
-                if (!domain.isEmpty() && url.startsWith(domain)) {
-                    return url;
-                }
-            }
-        }
         boolean useProxyForSameDomain = "true".equals(display.getProperty("javascript.useProxyForSameDomain", "false"));
-        if ((url.startsWith("http:") || url.startsWith("https:")) && (useProxyForSameDomain || !urlIsSameDomain(url))) {
-            String proxyURL = ((JSOImplementations.WindowExt)Window.current()).getCorsProxyURL();
-            proxyURL = display.getProperty("javascript.proxy.url", proxyURL);
-            if (proxyURL != null) {
-                return proxyURL + Window.encodeURIComponent(url);
+        String proxyURL = ((JSOImplementations.WindowExt)Window.current()).getCorsProxyURL();
+        proxyURL = display.getProperty("javascript.proxy.url", proxyURL);
+        return JavaScriptRuntimeFacade.proxifyUrl(url, doNotProxyList, useProxyForSameDomain, urlIsSameDomain(url), proxyURL, new JavaScriptRuntimeFacade.UrlEncoder() {
+            @Override
+            public String encode(String value) {
+                return Window.encodeURIComponent(value);
             }
-        }
-        return url;
+        });
     }
 
     @Override

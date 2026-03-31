@@ -7,7 +7,11 @@
 package com.codename1.impl.platform.js;
 
 /**
- * Minimal host bridge contract for JavaScript port smoke fixtures running through ParparVM.
+ * Host-native bridge for ParparVM-backed JavaScript port bootstrap and smoke/runtime probes.
+ *
+ * <p>The initial methods are intentionally narrow and map onto the existing worker
+ * host-call protocol used by the ParparVM JavaScript runtime tests. They provide
+ * a stable bridge surface while the broader JavaScript port runtime is integrated.</p>
  */
 public final class JavaScriptPortHost {
     private JavaScriptPortHost() {
