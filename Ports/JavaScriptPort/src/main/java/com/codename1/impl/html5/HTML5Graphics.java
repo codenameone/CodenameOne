@@ -1,0 +1,583 @@
+/*
+ * Copyright (c) 2026 Codename One and contributors.
+ * Licensed under the PolyForm Noncommercial License 1.0.0.
+ * You may use this file only in compliance with that license.
+ * The license notice for this subtree is available in Ports/JavaScriptPort/LICENSE.md.
+ */
+
+package com.codename1.impl.html5;
+
+
+
+
+import com.codename1.impl.html5.HTML5Implementation.NativeFont;
+import com.codename1.impl.html5.HTML5Implementation.NativeImage;
+import com.codename1.impl.html5.JSOImplementations.JSFontMetrics;
+import com.codename1.impl.html5.graphics.ClearRect;
+import com.codename1.impl.html5.graphics.ClipRect;
+import com.codename1.impl.html5.graphics.ClipShape;
+import com.codename1.impl.html5.graphics.ClipState;
+import com.codename1.impl.html5.graphics.DrawArc;
+import com.codename1.impl.html5.graphics.DrawImage;
+import com.codename1.impl.html5.graphics.DrawLine;
+import com.codename1.impl.html5.graphics.DrawPolygon;
+import com.codename1.impl.html5.graphics.DrawRect;
+import com.codename1.impl.html5.graphics.DrawRoundRect;
+import com.codename1.impl.html5.graphics.DrawShape;
+import com.codename1.impl.html5.graphics.DrawString;
+import com.codename1.impl.html5.graphics.FillArc;
+import com.codename1.impl.html5.graphics.FillLinearGradient;
+import com.codename1.impl.html5.graphics.FillPolygon;
+import com.codename1.impl.html5.graphics.FillRadialGradient;
+import com.codename1.impl.html5.graphics.FillRect;
+import com.codename1.impl.html5.graphics.FillRoundRect;
+import com.codename1.impl.html5.graphics.FillShape;
+import com.codename1.impl.html5.graphics.SetTransform;
+import com.codename1.impl.html5.graphics.TileImage;
+import com.codename1.teavm.geom.JSAffineTransform;
+import com.codename1.ui.Stroke;
+import com.codename1.ui.Transform;
+import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.geom.Shape;
+
+import org.teavm.jso.JSBody;
+import org.teavm.jso.JSObject;
+import org.teavm.jso.canvas.CanvasRenderingContext2D;
+import org.teavm.jso.canvas.ImageData;
+import org.teavm.jso.dom.html.HTMLCanvasElement;
+
+/**
+ * #######################################################################
+ * #######################################################################
+ *
+ * Bundle one canvas and two paints to get one graphics object.
+ */
+public class HTML5Graphics {
+
+    private ClipState clipState = new ClipState();
+    private HTMLCanvasElement canvas;
+    private CanvasRenderingContext2D context;
+    //private Paint paint;
+    private NativeFont font;
+    private int color;
+    HTML5Implementation impl;
+    private boolean inClip = false;
+    private int alpha=0xff;
+    private Rectangle clipBounds=new Rectangle();
+    private boolean clipBoundsDirty=true;
+    private GeneralPath clipShape = new GeneralPath();
+    
+    private boolean isClipShape;
+    private Transform transform, clipTransform;
+    private boolean transformApplied = false;
+   
+    
+    private final Rectangle clipRect = new Rectangle();
+    
+    //private final Path tmppath = new Path();
+    //private final static PorterDuffXfermode PORTER = new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER);
+    
+    HTML5Graphics(HTML5Implementation impl, HTMLCanvasElement canvas) {
+        this.canvas = canvas;
+        this.context = (CanvasRenderingContext2D)canvas.getContext("2d");
+        
+        this.impl = impl;
+        this.clipRect.setWidth(canvas.getWidth());
+        this.clipRect.setHeight(canvas.getHeight());
+        //transform = JSAffineTransform.Factory.getTranslateInstance(0, 0);
+        //paint.setAntiAlias(true);
+        
+        if(context != null) {
+            context.save();
+        }
+        //transform = Transform.makeIdentity();
+    }
+    
+    
+    public ClipState getClipState() {
+        return clipState;
+    }
+
+    public HTMLCanvasElement getCanvas(){
+        return canvas;
+    }
+    
+    void setCanvas(HTMLCanvasElement canvas) {
+        this.canvas = canvas;
+        this.context = null;
+        if(canvas != null) {
+            this.context = (CanvasRenderingContext2D)canvas.getContext("2d");
+            context.save();
+        }
+    }
+
+    void setCanvasNoSave(HTMLCanvasElement canvas) {
+        this.canvas = canvas;
+        this.context = null;
+        if(canvas != null) {
+            this.context = (CanvasRenderingContext2D)canvas.getContext("2d");
+            
+        }
+    }
+
+    NativeFont getFont() {
+        return font;
+    }
+
+    void setFont(NativeFont font) {
+        this.font = font;
+        context.setFont(font.getCSS());
+        
+        
+    }
+
+    public static String color(int rgb){
+        int red = (rgb >> 16) & 0xFF;
+        int green = (rgb >> 8) & 0xFF;
+        int blue = rgb & 0xFF;
+        //int alpha = (rgb >> 24) & 0xFF;
+        return "rgb("+red+","+green+","+blue+")";
+    }
+    
+    public static String colorWithAlpha(int argb) {
+        int red = (argb >> 16) & 0xFF;
+        int green = (argb >> 8) & 0xFF;
+        int blue = argb & 0xFF;
+        int alpha = (argb >> 24) & 0xFF;
+        return "rgba("+red+","+green+","+blue+","+(alpha/255f)+")";
+    }
+    
+    void setColor(int color){
+    	//System.out.println("Setting color "+color(color));
+        this.color = color;
+        this.context.setFillStyle(color(color));
+        this.context.setStrokeStyle(color(color));
+        
+    }
+    
+    void setColorWithAlpha(int color) {
+        //System.out.println("Setting color "+color(color));
+        this.color = color;
+        this.context.setFillStyle(colorWithAlpha(color));
+        this.context.setStrokeStyle(colorWithAlpha(color));
+    }
+    
+    void setAlpha(int alpha) {
+        this.alpha = alpha;
+        this.context.setGlobalAlpha(alpha / 255.0);
+    }
+    
+    int getAlpha() {
+        return alpha;
+        //return (int)(context.getGlobalAlpha() * 255);
+    }
+
+    CanvasRenderingContext2D getContext() {
+        return context;
+    }
+
+
+    public void drawImage(Object img, int x, int y) {
+        new DrawImage((NativeImage)img, x, y, alpha).execute(context);
+        
+    }
+    
+    
+    public void tileImage(Object img, int x, int y, int w, int h) {
+        new TileImage((NativeImage)img, x, y, w, h, alpha).execute(context);
+    }
+    
+    
+   
+    
+    public void setTransform(Transform t) {
+        setTransform(t, true);
+        
+    }
+    
+    public void applyTransform() {
+        if (!transformApplied) {
+            if (transform == null) {
+                transform = Transform.makeIdentity();
+            }
+            JSAffineTransform.Factory.setTransform(context, (JSAffineTransform)transform.getNativeTransform());
+            transformApplied = true;
+        }
+    }
+    
+    public void setTransformChanged() {
+        transformApplied = false;
+        clipBoundsDirty = true;
+    }
+    
+    public void setTransform(Transform t, boolean replace) {
+        if (transform == null) {
+            transform = Transform.makeIdentity();
+        }
+        if (replace) {
+            transform = t; 
+        } else {
+            transform.concatenate(t);
+        }
+        setTransformChanged();
+        applyTransform();
+    }
+    
+    public boolean isTransformSupported() {
+        return true;
+    }
+    
+    public void rotate(double angle) {
+        if (transform != null) {
+            transform.rotate((float)angle, 0, 0);
+            setTransformChanged();
+            applyTransform();
+        } else {
+            setTransform(Transform.makeRotation((float)angle, 0, 0), false);
+        }
+    }
+    
+    public void rotate(double angle, int pivotX, int pivotY) {
+        if (transform != null) {
+            transform.rotate((float)angle, pivotX, pivotY);
+            setTransformChanged();
+            applyTransform();
+        } else {
+            setTransform(Transform.makeRotation((float)angle, pivotX, pivotY), false);
+        }
+    }
+    
+//    public void shear(double shx, double shy) {
+//        
+//        transform = transform != null ? transform.shear(shx, shy) :
+//                JSAffineTransform.Factory.getShearInstance(shx, shy);
+//        setTransform(transform, false);
+//        transformDirty = true;
+//    }
+
+    public Transform getTransform() {
+        if (transform == null) {		
+             transform = Transform.makeIdentity();		
+        }		
+        return transform;
+    }
+    
+    
+    
+    public void scale(double sx, double sy) {
+        if (transform != null) {
+            transform.scale((float)sx, (float)sy);
+            setTransformChanged();
+            applyTransform();
+        } else {
+            setTransform(Transform.makeScale((float)sx, (float)sy));
+        }
+    }
+    
+    public void drawImage(Object img, int x, int y, int w, int h) {
+        new DrawImage((NativeImage)img, x, y, alpha, w, h).execute(context);
+    }
+
+    
+    public void drawLine(int x1, int y1, int x2, int y2) {
+        new DrawLine(x1, y1, x2, y2, color, alpha).execute(context);
+    }
+    
+    
+    public void drawPolygon(int[] xPoints, int[] yPoints, int nPoints) {
+        new DrawPolygon(xPoints, yPoints, nPoints, color, alpha).execute(context);
+    }
+    
+    public void fillPolygon(int[] xPoints, int[] yPoints, int nPoints) {
+        new FillPolygon(xPoints, yPoints, nPoints, color, alpha).execute(context);
+    }
+    
+    public void drawRGB(int[] rgbData, int offset, int x,
+            int y, int w, int h, boolean processAlpha) {
+        if (offset != 0){
+            int[] copy = new int[w*h];
+            System.arraycopy(rgbData, offset, copy, 0, w*h);
+            rgbData = copy;
+        }
+        NativeImage img = (NativeImage)impl.createImage(rgbData, w, h);
+        drawImage(img, x, y, w, h);
+    }
+    
+    public void drawRect(int x, int y, int width, int height) {
+    	new DrawRect(x, y, width, height, color, alpha).execute(context);
+    }
+    
+    public void drawRoundRect(int x, int y, int width,
+            int height, int arcWidthInt, int arcHeightInt) {
+        new DrawRoundRect(x, y, width, height, arcWidthInt, arcHeightInt, color, alpha).execute(context);
+    }
+
+    public void drawString(String str, int x, int y) {
+        new DrawString(str, x, y, color, alpha, font).execute(context);
+    }
+
+    public void drawArc(int x, int y, int width, int height,
+            int startAngle, int arcAngle) {
+        new DrawArc(x, y, width, height, startAngle, arcAngle, color, alpha).execute(context);
+    }
+    
+    public void drawShape(Shape shape, Stroke stroke) {
+        new DrawShape(shape, stroke, color, alpha).execute(context);
+    }
+    
+    public void fillShape(Shape shape) {
+        new FillShape(shape, color, alpha).execute(context);
+    }
+    
+    @JSBody(params={"o"}, script="console.log(o)")
+    private static native void log(JSObject o);
+    
+    
+    public void fillArc(int x, int y, int width, int height,
+            int startAngle, int arcAngle) {
+        new FillArc(x, y, width, height, startAngle, arcAngle, color, alpha).execute(context);
+    }
+    
+    public void fillRect(int x, int y, int width, int height) {
+        new FillRect(x, y, width, height, color, alpha).execute(context);        
+    }
+    
+    public void clearRect(int x, int y, int width, int height) {
+        new ClearRect(x, y, width, height).execute(context);
+    }
+
+    public void fillRoundRect(int x, int y, int width,
+            int height, int arcWidthInt, int arcHeightInt) {
+        new FillRoundRect(x, y, width, height, arcWidthInt, arcHeightInt, color, alpha).execute(context);
+        
+    }
+
+    
+
+    
+    
+    private void calculateClipBounds() {
+        if (clipBoundsDirty) {
+            clipBoundsDirty = false;
+            Rectangle projectedShape = getCurrentClipProjection().getBounds();
+            clipBounds.setBounds(projectedShape.getX(), projectedShape.getY(), projectedShape.getWidth(), projectedShape.getHeight());
+        }
+    }
+    
+    
+    public int getClipHeight() {
+        calculateClipBounds();
+        return clipBounds.getHeight();
+    }
+
+    
+    public int getClipWidth() {
+        calculateClipBounds();
+        return clipBounds.getWidth();
+    }
+
+    
+    public int getClipX() {
+        calculateClipBounds();
+        return clipBounds.getX();
+    }
+
+    
+    public int getClipY() {
+        calculateClipBounds();
+        return clipBounds.getY();
+    }
+
+     private Transform getInverseTransform() {
+        if (transform == null) return null;
+        return transform.getInverse();
+    }
+    
+    private Shape getCurrentClipProjection() {
+        if (isClipShape) {
+            GeneralPath out = new GeneralPath(clipShape);
+            Transform t = Transform.makeIdentity();
+            if (clipTransform != null && !clipTransform.isIdentity()) {
+                t.concatenate(clipTransform);
+            }
+            if (transform != null && !transform.isIdentity()) {
+                t.concatenate(transform.getInverse());
+            }
+            if (!t.isIdentity()) {
+                out.transform(t);
+            }
+            return out;
+        } else {
+            if (transform != null && !transform.isIdentity()) {
+                GeneralPath out = new GeneralPath();
+                out.setRect(clipRect, transform.getInverse());
+                return out;
+            } else {
+                return clipRect;
+            }
+        }
+    }
+    
+ 
+    public void setClip(Shape shape) {
+        clipShape.reset();
+        clipShape.setShape(shape, null);
+        isClipShape = true;
+        clipTransform = transform == null ? null : transform.copy();
+        JSAffineTransform t = null;
+        if (transform != null) {
+            t = (JSAffineTransform)transform.getNativeTransform();
+        }
+        clipBoundsDirty = true;
+        new ClipShape(shape, t, getClipState()).execute(context);
+        //upcoming.add(new ClipShape(shape, t));
+    }
+    
+    private void clipShape(Shape shape) {
+        if (!isClipShape) {
+            isClipShape = true;
+            clipShape.reset();
+            clipShape.setShape(clipRect, null);
+            clipTransform = null;
+        }
+        GeneralPath p = (GeneralPath)getCurrentClipProjection();
+        p.intersect(shape);
+        setClip(p);
+    }
+    
+    public void setClip(int x, int y, int width, int height) {
+        if (transform != null && !transform.isIdentity()) {
+            setClip(new Rectangle(x, y, width, height));
+            return;
+        }
+        isClipShape = false;
+        clipRect.setBounds(x, y, width, height);
+        clipBoundsDirty = true;
+        new ClipRect(x, y, width, height, getClipState()).execute(context);
+        
+    }
+    
+   
+
+    public void clipRect(int x, int y, int width, int height) {
+        Rectangle rect = new Rectangle(x, y, width, height);
+        if (isClipShape || transform != null && !transform.isIdentity()) {
+            clipShape(rect);
+            return;
+        }
+        
+        if (rect.contains(clipRect)) {
+            return;
+        }
+        clipRect.intersection(rect, clipRect);
+        clipBoundsDirty = true;
+        new ClipRect(clipRect.getX(), clipRect.getY(), clipRect.getWidth(), clipRect.getHeight(), getClipState()).execute(context);
+    }
+
+    public int getColor() {
+        return color;
+    }
+    
+    public void resetAffine() {
+        if (transform == null) {
+            transform = Transform.makeIdentity();
+        } else {
+            transform.setIdentity();
+        }
+        setTransformChanged();
+        applyTransform();
+    }
+
+   
+    
+    
+    public int charsWidth(Object nativeFont, char[] ch, int offset, int length) {
+        String oldFont = context.getFont();
+        context.setFont(((NativeFont)nativeFont).getCSS());
+        String str = new String(ch, offset, length);
+        //this.canvas.getStyle().setProperty("font", nativeFont+"");
+        
+        int out = context.measureText(str).getWidth()+1;
+        context.setFont(oldFont);
+        
+        return out;
+    }
+    
+    public int stringWidth(Object nativeFont, String str) {
+        String oldFont = context.getFont();
+        context.setFont(((NativeFont)nativeFont).getCSS());
+        //this.canvas.getStyle().setProperty("font", nativeFont+"");
+        int out = context.measureText(str).getWidth()+1;
+        context.setFont(oldFont);
+        //System.out.println("Width of string "+str+" is "+out+" in font "+nativeFont);
+        return out;
+    }
+    
+    
+    
+    int getFontHeight(Object nativeFont){
+        /*
+        String oldFont = context.getFont();
+        context.setFont(((NativeFont)nativeFont).getCSS());
+        //this.canvas.getStyle().setProperty("font", nativeFont+"");
+        int out = (int)Math.round(((JSFontMetrics)context.measureText(alphabet)).getHeight());
+        context.setFont(oldFont);
+        return out;
+        */
+        return ((NativeFont)nativeFont).fontHeight();
+    }
+    
+    int getFontAscent(Object nativeFont){
+        return ((NativeFont)nativeFont).fontAscent();
+    }
+    
+    int getFontDescent(Object nativeFont){
+        return getFontHeight(nativeFont) - getFontAscent(nativeFont);
+        /*
+        String oldFont = context.getFont();
+        context.setFont(((NativeFont)nativeFont).getCSS());
+        //this.canvas.getStyle().setProperty("font", nativeFont+"");
+        int out = (int)Math.round(((JSFontMetrics)context.measureText(alphabet)).getDescent());
+        
+        context.setFont(oldFont);
+        return out;
+                */
+        
+    }
+    
+//    int getFontLeading(Object nativeFont){
+//        String oldFont = context.getFont();
+//        context.setFont(((NativeFont)nativeFont).getCSS());
+//        //this.canvas.getStyle().setProperty("font", nativeFont+"");
+//        int out = (int)Math.round(((JSFontMetrics)context.measureText(alphabet)).getLeading());
+//        context.setFont(oldFont);
+//        return out;
+//    
+//        
+//    }
+    
+    void clear(){
+        context.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
+    }
+
+    public void fillLinearGradient(int x, int y, int width, int height, int startColor, int endColor, boolean horizontal) {
+        FillLinearGradient.execute(context, x, y, width, height, startColor, endColor, horizontal, alpha);
+    }
+
+    public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
+        FillRadialGradient.execute(context, x, y, width, height, startColor, endColor, alpha, startAngle, arcAngle);
+    }
+
+    public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
+       fillRadialGradient(startColor, endColor, x, y, width, height, 0, 360);
+    }
+
+    
+    
+    
+    
+    
+    
+    
+}
