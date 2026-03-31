@@ -1,0 +1,91 @@
+/*
+ * Copyright (c) 2026 Codename One and contributors.
+ * Licensed under the PolyForm Noncommercial License 1.0.0.
+ * You may use this file only in compliance with that license.
+ * The license notice for this subtree is available in Ports/JavaScriptPort/LICENSE.md.
+ */
+package com.codename1.impl.html5;
+
+import com.codename1.io.Log;
+import com.codename1.io.Util;
+import com.codename1.system.Lifecycle;
+import com.codename1.ui.Display;
+import org.teavm.jso.JSBody;
+import org.teavm.jso.browser.Window;
+import org.teavm.jso.dom.events.Event;
+
+public final class JavaScriptPortBootstrap implements Runnable {
+    public static final String APP_CLASS_PROPERTY = "codename1.javascript.appClass";
+    private final Lifecycle lifecycle;
+
+    public JavaScriptPortBootstrap(Lifecycle lifecycle) {
+        this.lifecycle = lifecycle;
+    }
+
+    public static void bootstrap(Lifecycle lifecycle) {
+        com.codename1.impl.ImplementationFactory.setInstance(new com.codename1.impl.ImplementationFactory());
+        JavaScriptPortBootstrap bootstrap = new JavaScriptPortBootstrap(lifecycle);
+        Display.init(bootstrap);
+        Display.getInstance().callSerially(bootstrap);
+    }
+
+    public static Lifecycle createLifecycle(String className) {
+        try {
+            return (Lifecycle)Class.forName(className).newInstance();
+        } catch (Throwable ex) {
+            throw new RuntimeException("Failed to instantiate application lifecycle " + className, ex);
+        }
+    }
+
+    @JSBody(params = {}, script = "window.cn1Initialized = true;")
+    private static native void setInitialized();
+
+    @JSBody(params = {}, script = "window.cn1Started = true;")
+    private static native void setStarted();
+
+    @JSBody(params = {"url"}, script = "var l = window.location; var base=l.protocol+'//'+l.hostname+(l.port?':':'')+l.port; return url.indexOf(base)===0;")
+    private static native boolean urlIsSameDomain(String url);
+
+    public static String proxifyUrl(Display display, String url) {
+        String doNotProxyList = display.getProperty("javascript.noProxyForDomains", "");
+        if (!doNotProxyList.isEmpty()) {
+            for (String domain : Util.split(doNotProxyList, " ")) {
+                domain = domain.trim();
+                if (!domain.isEmpty() && url.startsWith(domain)) {
+                    return url;
+                }
+            }
+        }
+        boolean useProxyForSameDomain = "true".equals(display.getProperty("javascript.useProxyForSameDomain", "false"));
+        if ((url.startsWith("http:") || url.startsWith("https:")) && (useProxyForSameDomain || !urlIsSameDomain(url))) {
+            String proxyURL = ((JSOImplementations.WindowExt)Window.current()).getCorsProxyURL();
+            proxyURL = display.getProperty("javascript.proxy.url", proxyURL);
+            if (proxyURL != null) {
+                return proxyURL + Window.encodeURIComponent(url);
+            }
+        }
+        return url;
+    }
+
+    @Override
+    public void run() {
+        try {
+            HTML5Implementation.setMainClass(lifecycle);
+            dispatchEvent("beforecn1init", 201);
+            lifecycle.init(this);
+            setInitialized();
+            dispatchEvent("aftercn1init", 202);
+            dispatchEvent("beforecn1start", 203);
+            lifecycle.start();
+            setStarted();
+            dispatchEvent("aftercn1start", 204);
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
+    private static void dispatchEvent(String type, int code) {
+        Event evt = HTML5Implementation.createCustomEvent(type, "", code);
+        Window.current().dispatchEvent(evt);
+    }
+}

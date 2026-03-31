@@ -1,0 +1,271 @@
+html, body {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    position: fixed; 
+    overflow: hidden;
+    width: 100%;
+    height: 100%
+}
+/* Holy Mother!!  This snippet is required so that IE 11 doesn't completely
+   block our event listeners!!! */
+@media all and (-ms-high-contrast: none), (-ms-high-contrast: active) {
+   body {
+        overflow: visible;
+        overflow-y: scroll;
+        height: auto;
+   }
+}
+body::-webkit-scrollbar { width: 0 !important }
+
+#codenameone-canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.cn1-edit-string, .cn1-string-picker {
+    position: absolute;
+    background-color: transparent;
+    z-index: 1000;
+    box-sizing: content-box;
+    -webkit-box-sizing: content-box;
+    -moz-box-sizing:content-box;
+    resize:none;
+}
+
+.cn1-native-peer {
+    position: absolute;
+    border:none;
+}
+
+.cn1-capture-dialog {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    border: 1px solid black;
+    background: rgba(33,33,33,33);
+}
+
+.cn1-capture-dialog video {
+    
+    margin: 0 auto;
+}
+.cn1-capture-preview-dialog {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    border: 1px solid black;
+    background: rgba(33,33,33,33);
+    z-index: 1000;
+    
+}
+
+
+
+#cn1-splash {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform:translate(-50%, -50%);
+    text-align:center;
+    font-family: sans-serif;
+    color: #666;
+    
+}
+
+#cn1-splash img.icon {
+    width: 2in;
+    max-width: 100%;
+    margin: auto;
+    display: block;
+}
+
+#cn1-splash .progress-bar {
+    width: 100%;
+    border: 1px solid #666;
+    background-color: white;
+    height: 5mm;
+    margin: 1mm;
+    position: relative;
+    padding:0;
+    background-image: none;
+    background-color:white;
+    box-shadow: 0 1px 5px #000 inset, 0 1px 0 #444; 
+    border-radius: 2.5mm;
+    overflow:hidden;
+
+}
+
+#cn1-splash .progress-bar .progress-bar-internal {
+    position:absolute;
+    top:0;
+    left:0;
+    height: 100%;
+    width:0;
+    background-image: linear-gradient(#0072ff,#00c6ff);
+    border-radius: 2.5mm;
+}
+
+#cn1-splash img.progress {
+    max-width: 50%;
+    max-height: 5mm;
+    width:auto;
+    height:auto;
+}
+
+
+div.cn1-image-capture-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: #333;
+
+    
+}
+
+div.cn1-image-capture-dialog video, div.cn1-image-capture-dialog.state-accept-snapshot > canvas {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin-left: -540px;
+    margin-top: -540px;
+    width: 1080px;
+    
+    
+}
+@media(max-width: 480px) {
+    div.cn1-image-capture-dialog video, div.cn1-image-capture-dialog.state-accept-snapshot > canvas {
+        
+        margin-left: -240px;
+        margin-top: -240px;
+        width: 480px;
+    }
+}
+
+@media(max-width: 640px) {
+    div.cn1-image-capture-dialog video, div.cn1-image-capture-dialog.state-accept-snapshot > canvas {
+        
+        margin-left: -320px;
+        margin-top: -320px;
+        width: 640px;
+    }
+}
+
+
+div.cn1-image-capture-dialog div.buttons {
+    position: fixed;
+    bottom: 1in;
+    left: 0;
+    width: 100%;
+    height: 20%;
+    text-align: center;
+    z-index: 1000;
+}
+
+div.cn1-image-capture-dialog button {
+    display: none;
+    background: none;
+    border: none;
+    
+
+
+}
+
+div.cn1-image-capture-dialog button span {
+    display: none;
+}
+
+div.cn1-image-capture-dialog button i {
+    color: #ccc;
+    opacity: 0.7;
+    font-size: 3em;
+}
+
+div.cn1-image-capture-dialog.state-stream button.capture-btn {
+    display:inline;
+    
+}
+div.cn1-image-capture-dialog.state-stream button.capture-btn i {
+    color: red;
+}
+
+div.cn1-image-capture-dialog.state-stream button.cancel-btn {
+    display:inline;
+}
+
+div.cn1-image-capture-dialog.state-accept-snapshot video{
+    display: none;
+}
+
+div.cn1-image-capture-dialog.state-accept-snapshot .use-btn {
+    display: inline;
+}
+
+div.cn1-image-capture-dialog.state-accept-snapshot .dontuse-btn {
+    display: inline;
+}
+
+
+#cn1-peers-container {
+    z-index: -1000;
+    padding:0;
+    margin:0;
+    position:absolute;
+    padding:0;
+    margin:0;
+
+    top:0;
+    left:0;
+
+    width: 100%;
+    height: 100%;
+    background:transparent;
+}
+
+div#cn1-video-capture {
+    position:fixed;
+    width: 100%;
+    height: 100%;
+    background-color:black;
+    
+}
+div#cn1-video-capture > video {
+    width: 100%;
+}
+.vjs-control-bar {
+    position:fixed;
+    bottom:0;
+    left:0;
+    right:0;
+    background-color:white;
+        
+}
+
+.vjs-current-time > span.vjs-control-text, .vjs-duration > span.vjs-control-text {
+    display:block;
+    font-size: 75%;
+}
+.vjs-time-control.vjs-time-divider {
+    border: 1px dotted #cccccc;
+    
+}
+.vjs-time-control.vjs-time-divider > span {
+    display:none;
+}
+.vjs-current-time.vjs-time-control.vjs-control, .vjs-duration.vjs-time-control.vjs-control {
+    padding: 1mm;
+}
+

@@ -1,0 +1,33 @@
+CACHE MANIFEST
+# This is a comment.
+# Cache manifest version {APP_VERSION}
+# If you change the version number in this comment,
+# the cache manifest is no longer byte-for-byte
+# identical.
+# From https://developer.apple.com/library/content/documentation/iPhone/Conceptual/SafariJSDatabaseGuide/OfflineApplicationCache/OfflineApplicationCache.html#//apple_ref/doc/uid/TP40007256-CH7-SW2
+
+CACHE:
+.
+favicon.png?v={APP_VERSION}
+icon.png?v={APP_VERSION}
+index.html
+manifest.appcache
+manifest.json?v={APP_VERSION}
+progress.gif
+style.css?v={APP_VERSION}
+icon.png?v={APP_VERSION}
+js/bootstrap.min.js?v={APP_VERSION}
+js/fontmetrics.js?v={APP_VERSION}
+js/jquery.min.js?v={APP_VERSION}
+js/manup.js?v={APP_VERSION}
+js/push.js?v={APP_VERSION}
+js/upup.min.js?v={APP_VERSION}
+css/bootstrap-theme.min.css?v={APP_VERSION}
+css/bootstrap.min.css?v={APP_VERSION}
+sw.js
+teavm/classes.js?v={APP_VERSION}
+
+## APPLICATION_MANIFEST_CACHED_FILES
+
+NETWORK:
+*
