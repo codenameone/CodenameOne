@@ -681,7 +681,27 @@ public abstract class Executor {
                 String javaImplSourceFile = "package " + currentNative.getPackage().getName() + ";\n\n"
                         + "import com.codename1.ui.PeerComponent;\n\n"
                         + "public class " + currentNative.getSimpleName() + "Stub implements " + currentNative.getSimpleName() + "{\n"
-                        + "    private " + currentNative.getSimpleName() + getImplSuffix() + " impl = new " + currentNative.getSimpleName() + getImplSuffix() + "();\n\n";
+                        + "    private final Object impl = createImpl();\n\n"
+                        + "    private static Object createImpl() {\n"
+                        + "        try {\n"
+                        + "            return Class.forName(\"" + currentNative.getName() + getImplSuffix() + "\").newInstance();\n"
+                        + "        } catch (Throwable t) {\n"
+                        + "            throw new RuntimeException(\"Failed to instantiate native implementation for " + currentNative.getName() + "\", t);\n"
+                        + "        }\n"
+                        + "    }\n\n"
+                        + "    private Object __cn1Invoke(String methodName, Object[] args) {\n"
+                        + "        try {\n"
+                        + "            java.lang.reflect.Method[] methods = impl.getClass().getMethods();\n"
+                        + "            for (java.lang.reflect.Method method : methods) {\n"
+                        + "                if (method.getName().equals(methodName) && method.getParameterTypes().length == args.length) {\n"
+                        + "                    return method.invoke(impl, args);\n"
+                        + "                }\n"
+                        + "            }\n"
+                        + "            throw new NoSuchMethodException(methodName + \" with \" + args.length + \" args\");\n"
+                        + "        } catch (Throwable t) {\n"
+                        + "            throw new RuntimeException(\"Failed to invoke native method \" + methodName, t);\n"
+                        + "        }\n"
+                        + "    }\n\n";
 
                 for (Method m : currentNative.getMethods()) {
                     String name = m.getName();
@@ -709,13 +729,34 @@ public abstract class Executor {
                         }
                     }
                     javaImplSourceFile += ") {\n";
+                    String invocationExpression = "__cn1Invoke(\"" + name + "\", new Object[]{" + args + "})";
                     if (Void.class == returnType || Void.TYPE == returnType) {
-                        javaImplSourceFile += "        impl." + name + "(" + args + ");\n    }\n\n";
+                        javaImplSourceFile += "        " + invocationExpression + ";\n    }\n\n";
                     } else {
                         if (returnType.getName().equals("com.codename1.ui.PeerComponent")) {
-                            javaImplSourceFile += "        return " + generatePeerComponentCreationCode("impl." + name + "(" + args + ")") + ";\n    }\n\n";
+                            javaImplSourceFile += "        return " + generatePeerComponentCreationCode(invocationExpression) + ";\n    }\n\n";
+                        } else if (returnType.isPrimitive()) {
+                            if (returnType == Boolean.TYPE) {
+                                javaImplSourceFile += "        return ((Boolean)" + invocationExpression + ").booleanValue();\n    }\n\n";
+                            } else if (returnType == Integer.TYPE) {
+                                javaImplSourceFile += "        return ((Integer)" + invocationExpression + ").intValue();\n    }\n\n";
+                            } else if (returnType == Long.TYPE) {
+                                javaImplSourceFile += "        return ((Long)" + invocationExpression + ").longValue();\n    }\n\n";
+                            } else if (returnType == Byte.TYPE) {
+                                javaImplSourceFile += "        return ((Byte)" + invocationExpression + ").byteValue();\n    }\n\n";
+                            } else if (returnType == Short.TYPE) {
+                                javaImplSourceFile += "        return ((Short)" + invocationExpression + ").shortValue();\n    }\n\n";
+                            } else if (returnType == Character.TYPE) {
+                                javaImplSourceFile += "        return ((Character)" + invocationExpression + ").charValue();\n    }\n\n";
+                            } else if (returnType == Float.TYPE) {
+                                javaImplSourceFile += "        return ((Float)" + invocationExpression + ").floatValue();\n    }\n\n";
+                            } else if (returnType == Double.TYPE) {
+                                javaImplSourceFile += "        return ((Double)" + invocationExpression + ").doubleValue();\n    }\n\n";
+                            } else {
+                                javaImplSourceFile += "        return (" + returnType.getSimpleName() + ")" + invocationExpression + ";\n    }\n\n";
+                            }
                         } else {
-                            javaImplSourceFile += "        return impl." + name + "(" + args + ");\n    }\n\n";
+                            javaImplSourceFile += "        return (" + returnType.getSimpleName() + ")" + invocationExpression + ";\n    }\n\n";
                         }
                     }
                 }
