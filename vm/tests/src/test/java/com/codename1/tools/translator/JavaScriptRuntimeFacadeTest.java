@@ -33,6 +33,9 @@ class JavaScriptRuntimeFacadeTest {
     private static final Path SHAPE_GRADIENT_RENDER_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptShapeGradientRenderAdapter.java");
     private static final Path TEXT_METRICS_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptTextMetricsAdapter.java");
     private static final Path CANVAS_IMAGE_BUFFER_LIFECYCLE_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptCanvasImageBufferLifecycle.java");
+    private static final Path SHAPE_PATH_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptShapePathAdapter.java");
+    private static final Path IMAGE_DATA_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptImageDataAdapter.java");
+    private static final Path NATIVE_IMAGE_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptNativeImageAdapter.java");
     private static final Path EXECUTABLE_OP_FACTORY_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptExecutableOpFactory.java");
     private static final Path STORAGE_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptStorageAdapter.java");
     private static final Path NETWORK_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptNetworkAdapter.java");
@@ -201,6 +204,26 @@ class JavaScriptRuntimeFacadeTest {
                 "HTML5Implementation should delegate blank canvas-backed image buffers to the buffer lifecycle helper");
         assertTrue(html5Source.contains("JavaScriptCanvasImageBufferLifecycle.createMutableBuffer("),
                 "HTML5Implementation should delegate mutable canvas-backed image buffers to the buffer lifecycle helper");
+        String drawShapeSource = new String(Files.readAllBytes(Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "graphics", "DrawShape.java")), StandardCharsets.UTF_8);
+        String clipShapeSource = new String(Files.readAllBytes(Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "graphics", "ClipShape.java")), StandardCharsets.UTF_8);
+        assertTrue(drawShapeSource.contains("JavaScriptShapePathAdapter.addShapeToPath("),
+                "DrawShape should delegate path traversal to the shared shape path adapter");
+        assertTrue(drawShapeSource.contains("JavaScriptShapePathAdapter.applyStrokeStyle("),
+                "DrawShape should delegate stroke style mapping to the shared shape path adapter");
+        assertTrue(clipShapeSource.contains("JavaScriptShapePathAdapter.addShapeToPath("),
+                "ClipShape should delegate path traversal to the shared shape path adapter");
+        assertTrue(html5Source.contains("JavaScriptImageDataAdapter.readRgbaToArgb("),
+                "HTML5Implementation should delegate image-data readback packing to the image data adapter");
+        assertTrue(html5Source.contains("JavaScriptImageDataAdapter.writeArgbToRgba("),
+                "HTML5Implementation should delegate image-data writes to the image data adapter");
+        assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.resolveWidth("),
+                "HTML5Implementation.NativeImage should delegate width resolution to the native image adapter");
+        assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.resolveHeight("),
+                "HTML5Implementation.NativeImage should delegate height resolution to the native image adapter");
+        assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.draw("),
+                "HTML5Implementation.NativeImage should delegate draw dispatch to the native image adapter");
+        assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.tile("),
+                "HTML5Implementation.NativeImage should delegate tile dispatch to the native image adapter");
         assertTrue(bootstrapSource.contains("JavaScriptRuntimeFacade.proxifyUrl("),
                 "JavaScriptPortBootstrap should delegate proxy decisions to the runtime facade");
         assertTrue(bootstrapSource.contains("JavaScriptBootstrapCoordinator.createLifecycle(className)"),
@@ -1092,5 +1115,173 @@ class JavaScriptRuntimeFacadeTest {
                 .invoke(null, 20, 10, 0xff336699, sizedFactory, graphicsFactory);
         assertEquals("graphics:20x10", bufferClass.getMethod("getGraphics").invoke(mutable));
         assertTrue(graphicsCalls.get(0).endsWith(":20x10"));
+    }
+
+    @Test
+    void extractedShapePathImageDataAndNativeImageHelpersCompileAndPreserveMinimalBehavior() throws Exception {
+        Path sourceDir = Files.createTempDirectory("js-render-runtime-src");
+        Path classesDir = Files.createTempDirectory("js-render-runtime-classes");
+        Path html5PackageDir = sourceDir.resolve(Paths.get("com", "codename1", "impl", "html5"));
+        Path uiPackageDir = sourceDir.resolve(Paths.get("com", "codename1", "ui"));
+        Path geomPackageDir = sourceDir.resolve(Paths.get("com", "codename1", "ui", "geom"));
+        Files.createDirectories(html5PackageDir);
+        Files.createDirectories(uiPackageDir);
+        Files.createDirectories(geomPackageDir);
+        Files.copy(SHAPE_PATH_ADAPTER_SOURCE, html5PackageDir.resolve("JavaScriptShapePathAdapter.java"));
+        Files.copy(IMAGE_DATA_ADAPTER_SOURCE, html5PackageDir.resolve("JavaScriptImageDataAdapter.java"));
+        Files.copy(NATIVE_IMAGE_ADAPTER_SOURCE, html5PackageDir.resolve("JavaScriptNativeImageAdapter.java"));
+        Files.write(uiPackageDir.resolve("Stroke.java"), (
+                "package com.codename1.ui;\n" +
+                "public class Stroke {\n" +
+                "  public static final int JOIN_MITER=0; public static final int JOIN_BEVEL=1; public static final int JOIN_ROUND=2;\n" +
+                "  public static final int CAP_BUTT=0; public static final int CAP_ROUND=1; public static final int CAP_SQUARE=2;\n" +
+                "  private float lineWidth; private int joinStyle; private int capStyle; private float miterLimit;\n" +
+                "  public float getLineWidth(){ return lineWidth; }\n" +
+                "  public void setLineWidth(float v){ lineWidth=v; }\n" +
+                "  public int getJoinStyle(){ return joinStyle; }\n" +
+                "  public void setJoinStyle(int v){ joinStyle=v; }\n" +
+                "  public int getCapStyle(){ return capStyle; }\n" +
+                "  public void setCapStyle(int v){ capStyle=v; }\n" +
+                "  public float getMiterLimit(){ return miterLimit; }\n" +
+                "  public void setMiterLimit(float v){ miterLimit=v; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(geomPackageDir.resolve("PathIterator.java"), (
+                "package com.codename1.ui.geom;\n" +
+                "public interface PathIterator {\n" +
+                " int SEG_MOVETO=0, SEG_CLOSE=1, SEG_LINETO=2, SEG_QUADTO=3, SEG_CUBICTO=4;\n" +
+                " boolean isDone(); int currentSegment(float[] pts); void next();\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(geomPackageDir.resolve("Shape.java"), (
+                "package com.codename1.ui.geom;\n" +
+                "public interface Shape { PathIterator getPathIterator(); }\n").getBytes(StandardCharsets.UTF_8));
+
+        CompilerHelper.CompilerConfig config = CompilerHelper.getAvailableCompilers("1.8").get(0);
+        int compileResult = CompilerHelper.compile(config.jdkHome, java.util.Arrays.asList(
+                "-source", config.targetVersion,
+                "-target", config.targetVersion,
+                "-d", classesDir.toString(),
+                uiPackageDir.resolve("Stroke.java").toString(),
+                geomPackageDir.resolve("PathIterator.java").toString(),
+                geomPackageDir.resolve("Shape.java").toString(),
+                html5PackageDir.resolve("JavaScriptShapePathAdapter.java").toString(),
+                html5PackageDir.resolve("JavaScriptImageDataAdapter.java").toString(),
+                html5PackageDir.resolve("JavaScriptNativeImageAdapter.java").toString()
+        ));
+        assertEquals(0, compileResult, "Shape path, image data, and native image helpers should compile as standalone Java helpers");
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classesDir.toUri().toURL()});
+        Class<?> pathAdapterClass = loader.loadClass("com.codename1.impl.html5.JavaScriptShapePathAdapter");
+        Class<?> strokeSinkClass = loader.loadClass("com.codename1.impl.html5.JavaScriptShapePathAdapter$StrokeStyleSink");
+        Class<?> pathSinkClass = loader.loadClass("com.codename1.impl.html5.JavaScriptShapePathAdapter$PathSink");
+        Class<?> strokeClass = loader.loadClass("com.codename1.ui.Stroke");
+        Class<?> shapeClass = loader.loadClass("com.codename1.ui.geom.Shape");
+        Class<?> pathIteratorClass = loader.loadClass("com.codename1.ui.geom.PathIterator");
+        assertEquals("bevel", pathAdapterClass.getMethod("resolveJoin", int.class).invoke(null, 1));
+        assertEquals("round", pathAdapterClass.getMethod("resolveCap", int.class).invoke(null, 1));
+        final java.util.List<String> pathCalls = new java.util.ArrayList<String>();
+        Object pathSink = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{pathSinkClass}, (proxy, method, args) -> {
+            pathCalls.add(method.getName());
+            return null;
+        });
+        Object pathIterator = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{pathIteratorClass}, new java.lang.reflect.InvocationHandler() {
+            int index = 0;
+            @Override
+            public Object invoke(Object proxy, Method method, Object[] args) {
+                if ("isDone".equals(method.getName())) return index > 2;
+                if ("currentSegment".equals(method.getName())) {
+                    float[] pts = (float[]) args[0];
+                    if (index == 0) {
+                        pts[0] = 1;
+                        pts[1] = 2;
+                        return 0;
+                    }
+                    if (index == 1) {
+                        pts[0] = 3;
+                        pts[1] = 4;
+                        return 2;
+                    }
+                    return 1;
+                }
+                if ("next".equals(method.getName())) {
+                    index++;
+                    return null;
+                }
+                throw new UnsupportedOperationException(method.getName());
+            }
+        });
+        Object shape = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{shapeClass}, (proxy, method, args) -> {
+            if ("getPathIterator".equals(method.getName())) return pathIterator;
+            throw new UnsupportedOperationException(method.getName());
+        });
+        pathAdapterClass.getMethod("addShapeToPath", pathSinkClass, shapeClass).invoke(null, pathSink, shape);
+        assertEquals(java.util.Arrays.asList("moveTo", "lineTo", "closePath"), pathCalls);
+        final java.util.List<String> strokeCalls = new java.util.ArrayList<String>();
+        Object strokeSink = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{strokeSinkClass}, (proxy, method, args) -> {
+            strokeCalls.add(method.getName() + ":" + args[0]);
+            return null;
+        });
+        Object stroke = strokeClass.getConstructor().newInstance();
+        strokeClass.getMethod("setLineWidth", float.class).invoke(stroke, 2f);
+        strokeClass.getMethod("setJoinStyle", int.class).invoke(stroke, 2);
+        strokeClass.getMethod("setCapStyle", int.class).invoke(stroke, 2);
+        strokeClass.getMethod("setMiterLimit", float.class).invoke(stroke, 3f);
+        pathAdapterClass.getMethod("applyStrokeStyle", strokeSinkClass, strokeClass).invoke(null, strokeSink, stroke);
+        assertTrue(strokeCalls.contains("setLineWidth:2.0"));
+        assertTrue(strokeCalls.contains("setLineJoin:round"));
+        assertTrue(strokeCalls.contains("setLineCap:square"));
+
+        Class<?> imageDataClass = loader.loadClass("com.codename1.impl.html5.JavaScriptImageDataAdapter");
+        Class<?> writerClass = loader.loadClass("com.codename1.impl.html5.JavaScriptImageDataAdapter$PixelWriter");
+        Class<?> readerClass = loader.loadClass("com.codename1.impl.html5.JavaScriptImageDataAdapter$PixelReader");
+        final int[] rgba = new int[8];
+        Object writer = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{writerClass}, (proxy, method, args) -> {
+            rgba[(Integer) args[0]] = (Integer) args[1];
+            return null;
+        });
+        imageDataClass.getMethod("writeArgbToRgba", int[].class, int.class, int.class, int.class, writerClass)
+                .invoke(null, new int[]{0xff112233, 0x80445566}, 0, 2, 1, writer);
+        assertEquals(0x11, rgba[0]);
+        assertEquals(0x22, rgba[1]);
+        assertEquals(0x33, rgba[2]);
+        assertEquals(0xff, rgba[3]);
+        int[] argb = new int[2];
+        Object reader = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{readerClass}, (proxy, method, args) -> {
+            if ("get".equals(method.getName())) return rgba[(Integer) args[0]];
+            if ("length".equals(method.getName())) return rgba.length;
+            throw new UnsupportedOperationException(method.getName());
+        });
+        imageDataClass.getMethod("readRgbaToArgb", readerClass, int[].class, int.class).invoke(null, reader, argb, 0);
+        assertEquals(0xff112233, argb[0]);
+        assertEquals(0x80445566, argb[1]);
+
+        Class<?> nativeImageClass = loader.loadClass("com.codename1.impl.html5.JavaScriptNativeImageAdapter");
+        Class<?> imageModelClass = loader.loadClass("com.codename1.impl.html5.JavaScriptNativeImageAdapter$ImageModel");
+        Class<?> imageTargetClass = loader.loadClass("com.codename1.impl.html5.JavaScriptNativeImageAdapter$ImageTarget");
+        Object loadedModel = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{imageModelClass}, (proxy, method, args) -> {
+            switch (method.getName()) {
+                case "getExplicitWidth": return 0;
+                case "getExplicitHeight": return 0;
+                case "hasLoadedImage": return true;
+                case "getLoadedImageWidth": return 33;
+                case "getLoadedImageHeight": return 44;
+                case "hasMutableSurface": return false;
+                case "getMutableSurfaceWidth": return 0;
+                case "getMutableSurfaceHeight": return 0;
+                default: throw new UnsupportedOperationException(method.getName());
+            }
+        });
+        assertEquals(33, nativeImageClass.getMethod("resolveWidth", imageModelClass).invoke(null, loadedModel));
+        assertEquals(44, nativeImageClass.getMethod("resolveHeight", imageModelClass).invoke(null, loadedModel));
+        final java.util.List<String> imageCalls = new java.util.ArrayList<String>();
+        Object imageTarget = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{imageTargetClass}, (proxy, method, args) -> {
+            imageCalls.add(method.getName() + ":" + args[2] + "x" + args[3]);
+            return null;
+        });
+        nativeImageClass.getMethod("draw", imageModelClass, imageTargetClass, int.class, int.class, int.class, int.class)
+                .invoke(null, loadedModel, imageTarget, 1, 2, 10, 20);
+        nativeImageClass.getMethod("tile", imageModelClass, imageTargetClass, int.class, int.class, int.class, int.class)
+                .invoke(null, loadedModel, imageTarget, 1, 2, 10, 20);
+        assertEquals("drawLoadedImage:10x20", imageCalls.get(0));
+        assertEquals("tileLoadedImage:10x20", imageCalls.get(1));
     }
 }

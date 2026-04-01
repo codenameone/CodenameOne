@@ -8,9 +8,9 @@
 package com.codename1.impl.html5.graphics;
 
 import com.codename1.impl.html5.BufferedGraphics;
+import com.codename1.impl.html5.JavaScriptShapePathAdapter;
 import com.codename1.teavm.geom.JSAffineTransform;
 import com.codename1.ui.geom.GeneralPath;
-import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
 import org.teavm.jso.canvas.CanvasRenderingContext2D;
 
@@ -60,31 +60,31 @@ public class ClipShape implements ExecutableOp {
     
     
     static void addShapeToPath(CanvasRenderingContext2D context, Shape shape) {
-        PathIterator it = shape.getPathIterator();
-        float[] points = new float[6];
-        //it.next();
-        while (!it.isDone()) {
-            int type = it.currentSegment(points);
-            switch (type) {
-                case PathIterator.SEG_MOVETO:
-                    context.moveTo(points[0], points[1]);
-                    break;
-                case PathIterator.SEG_CLOSE:
-                    context.closePath();
-                    break;
-                case PathIterator.SEG_LINETO:
-                    context.lineTo(points[0], points[1]);
-                    break;
-                case PathIterator.SEG_QUADTO:
-                    context.quadraticCurveTo(points[0], points[1], points[2], points[3]);
-                    break;
-                case PathIterator.SEG_CUBICTO:
-                    context.bezierCurveTo(points[0], points[1], points[2], points[3], points[4], points[5]);
-                    break;
-                
+        JavaScriptShapePathAdapter.addShapeToPath(new JavaScriptShapePathAdapter.PathSink() {
+            @Override
+            public void moveTo(float x, float y) {
+                context.moveTo(x, y);
             }
-            it.next();
-            
-        }
+
+            @Override
+            public void closePath() {
+                context.closePath();
+            }
+
+            @Override
+            public void lineTo(float x, float y) {
+                context.lineTo(x, y);
+            }
+
+            @Override
+            public void quadraticCurveTo(float cpx, float cpy, float x, float y) {
+                context.quadraticCurveTo(cpx, cpy, x, y);
+            }
+
+            @Override
+            public void bezierCurveTo(float cp1x, float cp1y, float cp2x, float cp2y, float x, float y) {
+                context.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y);
+            }
+        }, shape);
     }
 }

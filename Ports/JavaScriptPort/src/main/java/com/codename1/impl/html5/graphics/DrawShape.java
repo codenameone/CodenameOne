@@ -8,9 +8,9 @@
 package com.codename1.impl.html5.graphics;
 
 import com.codename1.impl.html5.HTML5Graphics;
+import com.codename1.impl.html5.JavaScriptShapePathAdapter;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.GeneralPath;
-import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
 import org.teavm.interop.Sync;
 
@@ -41,32 +41,32 @@ public class DrawShape implements ExecutableOp {
     private static native void log(JSObject o);
     
     static void addShapeToPath(CanvasRenderingContext2D context, Shape shape) {
-        PathIterator it = shape.getPathIterator();
-        float[] points = new float[6];
-        //it.next();
-        while (!it.isDone()) {
-            int type = it.currentSegment(points);
-            switch (type) {
-                case PathIterator.SEG_MOVETO:
-                    context.moveTo(points[0], points[1]);
-                    break;
-                case PathIterator.SEG_CLOSE:
-                    context.closePath();
-                    break;
-                case PathIterator.SEG_LINETO:
-                    context.lineTo(points[0], points[1]);
-                    break;
-                case PathIterator.SEG_QUADTO:
-                    context.quadraticCurveTo(points[0], points[1], points[2], points[3]);
-                    break;
-                case PathIterator.SEG_CUBICTO:
-                    context.bezierCurveTo(points[0], points[1], points[2], points[3], points[4], points[5]);
-                    break;
-                
+        JavaScriptShapePathAdapter.addShapeToPath(new JavaScriptShapePathAdapter.PathSink() {
+            @Override
+            public void moveTo(float x, float y) {
+                context.moveTo(x, y);
             }
-            it.next();
-            
-        }
+
+            @Override
+            public void closePath() {
+                context.closePath();
+            }
+
+            @Override
+            public void lineTo(float x, float y) {
+                context.lineTo(x, y);
+            }
+
+            @Override
+            public void quadraticCurveTo(float cpx, float cpy, float x, float y) {
+                context.quadraticCurveTo(cpx, cpy, x, y);
+            }
+
+            @Override
+            public void bezierCurveTo(float cp1x, float cp1y, float cp2x, float cp2y, float x, float y) {
+                context.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y);
+            }
+        }, shape);
     }
     
     //@Sync
@@ -76,36 +76,27 @@ public class DrawShape implements ExecutableOp {
         context.setStrokeStyle(HTML5Graphics.color(color));
         context.setGlobalAlpha(((double)alpha)/255.0);
         
-        context.setLineWidth(stroke.getLineWidth());
-        String joinStyle="miter";
-        switch (stroke.getJoinStyle()) {
-            case Stroke.JOIN_BEVEL:
-                joinStyle = "bevel";
-                break;
-            case Stroke.JOIN_MITER:
-                joinStyle = "miter";
-                break;
-            case Stroke.JOIN_ROUND:
-                joinStyle = "round";
-                break;
-        }
-        context.setLineJoin(joinStyle);
-        
-        context.setMiterLimit(stroke.getMiterLimit());
-        
-        String capStyle = "butt";
-        switch (stroke.getCapStyle()) {
-            case Stroke.CAP_BUTT:
-                capStyle = "butt";
-                break;
-            case Stroke.CAP_ROUND:
-                capStyle = "round";
-                break;
-            case Stroke.CAP_SQUARE:
-                capStyle = "square";
-                break;
-        }
-        context.setLineCap(capStyle);
+        JavaScriptShapePathAdapter.applyStrokeStyle(new JavaScriptShapePathAdapter.StrokeStyleSink() {
+            @Override
+            public void setLineWidth(float width) {
+                context.setLineWidth(width);
+            }
+
+            @Override
+            public void setLineJoin(String join) {
+                context.setLineJoin(join);
+            }
+
+            @Override
+            public void setMiterLimit(float limit) {
+                context.setMiterLimit(limit);
+            }
+
+            @Override
+            public void setLineCap(String cap) {
+                context.setLineCap(cap);
+            }
+        }, stroke);
         
         context.beginPath();
         addShapeToPath(context, shape);
