@@ -51,10 +51,7 @@ import org.teavm.jso.dom.html.HTMLCanvasElement;
 public class BufferedGraphics extends HTML5Graphics {
 
     Queue<ExecutableOp> upcoming = new LinkedList<ExecutableOp>();
-    private int color=0;
-    private int alpha=0xff;
     private Rectangle clipRect;
-    private NativeFont font;
     private Rectangle clip=new Rectangle();
     private Rectangle clipBounds=new Rectangle();
     private boolean clipBoundsDirty=true;
@@ -63,6 +60,14 @@ public class BufferedGraphics extends HTML5Graphics {
     private boolean isClipShape;
     private Transform transform, clipTransform;
     private boolean transformApplied=false;
+    private final JavaScriptPrimitiveRenderAdapter<NativeFont, ExecutableOp> primitiveRenderAdapter =
+            new JavaScriptPrimitiveRenderAdapter<NativeFont, ExecutableOp>(getRenderState(),
+                    new JavaScriptPrimitiveRenderAdapter.OperationSink<ExecutableOp>() {
+                        @Override
+                        public void submit(ExecutableOp operation) {
+                            upcoming.add(operation);
+                        }
+                    }, JavaScriptExecutableOpFactory.INSTANCE);
     
     public BufferedGraphics(HTML5Implementation impl, HTMLCanvasElement canvas) {
         super(impl, canvas);
@@ -70,76 +75,76 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void drawImage(Object img, int x, int y) {
-        upcoming.add(new DrawImage((NativeImage)img, x, y, alpha));
+        upcoming.add(new DrawImage((NativeImage)img, x, y, getAlpha()));
     }
 
     @Override
     public void drawImage(Object img, int x, int y, int w, int h) {
-        upcoming.add(new DrawImage((NativeImage)img, x, y, alpha, w, h));
+        upcoming.add(new DrawImage((NativeImage)img, x, y, getAlpha(), w, h));
     }
 
     @Override
     public void tileImage(Object img, int x, int y, int w, int h) {
-        upcoming.add(new TileImage((NativeImage)img, x, y, w, h, alpha));
+        upcoming.add(new TileImage((NativeImage)img, x, y, w, h, getAlpha()));
     }
     
     
 
     @Override
     public void drawArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
-        upcoming.add(new DrawArc(x, y, width, height, startAngle, arcAngle, color, alpha));
+        upcoming.add(new DrawArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()));
     }
 
     @Override
     public void fillRect(int x, int y, int width, int height) {
-        upcoming.add(new FillRect(x, y, width, height, color, alpha));
+        primitiveRenderAdapter.fillRect(x, y, width, height);
     }
 
     @Override
     public void clearRect(int x, int y, int width, int height) {
-        upcoming.add(new ClearRect(x, y, width, height));
+        primitiveRenderAdapter.clearRect(x, y, width, height);
     }
     
     
 
     @Override
     public void drawRect(int x, int y, int width, int height) {
-        upcoming.add(new DrawRect(x, y, width, height, color, alpha));
+        primitiveRenderAdapter.drawRect(x, y, width, height);
     }
 
     @Override
     public void drawLine(int x1, int y1, int x2, int y2) {
-        upcoming.add(new DrawLine(x1, y1, x2, y2, color, alpha));
+        primitiveRenderAdapter.drawLine(x1, y1, x2, y2);
     }
 
     @Override
     public void drawRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) {
-        upcoming.add(new DrawRoundRect(x, y, width, height, arcWidth, arcHeight, color, alpha));
+        upcoming.add(new DrawRoundRect(x, y, width, height, arcWidth, arcHeight, getColor(), getAlpha()));
     }
 
     @Override
     public void fillRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) {
-        upcoming.add(new FillRoundRect(x, y, width, height, arcWidth, arcHeight, color, alpha));
+        upcoming.add(new FillRoundRect(x, y, width, height, arcWidth, arcHeight, getColor(), getAlpha()));
     }
 
     @Override
     public void drawPolygon(int[] xPoints, int[] yPoints, int nPoints) {
-        upcoming.add(new DrawPolygon(xPoints, yPoints, nPoints, color, alpha));
+        upcoming.add(new DrawPolygon(xPoints, yPoints, nPoints, getColor(), getAlpha()));
     }
 
     @Override
     public void fillPolygon(int[] xPoints, int[] yPoints, int nPoints) {
-        upcoming.add(new FillPolygon(xPoints, yPoints, nPoints, color, alpha));
+        upcoming.add(new FillPolygon(xPoints, yPoints, nPoints, getColor(), getAlpha()));
     }
 
     @Override
     public void drawShape(Shape shape, Stroke stroke) {
-        upcoming.add(new DrawShape(shape, stroke, color, alpha));
+        upcoming.add(new DrawShape(shape, stroke, getColor(), getAlpha()));
     }
     
     @Override
     public void fillShape(Shape shape) {
-        upcoming.add(new FillShape(shape, color, alpha));
+        upcoming.add(new FillShape(shape, getColor(), getAlpha()));
     }
 
     @Override
@@ -227,7 +232,7 @@ public class BufferedGraphics extends HTML5Graphics {
     
     @Override
     public void fillArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
-        upcoming.add(new FillArc(x, y, width, height, startAngle, arcAngle, color, alpha));
+        upcoming.add(new FillArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()));
     }
 
     @Override
@@ -244,22 +249,22 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void drawString(String str, int x, int y) {
-        upcoming.add(new DrawString(str, x, y, color, alpha, font));
+        primitiveRenderAdapter.drawString(str, x, y);
     }
 
     @Override
     void setAlpha(int alpha) {
-        this.alpha=alpha;
+        getRenderState().setAlpha(alpha);
     }
 
     @Override
     void setColor(int color) {
-        this.color=color;
+        getRenderState().setColor(color);
     }
 
     @Override
     void setFont(NativeFont font) {
-        this.font=font;
+        getRenderState().setFont(font);
     }
     
     List<ExecutableOp> flush(int x, int y, int width, int height){
@@ -339,7 +344,7 @@ public class BufferedGraphics extends HTML5Graphics {
         isClipShape = false;
         clip.setBounds(x, y, width, height);
         clipBoundsDirty = true;
-        upcoming.add(new ClipRect(x, y, width, height, getClipState()));
+        primitiveRenderAdapter.setClipRect(x, y, width, height);
     }
 
     @Override
@@ -355,7 +360,7 @@ public class BufferedGraphics extends HTML5Graphics {
         }
         clip = clip.intersection(x, y, width, height);
         clipBoundsDirty = true;
-        upcoming.add(new ClipRect(clip.getX(), clip.getY(), clip.getWidth(), clip.getHeight(), getClipState()));
+        primitiveRenderAdapter.setClipRect(clip.getX(), clip.getY(), clip.getWidth(), clip.getHeight());
     }
     
     private void calculateClipBounds() {
@@ -393,32 +398,32 @@ public class BufferedGraphics extends HTML5Graphics {
     
     @Override
     public void fillLinearGradient(int x, int y, int width, int height, int startColor, int endColor, boolean horizontal) {
-        upcoming.add(new FillLinearGradient(x, y, width, height, startColor, endColor, horizontal, alpha));
+        upcoming.add(new FillLinearGradient(x, y, width, height, startColor, endColor, horizontal, getAlpha()));
     }
 
     @Override
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        upcoming.add(new FillRadialGradient(x, y, width, height, startColor, endColor, alpha, startAngle, arcAngle));
+        upcoming.add(new FillRadialGradient(x, y, width, height, startColor, endColor, getAlpha(), startAngle, arcAngle));
     }
     
     @Override
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
-        upcoming.add(new FillRadialGradient(x, y, width, height, startColor, endColor, alpha, 0, 360));
+        upcoming.add(new FillRadialGradient(x, y, width, height, startColor, endColor, getAlpha(), 0, 360));
     }
     
     @Override
     public int getAlpha() {
-        return this.alpha;
+        return getRenderState().getAlpha();
     }
 
     @Override
     public int getColor() {
-        return this.color;
+        return getRenderState().getColor();
     }
 
     @Override
     public NativeFont getFont() {
-        return this.font;
+        return getRenderState().getFont();
     }
     
     

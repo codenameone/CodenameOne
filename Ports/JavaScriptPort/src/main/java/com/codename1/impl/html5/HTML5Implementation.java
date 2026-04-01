@@ -192,14 +192,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     final Object editingLock=new Object();
     
-    class PendingDisplay {
-        ArrayList<ExecutableOp> ops=new ArrayList<ExecutableOp>();
-        int cropX;
-        int cropY;
-        int cropW;
-        int cropH;
-    }
-    
     private Form _getCurrent() {
         return getCurrentForm();
     }
@@ -207,7 +199,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     private AnimationFrameCallback animationFrameCallback;
     
-    private PendingDisplay pendingDisplay=new PendingDisplay();
+    private JavaScriptRenderQueueState<ExecutableOp> pendingDisplay=new JavaScriptRenderQueueState<ExecutableOp>();
     
     
     
@@ -2070,16 +2062,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                 }
 
-                graphicsLocked = true;
+                JavaScriptRenderQueueState.FrameSnapshot<ExecutableOp> frame =
+                        JavaScriptRenderQueueCoordinator.beginFrame(new JavaScriptRenderQueueCoordinator.GraphicsLock() {
+                            @Override
+                            public void setGraphicsLocked(boolean locked) {
+                                graphicsLocked = locked;
+                            }
+                        }, pendingDisplay);
 
-                ArrayList<ExecutableOp> ops = new ArrayList<ExecutableOp>();
-
-                ops.addAll(pendingDisplay.ops);
-
-                pendingDisplay.ops.clear();
-                graphicsLocked = false;
-
-                if (!ops.isEmpty()){
+                if (!frame.isEmpty()){
                     CanvasRenderingContext2D context = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
                     //double ratio = getDevicePixelRatio();
                     //if (ratio > 1.5) {
@@ -2088,10 +2079,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     context.save();
                     //context.setTransform(1, 0, 0, 1, 0, 0);
                     context.beginPath();
-                    context.rect(pendingDisplay.cropX, pendingDisplay.cropY, pendingDisplay.cropW, pendingDisplay.cropH);
+                    context.rect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
                     context.clip();
 
-                    for (ExecutableOp op : ops){
+                    for (ExecutableOp op : frame.getOps()){
                         op.execute(context);
                     }
                     ClipRect.resetClip(context, graphics.getClipState());
@@ -2319,36 +2310,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     private void updateCanvasSize() {
-        
-        //canvas.setWidth(((WindowExt)window).getInnerWidth());
-        canvas.setHeight(window.getInnerHeight());
-        canvas.setWidth(window.getDocument().getBody().getClientWidth());
-        peersContainer.getStyle().setProperty("height", String.valueOf(window.getInnerHeight())+"px");
-        peersContainer.getStyle().setProperty("width", String.valueOf(window.getDocument().getBody().getClientWidth())+"px");
-        
-        //canvas.setHeight(window.getDocument().getBody().getClientHeight());
-        outputCanvas.setWidth(canvas.getWidth());
-        outputCanvas.setHeight(canvas.getHeight());
-        
-        
-        //if (getDevicePixelRatio() > 1.5) {
-            double ratio = getDevicePixelRatio();
-            int w = canvas.getWidth();
-            int h = canvas.getHeight();
-            int hidpiWidth = (int)(w * ratio);
-            int hidpiHeight = (int)(h * ratio);
-            if (w != hidpiWidth) {
-                outputCanvas.setWidth(hidpiWidth);
-                outputCanvas.setHeight(hidpiHeight);
-                outputCanvas.getStyle().setProperty("width", w+"px");
-                outputCanvas.getStyle().setProperty("height", h+"px");
-                canvas.setWidth(hidpiWidth);
-                canvas.setHeight(hidpiHeight);
-                canvas.getStyle().setProperty("width", w+"px");
-                canvas.getStyle().setProperty("height", h+"px");
-            }
-            
-        //}
+        JavaScriptCanvasLayout.Dimensions dimensions = JavaScriptCanvasLayout.compute(
+                window.getDocument().getBody().getClientWidth(),
+                window.getInnerHeight(),
+                getDevicePixelRatio());
+        canvas.setWidth(dimensions.getBackingWidth());
+        canvas.setHeight(dimensions.getBackingHeight());
+        outputCanvas.setWidth(dimensions.getBackingWidth());
+        outputCanvas.setHeight(dimensions.getBackingHeight());
+        peersContainer.getStyle().setProperty("height", dimensions.getCssHeight() + "px");
+        peersContainer.getStyle().setProperty("width", dimensions.getCssWidth() + "px");
+        if (dimensions.getStyleWidth() != null) {
+            outputCanvas.getStyle().setProperty("width", dimensions.getStyleWidth());
+            outputCanvas.getStyle().setProperty("height", dimensions.getStyleHeight());
+            canvas.getStyle().setProperty("width", dimensions.getStyleWidth());
+            canvas.getStyle().setProperty("height", dimensions.getStyleHeight());
+        }
     }
 
     public void revalidate() {
@@ -4667,17 +4644,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public void flushGraphics(int x, int y, int width, int height) {
-        
-        while (graphicsLocked || !pendingDisplay.ops.isEmpty()){
-            try {
-                Thread.sleep(1);
-            } catch (InterruptedException ex) {
-                //Log.e(ex);
+        JavaScriptRenderQueueCoordinator.waitUntilFlushable(new JavaScriptRenderQueueCoordinator.FlushBarrier() {
+            @Override
+            public boolean isGraphicsLocked() {
+                return graphicsLocked;
             }
-        }
+
+            @Override
+            public void sleep(int millis) throws InterruptedException {
+                Thread.sleep(millis);
+            }
+        }, pendingDisplay);
         
         synchronized(pendingDisplay){
-            graphicsLocked=true;
             /*
             CanvasRenderingContext2D context = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
             List<ExecutableOp> ops = graphics.flush(x, y, width, height);
@@ -4685,14 +4664,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 op.execute(context);
             }
             */
-            pendingDisplay.ops.clear();
-            pendingDisplay.ops.addAll(graphics.flush(x, y, width, height));
-            pendingDisplay.cropH=height;
-            pendingDisplay.cropW=width;
-            pendingDisplay.cropX=x;
-            pendingDisplay.cropY=y;
-            graphicsLocked=false;
-            
+            JavaScriptRenderQueueCoordinator.queueFlush(new JavaScriptRenderQueueCoordinator.GraphicsLock() {
+                @Override
+                public void setGraphicsLocked(boolean locked) {
+                    graphicsLocked = locked;
+                }
+            }, pendingDisplay, graphics.flush(x, y, width, height), x, y, width, height);
         }
         if (isEditing) {
             resizeNativeEditor();

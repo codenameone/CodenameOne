@@ -24,9 +24,17 @@ class JavaScriptRuntimeFacadeTest {
     private static final Path BROWSER_INTERACTION_COORDINATOR_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptBrowserInteractionCoordinator.java");
     private static final Path KEYBOARD_INTERACTION_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptKeyboardInteractionAdapter.java");
     private static final Path BROWSER_LIFECYCLE_COORDINATOR_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptBrowserLifecycleCoordinator.java");
+    private static final Path CANVAS_LAYOUT_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptCanvasLayout.java");
+    private static final Path RENDER_QUEUE_COORDINATOR_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptRenderQueueCoordinator.java");
+    private static final Path RENDER_QUEUE_STATE_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptRenderQueueState.java");
+    private static final Path RENDER_STATE_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptRenderState.java");
+    private static final Path PRIMITIVE_RENDER_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptPrimitiveRenderAdapter.java");
+    private static final Path EXECUTABLE_OP_FACTORY_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptExecutableOpFactory.java");
     private static final Path STORAGE_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptStorageAdapter.java");
     private static final Path NETWORK_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptNetworkAdapter.java");
     private static final Path HTML5_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "HTML5Implementation.java");
+    private static final Path HTML5_GRAPHICS_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "HTML5Graphics.java");
+    private static final Path BUFFERED_GRAPHICS_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "BufferedGraphics.java");
     private static final Path BOOTSTRAP_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptPortBootstrap.java");
     private static final Path STUB_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "Stub.java");
 
@@ -72,6 +80,8 @@ class JavaScriptRuntimeFacadeTest {
     @Test
     void html5ImplementationAndBootstrapDelegateToRuntimeFacade() throws Exception {
         String html5Source = new String(Files.readAllBytes(HTML5_SOURCE), StandardCharsets.UTF_8);
+        String html5GraphicsSource = new String(Files.readAllBytes(HTML5_GRAPHICS_SOURCE), StandardCharsets.UTF_8);
+        String bufferedGraphicsSource = new String(Files.readAllBytes(BUFFERED_GRAPHICS_SOURCE), StandardCharsets.UTF_8);
         String bootstrapSource = new String(Files.readAllBytes(BOOTSTRAP_SOURCE), StandardCharsets.UTF_8);
         String stubSource = new String(Files.readAllBytes(STUB_SOURCE), StandardCharsets.UTF_8);
 
@@ -123,6 +133,32 @@ class JavaScriptRuntimeFacadeTest {
                 "HTML5Implementation should delegate popstate handling to the browser lifecycle coordinator");
         assertTrue(html5Source.contains("JavaScriptBrowserLifecycleCoordinator.handlePaste("),
                 "HTML5Implementation should delegate paste handling to the browser lifecycle coordinator");
+        assertTrue(html5Source.contains("new JavaScriptRenderQueueState<ExecutableOp>()"),
+                "HTML5Implementation should keep pending draw state in a dedicated render-queue state object");
+        assertTrue(html5Source.contains("JavaScriptCanvasLayout.compute("),
+                "HTML5Implementation should delegate canvas sizing to the canvas layout helper");
+        assertTrue(html5Source.contains("JavaScriptRenderQueueCoordinator.waitUntilFlushable("),
+                "HTML5Implementation should delegate flush gating to the render queue coordinator");
+        assertTrue(html5Source.contains("JavaScriptRenderQueueCoordinator.queueFlush("),
+                "HTML5Implementation should delegate pending-op queue handoff to the render queue coordinator");
+        assertTrue(html5Source.contains("JavaScriptRenderQueueCoordinator.beginFrame("),
+                "HTML5Implementation should delegate animation-frame snapshots to the render queue coordinator");
+        assertTrue(html5GraphicsSource.contains("new JavaScriptRenderState<NativeFont>()"),
+                "HTML5Graphics should keep render color/alpha/font/clip state in a dedicated render-state object");
+        assertTrue(html5GraphicsSource.contains("new JavaScriptPrimitiveRenderAdapter<NativeFont, ExecutableOp>("),
+                "HTML5Graphics should delegate primitive draw ops to the primitive render adapter");
+        assertTrue(html5GraphicsSource.contains("primitiveRenderAdapter.drawRect("),
+                "HTML5Graphics should route drawRect through the primitive render adapter");
+        assertTrue(html5GraphicsSource.contains("primitiveRenderAdapter.fillRect("),
+                "HTML5Graphics should route fillRect through the primitive render adapter");
+        assertTrue(html5GraphicsSource.contains("primitiveRenderAdapter.drawLine("),
+                "HTML5Graphics should route drawLine through the primitive render adapter");
+        assertTrue(html5GraphicsSource.contains("primitiveRenderAdapter.drawString("),
+                "HTML5Graphics should route drawString through the primitive render adapter");
+        assertTrue(html5GraphicsSource.contains("primitiveRenderAdapter.setClipRect("),
+                "HTML5Graphics should route clip-rect updates through the primitive render adapter");
+        assertTrue(bufferedGraphicsSource.contains("new JavaScriptPrimitiveRenderAdapter<NativeFont, ExecutableOp>("),
+                "BufferedGraphics should share the primitive render adapter for buffered primitive ops");
         assertTrue(bootstrapSource.contains("JavaScriptRuntimeFacade.proxifyUrl("),
                 "JavaScriptPortBootstrap should delegate proxy decisions to the runtime facade");
         assertTrue(bootstrapSource.contains("JavaScriptBootstrapCoordinator.createLifecycle(className)"),
@@ -643,5 +679,159 @@ class JavaScriptRuntimeFacadeTest {
         });
         coordinatorClass.getMethod("handleInstallBacksideHooks", backsideHooksClass).invoke(null, backside);
         assertTrue(calls.contains("installBacksideHooksInUserInteraction"));
+    }
+
+    @Test
+    void extractedCanvasLayoutAndRenderQueueHelpersCompileAndPreserveMinimalBehavior() throws Exception {
+        Path sourceDir = Files.createTempDirectory("js-render-src");
+        Path classesDir = Files.createTempDirectory("js-render-classes");
+        Path packageDir = sourceDir.resolve(Paths.get("com", "codename1", "impl", "html5"));
+        Files.createDirectories(packageDir);
+        Files.copy(CANVAS_LAYOUT_SOURCE, packageDir.resolve("JavaScriptCanvasLayout.java"));
+        Files.copy(RENDER_QUEUE_STATE_SOURCE, packageDir.resolve("JavaScriptRenderQueueState.java"));
+        Files.copy(RENDER_QUEUE_COORDINATOR_SOURCE, packageDir.resolve("JavaScriptRenderQueueCoordinator.java"));
+
+        CompilerHelper.CompilerConfig config = CompilerHelper.getAvailableCompilers("1.8").get(0);
+        int compileResult = CompilerHelper.compile(config.jdkHome, java.util.Arrays.asList(
+                "-source", config.targetVersion,
+                "-target", config.targetVersion,
+                "-d", classesDir.toString(),
+                packageDir.resolve("JavaScriptCanvasLayout.java").toString(),
+                packageDir.resolve("JavaScriptRenderQueueState.java").toString(),
+                packageDir.resolve("JavaScriptRenderQueueCoordinator.java").toString()
+        ));
+        assertEquals(0, compileResult, "Canvas layout and render queue helpers should compile as standalone Java helpers");
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classesDir.toUri().toURL()});
+        Class<?> layoutClass = loader.loadClass("com.codename1.impl.html5.JavaScriptCanvasLayout");
+        Class<?> dimensionsClass = loader.loadClass("com.codename1.impl.html5.JavaScriptCanvasLayout$Dimensions");
+        Object hidpiDimensions = layoutClass.getMethod("compute", int.class, int.class, double.class).invoke(null, 320, 480, 2.0d);
+        assertEquals(320, dimensionsClass.getMethod("getCssWidth").invoke(hidpiDimensions));
+        assertEquals(480, dimensionsClass.getMethod("getCssHeight").invoke(hidpiDimensions));
+        assertEquals(640, dimensionsClass.getMethod("getBackingWidth").invoke(hidpiDimensions));
+        assertEquals(960, dimensionsClass.getMethod("getBackingHeight").invoke(hidpiDimensions));
+        assertEquals("320px", dimensionsClass.getMethod("getStyleWidth").invoke(hidpiDimensions));
+        assertEquals("480px", dimensionsClass.getMethod("getStyleHeight").invoke(hidpiDimensions));
+        Object normalDimensions = layoutClass.getMethod("compute", int.class, int.class, double.class).invoke(null, 320, 480, 1.0d);
+        assertEquals(320, dimensionsClass.getMethod("getBackingWidth").invoke(normalDimensions));
+        assertEquals(480, dimensionsClass.getMethod("getBackingHeight").invoke(normalDimensions));
+        assertEquals(null, dimensionsClass.getMethod("getStyleWidth").invoke(normalDimensions));
+
+        Class<?> stateClass = loader.loadClass("com.codename1.impl.html5.JavaScriptRenderQueueState");
+        Class<?> snapshotClass = loader.loadClass("com.codename1.impl.html5.JavaScriptRenderQueueState$FrameSnapshot");
+        Class<?> coordinatorClass = loader.loadClass("com.codename1.impl.html5.JavaScriptRenderQueueCoordinator");
+        Class<?> flushBarrierClass = loader.loadClass("com.codename1.impl.html5.JavaScriptRenderQueueCoordinator$FlushBarrier");
+        Class<?> graphicsLockClass = loader.loadClass("com.codename1.impl.html5.JavaScriptRenderQueueCoordinator$GraphicsLock");
+
+        final boolean[] locked = new boolean[]{true};
+        final int[] sleeps = new int[]{0};
+        Object state = stateClass.getConstructor().newInstance();
+        Object barrier = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{flushBarrierClass}, (proxy, method, args) -> {
+            if ("isGraphicsLocked".equals(method.getName())) {
+                boolean current = locked[0];
+                if (locked[0]) {
+                    locked[0] = false;
+                }
+                return current;
+            }
+            if ("sleep".equals(method.getName())) {
+                sleeps[0] += (Integer) args[0];
+                return null;
+            }
+            throw new UnsupportedOperationException(method.getName());
+        });
+        coordinatorClass.getMethod("waitUntilFlushable", flushBarrierClass, stateClass).invoke(null, barrier, state);
+        assertEquals(1, sleeps[0]);
+
+        final java.util.List<Boolean> lockTransitions = new java.util.ArrayList<Boolean>();
+        Object graphicsLock = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{graphicsLockClass}, (proxy, method, args) -> {
+            lockTransitions.add((Boolean) args[0]);
+            return null;
+        });
+        coordinatorClass.getMethod("queueFlush", graphicsLockClass, stateClass, java.util.List.class, int.class, int.class, int.class, int.class)
+                .invoke(null, graphicsLock, state, java.util.Arrays.asList("draw"), 10, 20, 30, 40);
+        assertEquals(java.util.Arrays.asList(Boolean.TRUE, Boolean.FALSE), lockTransitions);
+
+        Object snapshot = coordinatorClass.getMethod("beginFrame", graphicsLockClass, stateClass).invoke(null, graphicsLock, state);
+        assertEquals(false, snapshotClass.getMethod("isEmpty").invoke(snapshot));
+        assertEquals(10, snapshotClass.getMethod("getCropX").invoke(snapshot));
+        assertEquals(20, snapshotClass.getMethod("getCropY").invoke(snapshot));
+        assertEquals(30, snapshotClass.getMethod("getCropW").invoke(snapshot));
+        assertEquals(40, snapshotClass.getMethod("getCropH").invoke(snapshot));
+        java.util.List<?> ops = (java.util.List<?>) snapshotClass.getMethod("getOps").invoke(snapshot);
+        assertEquals("draw", ops.get(0));
+        Object emptySnapshot = stateClass.getMethod("snapshotAndClear").invoke(state);
+        assertEquals(true, snapshotClass.getMethod("isEmpty").invoke(emptySnapshot));
+    }
+
+    @Test
+    void extractedRenderStateAndPrimitiveAdapterCompileAndPreserveMinimalBehavior() throws Exception {
+        Path sourceDir = Files.createTempDirectory("js-primitive-render-src");
+        Path classesDir = Files.createTempDirectory("js-primitive-render-classes");
+        Path html5PackageDir = sourceDir.resolve(Paths.get("com", "codename1", "impl", "html5"));
+        Path graphicsPackageDir = sourceDir.resolve(Paths.get("com", "codename1", "impl", "html5", "graphics"));
+        Files.createDirectories(html5PackageDir);
+        Files.createDirectories(graphicsPackageDir);
+        Files.copy(RENDER_STATE_SOURCE, html5PackageDir.resolve("JavaScriptRenderState.java"));
+        Files.copy(PRIMITIVE_RENDER_ADAPTER_SOURCE, html5PackageDir.resolve("JavaScriptPrimitiveRenderAdapter.java"));
+        Files.copy(Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "graphics", "ClipState.java"),
+                graphicsPackageDir.resolve("ClipState.java"));
+
+        CompilerHelper.CompilerConfig config = CompilerHelper.getAvailableCompilers("1.8").get(0);
+        int compileResult = CompilerHelper.compile(config.jdkHome, java.util.Arrays.asList(
+                "-source", config.targetVersion,
+                "-target", config.targetVersion,
+                "-d", classesDir.toString(),
+                graphicsPackageDir.resolve("ClipState.java").toString(),
+                html5PackageDir.resolve("JavaScriptRenderState.java").toString(),
+                html5PackageDir.resolve("JavaScriptPrimitiveRenderAdapter.java").toString()
+        ));
+        assertEquals(0, compileResult, "Render state and primitive render adapter should compile as standalone Java helpers");
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classesDir.toUri().toURL()});
+        Class<?> renderStateClass = loader.loadClass("com.codename1.impl.html5.JavaScriptRenderState");
+        Class<?> primitiveAdapterClass = loader.loadClass("com.codename1.impl.html5.JavaScriptPrimitiveRenderAdapter");
+        Class<?> sinkClass = loader.loadClass("com.codename1.impl.html5.JavaScriptPrimitiveRenderAdapter$OperationSink");
+        Class<?> factoryClass = loader.loadClass("com.codename1.impl.html5.JavaScriptPrimitiveRenderAdapter$PrimitiveOpFactory");
+        Class<?> clipStateClass = loader.loadClass("com.codename1.impl.html5.graphics.ClipState");
+
+        Object state = renderStateClass.getConstructor().newInstance();
+        renderStateClass.getMethod("setColor", int.class).invoke(state, 0x123456);
+        renderStateClass.getMethod("setAlpha", int.class).invoke(state, 77);
+        renderStateClass.getMethod("setFont", Object.class).invoke(state, "body-font");
+        assertEquals(0x123456, renderStateClass.getMethod("getColor").invoke(state));
+        assertEquals(77, renderStateClass.getMethod("getAlpha").invoke(state));
+        assertEquals("body-font", renderStateClass.getMethod("getFont").invoke(state));
+        assertTrue(clipStateClass.isInstance(renderStateClass.getMethod("getClipState").invoke(state)));
+
+        final java.util.List<String> submitted = new java.util.ArrayList<String>();
+        Object sink = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{sinkClass}, (proxy, method, args) -> {
+            submitted.add((String) args[0]);
+            return null;
+        });
+        Object factory = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{factoryClass}, (proxy, method, args) -> {
+            if ("createFillRect".equals(method.getName())) return "fill:" + args[4] + ":" + args[5];
+            if ("createClearRect".equals(method.getName())) return "clear";
+            if ("createDrawRect".equals(method.getName())) return "drawRect:" + args[4] + ":" + args[5];
+            if ("createDrawLine".equals(method.getName())) return "drawLine:" + args[4] + ":" + args[5];
+            if ("createDrawString".equals(method.getName())) return "drawString:" + args[3] + ":" + args[4] + ":" + args[5];
+            if ("createClipRect".equals(method.getName())) return "clip:" + args[4].getClass().getSimpleName();
+            throw new UnsupportedOperationException(method.getName());
+        });
+
+        Object adapter = primitiveAdapterClass.getConstructor(renderStateClass, sinkClass, factoryClass).newInstance(state, sink, factory);
+        primitiveAdapterClass.getMethod("fillRect", int.class, int.class, int.class, int.class).invoke(adapter, 1, 2, 3, 4);
+        primitiveAdapterClass.getMethod("clearRect", int.class, int.class, int.class, int.class).invoke(adapter, 1, 2, 3, 4);
+        primitiveAdapterClass.getMethod("drawRect", int.class, int.class, int.class, int.class).invoke(adapter, 1, 2, 3, 4);
+        primitiveAdapterClass.getMethod("drawLine", int.class, int.class, int.class, int.class).invoke(adapter, 1, 2, 3, 4);
+        primitiveAdapterClass.getMethod("drawString", String.class, int.class, int.class).invoke(adapter, "hi", 5, 6);
+        primitiveAdapterClass.getMethod("setClipRect", int.class, int.class, int.class, int.class).invoke(adapter, 7, 8, 9, 10);
+
+        assertEquals("fill:1193046:77", submitted.get(0));
+        assertEquals("clear", submitted.get(1));
+        assertEquals("drawRect:1193046:77", submitted.get(2));
+        assertEquals("drawLine:1193046:77", submitted.get(3));
+        assertEquals("drawString:1193046:77:body-font", submitted.get(4));
+        assertEquals("clip:ClipState", submitted.get(5));
     }
 }

@@ -34,6 +34,7 @@ import com.codename1.impl.html5.graphics.FillRoundRect;
 import com.codename1.impl.html5.graphics.FillShape;
 import com.codename1.impl.html5.graphics.SetTransform;
 import com.codename1.impl.html5.graphics.TileImage;
+import com.codename1.impl.html5.graphics.ExecutableOp;
 import com.codename1.teavm.geom.JSAffineTransform;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.Transform;
@@ -55,15 +56,12 @@ import org.teavm.jso.dom.html.HTMLCanvasElement;
  */
 public class HTML5Graphics {
 
-    private ClipState clipState = new ClipState();
+    private final JavaScriptRenderState<NativeFont> renderState = new JavaScriptRenderState<NativeFont>();
     private HTMLCanvasElement canvas;
     private CanvasRenderingContext2D context;
     //private Paint paint;
-    private NativeFont font;
-    private int color;
     HTML5Implementation impl;
     private boolean inClip = false;
-    private int alpha=0xff;
     private Rectangle clipBounds=new Rectangle();
     private boolean clipBoundsDirty=true;
     private GeneralPath clipShape = new GeneralPath();
@@ -74,6 +72,14 @@ public class HTML5Graphics {
    
     
     private final Rectangle clipRect = new Rectangle();
+    private final JavaScriptPrimitiveRenderAdapter<NativeFont, ExecutableOp> primitiveRenderAdapter =
+            new JavaScriptPrimitiveRenderAdapter<NativeFont, ExecutableOp>(renderState,
+                    new JavaScriptPrimitiveRenderAdapter.OperationSink<ExecutableOp>() {
+                        @Override
+                        public void submit(ExecutableOp operation) {
+                            operation.execute(context);
+                        }
+                    }, JavaScriptExecutableOpFactory.INSTANCE);
     
     //private final Path tmppath = new Path();
     //private final static PorterDuffXfermode PORTER = new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER);
@@ -96,7 +102,11 @@ public class HTML5Graphics {
     
     
     public ClipState getClipState() {
-        return clipState;
+        return renderState.getClipState();
+    }
+
+    protected final JavaScriptRenderState<NativeFont> getRenderState() {
+        return renderState;
     }
 
     public HTMLCanvasElement getCanvas(){
@@ -122,11 +132,11 @@ public class HTML5Graphics {
     }
 
     NativeFont getFont() {
-        return font;
+        return renderState.getFont();
     }
 
     void setFont(NativeFont font) {
-        this.font = font;
+        renderState.setFont(font);
         context.setFont(font.getCSS());
         
         
@@ -150,7 +160,7 @@ public class HTML5Graphics {
     
     void setColor(int color){
     	//System.out.println("Setting color "+color(color));
-        this.color = color;
+        renderState.setColor(color);
         this.context.setFillStyle(color(color));
         this.context.setStrokeStyle(color(color));
         
@@ -158,18 +168,18 @@ public class HTML5Graphics {
     
     void setColorWithAlpha(int color) {
         //System.out.println("Setting color "+color(color));
-        this.color = color;
+        renderState.setColor(color);
         this.context.setFillStyle(colorWithAlpha(color));
         this.context.setStrokeStyle(colorWithAlpha(color));
     }
     
     void setAlpha(int alpha) {
-        this.alpha = alpha;
+        renderState.setAlpha(alpha);
         this.context.setGlobalAlpha(alpha / 255.0);
     }
     
     int getAlpha() {
-        return alpha;
+        return renderState.getAlpha();
         //return (int)(context.getGlobalAlpha() * 255);
     }
 
@@ -179,13 +189,13 @@ public class HTML5Graphics {
 
 
     public void drawImage(Object img, int x, int y) {
-        new DrawImage((NativeImage)img, x, y, alpha).execute(context);
+        new DrawImage((NativeImage)img, x, y, getAlpha()).execute(context);
         
     }
     
     
     public void tileImage(Object img, int x, int y, int w, int h) {
-        new TileImage((NativeImage)img, x, y, w, h, alpha).execute(context);
+        new TileImage((NativeImage)img, x, y, w, h, getAlpha()).execute(context);
     }
     
     
@@ -276,21 +286,21 @@ public class HTML5Graphics {
     }
     
     public void drawImage(Object img, int x, int y, int w, int h) {
-        new DrawImage((NativeImage)img, x, y, alpha, w, h).execute(context);
+        new DrawImage((NativeImage)img, x, y, getAlpha(), w, h).execute(context);
     }
 
     
     public void drawLine(int x1, int y1, int x2, int y2) {
-        new DrawLine(x1, y1, x2, y2, color, alpha).execute(context);
+        primitiveRenderAdapter.drawLine(x1, y1, x2, y2);
     }
     
     
     public void drawPolygon(int[] xPoints, int[] yPoints, int nPoints) {
-        new DrawPolygon(xPoints, yPoints, nPoints, color, alpha).execute(context);
+        new DrawPolygon(xPoints, yPoints, nPoints, getColor(), getAlpha()).execute(context);
     }
     
     public void fillPolygon(int[] xPoints, int[] yPoints, int nPoints) {
-        new FillPolygon(xPoints, yPoints, nPoints, color, alpha).execute(context);
+        new FillPolygon(xPoints, yPoints, nPoints, getColor(), getAlpha()).execute(context);
     }
     
     public void drawRGB(int[] rgbData, int offset, int x,
@@ -305,29 +315,29 @@ public class HTML5Graphics {
     }
     
     public void drawRect(int x, int y, int width, int height) {
-    	new DrawRect(x, y, width, height, color, alpha).execute(context);
+    	primitiveRenderAdapter.drawRect(x, y, width, height);
     }
     
     public void drawRoundRect(int x, int y, int width,
             int height, int arcWidthInt, int arcHeightInt) {
-        new DrawRoundRect(x, y, width, height, arcWidthInt, arcHeightInt, color, alpha).execute(context);
+        new DrawRoundRect(x, y, width, height, arcWidthInt, arcHeightInt, getColor(), getAlpha()).execute(context);
     }
 
     public void drawString(String str, int x, int y) {
-        new DrawString(str, x, y, color, alpha, font).execute(context);
+        primitiveRenderAdapter.drawString(str, x, y);
     }
 
     public void drawArc(int x, int y, int width, int height,
             int startAngle, int arcAngle) {
-        new DrawArc(x, y, width, height, startAngle, arcAngle, color, alpha).execute(context);
+        new DrawArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()).execute(context);
     }
     
     public void drawShape(Shape shape, Stroke stroke) {
-        new DrawShape(shape, stroke, color, alpha).execute(context);
+        new DrawShape(shape, stroke, getColor(), getAlpha()).execute(context);
     }
     
     public void fillShape(Shape shape) {
-        new FillShape(shape, color, alpha).execute(context);
+        new FillShape(shape, getColor(), getAlpha()).execute(context);
     }
     
     @JSBody(params={"o"}, script="console.log(o)")
@@ -336,20 +346,20 @@ public class HTML5Graphics {
     
     public void fillArc(int x, int y, int width, int height,
             int startAngle, int arcAngle) {
-        new FillArc(x, y, width, height, startAngle, arcAngle, color, alpha).execute(context);
+        new FillArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()).execute(context);
     }
     
     public void fillRect(int x, int y, int width, int height) {
-        new FillRect(x, y, width, height, color, alpha).execute(context);        
+        primitiveRenderAdapter.fillRect(x, y, width, height);
     }
     
     public void clearRect(int x, int y, int width, int height) {
-        new ClearRect(x, y, width, height).execute(context);
+        primitiveRenderAdapter.clearRect(x, y, width, height);
     }
 
     public void fillRoundRect(int x, int y, int width,
             int height, int arcWidthInt, int arcHeightInt) {
-        new FillRoundRect(x, y, width, height, arcWidthInt, arcHeightInt, color, alpha).execute(context);
+        new FillRoundRect(x, y, width, height, arcWidthInt, arcHeightInt, getColor(), getAlpha()).execute(context);
         
     }
 
@@ -454,7 +464,7 @@ public class HTML5Graphics {
         isClipShape = false;
         clipRect.setBounds(x, y, width, height);
         clipBoundsDirty = true;
-        new ClipRect(x, y, width, height, getClipState()).execute(context);
+        primitiveRenderAdapter.setClipRect(x, y, width, height);
         
     }
     
@@ -472,11 +482,11 @@ public class HTML5Graphics {
         }
         clipRect.intersection(rect, clipRect);
         clipBoundsDirty = true;
-        new ClipRect(clipRect.getX(), clipRect.getY(), clipRect.getWidth(), clipRect.getHeight(), getClipState()).execute(context);
+        primitiveRenderAdapter.setClipRect(clipRect.getX(), clipRect.getY(), clipRect.getWidth(), clipRect.getHeight());
     }
 
     public int getColor() {
-        return color;
+        return renderState.getColor();
     }
     
     public void resetAffine() {
@@ -562,11 +572,11 @@ public class HTML5Graphics {
     }
 
     public void fillLinearGradient(int x, int y, int width, int height, int startColor, int endColor, boolean horizontal) {
-        FillLinearGradient.execute(context, x, y, width, height, startColor, endColor, horizontal, alpha);
+        FillLinearGradient.execute(context, x, y, width, height, startColor, endColor, horizontal, getAlpha());
     }
 
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        FillRadialGradient.execute(context, x, y, width, height, startColor, endColor, alpha, startAngle, arcAngle);
+        FillRadialGradient.execute(context, x, y, width, height, startColor, endColor, getAlpha(), startAngle, arcAngle);
     }
 
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
