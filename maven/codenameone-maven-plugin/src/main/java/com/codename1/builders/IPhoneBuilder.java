@@ -1099,14 +1099,28 @@ public class IPhoneBuilder extends Executor {
                         + "#include \"java_lang_String.h\"\n"
                         + "#import \"CodenameOne_GLViewController.h\"\n"
                         + "#import <UIKit/UIKit.h>\n"
-                        + "#import \"" + classNameWithUnderscores + "Impl.h\"\n" + newVMInclude
+                        + newVMInclude
                         + "#include \"" + classNameWithUnderscores + "ImplCodenameOne.h\"\n\n"
+                        + "static id cn1_createNativeInterfacePeer(NSString* className) {\n"
+                        + "    Class cls = NSClassFromString(className);\n"
+                        + "    if(cls == Nil) {\n"
+                        + "        NSString* mainBundleName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@\"CFBundleName\"];\n"
+                        + "        if(mainBundleName != nil) {\n"
+                        + "            NSString* prefixedName = [mainBundleName stringByAppendingFormat:@\".%@\", className];\n"
+                        + "            cls = NSClassFromString(prefixedName);\n"
+                        + "        }\n"
+                        + "    }\n"
+                        + "    if(cls == Nil) {\n"
+                        + "        return nil;\n"
+                        + "    }\n"
+                        + "    return [[cls alloc] init];\n"
+                        + "}\n\n"
                         + "JAVA_LONG " + classNameWithUnderscores + "ImplCodenameOne_initializeNativePeer__" + postfixForNewVM + "(" + prefixForNewVM + ") {\n"
-                        + "    " + classNameWithUnderscores + "Impl* i = [[" + classNameWithUnderscores + "Impl alloc] init];\n"
+                        + "    id i = cn1_createNativeInterfacePeer(@\"" + classNameWithUnderscores + "Impl\");\n"
                         + "    return i;\n"
                         + "}\n\n"
                         + "void " + classNameWithUnderscores + "ImplCodenameOne_releaseNativePeerInstance___long(" + prefix2ForNewVM + "JAVA_LONG l) {\n"
-                        + "    " + classNameWithUnderscores + "Impl* i = (" + classNameWithUnderscores + "Impl*)l;\n"
+                        + "    id i = (id)l;\n"
                         + "    [i release];\n"
                         + "}\n\n"
                         + "extern NSData* arrayToData(JAVA_OBJECT arr);\n"
@@ -1135,8 +1149,7 @@ public class IPhoneBuilder extends Executor {
                     String mFileBody;
 
                     mFileArgs = "(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me";
-                    mFileBody = "    " + classNameWithUnderscores + "Impl* ptr = (" + classNameWithUnderscores +
-                        "Impl*)get_field_" + classNameWithUnderscores + "ImplCodenameOne_nativePeer(me);\n";
+                    mFileBody = "    id ptr = (id)get_field_" + classNameWithUnderscores + "ImplCodenameOne_nativePeer(me);\n";
 
                     
                     if(!(returnType.equals(Void.class) || returnType.equals(Void.TYPE))) {

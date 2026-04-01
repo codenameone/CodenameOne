@@ -2,7 +2,7 @@
 /// [support for making platform native API calls](https://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces.html). Notice
 /// that when we say "native" we do not mean C/C++ always but rather the platforms "native" environment. So in the
 /// case of Android the Java code will be invoked with full access to the Android API's, in case of iOS an Objective-C
-/// message would be sent and so forth.
+/// or Swift message would be sent and so forth.
 ///
 /// Native interfaces are designed to only allow primitive types, Strings, arrays (single dimension only!) of primitives
 /// and PeerComponent values. Any other type of parameter/return type is prohibited. However, once in the native layer
@@ -59,9 +59,9 @@
 /// These sources should be placed under the appropriate folder in the native directory and are sent to the
 /// server for compilation.
 ///
-/// For Objective-C, one would need to define a class matching the name of the package and the class name
-/// combined where the "." elements are replaced by underscores. One would need to provide both a header and
-/// an "m" file following this convention e.g.:
+/// For iOS, one would need to define a class matching the name of the package and the class name
+/// combined where the "." elements are replaced by underscores. This class can be implemented in Objective-C
+/// (by providing both a header and an "m" file) or in Swift. Objective-C classes follow this convention e.g.:
 ///
 /// ```java
 /// @interface com_my_code_MyNative : NSObject {
