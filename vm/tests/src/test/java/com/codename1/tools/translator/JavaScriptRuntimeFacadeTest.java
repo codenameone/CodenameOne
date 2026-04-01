@@ -36,6 +36,8 @@ class JavaScriptRuntimeFacadeTest {
     private static final Path SHAPE_PATH_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptShapePathAdapter.java");
     private static final Path IMAGE_DATA_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptImageDataAdapter.java");
     private static final Path NATIVE_IMAGE_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptNativeImageAdapter.java");
+    private static final Path ASYNC_IMAGE_LOAD_COORDINATOR_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptAsyncImageLoadCoordinator.java");
+    private static final Path RENDERING_BACKEND_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptRenderingBackend.java");
     private static final Path EXECUTABLE_OP_FACTORY_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptExecutableOpFactory.java");
     private static final Path STORAGE_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptStorageAdapter.java");
     private static final Path NETWORK_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptNetworkAdapter.java");
@@ -224,6 +226,30 @@ class JavaScriptRuntimeFacadeTest {
                 "HTML5Implementation.NativeImage should delegate draw dispatch to the native image adapter");
         assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.tile("),
                 "HTML5Implementation.NativeImage should delegate tile dispatch to the native image adapter");
+        assertTrue(html5Source.contains("JavaScriptNativeImageAdapter.readPixels("),
+                "HTML5Implementation should delegate native-image pixel readback dispatch to the native image adapter");
+        assertTrue(html5Source.contains("private final JavaScriptRenderingBackend renderingBackend = new BrowserDomRenderingBackend()"),
+                "HTML5Implementation should route canvas and image allocation through an explicit rendering backend contract");
+        assertTrue(html5Source.contains("renderingBackend.createCrossOriginImageElement("),
+                "HTML5Implementation should route cross-origin image creation through the rendering backend");
+        assertTrue(html5Source.contains("renderingBackend.createBlobImageElement("),
+                "HTML5Implementation should route blob-backed image creation through the rendering backend");
+        assertTrue(html5Source.contains("renderingBackend.scaleLoadedImageToCanvas("),
+                "HTML5Implementation should route loaded-image scaling through the rendering backend");
+        assertTrue(html5Source.contains("renderingBackend.scaleMutableSurfaceToCanvas("),
+                "HTML5Implementation should route mutable-surface scaling through the rendering backend");
+        assertTrue(html5Source.contains("renderingBackend.toImageBlob("),
+                "HTML5Implementation should route canvas serialization through the rendering backend");
+        assertTrue(html5Source.contains("renderingBackend.writeImageData("),
+                "HTML5Implementation should route image-data writes through the rendering backend");
+        assertTrue(html5Source.contains("JavaScriptAsyncImageLoadCoordinator.handleImmediateCompletion("),
+                "HTML5Implementation.NativeImage should delegate synchronous completion checks to the async image load coordinator");
+        assertTrue(html5Source.contains("JavaScriptAsyncImageLoadCoordinator.beginLoading("),
+                "HTML5Implementation.NativeImage should delegate async load state setup to the async image load coordinator");
+        assertTrue(html5Source.contains("JavaScriptAsyncImageLoadCoordinator.shouldRepaintOnLoad("),
+                "HTML5Implementation.NativeImage should delegate repaint gating to the async image load coordinator");
+        assertTrue(html5Source.contains("attachMutableImageSurface("),
+                "Canvas-backed mutable images should share a single mutable-surface attachment path");
         assertTrue(bootstrapSource.contains("JavaScriptRuntimeFacade.proxifyUrl("),
                 "JavaScriptPortBootstrap should delegate proxy decisions to the runtime facade");
         assertTrue(bootstrapSource.contains("JavaScriptBootstrapCoordinator.createLifecycle(className)"),
@@ -1256,7 +1282,10 @@ class JavaScriptRuntimeFacadeTest {
 
         Class<?> nativeImageClass = loader.loadClass("com.codename1.impl.html5.JavaScriptNativeImageAdapter");
         Class<?> imageModelClass = loader.loadClass("com.codename1.impl.html5.JavaScriptNativeImageAdapter$ImageModel");
-        Class<?> imageTargetClass = loader.loadClass("com.codename1.impl.html5.JavaScriptNativeImageAdapter$ImageTarget");
+        Class<?> drawTargetClass = loader.loadClass("com.codename1.impl.html5.JavaScriptNativeImageAdapter$DrawTarget");
+        Class<?> tileTargetClass = loader.loadClass("com.codename1.impl.html5.JavaScriptNativeImageAdapter$TileTarget");
+        Class<?> pixelReadTargetClass = loader.loadClass("com.codename1.impl.html5.JavaScriptNativeImageAdapter$PixelReadTarget");
+        final java.util.concurrent.atomic.AtomicReference<Object> loadedPatternCache = new java.util.concurrent.atomic.AtomicReference<Object>();
         Object loadedModel = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{imageModelClass}, (proxy, method, args) -> {
             switch (method.getName()) {
                 case "getExplicitWidth": return 0;
@@ -1267,21 +1296,91 @@ class JavaScriptRuntimeFacadeTest {
                 case "hasMutableSurface": return false;
                 case "getMutableSurfaceWidth": return 0;
                 case "getMutableSurfaceHeight": return 0;
+                case "getPatternCache": return loadedPatternCache.get();
+                case "setPatternCache": loadedPatternCache.set(args[0]); return null;
                 default: throw new UnsupportedOperationException(method.getName());
             }
         });
         assertEquals(33, nativeImageClass.getMethod("resolveWidth", imageModelClass).invoke(null, loadedModel));
         assertEquals(44, nativeImageClass.getMethod("resolveHeight", imageModelClass).invoke(null, loadedModel));
         final java.util.List<String> imageCalls = new java.util.ArrayList<String>();
-        Object imageTarget = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{imageTargetClass}, (proxy, method, args) -> {
+        Object drawTarget = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{drawTargetClass}, (proxy, method, args) -> {
             imageCalls.add(method.getName() + ":" + args[2] + "x" + args[3]);
             return null;
         });
-        nativeImageClass.getMethod("draw", imageModelClass, imageTargetClass, int.class, int.class, int.class, int.class)
-                .invoke(null, loadedModel, imageTarget, 1, 2, 10, 20);
-        nativeImageClass.getMethod("tile", imageModelClass, imageTargetClass, int.class, int.class, int.class, int.class)
-                .invoke(null, loadedModel, imageTarget, 1, 2, 10, 20);
+        nativeImageClass.getMethod("draw", imageModelClass, drawTargetClass, int.class, int.class, int.class, int.class)
+                .invoke(null, loadedModel, drawTarget, 1, 2, 10, 20);
+        Object tileTarget = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{tileTargetClass}, (proxy, method, args) -> {
+            if ("createLoadedImagePattern".equals(method.getName())) {
+                imageCalls.add("createLoadedImagePattern");
+                return "loaded-pattern";
+            }
+            if ("createMutableSurfacePattern".equals(method.getName())) {
+                imageCalls.add("createMutableSurfacePattern");
+                return "mutable-pattern";
+            }
+            if ("paintPattern".equals(method.getName())) {
+                imageCalls.add("paintPattern:" + args[3] + "x" + args[4]);
+                return null;
+            }
+            throw new UnsupportedOperationException(method.getName());
+        });
+        nativeImageClass.getMethod("tile", imageModelClass, tileTargetClass, int.class, int.class, int.class, int.class)
+                .invoke(null, loadedModel, tileTarget, 1, 2, 10, 20);
+        nativeImageClass.getMethod("tile", imageModelClass, tileTargetClass, int.class, int.class, int.class, int.class)
+                .invoke(null, loadedModel, tileTarget, 1, 2, 10, 20);
+        Object pixelTarget = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{pixelReadTargetClass}, (proxy, method, args) -> {
+            imageCalls.add(method.getName());
+            return null;
+        });
+        nativeImageClass.getMethod("readPixels", imageModelClass, pixelReadTargetClass)
+                .invoke(null, loadedModel, pixelTarget);
         assertEquals("drawLoadedImage:10x20", imageCalls.get(0));
-        assertEquals("tileLoadedImage:10x20", imageCalls.get(1));
+        assertEquals("createLoadedImagePattern", imageCalls.get(1));
+        assertEquals("paintPattern:10x20", imageCalls.get(2));
+        assertEquals("paintPattern:10x20", imageCalls.get(3));
+        assertEquals("readLoadedImage", imageCalls.get(4));
+        nativeImageClass.getMethod("invalidatePatternCache", imageModelClass).invoke(null, loadedModel);
+        assertEquals(null, loadedPatternCache.get());
+    }
+
+    @Test
+    void extractedAsyncImageLoadCoordinatorCompilesAndPreservesMinimalBehavior() throws Exception {
+        Path sourceDir = Files.createTempDirectory("js-async-image-src");
+        Path classesDir = Files.createTempDirectory("js-async-image-classes");
+        Path packageDir = sourceDir.resolve(Paths.get("com", "codename1", "impl", "html5"));
+        Files.createDirectories(packageDir);
+        Files.copy(ASYNC_IMAGE_LOAD_COORDINATOR_SOURCE, packageDir.resolve("JavaScriptAsyncImageLoadCoordinator.java"));
+
+        CompilerHelper.CompilerConfig config = CompilerHelper.getAvailableCompilers("1.8").get(0);
+        int compileResult = CompilerHelper.compile(config.jdkHome, java.util.Arrays.asList(
+                "-source", config.targetVersion,
+                "-target", config.targetVersion,
+                "-d", classesDir.toString(),
+                packageDir.resolve("JavaScriptAsyncImageLoadCoordinator.java").toString()
+        ));
+        assertEquals(0, compileResult, "Async image load coordinator should compile as a standalone Java helper");
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classesDir.toUri().toURL()});
+        Class<?> coordinatorClass = loader.loadClass("com.codename1.impl.html5.JavaScriptAsyncImageLoadCoordinator");
+        Class<?> stateClass = loader.loadClass("com.codename1.impl.html5.JavaScriptAsyncImageLoadCoordinator$State");
+        Object state = stateClass.getConstructor().newInstance();
+        assertEquals(true, coordinatorClass.getMethod("handleImmediateCompletion", stateClass, int.class, int.class).invoke(null, state, 20, 10));
+        assertEquals(true, stateClass.getMethod("isLoaded").invoke(state));
+        assertEquals(false, stateClass.getMethod("isError").invoke(state));
+        assertEquals(20, stateClass.getMethod("getWidth").invoke(state));
+        assertEquals(10, stateClass.getMethod("getHeight").invoke(state));
+        state = stateClass.getConstructor().newInstance();
+        assertEquals(false, coordinatorClass.getMethod("handleImmediateCompletion", stateClass, int.class, int.class).invoke(null, state, 20, 0));
+        coordinatorClass.getMethod("beginLoading", stateClass).invoke(null, state);
+        assertEquals(true, coordinatorClass.getMethod("shouldWait", stateClass).invoke(null, state));
+        stateClass.getMethod("setSuppressRepaint", boolean.class).invoke(state, true);
+        coordinatorClass.getMethod("handleLoad", stateClass, int.class, int.class).invoke(null, state, 30, 15);
+        assertEquals(false, coordinatorClass.getMethod("shouldRepaintOnLoad", stateClass).invoke(null, state));
+        stateClass.getMethod("setSuppressRepaint", boolean.class).invoke(state, false);
+        assertEquals(true, coordinatorClass.getMethod("shouldRepaintOnLoad", stateClass).invoke(null, state));
+        coordinatorClass.getMethod("handleError", stateClass).invoke(null, state);
+        assertEquals(true, stateClass.getMethod("isError").invoke(state));
+        assertEquals(false, coordinatorClass.getMethod("shouldWait", stateClass).invoke(null, state));
     }
 }

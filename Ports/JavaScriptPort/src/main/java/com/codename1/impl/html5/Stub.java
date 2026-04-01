@@ -9,7 +9,7 @@ package com.codename1.impl.html5;
 import com.codename1.system.Lifecycle;
 
 /**
- * Default TeaVM entrypoint for the JavaScript port.
+ * Default JavaScript-port entrypoint.
  */
 public class Stub {
     public static void main(String[] args) {
