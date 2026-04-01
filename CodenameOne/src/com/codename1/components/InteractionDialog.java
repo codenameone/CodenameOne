@@ -723,11 +723,13 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
         Style contentPaneStyle = getStyle(); // PMD Fix: UnusedLocalVariable removed redundant contentPane reference
 
-        if (manager.isThemeConstant(getUIID() + "ArrowBool", false)) {
-            Image t = manager.getThemeImageConstant(getUIID() + "ArrowTopImage");
-            Image b = manager.getThemeImageConstant(getUIID() + "ArrowBottomImage");
-            Image l = manager.getThemeImageConstant(getUIID() + "ArrowLeftImage");
-            Image r = manager.getThemeImageConstant(getUIID() + "ArrowRightImage");
+        boolean arrowEnabled = manager.isThemeConstant(getUIID() + "ArrowBool", false);
+        Image t = manager.getThemeImageConstant(getUIID() + "ArrowTopImage");
+        Image b = manager.getThemeImageConstant(getUIID() + "ArrowBottomImage");
+        Image l = manager.getThemeImageConstant(getUIID() + "ArrowLeftImage");
+        Image r = manager.getThemeImageConstant(getUIID() + "ArrowRightImage");
+        boolean hasArrowImages = t != null || b != null || l != null || r != null;
+        if (arrowEnabled && hasArrowImages) {
             Border border = contentPaneStyle.getBorder();
             if (border != null) {
                 border.setImageBorderSpecialTile(t, b, l, r, rect);
@@ -796,16 +798,10 @@ public class InteractionDialog extends Container implements AbstractDialog {
             int spaceBelow = availableHeight - (rect.getY() + rect.getHeight());
             boolean canShowAbove = prefHeight <= spaceAbove;
             boolean canShowBelow = prefHeight <= spaceBelow;
-            boolean showAbove;
-            if (canShowAbove && canShowBelow) {
-                showAbove = prioritizeTopOrRightPosition;
-            } else if (canShowAbove) {
-                showAbove = true;
-            } else if (canShowBelow) {
-                showAbove = false;
-            } else {
-                showAbove = spaceAbove >= spaceBelow;
-            }
+            // Boolean decision: honor preference when both sides fit, otherwise use the fitting side,
+            // and if neither fits use the side with more available space.
+            boolean showAbove = canShowAbove && (canShowBelow ? prioritizeTopOrRightPosition : true)
+                    || !canShowAbove && !canShowBelow && spaceAbove >= spaceBelow;
 
             if (!showAbove) {
                 // popup downwards
@@ -843,16 +839,10 @@ public class InteractionDialog extends Container implements AbstractDialog {
             int spaceLeft = rect.getX();
             boolean canShowRight = prefWidth <= spaceRight;
             boolean canShowLeft = prefWidth <= spaceLeft;
-            boolean showRight;
-            if (canShowRight && canShowLeft) {
-                showRight = prioritizeTopOrRightPosition;
-            } else if (canShowRight) {
-                showRight = true;
-            } else if (canShowLeft) {
-                showRight = false;
-            } else {
-                showRight = spaceRight >= spaceLeft;
-            }
+            // Boolean decision: honor preference when both sides fit, otherwise use the fitting side,
+            // and if neither fits use the side with more available space.
+            boolean showRight = canShowRight && (canShowLeft ? prioritizeTopOrRightPosition : true)
+                    || !canShowRight && !canShowLeft && spaceRight >= spaceLeft;
 
             if (showRight) {
                 // popup right

@@ -67,6 +67,7 @@ public class InteractionDialogPopupBiasScreenshotTest extends BaseTest {
     private InteractionDialog createDialog(String text) {
         InteractionDialog dialog = new InteractionDialog();
         dialog.setLayout(BoxLayout.y());
+        dialog.setAnimateShow(false);
         Label label = new Label(text);
         label.getAllStyles().setPadding(1, 1, 1, 1);
         dialog.add(label);
