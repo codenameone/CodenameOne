@@ -19,6 +19,8 @@ class JavaScriptRuntimeFacadeTest {
     private static final Path INITIALIZATION_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptInitializationAdapter.java");
     private static final Path RUNTIME_ENVIRONMENT_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptRuntimeEnvironment.java");
     private static final Path INPUT_COORDINATOR_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptInputCoordinator.java");
+    private static final Path POINTER_STATE_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptPointerSessionState.java");
+    private static final Path EVENT_WIRING_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptEventWiring.java");
     private static final Path STORAGE_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptStorageAdapter.java");
     private static final Path NETWORK_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptNetworkAdapter.java");
     private static final Path HTML5_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "HTML5Implementation.java");
@@ -94,6 +96,12 @@ class JavaScriptRuntimeFacadeTest {
                 "HTML5Implementation should delegate pointer routing decisions to the input coordinator");
         assertTrue(html5Source.contains("new JavaScriptRuntimeEnvironment("),
                 "HTML5Implementation should build a compact runtime environment object");
+        assertTrue(html5Source.contains("new JavaScriptPointerSessionState()"),
+                "HTML5Implementation should store pointer lifecycle state in a dedicated session object");
+        assertTrue(html5Source.contains("JavaScriptEventWiring.registerDocumentEvents("),
+                "HTML5Implementation should delegate document event registration to the event-wiring helper");
+        assertTrue(html5Source.contains("JavaScriptEventWiring.registerPeerPointerEvents("),
+                "HTML5Implementation should delegate peer pointer registration to the event-wiring helper");
         assertTrue(bootstrapSource.contains("JavaScriptRuntimeFacade.proxifyUrl("),
                 "JavaScriptPortBootstrap should delegate proxy decisions to the runtime facade");
         assertTrue(bootstrapSource.contains("JavaScriptBootstrapCoordinator.createLifecycle(className)"),
@@ -313,5 +321,84 @@ class JavaScriptRuntimeFacadeTest {
 
         assertEquals(Boolean.TRUE, shouldCreatePreemptiveTextField.invoke(null, true, 1000L, 1100L, 10, 10, 15, 15));
         assertEquals(Boolean.FALSE, shouldCreatePreemptiveTextField.invoke(null, true, 1000L, 1300L, 10, 10, 15, 15));
+    }
+
+    @Test
+    void extractedPointerStateAndEventWiringCompileAndPreserveMinimalContracts() throws Exception {
+        Path sourceDir = Files.createTempDirectory("js-pointer-state-src");
+        Path classesDir = Files.createTempDirectory("js-pointer-state-classes");
+        Path packageDir = sourceDir.resolve(Paths.get("com", "codename1", "impl", "html5"));
+        Files.createDirectories(packageDir);
+        Files.copy(POINTER_STATE_SOURCE, packageDir.resolve("JavaScriptPointerSessionState.java"));
+        Files.copy(EVENT_WIRING_SOURCE, packageDir.resolve("JavaScriptEventWiring.java"));
+
+        CompilerHelper.CompilerConfig config = CompilerHelper.getAvailableCompilers("1.8").get(0);
+        int compileResult = CompilerHelper.compile(config.jdkHome, java.util.Arrays.asList(
+                "-source", config.targetVersion,
+                "-target", config.targetVersion,
+                "-d", classesDir.toString(),
+                packageDir.resolve("JavaScriptPointerSessionState.java").toString(),
+                packageDir.resolve("JavaScriptEventWiring.java").toString()
+        ));
+        assertEquals(0, compileResult, "Pointer state and event wiring helpers should compile as standalone Java helpers");
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classesDir.toUri().toURL()});
+        Class<?> pointerStateClass = loader.loadClass("com.codename1.impl.html5.JavaScriptPointerSessionState");
+        Object state = pointerStateClass.getConstructor().newInstance();
+        pointerStateClass.getMethod("setMouseDown", boolean.class).invoke(state, true);
+        pointerStateClass.getMethod("setTouchDown", boolean.class).invoke(state, true);
+        pointerStateClass.getMethod("setGrabbedDrag", boolean.class).invoke(state, true);
+        pointerStateClass.getMethod("setCapturingEvents", boolean.class).invoke(state, false);
+        pointerStateClass.getMethod("setLastMousePosition", int.class, int.class).invoke(state, 10, 20);
+        pointerStateClass.getMethod("setLastTouchUpPosition", int.class, int.class).invoke(state, 30, 40);
+        pointerStateClass.getMethod("setTouchStart", int.class, int.class, long.class).invoke(state, 50, 60, 70L);
+        pointerStateClass.getMethod("setTouches", int[].class, int[].class).invoke(state, new int[]{1, 2}, new int[]{3, 4});
+        assertEquals(Boolean.TRUE, pointerStateClass.getMethod("isMouseDown").invoke(state));
+        assertEquals(Boolean.TRUE, pointerStateClass.getMethod("isTouchDown").invoke(state));
+        assertEquals(Boolean.TRUE, pointerStateClass.getMethod("isGrabbedDrag").invoke(state));
+        assertEquals(Boolean.FALSE, pointerStateClass.getMethod("isCapturingEvents").invoke(state));
+        assertEquals(10, pointerStateClass.getMethod("getLastMouseX").invoke(state));
+        assertEquals(20, pointerStateClass.getMethod("getLastMouseY").invoke(state));
+        assertEquals(30, pointerStateClass.getMethod("getLastTouchUpX").invoke(state));
+        assertEquals(40, pointerStateClass.getMethod("getLastTouchUpY").invoke(state));
+        assertEquals(50, pointerStateClass.getMethod("getTouchStartX").invoke(state));
+        assertEquals(60, pointerStateClass.getMethod("getTouchStartY").invoke(state));
+        assertEquals(70L, pointerStateClass.getMethod("getTouchStartTime").invoke(state));
+
+        Class<?> wiringClass = loader.loadClass("com.codename1.impl.html5.JavaScriptEventWiring");
+        Class<?> windowRegistrarClass = loader.loadClass("com.codename1.impl.html5.JavaScriptEventWiring$WindowRegistrar");
+        Class<?> documentRegistrarClass = loader.loadClass("com.codename1.impl.html5.JavaScriptEventWiring$DocumentRegistrar");
+        Class<?> elementRegistrarClass = loader.loadClass("com.codename1.impl.html5.JavaScriptEventWiring$ElementRegistrar");
+
+        final java.util.List<String> windowEvents = new java.util.ArrayList<String>();
+        Object windowRegistrar = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{windowRegistrarClass}, (proxy, method, args) -> {
+            windowEvents.add(args[0] + ":" + args[2]);
+            return null;
+        });
+        wiringClass.getMethod("registerCoreWindowEvents", windowRegistrarClass, boolean.class, Object.class, Object.class, Object.class, Object.class, Object.class, Object.class, Object.class, Object.class)
+                .invoke(null, windowRegistrar, true, new Object(), new Object(), new Object(), new Object(), new Object(), new Object(), new Object(), new Object());
+        assertTrue(windowEvents.contains("cn1inbox:false"));
+        assertTrue(windowEvents.contains("popstate:true"));
+        assertTrue(windowEvents.contains("mousemove:false"));
+
+        final java.util.List<String> documentEvents = new java.util.ArrayList<String>();
+        Object documentRegistrar = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{documentRegistrarClass}, (proxy, method, args) -> {
+            documentEvents.add((String) args[0]);
+            return null;
+        });
+        wiringClass.getMethod("registerDocumentEvents", documentRegistrarClass, Object.class).invoke(null, documentRegistrar, new Object());
+        assertEquals("paste", documentEvents.get(0));
+
+        final java.util.List<String> peerEvents = new java.util.ArrayList<String>();
+        Object elementRegistrar = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{elementRegistrarClass}, (proxy, method, args) -> {
+            peerEvents.add(args[0] + ":" + args[2]);
+            return null;
+        });
+        wiringClass.getMethod("registerPeerPointerEvents", elementRegistrarClass, boolean.class, boolean.class, boolean.class, boolean.class, boolean.class, String.class, Object.class, Object.class, Object.class, Object.class, Object.class, Object.class)
+                .invoke(null, elementRegistrar, true, true, true, true, true, "wheel", new Object(), new Object(), new Object(), new Object(), new Object(), new Object());
+        assertTrue(peerEvents.contains("mousedown:true"));
+        assertTrue(peerEvents.contains("pointerdown:true"));
+        assertTrue(peerEvents.contains("hittest:true"));
+        assertTrue(peerEvents.contains("wheel:true"));
     }
 }
