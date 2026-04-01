@@ -5,6 +5,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -18,30 +19,28 @@ public class InteractionDialogPopupBiasScreenshotTest extends BaseTest {
 
     @Override
     public boolean runTest() {
-        Form form = createForm("InteractionDialog Popup Bias", new BorderLayout(), "InteractionDialogPopupBias");
+        Form form = createForm("InteractionDialog Popup", new BorderLayout(), "InteractionDialogPopupBias");
         Container center = new Container(new FlowLayout(Component.CENTER, Component.CENTER));
         Label target = new Label("CENTER TARGET");
         target.getAllStyles().setPadding(2, 2, 2, 2);
         center.add(target);
         form.add(BorderLayout.CENTER, center);
-        form.add(BorderLayout.NORTH, new Label("3 dialogs: above target, below target, and top-fallback"));
-        form.add(BorderLayout.SOUTH, new Label("CENTER TARGET helps verify relative arrow direction"));
         form.show();
         return true;
     }
 
     @Override
     protected void registerReadyCallback(Form parent, Runnable run) {
-        topPreferredDialog = createDialog("bias=true -> above target");
-        bottomPreferredDialog = createDialog("bias=false -> below target");
-        topFallbackDialog = createDialog("bias=true near top -> fallback below");
+        topPreferredDialog = createDialog("T: bias=true");
+        bottomPreferredDialog = createDialog("B: bias=false");
+        topFallbackDialog = createDialog("F: top fallback");
         int width = parent.getWidth();
         int height = parent.getHeight();
 
         // Keep the targets far apart to avoid overlap in screenshot.
-        Rectangle upperTarget = new Rectangle(width / 2 - 45, height / 3, 90, 24);
-        Rectangle lowerTarget = new Rectangle(width / 2 - 45, (height * 2 / 3) - 24, 90, 24);
-        Rectangle nearTopTarget = new Rectangle(width / 2 - 45, 6, 90, 24);
+        Rectangle upperTarget = new Rectangle(width / 2 - 24, Math.max(40, (height / 2) - 130), 48, 20);
+        Rectangle lowerTarget = new Rectangle(width / 2 - 24, Math.min(height - 60, (height / 2) + 90), 48, 20);
+        Rectangle nearTopTarget = new Rectangle(width / 2 - 24, 2, 48, 20);
         topPreferredDialog.showPopupDialog(upperTarget, true);
         bottomPreferredDialog.showPopupDialog(lowerTarget, false);
         topFallbackDialog.showPopupDialog(nearTopTarget, true);
@@ -63,8 +62,12 @@ public class InteractionDialogPopupBiasScreenshotTest extends BaseTest {
 
     private InteractionDialog createDialog(String text) {
         InteractionDialog dialog = new InteractionDialog();
+        dialog.setUIID("PopupDialogCN1SSBias");
+        dialog.setDialogUIID("PopupDialogCN1SSBiasContent");
         dialog.setLayout(BoxLayout.y());
-        dialog.add(new Label(text));
+        Label label = new Label(text);
+        label.getAllStyles().setFont(label.getUnselectedStyle().getFont().derive(label.getUnselectedStyle().getFont().getHeight() * 0.75f, Style.FONT_STYLE_PLAIN));
+        dialog.add(label);
         dialog.setDisposeWhenPointerOutOfBounds(false);
         return dialog;
     }
