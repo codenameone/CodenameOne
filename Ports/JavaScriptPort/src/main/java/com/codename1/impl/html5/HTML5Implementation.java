@@ -1035,27 +1035,48 @@ public class HTML5Implementation extends CodenameOneImplementation {
             //_log("Setting default timezone to "+TimeZone.getDefault().getDisplayName());
         }
         
-        window.addEventListener("cn1inbox", new EventListener() {
+        final EventListener cn1InboxListener = new EventListener() {
             public void handleEvent(Event evt) {
-                evt.stopPropagation();
-                evt.preventDefault();
-                
                 final String detailString = getEventDetailString(evt);
                 final int eventCode = getEventCode(evt);
-                callSerially(new Runnable() {
+                JavaScriptBrowserLifecycleCoordinator.handleInboxEvent(new JavaScriptBrowserLifecycleCoordinator.InboxHooks() {
                     public void run() {
-                        Display.getInstance().dispatchMessage(new MessageEvent(CN.getCurrentForm(), detailString, eventCode));
-                        
                     }
-                });
+
+                    @Override
+                    public void stopPropagation() {
+                        evt.stopPropagation();
+                    }
+
+                    @Override
+                    public void preventDefault() {
+                        evt.preventDefault();
+                    }
+
+                    @Override
+                    public void callSerially(Runnable runnable) {
+                        HTML5Implementation.this.callSerially(runnable);
+                    }
+
+                    @Override
+                    public void dispatchMessage(String message, int code) {
+                        Display.getInstance().dispatchMessage(new MessageEvent(CN.getCurrentForm(), message, code));
+                    }
+                }, detailString, eventCode);
             }
-        });
+        };
         
-        window.addEventListener("popstate", new EventListener() {
+        final EventListener popstateListener = new EventListener() {
             @Override
             public void handleEvent(Event evt) {
-                callSerially(new Runnable() {
-                    public void run() {
+                JavaScriptBrowserLifecycleCoordinator.handlePopState(new JavaScriptBrowserLifecycleCoordinator.BackNavigationHooks() {
+                    @Override
+                    public void callSerially(Runnable runnable) {
+                        HTML5Implementation.this.callSerially(runnable);
+                    }
+
+                    @Override
+                    public void runBackCommand() {
                         Form f = getCurrentForm();
                         if (f != null && f.getBackCommand() != null) {
                             f.getBackCommand().actionPerformed(new ActionEvent(f, ActionEvent.Type.Other));
@@ -1064,10 +1085,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 });
             }
             
-        }, true);
+        };
         
         // Handle browser resizing.
-        window.addEventListener("resize", new EventListener(){
+        final EventListener resizeListener = new EventListener(){
 
             @Override
             public void handleEvent(final Event evt) {
@@ -1076,69 +1097,83 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                     @Override
                     public void run() {
-                        //Log.p("Body size: "+window.getDocument().getBody().getClientWidth()+"x"+window.getInnerHeight());
-                        //Log.p("Canvas size: "+canvas.getWidth()+"x"+canvas.getHeight());
-                        //Log.p("Canvas style size: "+canvas.getStyle().getPropertyValue("width")+"x"+canvas.getStyle().getPropertyValue("height"));
-                        // This invokeAndBlock is necessary to fix race condition on Chrome for iOS only
-                        // in which the body doesn't yet have the updated size inside the resize event.
-                        // This seems to fix the issue.
-                        // https://github.com/codenameone/CodenameOne/issues/2636
-                        CN.invokeAndBlock(new Runnable() {
+                        JavaScriptBrowserInteractionCoordinator.handleResize(new JavaScriptBrowserInteractionCoordinator.ResizeHooks() {
                             @Override
-                            public void run() {
-                                Util.sleep(1);
+                            public void waitForResizeStabilization() {
+                                CN.invokeAndBlock(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        Util.sleep(1);
+                                    }
+                                });
                             }
-                            
+
+                            @Override
+                            public void updateCanvasSize() {
+                                HTML5Implementation.this.updateCanvasSize();
+                            }
+
+                            @Override
+                            public void sizeChanged() {
+                                HTML5Implementation.this.sizeChanged(canvas.getWidth(), canvas.getHeight());
+                            }
+
+                            @Override
+                            public void revalidate() {
+                                HTML5Implementation.this.revalidate();
+                            }
                         });
-                        updateCanvasSize();
-                        sizeChanged(canvas.getWidth(), canvas.getHeight());
-                        revalidate();
                     }
 
                 });
             }
-        });
-        if (!debugFlag("disableHover")) {
-            window.addEventListener("mousemove", new EventListener() {
+        };
+        final EventListener hoverListener = new EventListener() {
 
                 @Override
                 public void handleEvent(Event evt) {
                     final MouseEvent me = (MouseEvent)evt;
                     new Thread() {
                         public void run() {
-                            Display.getInstance().pointerHover(new int[]{getClientX(me)}, new int[]{getClientY(me)});
-                            final Form f = _getCurrent();
-                            if (f != null && f.isEnableCursors()) {
-                                Display.getInstance().callSerially(new Runnable() {
-                                    public void run() {
-                                        int x = getClientX(me);
-                                        int y = getClientY(me);
-                                        if (x >= 0 && x < f.getWidth() && y >= 0 && y < f.getHeight()) {
-                                            Component cmp = f.getComponentAt(x, y);
-                                            if (cmp != null) {
-                                                int cursor = cmp.getCursor();
-                                                setCursor(cursor);
-                                            } else {
-                                                setCursor(Component.DEFAULT_CURSOR);
-                                            }
-                                        } else {
-                                            setCursor(Component.DEFAULT_CURSOR);
+                            final int x = getClientX(me);
+                            final int y = getClientY(me);
+                            JavaScriptBrowserInteractionCoordinator.handleHover(new JavaScriptBrowserInteractionCoordinator.HoverHooks() {
+                                @Override
+                                public void dispatchHover(int x, int y) {
+                                    Display.getInstance().pointerHover(new int[]{x}, new int[]{y});
+                                }
 
+                                @Override
+                                public void setCursor(int cursor) {
+                                    HTML5Implementation.this.setCursor(cursor);
+                                }
 
-                                        }
+                                @Override
+                                public void callSerially(Runnable runnable) {
+                                    Display.getInstance().callSerially(runnable);
+                                }
+                            }, new JavaScriptBrowserInteractionCoordinator.CursorLocator() {
+                                @Override
+                                public boolean isCursorEnabled() {
+                                    Form f = _getCurrent();
+                                    return f != null && f.isEnableCursors();
+                                }
+
+                                @Override
+                                public int resolveCursorAt(int x, int y) {
+                                    Form f = _getCurrent();
+                                    if (f == null || x < 0 || x >= f.getWidth() || y < 0 || y >= f.getHeight()) {
+                                        return Component.DEFAULT_CURSOR;
                                     }
-
-                                });
-
-                            } else {
-                                setCursor(Component.DEFAULT_CURSOR);
-                            }
+                                    Component cmp = f.getComponentAt(x, y);
+                                    return cmp != null ? cmp.getCursor() : Component.DEFAULT_CURSOR;
+                                }
+                            }, x, y, Component.DEFAULT_CURSOR);
                         }
                     }.start();
                 }
 
-            });
-        }
+            };
         
         hitTest = new EventListener() {
             @Override
@@ -1158,37 +1193,42 @@ public class HTML5Implementation extends CodenameOneImplementation {
             @Override
             public void handleEvent(Event evt) {
                 String plainText = getPasteEventData(evt, "text/plain");
-                if (plainText != null && !"".equals(plainText)) {
-                   
-                    HTML5Implementation.super.copyToClipboard(plainText);
-                    firePasteEvent();
-                    return;
-                }
-                
                 String htmlText = getPasteEventData(evt, "text/html");
-                if (htmlText != null && !"".equals(htmlText)) {
-                    HTML5Implementation.super.copyToClipboard(htmlText);
-                    firePasteEvent();
-                    return;
-                }
-                
                 FileList files = getPasteEventFileList(evt);
-                
+                String[] filePaths = null;
                 if (files != null) {
-                    
                     int len = files.getLength();
-                    com.codename1.io.File[] cn1Files = new com.codename1.io.File[len];
+                    filePaths = new String[len];
                     for (int i=0; i<len; i++) {
                         Blob file = files.item(i);
-                        String path = createTempFile(file);
-                        cn1Files[i] = new com.codename1.io.File(path);
-                        
+                        filePaths[i] = createTempFile(file);
                     }
-                    HTML5Implementation.super.copyToClipboard(cn1Files);
-                    firePasteEvent();
-                    return;
                 }
-                
+                JavaScriptBrowserLifecycleCoordinator.handlePaste(new JavaScriptBrowserLifecycleCoordinator.PasteHooks() {
+                    @Override
+                    public void copyPlainText(String text) {
+                        HTML5Implementation.super.copyToClipboard(text);
+                    }
+
+                    @Override
+                    public void copyHtmlText(String html) {
+                        HTML5Implementation.super.copyToClipboard(html);
+                    }
+
+                    @Override
+                    public void copyFiles(String[] paths) {
+                        com.codename1.io.File[] cn1Files = new com.codename1.io.File[paths.length];
+                        for (int i = 0; i < paths.length; i++) {
+                            cn1Files[i] = new com.codename1.io.File(paths[i]);
+                        }
+                        HTML5Implementation.super.copyToClipboard(cn1Files);
+                    }
+
+                    @Override
+                    public void firePasteEvent() {
+                        HTML5Implementation.this.firePasteEvent();
+                    }
+                }, plainText, htmlText, filePaths);
             }
             
         };
@@ -1718,92 +1758,236 @@ public class HTML5Implementation extends CodenameOneImplementation {
          * isn't triggered (where the backside hooks are usually installed).
          * listener isn't being called, the 
          */
-        window.addEventListener("installbacksidehooks", new EventListener() {
+        final EventListener installBacksideHooksListener = new EventListener() {
             @Override
             public void handleEvent(Event evt) {
-                installBacksideHooksInUserInteraction();
+                JavaScriptBrowserLifecycleCoordinator.handleInstallBacksideHooks(new JavaScriptBrowserLifecycleCoordinator.BacksideHooks() {
+                    @Override
+                    public void installBacksideHooksInUserInteraction() {
+                        HTML5Implementation.this.installBacksideHooksInUserInteraction();
+                    }
+                });
             }
             
-        });
+        };
         
-        window.addEventListener("keydown", new EventListener() {
+        final EventListener keydownListener = new EventListener() {
 
             @Override
             public void handleEvent(Event evt) {
                 final KeyEvent kevt = (KeyEvent) evt;
-                if (!isEditing && (kevt.getKeyCode() == 9 || kevt.getKeyCode() == 11)) {
-                    evt.preventDefault();
-                }
-                installBacksideHooksInUserInteraction();
-                nativeCallSerially(new Runnable() {
-                    public void run() {
-                        if (kevt.getKeyCode() == 16) {
-                            // shift key
-                            shiftKeyDown = true;
-                        }
-                        if (kevt.getCharCode() != 0) {
-                            lastCharCode = kevt.getCharCode();
-                        }
-                        HTML5Implementation.this.keyPressed(getCode(kevt));
-                        
+                JavaScriptKeyboardInteractionAdapter.handleKeyDown(new JavaScriptKeyboardInteractionAdapter.EditingState() {
+                    @Override
+                    public boolean isEditing() {
+                        return isEditing;
+                    }
+                }, new JavaScriptKeyboardInteractionAdapter.BacksideHooks() {
+                    @Override
+                    public void installBacksideHooksInUserInteraction() {
+                        HTML5Implementation.this.installBacksideHooksInUserInteraction();
+                    }
+                }, new JavaScriptKeyboardInteractionAdapter.KeyDispatch() {
+                    @Override
+                    public void preventDefault() {
+                        evt.preventDefault();
+                    }
+
+                    @Override
+                    public void nativeCallSerially(Runnable runnable) {
+                        HTML5Implementation.this.nativeCallSerially(runnable);
+                    }
+
+                    @Override
+                    public void callSerially(Runnable runnable) {
+                        HTML5Implementation.this.callSerially(runnable);
+                    }
+
+                    @Override
+                    public void setShiftKeyDown(boolean down) {
+                        shiftKeyDown = down;
+                    }
+
+                    @Override
+                    public void setLastCharCode(int code) {
+                        lastCharCode = code;
+                    }
+
+                    @Override
+                    public int translateKeyCode(JavaScriptKeyboardInteractionAdapter.KeyEventView event) {
+                        return getCode(kevt);
+                    }
+
+                    @Override
+                    public void keyPressed(int code) {
+                        HTML5Implementation.this.keyPressed(code);
+                    }
+
+                    @Override
+                    public void keyReleased(int code) {
+                    }
+
+                    @Override
+                    public void editFocusedTextArea(JavaScriptKeyboardInteractionAdapter.KeyEventView event) {
+                    }
+                }, new JavaScriptKeyboardInteractionAdapter.KeyEventView() {
+                    @Override
+                    public int getKeyCode() {
+                        return kevt.getKeyCode();
+                    }
+
+                    @Override
+                    public int getCharCode() {
+                        return kevt.getCharCode();
+                    }
+
+                    @Override
+                    public boolean isShiftKey() {
+                        return kevt.isShiftKey();
+                    }
+                });
+                
+            }
+            
+        };
+        
+        final EventListener keyupListener = new EventListener() {
+
+            @Override
+            public void handleEvent(Event evt) {
+                final KeyEvent kevt = (KeyEvent) evt;
+                JavaScriptKeyboardInteractionAdapter.handleKeyUp(new JavaScriptKeyboardInteractionAdapter.BacksideHooks() {
+                    @Override
+                    public void installBacksideHooksInUserInteraction() {
+                        HTML5Implementation.this.installBacksideHooksInUserInteraction();
+                    }
+                }, new JavaScriptKeyboardInteractionAdapter.KeyDispatch() {
+                    @Override
+                    public void preventDefault() {
+                    }
+
+                    @Override
+                    public void nativeCallSerially(Runnable runnable) {
+                        HTML5Implementation.this.nativeCallSerially(runnable);
+                    }
+
+                    @Override
+                    public void callSerially(Runnable runnable) {
+                        HTML5Implementation.this.callSerially(runnable);
+                    }
+
+                    @Override
+                    public void setShiftKeyDown(boolean down) {
+                        shiftKeyDown = down;
+                    }
+
+                    @Override
+                    public void setLastCharCode(int code) {
+                        lastCharCode = code;
+                    }
+
+                    @Override
+                    public int translateKeyCode(JavaScriptKeyboardInteractionAdapter.KeyEventView event) {
+                        return getCode(kevt);
+                    }
+
+                    @Override
+                    public void keyPressed(int code) {
+                    }
+
+                    @Override
+                    public void keyReleased(int code) {
+                        HTML5Implementation.this.keyReleased(code);
+                    }
+
+                    @Override
+                    public void editFocusedTextArea(JavaScriptKeyboardInteractionAdapter.KeyEventView event) {
+                    }
+                }, new JavaScriptKeyboardInteractionAdapter.KeyEventView() {
+                    @Override
+                    public int getKeyCode() {
+                        return kevt.getKeyCode();
+                    }
+
+                    @Override
+                    public int getCharCode() {
+                        return kevt.getCharCode();
+                    }
+
+                    @Override
+                    public boolean isShiftKey() {
+                        return kevt.isShiftKey();
                     }
                 }); 
                 
             }
             
-        }, false);
+        };
         
-        window.addEventListener("keyup", new EventListener() {
+        final EventListener keypressListener = new EventListener() {
 
             @Override
             public void handleEvent(Event evt) {
                 final KeyEvent kevt = (KeyEvent) evt;
-                installBacksideHooksInUserInteraction();
-                nativeCallSerially(new Runnable() {
-                    public void run() {
-                        if (kevt.getKeyCode() == 16) {
-                            // shift key
-                            shiftKeyDown = false;
-                        }
-                        HTML5Implementation.this.keyReleased(getCode(kevt));
+                JavaScriptKeyboardInteractionAdapter.handleKeyPress(new JavaScriptKeyboardInteractionAdapter.EditingState() {
+                    @Override
+                    public boolean isEditing() {
+                        return isEditing;
                     }
-                }); 
-                
-            }
-            
-        }, false);
-        
-        window.addEventListener("keypress", new EventListener() {
+                }, new JavaScriptKeyboardInteractionAdapter.BacksideHooks() {
+                    @Override
+                    public void installBacksideHooksInUserInteraction() {
+                        HTML5Implementation.this.installBacksideHooksInUserInteraction();
+                    }
+                }, new JavaScriptKeyboardInteractionAdapter.KeyDispatch() {
+                    @Override
+                    public void preventDefault() {
+                    }
 
-            @Override
-            public void handleEvent(Event evt) {
-                if (isEditing) {
-                    return;
-                }
-                final KeyEvent kevt = (KeyEvent) evt;
-                if (kevt.getCharCode() != 0) {
-                    lastCharCode = kevt.getCharCode();
-                }
-                installBacksideHooksInUserInteraction();
-                nativeCallSerially(new Runnable() {
-                    public void run() {
-                        if (kevt.getCharCode() != 0) {
-                            lastCharCode = kevt.getCharCode();
-                        }
+                    @Override
+                    public void nativeCallSerially(Runnable runnable) {
+                        HTML5Implementation.this.nativeCallSerially(runnable);
                     }
-                }); 
-                callSerially(new Runnable() {
-                    public void run() {
+
+                    @Override
+                    public void callSerially(Runnable runnable) {
+                        HTML5Implementation.this.callSerially(runnable);
+                    }
+
+                    @Override
+                    public void setShiftKeyDown(boolean down) {
+                        shiftKeyDown = down;
+                    }
+
+                    @Override
+                    public void setLastCharCode(int code) {
+                        lastCharCode = code;
+                    }
+
+                    @Override
+                    public int translateKeyCode(JavaScriptKeyboardInteractionAdapter.KeyEventView event) {
+                        return getCode(kevt);
+                    }
+
+                    @Override
+                    public void keyPressed(int code) {
+                    }
+
+                    @Override
+                    public void keyReleased(int code) {
+                    }
+
+                    @Override
+                    public void editFocusedTextArea(JavaScriptKeyboardInteractionAdapter.KeyEventView event) {
                         Form currentForm = Display.getInstance().getCurrent();
                         if (currentForm != null) {
                             Component cmp = currentForm.getFocused();
                             if (cmp != null && cmp instanceof TextArea) {
                                 TextArea ta = (TextArea) cmp;
-                                int charCode = kevt.getCharCode();
-                                switch (kevt.getKeyCode()) {
+                                int charCode = event.getCharCode();
+                                switch (event.getKeyCode()) {
                                     case 11:
                                     case 9 : { // tab
-                                        if (kevt.isShiftKey()) {
+                                        if (event.isShiftKey()) {
                                             cmp = currentForm.getPreviousComponent(cmp);
                                         } else {
                                             cmp = currentForm.getNextComponent(cmp);
@@ -1846,10 +2030,32 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             
                         }
                     }
+                }, new JavaScriptKeyboardInteractionAdapter.KeyEventView() {
+                    @Override
+                    public int getKeyCode() {
+                        return kevt.getKeyCode();
+                    }
+
+                    @Override
+                    public int getCharCode() {
+                        return kevt.getCharCode();
+                    }
+
+                    @Override
+                    public boolean isShiftKey() {
+                        return kevt.isShiftKey();
+                    }
                 }); 
                  
             }
-        }, false);
+        };
+        JavaScriptEventWiring.registerCoreWindowEvents(new JavaScriptEventWiring.WindowRegistrar() {
+            @Override
+            public void add(String eventName, Object listener, boolean capture) {
+                window.addEventListener(eventName, (EventListener) listener, capture);
+            }
+        }, !debugFlag("disableHover"), cn1InboxListener, popstateListener, resizeListener, hoverListener,
+                installBacksideHooksListener, keydownListener, keyupListener, keypressListener);
         
         animationFrameCallback = new AnimationFrameCallback(){
 

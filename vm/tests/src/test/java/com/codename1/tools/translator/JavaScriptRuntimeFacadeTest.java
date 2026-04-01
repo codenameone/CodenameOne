@@ -21,6 +21,9 @@ class JavaScriptRuntimeFacadeTest {
     private static final Path INPUT_COORDINATOR_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptInputCoordinator.java");
     private static final Path POINTER_STATE_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptPointerSessionState.java");
     private static final Path EVENT_WIRING_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptEventWiring.java");
+    private static final Path BROWSER_INTERACTION_COORDINATOR_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptBrowserInteractionCoordinator.java");
+    private static final Path KEYBOARD_INTERACTION_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptKeyboardInteractionAdapter.java");
+    private static final Path BROWSER_LIFECYCLE_COORDINATOR_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptBrowserLifecycleCoordinator.java");
     private static final Path STORAGE_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptStorageAdapter.java");
     private static final Path NETWORK_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptNetworkAdapter.java");
     private static final Path HTML5_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "HTML5Implementation.java");
@@ -102,6 +105,24 @@ class JavaScriptRuntimeFacadeTest {
                 "HTML5Implementation should delegate document event registration to the event-wiring helper");
         assertTrue(html5Source.contains("JavaScriptEventWiring.registerPeerPointerEvents("),
                 "HTML5Implementation should delegate peer pointer registration to the event-wiring helper");
+        assertTrue(html5Source.contains("JavaScriptEventWiring.registerCoreWindowEvents("),
+                "HTML5Implementation should delegate core window event registration to the event-wiring helper");
+        assertTrue(html5Source.contains("JavaScriptBrowserInteractionCoordinator.handleResize("),
+                "HTML5Implementation should delegate resize handling to the browser interaction coordinator");
+        assertTrue(html5Source.contains("JavaScriptBrowserInteractionCoordinator.handleHover("),
+                "HTML5Implementation should delegate hover/cursor handling to the browser interaction coordinator");
+        assertTrue(html5Source.contains("JavaScriptKeyboardInteractionAdapter.handleKeyDown("),
+                "HTML5Implementation should delegate keydown semantics to the keyboard interaction adapter");
+        assertTrue(html5Source.contains("JavaScriptKeyboardInteractionAdapter.handleKeyUp("),
+                "HTML5Implementation should delegate keyup semantics to the keyboard interaction adapter");
+        assertTrue(html5Source.contains("JavaScriptKeyboardInteractionAdapter.handleKeyPress("),
+                "HTML5Implementation should delegate keypress semantics to the keyboard interaction adapter");
+        assertTrue(html5Source.contains("JavaScriptBrowserLifecycleCoordinator.handleInboxEvent("),
+                "HTML5Implementation should delegate inbox listener handling to the browser lifecycle coordinator");
+        assertTrue(html5Source.contains("JavaScriptBrowserLifecycleCoordinator.handlePopState("),
+                "HTML5Implementation should delegate popstate handling to the browser lifecycle coordinator");
+        assertTrue(html5Source.contains("JavaScriptBrowserLifecycleCoordinator.handlePaste("),
+                "HTML5Implementation should delegate paste handling to the browser lifecycle coordinator");
         assertTrue(bootstrapSource.contains("JavaScriptRuntimeFacade.proxifyUrl("),
                 "JavaScriptPortBootstrap should delegate proxy decisions to the runtime facade");
         assertTrue(bootstrapSource.contains("JavaScriptBootstrapCoordinator.createLifecycle(className)"),
@@ -400,5 +421,227 @@ class JavaScriptRuntimeFacadeTest {
         assertTrue(peerEvents.contains("pointerdown:true"));
         assertTrue(peerEvents.contains("hittest:true"));
         assertTrue(peerEvents.contains("wheel:true"));
+    }
+
+    @Test
+    void extractedBrowserInteractionCoordinatorCompilesAndPreservesMinimalBehavior() throws Exception {
+        Path sourceDir = Files.createTempDirectory("js-browser-interaction-src");
+        Path classesDir = Files.createTempDirectory("js-browser-interaction-classes");
+        Path packageDir = sourceDir.resolve(Paths.get("com", "codename1", "impl", "html5"));
+        Files.createDirectories(packageDir);
+        Files.copy(BROWSER_INTERACTION_COORDINATOR_SOURCE, packageDir.resolve("JavaScriptBrowserInteractionCoordinator.java"));
+
+        CompilerHelper.CompilerConfig config = CompilerHelper.getAvailableCompilers("1.8").get(0);
+        int compileResult = CompilerHelper.compile(config.jdkHome, java.util.Arrays.asList(
+                "-source", config.targetVersion,
+                "-target", config.targetVersion,
+                "-d", classesDir.toString(),
+                packageDir.resolve("JavaScriptBrowserInteractionCoordinator.java").toString()
+        ));
+        assertEquals(0, compileResult, "Browser interaction coordinator should compile as a standalone Java helper");
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classesDir.toUri().toURL()});
+        Class<?> coordinatorClass = loader.loadClass("com.codename1.impl.html5.JavaScriptBrowserInteractionCoordinator");
+        Class<?> resizeHooksClass = loader.loadClass("com.codename1.impl.html5.JavaScriptBrowserInteractionCoordinator$ResizeHooks");
+        Class<?> hoverHooksClass = loader.loadClass("com.codename1.impl.html5.JavaScriptBrowserInteractionCoordinator$HoverHooks");
+        Class<?> cursorLocatorClass = loader.loadClass("com.codename1.impl.html5.JavaScriptBrowserInteractionCoordinator$CursorLocator");
+
+        final java.util.List<String> resizeCalls = new java.util.ArrayList<String>();
+        Object resizeHooks = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{resizeHooksClass}, (proxy, method, args) -> {
+            resizeCalls.add(method.getName());
+            return null;
+        });
+        coordinatorClass.getMethod("handleResize", resizeHooksClass).invoke(null, resizeHooks);
+        assertEquals(java.util.Arrays.asList("waitForResizeStabilization", "updateCanvasSize", "sizeChanged", "revalidate"), resizeCalls);
+
+        final java.util.List<String> hoverCalls = new java.util.ArrayList<String>();
+        Object hoverHooks = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{hoverHooksClass}, (proxy, method, args) -> {
+            hoverCalls.add(method.getName() + (args == null || args.length == 0 ? "" : ":" + args[0]));
+            if ("callSerially".equals(method.getName())) {
+                ((Runnable) args[0]).run();
+            }
+            return null;
+        });
+        Object cursorLocator = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{cursorLocatorClass}, (proxy, method, args) -> {
+            if ("isCursorEnabled".equals(method.getName())) {
+                return true;
+            }
+            if ("resolveCursorAt".equals(method.getName())) {
+                return 7;
+            }
+            throw new UnsupportedOperationException(method.getName());
+        });
+        coordinatorClass.getMethod("handleHover", hoverHooksClass, cursorLocatorClass, int.class, int.class, int.class)
+                .invoke(null, hoverHooks, cursorLocator, 12, 34, 1);
+        assertTrue(hoverCalls.contains("dispatchHover:12"));
+        assertTrue(hoverCalls.contains("setCursor:7"));
+
+        hoverCalls.clear();
+        Object disabledCursorLocator = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{cursorLocatorClass}, (proxy, method, args) -> {
+            if ("isCursorEnabled".equals(method.getName())) {
+                return false;
+            }
+            if ("resolveCursorAt".equals(method.getName())) {
+                return 99;
+            }
+            throw new UnsupportedOperationException(method.getName());
+        });
+        coordinatorClass.getMethod("handleHover", hoverHooksClass, cursorLocatorClass, int.class, int.class, int.class)
+                .invoke(null, hoverHooks, disabledCursorLocator, 12, 34, 1);
+        assertTrue(hoverCalls.contains("setCursor:1"));
+    }
+
+    @Test
+    void extractedKeyboardInteractionAdapterCompilesAndPreservesMinimalBehavior() throws Exception {
+        Path sourceDir = Files.createTempDirectory("js-keyboard-adapter-src");
+        Path classesDir = Files.createTempDirectory("js-keyboard-adapter-classes");
+        Path packageDir = sourceDir.resolve(Paths.get("com", "codename1", "impl", "html5"));
+        Files.createDirectories(packageDir);
+        Files.copy(KEYBOARD_INTERACTION_ADAPTER_SOURCE, packageDir.resolve("JavaScriptKeyboardInteractionAdapter.java"));
+
+        CompilerHelper.CompilerConfig config = CompilerHelper.getAvailableCompilers("1.8").get(0);
+        int compileResult = CompilerHelper.compile(config.jdkHome, java.util.Arrays.asList(
+                "-source", config.targetVersion,
+                "-target", config.targetVersion,
+                "-d", classesDir.toString(),
+                packageDir.resolve("JavaScriptKeyboardInteractionAdapter.java").toString()
+        ));
+        assertEquals(0, compileResult, "Keyboard interaction adapter should compile as a standalone Java helper");
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classesDir.toUri().toURL()});
+        Class<?> adapterClass = loader.loadClass("com.codename1.impl.html5.JavaScriptKeyboardInteractionAdapter");
+        Class<?> eventViewClass = loader.loadClass("com.codename1.impl.html5.JavaScriptKeyboardInteractionAdapter$KeyEventView");
+        Class<?> editingStateClass = loader.loadClass("com.codename1.impl.html5.JavaScriptKeyboardInteractionAdapter$EditingState");
+        Class<?> backsideHooksClass = loader.loadClass("com.codename1.impl.html5.JavaScriptKeyboardInteractionAdapter$BacksideHooks");
+        Class<?> keyDispatchClass = loader.loadClass("com.codename1.impl.html5.JavaScriptKeyboardInteractionAdapter$KeyDispatch");
+
+        Object tabEvent = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{eventViewClass}, (proxy, method, args) -> {
+            if ("getKeyCode".equals(method.getName())) return 9;
+            if ("getCharCode".equals(method.getName())) return 65;
+            if ("isShiftKey".equals(method.getName())) return false;
+            throw new UnsupportedOperationException(method.getName());
+        });
+        assertEquals(Boolean.TRUE, adapterClass.getMethod("shouldPreventDefaultOnKeyDown", boolean.class, eventViewClass).invoke(null, false, tabEvent));
+
+        final java.util.List<String> calls = new java.util.ArrayList<String>();
+        Object editingState = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{editingStateClass}, (proxy, method, args) -> false);
+        Object backsideHooks = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{backsideHooksClass}, (proxy, method, args) -> {
+            calls.add("installBacksideHooks");
+            return null;
+        });
+        Object keyDispatch = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{keyDispatchClass}, (proxy, method, args) -> {
+            String name = method.getName();
+            String suffix = "";
+            if (args != null && args.length > 0) {
+                Object first = args[0];
+                if (first instanceof Integer || first instanceof Boolean || first instanceof Long || first instanceof String) {
+                    suffix = ":" + first;
+                } else if (first instanceof Runnable) {
+                    suffix = ":Runnable";
+                } else {
+                    suffix = ":arg";
+                }
+            }
+            calls.add(name + suffix);
+            if ("nativeCallSerially".equals(name) || "callSerially".equals(name)) {
+                ((Runnable) args[0]).run();
+            }
+            if ("translateKeyCode".equals(name)) {
+                return 123;
+            }
+            return null;
+        });
+
+        adapterClass.getMethod("handleKeyDown", editingStateClass, backsideHooksClass, keyDispatchClass, eventViewClass)
+                .invoke(null, editingState, backsideHooks, keyDispatch, tabEvent);
+        assertTrue(calls.contains("preventDefault"));
+        assertTrue(calls.contains("setLastCharCode:65"));
+        assertTrue(calls.contains("keyPressed:123"));
+
+        calls.clear();
+        Object shiftEvent = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{eventViewClass}, (proxy, method, args) -> {
+            if ("getKeyCode".equals(method.getName())) return 16;
+            if ("getCharCode".equals(method.getName())) return 0;
+            if ("isShiftKey".equals(method.getName())) return true;
+            throw new UnsupportedOperationException(method.getName());
+        });
+        adapterClass.getMethod("handleKeyUp", backsideHooksClass, keyDispatchClass, eventViewClass)
+                .invoke(null, backsideHooks, keyDispatch, shiftEvent);
+        assertTrue(calls.contains("setShiftKeyDown:false"));
+        assertTrue(calls.contains("keyReleased:123"));
+
+        calls.clear();
+        adapterClass.getMethod("handleKeyPress", editingStateClass, backsideHooksClass, keyDispatchClass, eventViewClass)
+                .invoke(null, editingState, backsideHooks, keyDispatch, tabEvent);
+        assertTrue(calls.contains("editFocusedTextArea:arg"));
+    }
+
+    @Test
+    void extractedBrowserLifecycleCoordinatorCompilesAndPreservesMinimalBehavior() throws Exception {
+        Path sourceDir = Files.createTempDirectory("js-browser-lifecycle-src");
+        Path classesDir = Files.createTempDirectory("js-browser-lifecycle-classes");
+        Path packageDir = sourceDir.resolve(Paths.get("com", "codename1", "impl", "html5"));
+        Files.createDirectories(packageDir);
+        Files.copy(BROWSER_LIFECYCLE_COORDINATOR_SOURCE, packageDir.resolve("JavaScriptBrowserLifecycleCoordinator.java"));
+
+        CompilerHelper.CompilerConfig config = CompilerHelper.getAvailableCompilers("1.8").get(0);
+        int compileResult = CompilerHelper.compile(config.jdkHome, java.util.Arrays.asList(
+                "-source", config.targetVersion,
+                "-target", config.targetVersion,
+                "-d", classesDir.toString(),
+                packageDir.resolve("JavaScriptBrowserLifecycleCoordinator.java").toString()
+        ));
+        assertEquals(0, compileResult, "Browser lifecycle coordinator should compile as a standalone Java helper");
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classesDir.toUri().toURL()});
+        Class<?> coordinatorClass = loader.loadClass("com.codename1.impl.html5.JavaScriptBrowserLifecycleCoordinator");
+        Class<?> inboxHooksClass = loader.loadClass("com.codename1.impl.html5.JavaScriptBrowserLifecycleCoordinator$InboxHooks");
+        Class<?> backNavHooksClass = loader.loadClass("com.codename1.impl.html5.JavaScriptBrowserLifecycleCoordinator$BackNavigationHooks");
+        Class<?> pasteHooksClass = loader.loadClass("com.codename1.impl.html5.JavaScriptBrowserLifecycleCoordinator$PasteHooks");
+        Class<?> backsideHooksClass = loader.loadClass("com.codename1.impl.html5.JavaScriptBrowserLifecycleCoordinator$BacksideHooks");
+
+        final java.util.List<String> calls = new java.util.ArrayList<String>();
+        Object inboxHooks = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{inboxHooksClass}, (proxy, method, args) -> {
+            calls.add(method.getName() + (args == null || args.length == 0 ? "" : ":" + args[0]));
+            if ("callSerially".equals(method.getName())) {
+                ((Runnable) args[0]).run();
+            }
+            return null;
+        });
+        coordinatorClass.getMethod("handleInboxEvent", inboxHooksClass, String.class, int.class)
+                .invoke(null, inboxHooks, "msg", 42);
+        assertTrue(calls.contains("stopPropagation"));
+        assertTrue(calls.contains("preventDefault"));
+        assertTrue(calls.contains("dispatchMessage:msg"));
+
+        calls.clear();
+        Object backNavHooks = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{backNavHooksClass}, (proxy, method, args) -> {
+            calls.add(method.getName());
+            if ("callSerially".equals(method.getName())) {
+                ((Runnable) args[0]).run();
+            }
+            return null;
+        });
+        coordinatorClass.getMethod("handlePopState", backNavHooksClass).invoke(null, backNavHooks);
+        assertTrue(calls.contains("runBackCommand"));
+
+        calls.clear();
+        Object pasteHooks = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{pasteHooksClass}, (proxy, method, args) -> {
+            calls.add(method.getName());
+            return null;
+        });
+        Object handled = coordinatorClass.getMethod("handlePaste", pasteHooksClass, String.class, String.class, String[].class)
+                .invoke(null, pasteHooks, "plain", "", null);
+        assertEquals(Boolean.TRUE, handled);
+        assertTrue(calls.contains("copyPlainText"));
+        assertTrue(calls.contains("firePasteEvent"));
+
+        calls.clear();
+        Object backside = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{backsideHooksClass}, (proxy, method, args) -> {
+            calls.add(method.getName());
+            return null;
+        });
+        coordinatorClass.getMethod("handleInstallBacksideHooks", backsideHooksClass).invoke(null, backside);
+        assertTrue(calls.contains("installBacksideHooksInUserInteraction"));
     }
 }
