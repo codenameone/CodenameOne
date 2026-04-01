@@ -36,10 +36,10 @@ public class InteractionDialogPopupBiasScreenshotTest extends BaseTest {
 
     @Override
     protected void registerReadyCallback(Form parent, Runnable run) {
-        northFallbackDialog = createDialog("1) North + bias=true -> fallback below");
-        centerTopDialog = createDialog("2) Center + bias=true -> above");
-        centerBottomDialog = createDialog("3) Center + bias=false -> below");
-        southFallbackDialog = createDialog("4) South + bias=false -> fallback above");
+        northFallbackDialog = createDialog("1) N,true fallback");
+        centerTopDialog = createDialog("2) C,true (top)");
+        centerBottomDialog = createDialog("3) C,false (bottom)");
+        southFallbackDialog = createDialog("4) S,false fallback");
         northFallbackDialog.showPopupDialog(northTarget, true);
         centerTopDialog.showPopupDialog(centerTarget, true);
         centerBottomDialog.showPopupDialog(centerTarget, false);
@@ -66,7 +66,9 @@ public class InteractionDialogPopupBiasScreenshotTest extends BaseTest {
     private InteractionDialog createDialog(String text) {
         InteractionDialog dialog = new InteractionDialog();
         dialog.setLayout(BoxLayout.y());
-        dialog.add(new Label(text));
+        Label label = new Label(text);
+        label.getAllStyles().setPadding(1, 1, 1, 1);
+        dialog.add(label);
         dialog.setDisposeWhenPointerOutOfBounds(false);
         return dialog;
     }
