@@ -697,7 +697,7 @@ public abstract class Executor {
                         + "                    return method.invoke(impl, args);\n"
                         + "                }\n"
                         + "            }\n"
-                        + "            throw new NoSuchMethodException(methodName + \" with \" + args.length + \" args\");\n"
+                        + "            throw new RuntimeException(methodName + \" with \" + args.length + \" args\");\n"
                         + "        } catch (Throwable t) {\n"
                         + "            throw new RuntimeException(\"Failed to invoke native method \" + methodName, t);\n"
                         + "        }\n"
