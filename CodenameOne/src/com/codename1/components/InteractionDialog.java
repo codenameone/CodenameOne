@@ -811,17 +811,17 @@ public class InteractionDialog extends Container implements AbstractDialog {
                 // popup downwards
                 y = rect.getY() + rect.getHeight();
                 int height = Math.min(prefHeight, Math.max(0, availableHeight - y));
-                padOrientation(contentPaneStyle, TOP, 1);
+                padOrientation(contentPaneStyle, BOTTOM, 1);
                 show(Math.max(0, y), Math.max(0, availableHeight - height - y),
                         Math.max(0, x), Math.max(0, availableWidth - width - x));
-                padOrientation(contentPaneStyle, TOP, -1);
+                padOrientation(contentPaneStyle, BOTTOM, -1);
             } else {
                 // popup upwards
                 int height = Math.min(prefHeight, rect.getY());
                 y = rect.getY() - height;
-                padOrientation(contentPaneStyle, BOTTOM, 1);
+                padOrientation(contentPaneStyle, TOP, 1);
                 show(y, Math.max(0, availableHeight - rect.getY()), x, Math.max(0, availableWidth - width - x));
-                padOrientation(contentPaneStyle, BOTTOM, -1);
+                padOrientation(contentPaneStyle, TOP, -1);
             }
         } else {
             int height = Math.min(prefHeight, availableHeight);
