@@ -32,7 +32,7 @@ import org.teavm.jso.typedarrays.Uint8Array;
  *
  * @author shannah
  */
-public class NetworkConnection {
+public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
     private String url;
     private boolean read;
     private boolean write;
@@ -239,7 +239,7 @@ public class NetworkConnection {
         }
     }
 
-    String[] getHeaderFieldNames() {
+    public String[] getHeaderFieldNames() {
         List<String> out = new ArrayList<String>();
         List<String> headerStrings =  StringUtil.tokenize(req.getAllResponseHeaders(), "\n");
         for (String str : headerStrings){
@@ -264,7 +264,7 @@ public class NetworkConnection {
     @JSBody(params={"str"}, script="console.log(str)")
     private native static void log(String str);
     
-    String[] getHeaderFields(String name) {
+    public String[] getHeaderFields(String name) {
         List<String> flds =  StringUtil.tokenize(req.getAllResponseHeaders(), "\n");
         List<String> out = new ArrayList<String>();
         

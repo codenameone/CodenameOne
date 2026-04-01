@@ -2246,10 +2246,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     public static void setMainClass(Object main) {
-        if (main instanceof PushCallback) {
-            setPushCallback((PushCallback)main);
-            HTML5Push.setPushCallback((PushCallback)main);
-        }
+        JavaScriptBootstrapCoordinator.bindMainClass(main,
+                new JavaScriptBootstrapCoordinator.PushCallbackRegistrar() {
+                    @Override
+                    public void register(PushCallback callback) {
+                        setPushCallback(callback);
+                    }
+                },
+                new JavaScriptBootstrapCoordinator.PushCallbackRegistrar() {
+                    @Override
+                    public void register(PushCallback callback) {
+                        HTML5Push.setPushCallback(callback);
+                    }
+                });
     }
 
     public MouseEvent getLastMouseEvent() {
@@ -5948,11 +5957,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
-        
-        if (urlProxifier != null){
-            url = urlProxifier.proxifyURL(url);
-        }
-        return new NetworkConnection(url, read, write, timeout);
+        return JavaScriptNetworkAdapter.connect(url, read, write, timeout,
+                urlProxifier == null ? null : new JavaScriptNetworkAdapter.UrlTransformer() {
+                    @Override
+                    public String transform(String input) {
+                        return urlProxifier.proxifyURL(input);
+                    }
+                },
+                new JavaScriptNetworkAdapter.ConnectionFactory<NetworkConnection>() {
+                    @Override
+                    public NetworkConnection create(String targetUrl, boolean readConnection, boolean writeConnection, int connectionTimeout) throws IOException {
+                        return new NetworkConnection(targetUrl, readConnection, writeConnection, connectionTimeout);
+                    }
+                });
     }
     
     
@@ -5972,19 +5989,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void setHeader(Object connection, String key, String val) {
-        ((NetworkConnection)connection).setHeader(key, val);
+        JavaScriptNetworkAdapter.setHeader((JavaScriptNetworkAdapter.Connection) connection, key, val);
     }
 
     @Override
     public void setHttpMethod(Object connection, String method) throws IOException {
-        ((NetworkConnection)connection).setHttpMethod(method);
+        JavaScriptNetworkAdapter.setHttpMethod((JavaScriptNetworkAdapter.Connection) connection, method);
     }
 
     
     
     @Override
     public int getContentLength(Object connection) {
-        return ((NetworkConnection)connection).getContentLength();
+        return JavaScriptNetworkAdapter.getContentLength((JavaScriptNetworkAdapter.Connection) connection);
     }
 
     @Override
@@ -6017,11 +6034,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public OutputStream openOutputStream(Object connection) throws IOException {
-        
-        if (connection instanceof String) {
-            return openFileOutputStream((String)connection);
-        }
-     return ((NetworkConnection)connection).openOutputStream();
+        return JavaScriptNetworkAdapter.openOutputStream(connection, new JavaScriptNetworkAdapter.FileOutputStreamProvider() {
+            @Override
+            public OutputStream openFileOutputStream(String file) throws IOException {
+                return HTML5Implementation.this.openFileOutputStream(file);
+            }
+        });
     }
 
     @Override
@@ -6038,52 +6056,45 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public InputStream openInputStream(Object connection) throws IOException {
-        
-         if (connection instanceof String) {
-             
-            throw new RuntimeException("openInputStream for file types not supported");
-        }
-        return ((NetworkConnection)connection).openInputStream();
+        return JavaScriptNetworkAdapter.openInputStream(connection);
     }
 
     @Override
     public void cleanup(Object o) {
         super.cleanup(o);
-        if (o instanceof NetworkConnection){
-            ((NetworkConnection)o).cleanup();
-        }
+        JavaScriptNetworkAdapter.cleanup(o);
     }
 
     
     
     @Override
     public void setPostRequest(Object connection, boolean p) {
-        ((NetworkConnection)connection).setPostRequest(p);
+        JavaScriptNetworkAdapter.setPostRequest((JavaScriptNetworkAdapter.Connection) connection, p);
     }
 
     @Override
     public int getResponseCode(Object connection) throws IOException {
-        return ((NetworkConnection)connection).getResponseCode();
+        return JavaScriptNetworkAdapter.getResponseCode((JavaScriptNetworkAdapter.Connection) connection);
     }
 
     @Override
     public String getResponseMessage(Object connection) throws IOException {
-        return ((NetworkConnection)connection).getResponseMessage();
+        return JavaScriptNetworkAdapter.getResponseMessage((JavaScriptNetworkAdapter.Connection) connection);
     }
 
     @Override
     public String getHeaderField(String name, Object connection) throws IOException {
-        return ((NetworkConnection)connection).getHeaderField(name);
+        return JavaScriptNetworkAdapter.getHeaderField(name, (JavaScriptNetworkAdapter.Connection) connection);
     }
 
     @Override
     public String[] getHeaderFieldNames(Object connection) throws IOException {
-        return ((NetworkConnection)connection).getHeaderFieldNames();
+        return JavaScriptNetworkAdapter.getHeaderFieldNames((JavaScriptNetworkAdapter.Connection) connection);
     }
 
     @Override
     public String[] getHeaderFields(String name, Object connection) throws IOException {
-        return ((NetworkConnection)connection).getHeaderFields(name);
+        return JavaScriptNetworkAdapter.getHeaderFields(name, (JavaScriptNetworkAdapter.Connection) connection);
     }
 
     private LocalForage getLocalForage(){
@@ -6109,7 +6120,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void deleteStorageFile(String name) {
         try {
-            getLocalForage().removeItem(wrapStorageKey(name));
+            JavaScriptStorageAdapter.deleteStorageFile(createStorageBackend(), name);
         } catch (IOException ex){
             consoleLog("Error on deleteStorageFile "+name+", : "+ex.getMessage());
             
@@ -6119,18 +6130,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public OutputStream createStorageOutputStream(String name) throws IOException {
-        return getLocalForage().openOutputStream(wrapStorageKey(name));
+        return JavaScriptStorageAdapter.createStorageOutputStream(createStorageBackend(), name);
     }
 
     @Override
     public InputStream createStorageInputStream(String name) throws IOException {
-        return getLocalForage().openInputStream(wrapStorageKey(name));
+        return JavaScriptStorageAdapter.createStorageInputStream(createStorageBackend(), name);
     }
 
     @Override
     public boolean storageFileExists(String name) {
         try {
-            return getLocalForage().getItem(wrapStorageKey(name)) != null;
+            return JavaScriptStorageAdapter.storageFileExists(createStorageBackend(), name);
         } catch (IOException ex) {
             //Log.e(ex);
             consoleLog("Error checking storage for storageFileExists");
@@ -6142,7 +6153,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public int getStorageEntrySize(String name) {
         try {
-            return getLocalForage().getSize(wrapStorageKey(name));
+            return JavaScriptStorageAdapter.getStorageEntrySize(createStorageBackend(), name);
         } catch (IOException ex) {
             //Log.e(ex);
             return -1;
@@ -6154,13 +6165,47 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public String[] listStorageEntries() {
         try {
-            return JavaScriptRuntimeFacade.unwrapStorageEntries(getLocalForage().keys());
+            return JavaScriptStorageAdapter.listStorageEntries(createStorageBackend());
         } catch (IOException ex) {
             //Log.e(ex);
             consoleLog("Error in listStorageEntries");
             consoleLog(ex.getMessage());
         } 
         return new String[]{};
+    }
+
+    private JavaScriptStorageAdapter.Backend createStorageBackend() {
+        return new JavaScriptStorageAdapter.Backend() {
+            @Override
+            public void removeItem(String key) throws IOException {
+                getLocalForage().removeItem(key);
+            }
+
+            @Override
+            public OutputStream openOutputStream(String key) throws IOException {
+                return getLocalForage().openOutputStream(key);
+            }
+
+            @Override
+            public InputStream openInputStream(String key) throws IOException {
+                return getLocalForage().openInputStream(key);
+            }
+
+            @Override
+            public Object getItem(String key) throws IOException {
+                return getLocalForage().getItem(key);
+            }
+
+            @Override
+            public int getSize(String key) throws IOException {
+                return getLocalForage().getSize(key);
+            }
+
+            @Override
+            public String[] keys() throws IOException {
+                return getLocalForage().keys();
+            }
+        };
     }
 
     @Override
