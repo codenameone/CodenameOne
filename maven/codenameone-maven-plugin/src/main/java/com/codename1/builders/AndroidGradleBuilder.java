@@ -41,6 +41,7 @@ import java.awt.image.ImageFilter;
 import java.awt.image.ImageProducer;
 import java.awt.image.RGBImageFilter;
 import java.io.*;
+import java.lang.reflect.Method;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -3975,17 +3976,17 @@ public class AndroidGradleBuilder extends Executor {
 
     @Override
     protected String registerNativeImplementationsAndCreateStubs(ClassLoader parentClassLoader, File stubDir, File... classesDirectory) throws MalformedURLException, IOException {
-        nativeInterfaces = findNativeInterfaces(parentClassLoader, classesDirectory);
+        Class[] discoveredNativeInterfaces = findNativeInterfaces(parentClassLoader, classesDirectory);
         String registerNativeFunctions = "";
-        if (nativeInterfaces != null && nativeInterfaces.length > 0) {
-            for (Class n : nativeInterfaces) {
+        if (discoveredNativeInterfaces != null && discoveredNativeInterfaces.length > 0) {
+            for (Class n : discoveredNativeInterfaces) {
                 registerNativeFunctions += "        NativeLookup.register(" + n.getName() + ".class, "
                         + n.getName() + "Stub.class" + ");\n";
             }
         }
 
-        if (nativeInterfaces != null && nativeInterfaces.length > 0) {
-            for (Class currentNative : nativeInterfaces) {
+        if (discoveredNativeInterfaces != null && discoveredNativeInterfaces.length > 0) {
+            for (Class currentNative : discoveredNativeInterfaces) {
                 File folder = new File(stubDir, currentNative.getPackage().getName().replace('.', File.separatorChar));
                 folder.mkdirs();
                 File javaFile = new File(folder, currentNative.getSimpleName() + "Stub.java");
