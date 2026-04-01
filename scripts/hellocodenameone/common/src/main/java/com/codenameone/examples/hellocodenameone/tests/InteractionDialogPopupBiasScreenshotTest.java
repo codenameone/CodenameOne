@@ -20,7 +20,7 @@ public class InteractionDialogPopupBiasScreenshotTest extends BaseTest {
         Form form = createForm("InteractionDialog Popup Bias", new BorderLayout(), "InteractionDialogPopupBias");
         Container center = new Container(new FlowLayout(Component.CENTER, Component.CENTER));
         Label target = new Label("CENTER TARGET");
-        target.getAllStyles().setPaddingMillimeters(2f, 2f, 2f, 2f);
+        target.getAllStyles().setPadding(2, 2, 2, 2);
         center.add(target);
         form.add(BorderLayout.CENTER, center);
         form.add(BorderLayout.NORTH, new Label("Top popup: bias works (prefers top when possible)"));
