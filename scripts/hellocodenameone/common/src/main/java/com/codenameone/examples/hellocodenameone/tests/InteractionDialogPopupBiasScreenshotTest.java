@@ -36,10 +36,11 @@ public class InteractionDialogPopupBiasScreenshotTest extends BaseTest {
 
     @Override
     protected void registerReadyCallback(Form parent, Runnable run) {
-        northFallbackDialog = createDialog("1) N,true fallback");
-        centerTopDialog = createDialog("2) C,true (top)");
-        centerBottomDialog = createDialog("3) C,false (bottom)");
-        southFallbackDialog = createDialog("4) S,false fallback");
+        northFallbackDialog = createDialog("1) N/T -> down");
+        centerTopDialog = createDialog("2) C/T -> up");
+        centerBottomDialog = createDialog("3) C/B -> down");
+        southFallbackDialog = createDialog("4) S/B -> up");
+        parent.revalidate();
         northFallbackDialog.showPopupDialog(northTarget, true);
         centerTopDialog.showPopupDialog(centerTarget, true);
         centerBottomDialog.showPopupDialog(centerTarget, false);
