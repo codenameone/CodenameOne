@@ -5,6 +5,7 @@ import com.codename1.junit.UITestBase;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 
@@ -94,6 +95,60 @@ class InteractionDialogTest extends UITestBase {
         dialog.showPopupDialog(rect);
         Container formLayer = form.getFormLayeredPane(InteractionDialog.class, true);
         assertTrue(formLayer.contains(dialog));
+        dialog.dispose();
+    }
+
+    @Test
+    void showPopupDialogBiasTruePrefersTopWhenBothFit() {
+        Form form = new Form(new BorderLayout());
+        implementation.setCurrentForm(form);
+
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setLayout(new FlowLayout());
+        dialog.add(new Label("Popup"));
+        dialog.setAnimateShow(false);
+
+        Rectangle rect = new Rectangle(120, 220, 60, 40);
+        dialog.showPopupDialog(rect, true);
+
+        assertTrue(dialog.getY() + dialog.getHeight() <= rect.getY(),
+                "Expected popup above target when prioritizeTopOrRightPosition=true");
+        dialog.dispose();
+    }
+
+    @Test
+    void showPopupDialogBiasFalsePrefersBottomWhenBothFit() {
+        Form form = new Form(new BorderLayout());
+        implementation.setCurrentForm(form);
+
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setLayout(new FlowLayout());
+        dialog.add(new Label("Popup"));
+        dialog.setAnimateShow(false);
+
+        Rectangle rect = new Rectangle(120, 220, 60, 40);
+        dialog.showPopupDialog(rect, false);
+
+        assertTrue(dialog.getY() >= rect.getY() + rect.getHeight(),
+                "Expected popup below target when prioritizeTopOrRightPosition=false");
+        dialog.dispose();
+    }
+
+    @Test
+    void showPopupDialogFallsBackWhenPreferredTopDoesNotFit() {
+        Form form = new Form(new BorderLayout());
+        implementation.setCurrentForm(form);
+
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setLayout(new FlowLayout());
+        dialog.add(new Label("Popup"));
+        dialog.setAnimateShow(false);
+
+        Rectangle rect = new Rectangle(120, 2, 60, 40);
+        dialog.showPopupDialog(rect, true);
+
+        assertTrue(dialog.getY() >= rect.getY() + rect.getHeight(),
+                "Expected fallback below when preferred top side does not fit");
         dialog.dispose();
     }
 

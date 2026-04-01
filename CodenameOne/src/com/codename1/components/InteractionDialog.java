@@ -637,9 +637,10 @@ public class InteractionDialog extends Container implements AbstractDialog {
     ///
     /// - `c`: the context component which is used to position the dialog and can also be pointed at
     ///
-    /// - `bias`: @param bias biases the dialog to appear above/below or to the sides.
-    /// This is ignored if there isn't enough space
-    public void showPopupDialog(Component c, boolean bias) {
+    /// - `prioritizeTopOrRightPosition`: if `true`, prefer showing above the target (portrait layout) or to
+    ///   the right of the target (landscape layout) when both positions fit. If `false`, prefer below/left.
+    ///   If there isn't enough room in the preferred position, the dialog falls back automatically.
+    public void showPopupDialog(Component c, boolean prioritizeTopOrRightPosition) {
         if (c == null) {
             throw new IllegalArgumentException("Component cannot be null");
         }
@@ -653,7 +654,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         componentPos.setX(componentPos.getX() - c.getScrollX());
         componentPos.setY(componentPos.getY() - c.getScrollY());
         setOwner(c);
-        showPopupDialog(componentPos, bias);
+        showPopupDialog(componentPos, prioritizeTopOrRightPosition);
     }
 
     /// A popup dialog is shown with the context of a component and  its selection. You should use `#setDisposeWhenPointerOutOfBounds(boolean)` to make it dispose
@@ -675,9 +676,10 @@ public class InteractionDialog extends Container implements AbstractDialog {
     ///
     /// - `rect`: the screen rectangle to which the popup should point
     ///
-    /// - `bias`: @param bias biases the dialog to appear above/below or to the sides.
-    /// This is ignored if there isn't enough space
-    public void showPopupDialog(Rectangle rect, boolean bias) {
+    /// - `prioritizeTopOrRightPosition`: if `true`, prefer showing above the target (portrait layout) or to
+    ///   the right of the target (landscape layout) when both positions fit. If `false`, prefer below/left.
+    ///   If there isn't enough room in the preferred position, the dialog falls back automatically.
+    public void showPopupDialog(Rectangle rect, boolean prioritizeTopOrRightPosition) {
         if (rect == null) {
             throw new IllegalArgumentException("rect cannot be null");
         }
@@ -762,7 +764,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         int x = 0;
         int y = 0;
 
-        boolean showPortrait = bias;
+        boolean showPortrait = Display.getInstance().isPortrait();
 
         // if we don't have enough space then disregard device orientation
         if (showPortrait) {
@@ -790,7 +792,22 @@ public class InteractionDialog extends Container implements AbstractDialog {
                     }
                 }
             }
-            if (rect.getY() + rect.getHeight() < availableHeight / 2) {
+            int spaceAbove = rect.getY();
+            int spaceBelow = availableHeight - (rect.getY() + rect.getHeight());
+            boolean canShowAbove = prefHeight <= spaceAbove;
+            boolean canShowBelow = prefHeight <= spaceBelow;
+            boolean showAbove;
+            if (canShowAbove && canShowBelow) {
+                showAbove = prioritizeTopOrRightPosition;
+            } else if (canShowAbove) {
+                showAbove = true;
+            } else if (canShowBelow) {
+                showAbove = false;
+            } else {
+                showAbove = spaceAbove >= spaceBelow;
+            }
+
+            if (!showAbove) {
                 // popup downwards
                 y = rect.getY() + rect.getHeight();
                 int height = Math.min(prefHeight, Math.max(0, availableHeight - y));
@@ -798,30 +815,13 @@ public class InteractionDialog extends Container implements AbstractDialog {
                 show(Math.max(0, y), Math.max(0, availableHeight - height - y),
                         Math.max(0, x), Math.max(0, availableWidth - width - x));
                 padOrientation(contentPaneStyle, TOP, -1);
-            } else if (rect.getY() > availableHeight / 2) {
+            } else {
                 // popup upwards
                 int height = Math.min(prefHeight, rect.getY());
                 y = rect.getY() - height;
                 padOrientation(contentPaneStyle, BOTTOM, 1);
                 show(y, Math.max(0, availableHeight - rect.getY()), x, Math.max(0, availableWidth - width - x));
                 padOrientation(contentPaneStyle, BOTTOM, -1);
-            } else if (rect.getY() < availableHeight / 2) {
-                // popup over aligned with top of rect, but inset a few mm
-                y = rect.getY() + CN.convertToPixels(3);
-
-                int height = Math.min(prefHeight, availableHeight - y);
-                padOrientation(contentPaneStyle, BOTTOM, 1);
-                show(y, Math.max(0, availableHeight - height - y),
-                        Math.max(0, x), Math.max(0, availableWidth - width - x));
-                padOrientation(contentPaneStyle, BOTTOM, -1);
-            } else {
-                // popup over aligned with bottom of rect but inset a few mm
-                y = Math.max(0, rect.getY() + rect.getHeight() - CN.convertToPixels(3) - prefHeight);
-                int height = prefHeight;
-                padOrientation(contentPaneStyle, TOP, 1);
-                show(y, Math.max(0, availableHeight - height - y),
-                        Math.max(0, x), Math.max(0, availableWidth - width - x));
-                padOrientation(contentPaneStyle, TOP, -1);
             }
         } else {
             int height = Math.min(prefHeight, availableHeight);
@@ -839,23 +839,31 @@ public class InteractionDialog extends Container implements AbstractDialog {
                 }
             }
 
-            if (prefWidth < availableWidth - rect.getX() - rect.getWidth()) {
+            int spaceRight = availableWidth - rect.getX() - rect.getWidth();
+            int spaceLeft = rect.getX();
+            boolean canShowRight = prefWidth <= spaceRight;
+            boolean canShowLeft = prefWidth <= spaceLeft;
+            boolean showRight;
+            if (canShowRight && canShowLeft) {
+                showRight = prioritizeTopOrRightPosition;
+            } else if (canShowRight) {
+                showRight = true;
+            } else if (canShowLeft) {
+                showRight = false;
+            } else {
+                showRight = spaceRight >= spaceLeft;
+            }
+
+            if (showRight) {
                 // popup right
                 x = rect.getX() + rect.getWidth();
-
-
                 width = Math.min(prefWidth, availableWidth - x);
-                show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x));
-            } else if (prefWidth < rect.getX()) {
-                x = rect.getX() - prefWidth;
-                width = prefWidth;
-                show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x));
             } else {
                 // popup left
-                width = Math.min(prefWidth, availableWidth - (availableWidth - rect.getX()));
+                width = Math.min(prefWidth, rect.getX());
                 x = rect.getX() - width;
-                show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x));
             }
+            show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x));
         }
     }
 
