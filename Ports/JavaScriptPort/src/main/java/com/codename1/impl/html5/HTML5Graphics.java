@@ -80,6 +80,22 @@ public class HTML5Graphics {
                             operation.execute(context);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
+    private final JavaScriptImageTransformRenderAdapter<NativeImage, Shape, JSAffineTransform, ExecutableOp> imageTransformRenderAdapter =
+            new JavaScriptImageTransformRenderAdapter<NativeImage, Shape, JSAffineTransform, ExecutableOp>(renderState,
+                    new JavaScriptImageTransformRenderAdapter.OperationSink<ExecutableOp>() {
+                        @Override
+                        public void submit(ExecutableOp operation) {
+                            operation.execute(context);
+                        }
+                    }, JavaScriptExecutableOpFactory.INSTANCE);
+    private final JavaScriptShapeGradientRenderAdapter<Shape, Stroke, ExecutableOp> shapeGradientRenderAdapter =
+            new JavaScriptShapeGradientRenderAdapter<Shape, Stroke, ExecutableOp>(renderState,
+                    new JavaScriptShapeGradientRenderAdapter.OperationSink<ExecutableOp>() {
+                        @Override
+                        public void submit(ExecutableOp operation) {
+                            operation.execute(context);
+                        }
+                    }, JavaScriptExecutableOpFactory.INSTANCE);
     
     //private final Path tmppath = new Path();
     //private final static PorterDuffXfermode PORTER = new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER);
@@ -189,13 +205,13 @@ public class HTML5Graphics {
 
 
     public void drawImage(Object img, int x, int y) {
-        new DrawImage((NativeImage)img, x, y, getAlpha()).execute(context);
+        imageTransformRenderAdapter.drawImage((NativeImage)img, x, y);
         
     }
     
     
     public void tileImage(Object img, int x, int y, int w, int h) {
-        new TileImage((NativeImage)img, x, y, w, h, getAlpha()).execute(context);
+        imageTransformRenderAdapter.tileImage((NativeImage)img, x, y, w, h);
     }
     
     
@@ -211,7 +227,7 @@ public class HTML5Graphics {
             if (transform == null) {
                 transform = Transform.makeIdentity();
             }
-            JSAffineTransform.Factory.setTransform(context, (JSAffineTransform)transform.getNativeTransform());
+            imageTransformRenderAdapter.applyTransform((JSAffineTransform)transform.getNativeTransform(), true);
             transformApplied = true;
         }
     }
@@ -286,7 +302,7 @@ public class HTML5Graphics {
     }
     
     public void drawImage(Object img, int x, int y, int w, int h) {
-        new DrawImage((NativeImage)img, x, y, getAlpha(), w, h).execute(context);
+        imageTransformRenderAdapter.drawImage((NativeImage)img, x, y, w, h);
     }
 
     
@@ -333,11 +349,11 @@ public class HTML5Graphics {
     }
     
     public void drawShape(Shape shape, Stroke stroke) {
-        new DrawShape(shape, stroke, getColor(), getAlpha()).execute(context);
+        shapeGradientRenderAdapter.drawShape(shape, stroke);
     }
     
     public void fillShape(Shape shape) {
-        new FillShape(shape, getColor(), getAlpha()).execute(context);
+        shapeGradientRenderAdapter.fillShape(shape);
     }
     
     @JSBody(params={"o"}, script="console.log(o)")
@@ -440,7 +456,7 @@ public class HTML5Graphics {
             t = (JSAffineTransform)transform.getNativeTransform();
         }
         clipBoundsDirty = true;
-        new ClipShape(shape, t, getClipState()).execute(context);
+        imageTransformRenderAdapter.setClipShape(shape, t);
         //upcoming.add(new ClipShape(shape, t));
     }
     
@@ -503,39 +519,92 @@ public class HTML5Graphics {
     
     
     public int charsWidth(Object nativeFont, char[] ch, int offset, int length) {
-        String oldFont = context.getFont();
-        context.setFont(((NativeFont)nativeFont).getCSS());
-        String str = new String(ch, offset, length);
-        //this.canvas.getStyle().setProperty("font", nativeFont+"");
-        
-        int out = context.measureText(str).getWidth()+1;
-        context.setFont(oldFont);
-        
-        return out;
+        return JavaScriptTextMetricsAdapter.charsWidth(new JavaScriptTextMetricsAdapter.FontMetricsContext() {
+            @Override
+            public String getCurrentFont() {
+                return context.getFont();
+            }
+
+            @Override
+            public void setCurrentFont(String fontCss) {
+                context.setFont(fontCss);
+            }
+
+            @Override
+            public int measureWidth(String text) {
+                return context.measureText(text).getWidth();
+            }
+        }, new JavaScriptTextMetricsAdapter.FontCssSupplier<NativeFont>() {
+            @Override
+            public String getCss(NativeFont font) {
+                return font.getCSS();
+            }
+
+            @Override
+            public int getHeight(NativeFont font) {
+                return font.fontHeight();
+            }
+
+            @Override
+            public int getAscent(NativeFont font) {
+                return font.fontAscent();
+            }
+        }, (NativeFont) nativeFont, ch, offset, length);
     }
     
     public int stringWidth(Object nativeFont, String str) {
-        String oldFont = context.getFont();
-        context.setFont(((NativeFont)nativeFont).getCSS());
-        //this.canvas.getStyle().setProperty("font", nativeFont+"");
-        int out = context.measureText(str).getWidth()+1;
-        context.setFont(oldFont);
-        //System.out.println("Width of string "+str+" is "+out+" in font "+nativeFont);
-        return out;
+        return JavaScriptTextMetricsAdapter.stringWidth(new JavaScriptTextMetricsAdapter.FontMetricsContext() {
+            @Override
+            public String getCurrentFont() {
+                return context.getFont();
+            }
+
+            @Override
+            public void setCurrentFont(String fontCss) {
+                context.setFont(fontCss);
+            }
+
+            @Override
+            public int measureWidth(String text) {
+                return context.measureText(text).getWidth();
+            }
+        }, new JavaScriptTextMetricsAdapter.FontCssSupplier<NativeFont>() {
+            @Override
+            public String getCss(NativeFont font) {
+                return font.getCSS();
+            }
+
+            @Override
+            public int getHeight(NativeFont font) {
+                return font.fontHeight();
+            }
+
+            @Override
+            public int getAscent(NativeFont font) {
+                return font.fontAscent();
+            }
+        }, (NativeFont) nativeFont, str);
     }
     
     
     
     int getFontHeight(Object nativeFont){
-        /*
-        String oldFont = context.getFont();
-        context.setFont(((NativeFont)nativeFont).getCSS());
-        //this.canvas.getStyle().setProperty("font", nativeFont+"");
-        int out = (int)Math.round(((JSFontMetrics)context.measureText(alphabet)).getHeight());
-        context.setFont(oldFont);
-        return out;
-        */
-        return ((NativeFont)nativeFont).fontHeight();
+        return JavaScriptTextMetricsAdapter.getFontHeight(new JavaScriptTextMetricsAdapter.FontCssSupplier<NativeFont>() {
+            @Override
+            public String getCss(NativeFont font) {
+                return font.getCSS();
+            }
+
+            @Override
+            public int getHeight(NativeFont font) {
+                return font.fontHeight();
+            }
+
+            @Override
+            public int getAscent(NativeFont font) {
+                return font.fontAscent();
+            }
+        }, (NativeFont) nativeFont);
     }
     
     int getFontAscent(Object nativeFont){
@@ -543,17 +612,22 @@ public class HTML5Graphics {
     }
     
     int getFontDescent(Object nativeFont){
-        return getFontHeight(nativeFont) - getFontAscent(nativeFont);
-        /*
-        String oldFont = context.getFont();
-        context.setFont(((NativeFont)nativeFont).getCSS());
-        //this.canvas.getStyle().setProperty("font", nativeFont+"");
-        int out = (int)Math.round(((JSFontMetrics)context.measureText(alphabet)).getDescent());
-        
-        context.setFont(oldFont);
-        return out;
-                */
-        
+        return JavaScriptTextMetricsAdapter.getFontDescent(new JavaScriptTextMetricsAdapter.FontCssSupplier<NativeFont>() {
+            @Override
+            public String getCss(NativeFont font) {
+                return font.getCSS();
+            }
+
+            @Override
+            public int getHeight(NativeFont font) {
+                return font.fontHeight();
+            }
+
+            @Override
+            public int getAscent(NativeFont font) {
+                return font.fontAscent();
+            }
+        }, (NativeFont) nativeFont);
     }
     
 //    int getFontLeading(Object nativeFont){
@@ -572,11 +646,11 @@ public class HTML5Graphics {
     }
 
     public void fillLinearGradient(int x, int y, int width, int height, int startColor, int endColor, boolean horizontal) {
-        FillLinearGradient.execute(context, x, y, width, height, startColor, endColor, horizontal, getAlpha());
+        shapeGradientRenderAdapter.fillLinearGradient(x, y, width, height, startColor, endColor, horizontal);
     }
 
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        FillRadialGradient.execute(context, x, y, width, height, startColor, endColor, getAlpha(), startAngle, arcAngle);
+        shapeGradientRenderAdapter.fillRadialGradient(x, y, width, height, startColor, endColor, startAngle, arcAngle);
     }
 
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height) {

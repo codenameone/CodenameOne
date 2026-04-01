@@ -2519,13 +2519,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     
     private HTMLCanvasElement getCanvasBuffer(int width, int height){
-        if (scratchBuffer == null){
-            scratchBuffer=(HTMLCanvasElement)window.getDocument().createElement("canvas");
-        }
-        if (width>scratchBuffer.getWidth() || height < scratchBuffer.getHeight()){
-            scratchBuffer.setWidth(width);
-            scratchBuffer.setHeight(height);
-        }
+        scratchBuffer = JavaScriptCanvasImageBufferLifecycle.ensureScratchBuffer(scratchBuffer, width, height,
+                new JavaScriptCanvasImageBufferLifecycle.ScratchCanvasFactory<HTMLCanvasElement>() {
+                    @Override
+                    public HTMLCanvasElement createScratchCanvas() {
+                        return (HTMLCanvasElement)window.getDocument().createElement("canvas");
+                    }
+                }, new JavaScriptCanvasImageBufferLifecycle.CanvasSizeAccess<HTMLCanvasElement>() {
+                    @Override
+                    public int getWidth(HTMLCanvasElement canvas) {
+                        return canvas.getWidth();
+                    }
+
+                    @Override
+                    public int getHeight(HTMLCanvasElement canvas) {
+                        return canvas.getHeight();
+                    }
+
+                    @Override
+                    public void setWidth(HTMLCanvasElement canvas, int canvasWidth) {
+                        canvas.setWidth(canvasWidth);
+                    }
+
+                    @Override
+                    public void setHeight(HTMLCanvasElement canvas, int canvasHeight) {
+                        canvas.setHeight(canvasHeight);
+                    }
+                });
         return scratchBuffer;
     }
     
@@ -4787,11 +4807,28 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public Object createImage(int[] rgb, int width, int height) {
         NativeImage img = new NativeImage();
         ImageData data = (ImageData)createImageData(rgb, width, height);
-        HTMLCanvasElement buf = (HTMLCanvasElement)window.getDocument().createElement("canvas");
-        buf.setWidth(width);
-        buf.setHeight(height);
-        img.mutableGraphics = new HTML5Graphics(this, buf);
-        CanvasRenderingContext2D bufCtx = (CanvasRenderingContext2D)buf.getContext("2d");
+        JavaScriptCanvasImageBufferLifecycle.CanvasImageBuffer<HTMLCanvasElement, HTML5Graphics> buffer =
+                JavaScriptCanvasImageBufferLifecycle.createBlankBuffer(width, height,
+                        new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
+                            @Override
+                            public HTMLCanvasElement createCanvas(int canvasWidth, int canvasHeight) {
+                                HTMLCanvasElement canvas = (HTMLCanvasElement)window.getDocument().createElement("canvas");
+                                canvas.setWidth(canvasWidth);
+                                canvas.setHeight(canvasHeight);
+                                return canvas;
+                            }
+                        }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
+                            @Override
+                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas) {
+                                return new HTML5Graphics(HTML5Implementation.this, canvas);
+                            }
+
+                            @Override
+                            public void fillRect(HTML5Graphics graphics, int fillColor, int fillWidth, int fillHeight) {
+                            }
+                        });
+        img.mutableGraphics = buffer.getGraphics();
+        CanvasRenderingContext2D bufCtx = (CanvasRenderingContext2D)buffer.getCanvas().getContext("2d");
         bufCtx.clearRect(0, 0, width, height);
         bufCtx.putImageData(data, 0, 0, 0, 0, width, height);
         //System.out.println("Created image from rgb "+img);
@@ -5296,21 +5333,30 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public Object createMutableImage(int width, int height, int fillColor) {
-        
-        HTMLCanvasElement el = (HTMLCanvasElement)window.getDocument().createElement("canvas");
-        el.setWidth(width);
-        el.setHeight(height);
-        //CanvasRenderingContext2D ctx = (CanvasRenderingContext2D)el.getContext("2d");
-        
-        HTML5Graphics g = new HTML5Graphics(this, el);
-        int a = (fillColor >> 24) & 0xff;
-        if (a != 0) {
-            g.setColorWithAlpha(fillColor);
-            g.fillRect(0, 0, width, height);
-        }
-        
+        JavaScriptCanvasImageBufferLifecycle.CanvasImageBuffer<HTMLCanvasElement, HTML5Graphics> buffer =
+                JavaScriptCanvasImageBufferLifecycle.createMutableBuffer(width, height, fillColor,
+                        new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
+                            @Override
+                            public HTMLCanvasElement createCanvas(int canvasWidth, int canvasHeight) {
+                                HTMLCanvasElement canvas = (HTMLCanvasElement)window.getDocument().createElement("canvas");
+                                canvas.setWidth(canvasWidth);
+                                canvas.setHeight(canvasHeight);
+                                return canvas;
+                            }
+                        }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
+                            @Override
+                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas) {
+                                return new HTML5Graphics(HTML5Implementation.this, canvas);
+                            }
+
+                            @Override
+                            public void fillRect(HTML5Graphics graphics, int color, int fillWidth, int fillHeight) {
+                                graphics.setColorWithAlpha(color);
+                                graphics.fillRect(0, 0, fillWidth, fillHeight);
+                            }
+                        });
         NativeImage img = new NativeImage();
-        img.mutableGraphics = g;
+        img.mutableGraphics = buffer.getGraphics();
         return img;
         
     }
@@ -5342,13 +5388,30 @@ public class HTML5Implementation extends CodenameOneImplementation {
         NativeImage img = (NativeImage)nativeImage;
         
         NativeImage scaled = new NativeImage();
-        scaled.width = width;
-        scaled.height = height;
-        HTMLCanvasElement buf = (HTMLCanvasElement)window.getDocument().createElement("canvas");
-        buf.setWidth(width);
-        buf.setHeight(height);
-        scaled.mutableGraphics = new HTML5Graphics(this, buf);
-        CanvasRenderingContext2D bufCtx = (CanvasRenderingContext2D)buf.getContext("2d");
+        JavaScriptCanvasImageBufferLifecycle.CanvasImageBuffer<HTMLCanvasElement, HTML5Graphics> buffer =
+                JavaScriptCanvasImageBufferLifecycle.createBlankBuffer(width, height,
+                        new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
+                            @Override
+                            public HTMLCanvasElement createCanvas(int canvasWidth, int canvasHeight) {
+                                HTMLCanvasElement canvas = (HTMLCanvasElement)window.getDocument().createElement("canvas");
+                                canvas.setWidth(canvasWidth);
+                                canvas.setHeight(canvasHeight);
+                                return canvas;
+                            }
+                        }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
+                            @Override
+                            public HTML5Graphics createGraphics(HTMLCanvasElement canvas) {
+                                return new HTML5Graphics(HTML5Implementation.this, canvas);
+                            }
+
+                            @Override
+                            public void fillRect(HTML5Graphics graphics, int fillColor, int fillWidth, int fillHeight) {
+                            }
+                        });
+        scaled.width = buffer.getWidth();
+        scaled.height = buffer.getHeight();
+        scaled.mutableGraphics = buffer.getGraphics();
+        CanvasRenderingContext2D bufCtx = (CanvasRenderingContext2D)buffer.getCanvas().getContext("2d");
         if (img.img != null && !img.loaded) {
             img.load();
         }
