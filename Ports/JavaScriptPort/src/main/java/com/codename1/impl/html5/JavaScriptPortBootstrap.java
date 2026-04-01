@@ -14,7 +14,7 @@ import org.teavm.jso.browser.Window;
 import org.teavm.jso.dom.events.Event;
 
 public final class JavaScriptPortBootstrap implements Runnable {
-    public static final String APP_CLASS_PROPERTY = "codename1.javascript.appClass";
+    public static final String APP_CLASS_PROPERTY = JavaScriptBootstrapCoordinator.APP_CLASS_PROPERTY;
     private final Lifecycle lifecycle;
 
     public JavaScriptPortBootstrap(Lifecycle lifecycle) {
@@ -29,11 +29,7 @@ public final class JavaScriptPortBootstrap implements Runnable {
     }
 
     public static Lifecycle createLifecycle(String className) {
-        try {
-            return (Lifecycle)Class.forName(className).newInstance();
-        } catch (Throwable ex) {
-            throw new RuntimeException("Failed to instantiate application lifecycle " + className, ex);
-        }
+        return JavaScriptBootstrapCoordinator.createLifecycle(className);
     }
 
     @JSBody(params = {}, script = "window.cn1Initialized = true;")

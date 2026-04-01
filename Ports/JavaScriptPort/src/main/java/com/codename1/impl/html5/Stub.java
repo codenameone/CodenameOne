@@ -13,8 +13,8 @@ import com.codename1.system.Lifecycle;
  */
 public class Stub {
     public static void main(String[] args) {
-        String lifecycleClass = System.getProperty(JavaScriptPortBootstrap.APP_CLASS_PROPERTY, "com.codename1.system.Lifecycle");
-        Lifecycle lifecycle = JavaScriptPortBootstrap.createLifecycle(lifecycleClass);
+        String lifecycleClass = System.getProperty(JavaScriptBootstrapCoordinator.APP_CLASS_PROPERTY, "com.codename1.system.Lifecycle");
+        Lifecycle lifecycle = JavaScriptBootstrapCoordinator.createLifecycle(lifecycleClass);
         JavaScriptPortBootstrap.bootstrap(lifecycle);
     }
 }
