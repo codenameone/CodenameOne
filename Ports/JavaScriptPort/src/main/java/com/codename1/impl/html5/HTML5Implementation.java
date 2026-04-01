@@ -166,6 +166,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private HTMLCanvasElement canvas;
     private HTMLCanvasElement scratchBuffer;
     HTMLCanvasElement outputCanvas;
+    private final JavaScriptRenderingBackend renderingBackend = new BrowserDomRenderingBackend();
     private EventListener onMouseDown, onMouseUp, onTouchStart, onTouchEnd, onMouseMove, onTouchMove, hitTest, onPaste;
     
     // This event listener can be assigned to listen to native mouse events
@@ -212,6 +213,107 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     
     private String photosPath="/photos";
+
+    private class BrowserDomRenderingBackend implements JavaScriptRenderingBackend {
+        @Override
+        public HTMLCanvasElement createCanvas(int width, int height) {
+            HTMLCanvasElement canvas = (HTMLCanvasElement)window.getDocument().createElement("canvas");
+            canvas.setWidth(width);
+            canvas.setHeight(height);
+            return canvas;
+        }
+
+        @Override
+        public HTMLImageElement createImageElement() {
+            return (HTMLImageElement)window.getDocument().createElement("img");
+        }
+
+        @Override
+        public HTMLImageElement createCrossOriginImageElement(String sourceUrl) {
+            HTMLImageElement image = createImageElement();
+            image.setAttribute("crossorigin", "anonymous");
+            image.setSrc(sourceUrl);
+            return image;
+        }
+
+        @Override
+        public HTMLImageElement createBlobImageElement(Blob blob) {
+            return createCrossOriginImageElement(BlobUtil.createObjectURL(blob));
+        }
+
+        @Override
+        public HTML5Graphics createGraphics(HTML5Implementation implementation, HTMLCanvasElement canvas) {
+            return new HTML5Graphics(implementation, canvas);
+        }
+
+        @Override
+        public CanvasRenderingContext2D getContext(HTMLCanvasElement canvas) {
+            return (CanvasRenderingContext2D)canvas.getContext("2d");
+        }
+
+        @Override
+        public void drawLoadedImage(CanvasRenderingContext2D context, HTMLImageElement image, int x, int y, int width, int height) {
+            context.drawImage(image, x, y, width, height);
+        }
+
+        @Override
+        public void drawMutableSurface(CanvasRenderingContext2D context, HTMLCanvasElement canvas, int x, int y, int width, int height) {
+            context.drawImage(canvas, x, y, width, height);
+        }
+
+        @Override
+        public CanvasPattern createLoadedImagePattern(CanvasRenderingContext2D context, HTMLImageElement image) {
+            return context.createPattern(image, "repeat");
+        }
+
+        @Override
+        public CanvasPattern createMutableSurfacePattern(CanvasRenderingContext2D context, HTMLCanvasElement canvas) {
+            return context.createPattern(canvas, "repeat");
+        }
+
+        @Override
+        public ImageData readLoadedImageData(HTMLImageElement image, int x, int y, int width, int height) {
+            HTMLCanvasElement canvas = createCanvas(width, height);
+            CanvasRenderingContext2D context = getContext(canvas);
+            context.drawImage(image, x, y, width, height, 0, 0, width, height);
+            return context.getImageData(0, 0, width, height);
+        }
+
+        @Override
+        public ImageData readMutableSurfaceData(HTMLCanvasElement canvas, int x, int y, int width, int height) {
+            return getContext(canvas).getImageData(x, y, width, height);
+        }
+
+        @Override
+        public void writeImageData(HTMLCanvasElement canvas, ImageData imageData, int width, int height) {
+            CanvasRenderingContext2D context = getContext(canvas);
+            context.clearRect(0, 0, width, height);
+            context.putImageData(imageData, 0, 0, 0, 0, width, height);
+        }
+
+        @Override
+        public void scaleLoadedImageToCanvas(HTMLCanvasElement canvas, HTMLImageElement image, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight) {
+            getContext(canvas).drawImage(image, 0, 0, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
+        }
+
+        @Override
+        public void scaleMutableSurfaceToCanvas(HTMLCanvasElement canvas, HTMLCanvasElement sourceCanvas, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight) {
+            getContext(canvas).drawImage(sourceCanvas, 0, 0, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
+        }
+
+        @Override
+        public Blob toImageBlob(HTMLCanvasElement canvas, String mimeType, float quality) {
+            return BlobUtil.canvasToBlob(canvas, mimeType, quality);
+        }
+
+        @Override
+        public void repaintCurrentForm() {
+            Form current = Display.getInstance().getCurrent();
+            if (current != null) {
+                current.repaint();
+            }
+        }
+    }
     
     /**
      * We don't have an API yet to auto-detect the device's camera dimensions
@@ -4710,33 +4812,26 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void getRGB(Object nativeImage, int[] arr, int offset, int x, int y, int width, int height) {
     	NativeImage im = (NativeImage)nativeImage;
-        CanvasRenderingContext2D ctx = null;
-        ImageData imData = null;
-        if (im.mutableGraphics != null){
-            ctx = im.mutableGraphics.getContext();
-            imData = ctx.getImageData(x, y, width, height);
-        } else if (im.img != null && im.loaded ){
-            HTMLCanvasElement buf = (HTMLCanvasElement)window.getDocument().createElement("canvas");
-            buf.setWidth(width);
-            buf.setHeight(height);
-            ctx = (CanvasRenderingContext2D)buf.getContext("2d");
-            ctx.drawImage(im.img, x, y, width, height, 0, 0, width, height);
-            //im.draw(ctx, 0, 0);
-            imData = ctx.getImageData(0, 0, width, height);
-        } else {
-            if (im.img!=null){
-                im.load();
-            }
-            if (!im.loaded){
-                throw new RuntimeException("Failed to get RGB data.  Image not loaded "+nativeImage);
-            } else {
-                getRGB(im, arr, offset, x, y, width, height);
-                return;
-            }
-            
+        if (im.img != null && !im.loaded) {
+            im.load();
         }
-        
-        final Uint8ClampedArray dataArr = imData.getData();
+        final ImageData[] imData = new ImageData[1];
+        JavaScriptNativeImageAdapter.readPixels(im.getImageModel(), new JavaScriptNativeImageAdapter.PixelReadTarget() {
+            @Override
+            public void readLoadedImage() {
+                imData[0] = renderingBackend.readLoadedImageData(im.img, x, y, width, height);
+            }
+
+            @Override
+            public void readMutableSurface() {
+                imData[0] = renderingBackend.readMutableSurfaceData(im.mutableGraphics.getCanvas(), x, y, width, height);
+            }
+        });
+        if (imData[0] == null) {
+            throw new RuntimeException("Failed to get RGB data.  Image not loaded " + nativeImage);
+        }
+
+        final Uint8ClampedArray dataArr = imData[0].getData();
         JavaScriptImageDataAdapter.readRgbaToArgb(new JavaScriptImageDataAdapter.PixelReader() {
             @Override
             public int get(int index) {
@@ -4779,14 +4874,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
 
             private void saveImage(NativeImage nimg, OutputStream response, String format, int width, int height, float quality) throws IOException {
-                
-                HTMLCanvasElement canvas = (HTMLCanvasElement)window.getDocument().createElement("canvas");
-                canvas.setWidth(width);
-                canvas.setHeight(height);
-                CanvasRenderingContext2D ctx = (CanvasRenderingContext2D)canvas.getContext("2d");
-                
+                HTMLCanvasElement canvas = renderingBackend.createCanvas(width, height);
+                CanvasRenderingContext2D ctx = renderingBackend.getContext(canvas);
                 nimg.draw(ctx, 0, 0, width, height);
-                Blob blob = BlobUtil.canvasToBlob(canvas, "image/"+format, quality);
+                Blob blob = renderingBackend.toImageBlob(canvas, "image/"+format, quality);
                 InputStream blobInput = BlobUtil.openInputStream(blob);
                 Util.copy(blobInput, response);
                 Util.cleanup(blobInput);
@@ -4819,25 +4910,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
                             @Override
                             public HTMLCanvasElement createCanvas(int canvasWidth, int canvasHeight) {
-                                HTMLCanvasElement canvas = (HTMLCanvasElement)window.getDocument().createElement("canvas");
-                                canvas.setWidth(canvasWidth);
-                                canvas.setHeight(canvasHeight);
-                                return canvas;
+                                return renderingBackend.createCanvas(canvasWidth, canvasHeight);
                             }
                         }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
                             @Override
                             public HTML5Graphics createGraphics(HTMLCanvasElement canvas) {
-                                return new HTML5Graphics(HTML5Implementation.this, canvas);
+                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas);
                             }
 
                             @Override
                             public void fillRect(HTML5Graphics graphics, int fillColor, int fillWidth, int fillHeight) {
                             }
                         });
-        img.mutableGraphics = buffer.getGraphics();
-        CanvasRenderingContext2D bufCtx = (CanvasRenderingContext2D)buffer.getCanvas().getContext("2d");
-        bufCtx.clearRect(0, 0, width, height);
-        bufCtx.putImageData(data, 0, 0, 0, 0, width, height);
+        attachMutableImageSurface(img, buffer.getGraphics());
+        renderingBackend.writeImageData(buffer.getCanvas(), data, width, height);
         //System.out.println("Created image from rgb "+img);
         
         return img;
@@ -5088,6 +5174,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return true;
     }
 
+    private void attachMutableImageSurface(final NativeImage image, HTML5Graphics graphics) {
+        image.mutableGraphics = graphics;
+        image.mutableGraphics.setMutationListener(new Runnable() {
+            @Override
+            public void run() {
+                JavaScriptNativeImageAdapter.invalidatePatternCache(image.getImageModel());
+            }
+        });
+    }
+
     
     
     @Override
@@ -5097,16 +5193,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         final String url = _url;
         final NativeImage im = new NativeImage();
-        HTMLImageElement img = (HTMLImageElement)window.getDocument().createElement("img");
-        img.setAttribute("crossorigin", "anonymous");
-        img.setSrc(url);
-        im.img = img;
-        im.doNotRepaint = true;
+        im.img = renderingBackend.createCrossOriginImageElement(url);
+        im.setSuppressRepaint(true);
         new Thread(new Runnable() {
             @Override
             public void run() {
                 im.load();
-                im.doNotRepaint = false;
+                im.setSuppressRepaint(false);
                 if (im.loaded) {
                     final HTML5Image cn1Im = new HTML5Image(im);
                     
@@ -5137,16 +5230,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         final String url = _url;
         final NativeImage im = new NativeImage();
-        HTMLImageElement img = (HTMLImageElement)window.getDocument().createElement("img");
-        img.setAttribute("crossorigin", "anonymous");
-        img.setSrc(url);
-        im.img = img;
-        im.doNotRepaint = true;
+        im.img = renderingBackend.createCrossOriginImageElement(url);
+        im.setSuppressRepaint(true);
         new Thread(new Runnable() {
             @Override
             public void run() {
                 im.load();
-                im.doNotRepaint = false;
+                im.setSuppressRepaint(false);
                 if (im.loaded) {
                     final HTML5Image cn1Im = new HTML5Image(im);
                     ImageIO imageIO = ImageIO.getImageIO();
@@ -5196,15 +5286,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         final String url = _url;
         final NativeImage im = new NativeImage();
-        HTMLImageElement img = (HTMLImageElement)window.getDocument().createElement("img");
-        img.setAttribute("crossorigin", "anonymous");
-        img.setSrc(url);
-        im.img = img;
-        im.doNotRepaint = true;
+        im.img = renderingBackend.createCrossOriginImageElement(url);
+        im.setSuppressRepaint(true);
         new Thread(new Runnable() {
             @Override
             public void run() {
                 im.load();
+                im.setSuppressRepaint(false);
                 if (im.loaded) {
                     final HTML5Image cn1Im = new HTML5Image(im);
                     ImageIO imageIO = ImageIO.getImageIO();
@@ -5254,11 +5342,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public Object createImage(String path) throws IOException {
         if (exists(path) && !isDirectory(path)){
             NativeImage im = new NativeImage();
-            HTMLImageElement img = (HTMLImageElement)window.getDocument().createElement("img");
             Blob blob = openFileAsBlob(path);
-            img.setAttribute("crossorigin", "anonymous");
-            img.setSrc(BlobUtil.createObjectURL(blob));
-            im.img = img;
+            im.img = renderingBackend.createBlobImageElement(blob);
             im.load();
             return im;
         } else {
@@ -5335,15 +5420,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
                             @Override
                             public HTMLCanvasElement createCanvas(int canvasWidth, int canvasHeight) {
-                                HTMLCanvasElement canvas = (HTMLCanvasElement)window.getDocument().createElement("canvas");
-                                canvas.setWidth(canvasWidth);
-                                canvas.setHeight(canvasHeight);
-                                return canvas;
+                                return renderingBackend.createCanvas(canvasWidth, canvasHeight);
                             }
                         }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
                             @Override
                             public HTML5Graphics createGraphics(HTMLCanvasElement canvas) {
-                                return new HTML5Graphics(HTML5Implementation.this, canvas);
+                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas);
                             }
 
                             @Override
@@ -5353,7 +5435,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             }
                         });
         NativeImage img = new NativeImage();
-        img.mutableGraphics = buffer.getGraphics();
+        attachMutableImageSurface(img, buffer.getGraphics());
         return img;
         
     }
@@ -5390,15 +5472,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         new JavaScriptCanvasImageBufferLifecycle.SizedCanvasFactory<HTMLCanvasElement>() {
                             @Override
                             public HTMLCanvasElement createCanvas(int canvasWidth, int canvasHeight) {
-                                HTMLCanvasElement canvas = (HTMLCanvasElement)window.getDocument().createElement("canvas");
-                                canvas.setWidth(canvasWidth);
-                                canvas.setHeight(canvasHeight);
-                                return canvas;
+                                return renderingBackend.createCanvas(canvasWidth, canvasHeight);
                             }
                         }, new JavaScriptCanvasImageBufferLifecycle.GraphicsFactory<HTMLCanvasElement, HTML5Graphics>() {
                             @Override
                             public HTML5Graphics createGraphics(HTMLCanvasElement canvas) {
-                                return new HTML5Graphics(HTML5Implementation.this, canvas);
+                                return renderingBackend.createGraphics(HTML5Implementation.this, canvas);
                             }
 
                             @Override
@@ -5407,8 +5486,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         });
         scaled.width = buffer.getWidth();
         scaled.height = buffer.getHeight();
-        scaled.mutableGraphics = buffer.getGraphics();
-        CanvasRenderingContext2D bufCtx = (CanvasRenderingContext2D)buffer.getCanvas().getContext("2d");
+        attachMutableImageSurface(scaled, buffer.getGraphics());
         if (img.img != null && !img.loaded) {
             img.load();
         }
@@ -5416,13 +5494,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
             int srcW = img.img.getNaturalWidth();
             int srcH = img.img.getNaturalHeight();
             if (srcW >0 && srcH > 0) {
-                bufCtx.drawImage(img.img, 0, 0, srcW, srcH, 0, 0, width, height);
+                renderingBackend.scaleLoadedImageToCanvas(buffer.getCanvas(), img.img, srcW, srcH, width, height);
             } else {
                 String msg = "Failed to scale image because the width or height is non-positive. "+srcW+"x"+srcH;
                 _log(msg);
             }
         } else if (img.mutableGraphics != null) {
-            bufCtx.drawImage(img.mutableGraphics.getCanvas(), 0, 0, img.getWidth(), img.getHeight(), 0, 0, width, height);
+            renderingBackend.scaleMutableSurfaceToCanvas(buffer.getCanvas(), img.mutableGraphics.getCanvas(), img.getWidth(), img.getHeight(), width, height);
         }
         
         
@@ -7484,25 +7562,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         for (int i=0; i<len; i++){
             arr.set(i, bytes[i+offset]);
         }
-        HTMLImageElement img = (HTMLImageElement)window.getDocument().createElement("img");
-        
         Blob blob = BlobUtil.createBlob(arr, "image/png");
-        URLBuilderFactory factory = (URLBuilderFactory)window;
-        
-        URLBuilder urlBuilder = null;
-        if (factory.getURL() != null){
-            urlBuilder = factory.getURL();
-        } else {
-            urlBuilder = factory.getWebkitURL();
-        }
-
-        String objUrl = urlBuilder.createObjectURL(blob);
-
         NativeImage nimg = new NativeImage();
-        nimg.img = img;
-        
-        nimg.img.setAttribute("crossorigin", "anonymous");
-        nimg.img.setSrc(objUrl);
+        nimg.img = renderingBackend.createBlobImageElement(blob);
         nimg.load();
         return nimg;
     }
@@ -7558,9 +7620,61 @@ public class HTML5Implementation extends CodenameOneImplementation {
         int height;
         boolean loaded;
         boolean error;
+        final JavaScriptAsyncImageLoadCoordinator.State loadState = new JavaScriptAsyncImageLoadCoordinator.State();
         HTML5Graphics mutableGraphics;
         CanvasPattern pattern;
         boolean doNotRepaint = false;
+        private final JavaScriptNativeImageAdapter.ImageModel imageModel = new JavaScriptNativeImageAdapter.ImageModel() {
+            @Override
+            public int getExplicitWidth() {
+                return width;
+            }
+
+            @Override
+            public int getExplicitHeight() {
+                return height;
+            }
+
+            @Override
+            public boolean hasLoadedImage() {
+                return img != null && loaded;
+            }
+
+            @Override
+            public int getLoadedImageWidth() {
+                return img.getNaturalWidth();
+            }
+
+            @Override
+            public int getLoadedImageHeight() {
+                return img.getNaturalHeight();
+            }
+
+            @Override
+            public boolean hasMutableSurface() {
+                return mutableGraphics != null;
+            }
+
+            @Override
+            public int getMutableSurfaceWidth() {
+                return mutableGraphics.getCanvas().getWidth();
+            }
+
+            @Override
+            public int getMutableSurfaceHeight() {
+                return mutableGraphics.getCanvas().getHeight();
+            }
+
+            @Override
+            public Object getPatternCache() {
+                return pattern;
+            }
+
+            @Override
+            public void setPatternCache(Object patternCache) {
+                pattern = (CanvasPattern)patternCache;
+            }
+        };
         public HTMLImageElement getImg(){
             return img;
         }
@@ -7568,93 +7682,88 @@ public class HTML5Implementation extends CodenameOneImplementation {
         public HTML5Graphics getMutableGraphics() {
             return mutableGraphics;
         }
+
+        JavaScriptNativeImageAdapter.ImageModel getImageModel() {
+            return imageModel;
+        }
+
+        public void setSuppressRepaint(boolean suppress) {
+            doNotRepaint = suppress;
+            loadState.setSuppressRepaint(suppress);
+        }
         
         public void load(){
             ImageExt imageExt = (ImageExt)img;
             if (img!=null && imageExt.isComplete()){
-                if (img.getNaturalHeight() <= 0) {
-                    error = true;
-                    loaded = false;
-                    
-                } else {
-                    loaded=true;
-                    error=false;
-                    width=img.getNaturalWidth();
-                    height=img.getNaturalHeight();
+                if (JavaScriptAsyncImageLoadCoordinator.handleImmediateCompletion(loadState, img.getNaturalWidth(), img.getNaturalHeight())) {
+                    loaded = loadState.isLoaded();
+                    error = loadState.isError();
+                    width = loadState.getWidth();
+                    height = loadState.getHeight();
                     return;
                 }
+                loaded = loadState.isLoaded();
+                error = loadState.isError();
             }
             if ( error || !loaded && img != null){
                 final Object lock = new Object();
+                JavaScriptAsyncImageLoadCoordinator.beginLoading(loadState);
                 loaded = false;
                 error = false;
-                
-                img.addEventListener("load", new EventListener(){
+                if (!loadState.areListenersInstalled()) {
+                    loadState.setListenersInstalled(true);
+                    img.addEventListener("load", new EventListener(){
 
-                    @Override
-                    public void handleEvent(Event evt) {
-                        new Thread(){
+                        @Override
+                        public void handleEvent(Event evt) {
+                            new Thread(){
 
-                            @Override
-                            public void run() {
-                                if (width<=0){
-                                    width = img.getNaturalWidth();
-                                }
-                                if (height<=0){
-                                    height = img.getNaturalHeight();
-                                }
-                                if (width < 0 || height < 0) {
-                                    loaded = false;
-                                    error = true;
+                                @Override
+                                public void run() {
+                                    JavaScriptAsyncImageLoadCoordinator.handleLoad(loadState, img.getNaturalWidth(), img.getNaturalHeight());
+                                    loaded = loadState.isLoaded();
+                                    error = loadState.isError();
+                                    width = loadState.getWidth();
+                                    height = loadState.getHeight();
+                                    if (JavaScriptAsyncImageLoadCoordinator.shouldRepaintOnLoad(loadState)) {
+                                        Display.getInstance().callSerially(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                renderingBackend.repaintCurrentForm();
+                                            }
+                                        });
+                                    }
                                     synchronized(lock){
                                         lock.notifyAll();
                                     }
-                                    return;
                                 }
-                                if (!doNotRepaint) {
-                                    Display.getInstance().callSerially(new Runnable() {
+                                
+                            }.start();
+                        }
+                        
+                    }, false);
+                    img.addEventListener("error", new EventListener(){
 
-                                        @Override
-                                        public void run() {
-                                            Form current = Display.getInstance().getCurrent();
-                                            if (current != null) {
-                                                current.repaint();
-                                            }
-                                        }
+                        @Override
+                        public void handleEvent(final Event evt) {
+                            new Thread(){
 
-                                    });
+                                @Override
+                                public void run() {
+                                    JavaScriptAsyncImageLoadCoordinator.handleError(loadState);
+                                    loaded = loadState.isLoaded();
+                                    error = loadState.isError();
+                                    synchronized(lock){
+                                        lock.notifyAll();
+                                    }
                                 }
-                                loaded = true;
-                                error = false;
-                                synchronized(lock){
-                                    lock.notifyAll();
-                                }
-                            }
-                            
-                        }.start();
-                    }
-                    
-                }, false);
-                img.addEventListener("error", new EventListener(){
-
-                    @Override
-                    public void handleEvent(final Event evt) {
-                        new Thread(){
-
-                            @Override
-                            public void run() {
-                                error = true;
-                                loaded = false;
-                                synchronized(lock){
-                                    lock.notifyAll();
-                                }
-                            }
-                            
-                        }.start();
-                    }
-                    
-                }, false);
-                while (!loaded && !error){
+                                
+                            }.start();
+                        }
+                        
+                    }, false);
+                }
+                while (JavaScriptAsyncImageLoadCoordinator.shouldWait(loadState)){
                     synchronized(lock){
                         try {
                             lock.wait(200);
@@ -7663,232 +7772,49 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         }
                     }
                 }
+                loaded = loadState.isLoaded();
+                error = loadState.isError();
                
             }
         }
         
         public int getWidth(){
-            return JavaScriptNativeImageAdapter.resolveWidth(new JavaScriptNativeImageAdapter.ImageModel() {
-                @Override
-                public int getExplicitWidth() {
-                    return width;
-                }
-
-                @Override
-                public int getExplicitHeight() {
-                    return height;
-                }
-
-                @Override
-                public boolean hasLoadedImage() {
-                    return img != null && loaded;
-                }
-
-                @Override
-                public int getLoadedImageWidth() {
-                    return img.getNaturalWidth();
-                }
-
-                @Override
-                public int getLoadedImageHeight() {
-                    return img.getNaturalHeight();
-                }
-
-                @Override
-                public boolean hasMutableSurface() {
-                    return mutableGraphics != null;
-                }
-
-                @Override
-                public int getMutableSurfaceWidth() {
-                    return mutableGraphics.getCanvas().getWidth();
-                }
-
-                @Override
-                public int getMutableSurfaceHeight() {
-                    return mutableGraphics.getCanvas().getHeight();
-                }
-            });
+            return JavaScriptNativeImageAdapter.resolveWidth(imageModel);
         }
         
         public int getHeight(){
-            return JavaScriptNativeImageAdapter.resolveHeight(new JavaScriptNativeImageAdapter.ImageModel() {
-                @Override
-                public int getExplicitWidth() {
-                    return width;
-                }
-
-                @Override
-                public int getExplicitHeight() {
-                    return height;
-                }
-
-                @Override
-                public boolean hasLoadedImage() {
-                    return img != null && loaded;
-                }
-
-                @Override
-                public int getLoadedImageWidth() {
-                    return img.getNaturalWidth();
-                }
-
-                @Override
-                public int getLoadedImageHeight() {
-                    return img.getNaturalHeight();
-                }
-
-                @Override
-                public boolean hasMutableSurface() {
-                    return mutableGraphics != null;
-                }
-
-                @Override
-                public int getMutableSurfaceWidth() {
-                    return mutableGraphics.getCanvas().getWidth();
-                }
-
-                @Override
-                public int getMutableSurfaceHeight() {
-                    return mutableGraphics.getCanvas().getHeight();
-                }
-            });
+            return JavaScriptNativeImageAdapter.resolveHeight(imageModel);
         }
         
         public void draw(CanvasRenderingContext2D ctx, int x, int y, int width, int height){
-            JavaScriptNativeImageAdapter.draw(new JavaScriptNativeImageAdapter.ImageModel() {
-                @Override
-                public int getExplicitWidth() {
-                    return NativeImage.this.width;
-                }
-
-                @Override
-                public int getExplicitHeight() {
-                    return NativeImage.this.height;
-                }
-
-                @Override
-                public boolean hasLoadedImage() {
-                    return img != null && loaded;
-                }
-
-                @Override
-                public int getLoadedImageWidth() {
-                    return img.getNaturalWidth();
-                }
-
-                @Override
-                public int getLoadedImageHeight() {
-                    return img.getNaturalHeight();
-                }
-
-                @Override
-                public boolean hasMutableSurface() {
-                    return mutableGraphics != null;
-                }
-
-                @Override
-                public int getMutableSurfaceWidth() {
-                    return mutableGraphics.getCanvas().getWidth();
-                }
-
-                @Override
-                public int getMutableSurfaceHeight() {
-                    return mutableGraphics.getCanvas().getHeight();
-                }
-            }, new JavaScriptNativeImageAdapter.ImageTarget() {
+            JavaScriptNativeImageAdapter.draw(imageModel, new JavaScriptNativeImageAdapter.DrawTarget() {
                 @Override
                 public void drawLoadedImage(int drawX, int drawY, int drawWidth, int drawHeight) {
-                    ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                    renderingBackend.drawLoadedImage(ctx, img, drawX, drawY, drawWidth, drawHeight);
                 }
 
                 @Override
                 public void drawMutableSurface(int drawX, int drawY, int drawWidth, int drawHeight) {
-                    ctx.drawImage(mutableGraphics.getCanvas(), drawX, drawY, drawWidth, drawHeight);
-                }
-
-                @Override
-                public void tileLoadedImage(int tileX, int tileY, int tileWidth, int tileHeight) {
-                }
-
-                @Override
-                public void tileMutableSurface(int tileX, int tileY, int tileWidth, int tileHeight) {
+                    renderingBackend.drawMutableSurface(ctx, mutableGraphics.getCanvas(), drawX, drawY, drawWidth, drawHeight);
                 }
             }, x, y, width, height);
         }
         
         public void tile(CanvasRenderingContext2D ctx, int x, int y, int width, int height) {
-            if (pattern != null) {
-                ctx.setFillStyle(pattern);
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.fillRect(0, 0, width, height);
-                ctx.restore();
-                return;
-            }
-            JavaScriptNativeImageAdapter.tile(new JavaScriptNativeImageAdapter.ImageModel() {
+            JavaScriptNativeImageAdapter.tile(imageModel, new JavaScriptNativeImageAdapter.TileTarget() {
                 @Override
-                public int getExplicitWidth() {
-                    return NativeImage.this.width;
+                public Object createLoadedImagePattern() {
+                    return renderingBackend.createLoadedImagePattern(ctx, img);
                 }
 
                 @Override
-                public int getExplicitHeight() {
-                    return NativeImage.this.height;
+                public Object createMutableSurfacePattern() {
+                    return renderingBackend.createMutableSurfacePattern(ctx, mutableGraphics.getCanvas());
                 }
 
                 @Override
-                public boolean hasLoadedImage() {
-                    return img != null && loaded;
-                }
-
-                @Override
-                public int getLoadedImageWidth() {
-                    return img.getNaturalWidth();
-                }
-
-                @Override
-                public int getLoadedImageHeight() {
-                    return img.getNaturalHeight();
-                }
-
-                @Override
-                public boolean hasMutableSurface() {
-                    return mutableGraphics != null;
-                }
-
-                @Override
-                public int getMutableSurfaceWidth() {
-                    return mutableGraphics.getCanvas().getWidth();
-                }
-
-                @Override
-                public int getMutableSurfaceHeight() {
-                    return mutableGraphics.getCanvas().getHeight();
-                }
-            }, new JavaScriptNativeImageAdapter.ImageTarget() {
-                @Override
-                public void drawLoadedImage(int drawX, int drawY, int drawWidth, int drawHeight) {
-                }
-
-                @Override
-                public void drawMutableSurface(int drawX, int drawY, int drawWidth, int drawHeight) {
-                }
-
-                @Override
-                public void tileLoadedImage(int tileX, int tileY, int tileWidth, int tileHeight) {
-                    pattern = ctx.createPattern(img, "repeat");
-                    ctx.setFillStyle(pattern);
-                    ctx.save();
-                    ctx.translate(tileX, tileY);
-                    ctx.fillRect(0, 0, tileWidth, tileHeight);
-                    ctx.restore();
-                }
-
-                @Override
-                public void tileMutableSurface(int tileX, int tileY, int tileWidth, int tileHeight) {
-                    pattern = ctx.createPattern(mutableGraphics.getCanvas(), "repeat");
-                    ctx.setFillStyle(pattern);
+                public void paintPattern(Object pattern, int tileX, int tileY, int tileWidth, int tileHeight) {
+                    ctx.setFillStyle((CanvasPattern)pattern);
                     ctx.save();
                     ctx.translate(tileX, tileY);
                     ctx.fillRect(0, 0, tileWidth, tileHeight);

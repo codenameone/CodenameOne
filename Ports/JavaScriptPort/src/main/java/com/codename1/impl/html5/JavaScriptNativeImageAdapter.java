@@ -10,6 +10,12 @@ public final class JavaScriptNativeImageAdapter {
     private JavaScriptNativeImageAdapter() {
     }
 
+    public enum SurfaceKind {
+        NONE,
+        LOADED_IMAGE,
+        MUTABLE_SURFACE
+    }
+
     public interface ImageModel {
         int getExplicitWidth();
         int getExplicitHeight();
@@ -19,13 +25,34 @@ public final class JavaScriptNativeImageAdapter {
         boolean hasMutableSurface();
         int getMutableSurfaceWidth();
         int getMutableSurfaceHeight();
+        Object getPatternCache();
+        void setPatternCache(Object patternCache);
     }
 
-    public interface ImageTarget {
+    public interface DrawTarget {
         void drawLoadedImage(int x, int y, int width, int height);
         void drawMutableSurface(int x, int y, int width, int height);
-        void tileLoadedImage(int x, int y, int width, int height);
-        void tileMutableSurface(int x, int y, int width, int height);
+    }
+
+    public interface TileTarget {
+        Object createLoadedImagePattern();
+        Object createMutableSurfacePattern();
+        void paintPattern(Object pattern, int x, int y, int width, int height);
+    }
+
+    public interface PixelReadTarget {
+        void readLoadedImage();
+        void readMutableSurface();
+    }
+
+    public static SurfaceKind resolveSurfaceKind(ImageModel image) {
+        if (image.hasLoadedImage()) {
+            return SurfaceKind.LOADED_IMAGE;
+        }
+        if (image.hasMutableSurface()) {
+            return SurfaceKind.MUTABLE_SURFACE;
+        }
+        return SurfaceKind.NONE;
     }
 
     public static int resolveWidth(ImageModel image) {
@@ -54,25 +81,62 @@ public final class JavaScriptNativeImageAdapter {
         return 10;
     }
 
-    public static void draw(ImageModel image, ImageTarget target, int x, int y, int width, int height) {
+    public static void invalidatePatternCache(ImageModel image) {
+        image.setPatternCache(null);
+    }
+
+    public static void draw(ImageModel image, DrawTarget target, int x, int y, int width, int height) {
         if (width <= 0 || height <= 0) {
             return;
         }
-        if (image.hasLoadedImage()) {
-            target.drawLoadedImage(x, y, width, height);
-        } else if (image.hasMutableSurface()) {
-            target.drawMutableSurface(x, y, width, height);
+        switch (resolveSurfaceKind(image)) {
+            case LOADED_IMAGE:
+                target.drawLoadedImage(x, y, width, height);
+                break;
+            case MUTABLE_SURFACE:
+                target.drawMutableSurface(x, y, width, height);
+                break;
+            default:
+                break;
         }
     }
 
-    public static void tile(ImageModel image, ImageTarget target, int x, int y, int width, int height) {
+    public static void tile(ImageModel image, TileTarget target, int x, int y, int width, int height) {
         if (width <= 0 || height <= 0) {
             return;
         }
-        if (image.hasLoadedImage()) {
-            target.tileLoadedImage(x, y, width, height);
-        } else if (image.hasMutableSurface()) {
-            target.tileMutableSurface(x, y, width, height);
+        Object pattern = image.getPatternCache();
+        if (pattern != null) {
+            target.paintPattern(pattern, x, y, width, height);
+            return;
+        }
+        switch (resolveSurfaceKind(image)) {
+            case LOADED_IMAGE:
+                pattern = target.createLoadedImagePattern();
+                break;
+            case MUTABLE_SURFACE:
+                pattern = target.createMutableSurfacePattern();
+                break;
+            default:
+                pattern = null;
+                break;
+        }
+        if (pattern != null) {
+            image.setPatternCache(pattern);
+            target.paintPattern(pattern, x, y, width, height);
+        }
+    }
+
+    public static void readPixels(ImageModel image, PixelReadTarget target) {
+        switch (resolveSurfaceKind(image)) {
+            case LOADED_IMAGE:
+                target.readLoadedImage();
+                break;
+            case MUTABLE_SURFACE:
+                target.readMutableSurface();
+                break;
+            default:
+                break;
         }
     }
 }
