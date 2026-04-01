@@ -4736,11 +4736,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
             
         }
         
-        Uint8ClampedArray dataArr = imData.getData();
-        int len = dataArr.getLength();
-        for (int i=0; i<len; i+=4){
-            arr[i/4] = ((dataArr.get(i+3) <<24) & 0xff000000) | ((dataArr.get(i) << 16) & 0xff0000) | ((dataArr.get(i+1) << 8) & 0xff00) | ((dataArr.get(i+2)) & 0xff);
-        }
+        final Uint8ClampedArray dataArr = imData.getData();
+        JavaScriptImageDataAdapter.readRgbaToArgb(new JavaScriptImageDataAdapter.PixelReader() {
+            @Override
+            public int get(int index) {
+                return dataArr.get(index);
+            }
+
+            @Override
+            public int length() {
+                return dataArr.getLength();
+            }
+        }, arr, offset);
             
         
     }
@@ -4856,23 +4863,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     Object createImageData(int[] rgb, int offset, int width, int height) {
-        
-        Uint8ClampedArray arr = Uint8ClampedArray.create(width*height*4);
-        int j=0;
-        int start = offset;
-        int end = offset + width*height;
-        for (int i=offset; i<end; i++){
-            
-            int red = (rgb[i] >> 16) & 0xFF;
-            int green = (rgb[i] >> 8) & 0xFF;
-            int blue = rgb[i] & 0xFF;
-            int alpha = (rgb[i] >> 24) & 0xFF;
-            arr.set(j++, red);
-            arr.set(j++, green);
-            arr.set(j++, blue);
-            arr.set(j++, alpha);
-        }
-        
+        final Uint8ClampedArray arr = Uint8ClampedArray.create(width*height*4);
+        JavaScriptImageDataAdapter.writeArgbToRgba(rgb, offset, width, height, new JavaScriptImageDataAdapter.PixelWriter() {
+            @Override
+            public void set(int index, int value) {
+                arr.set(index, value);
+            }
+        });
         ImageData d = graphics.getContext().createImageData(width, height);
         ((Uint8ClampedArraySetter)d.getData()).set(arr);
         return d;
@@ -7671,82 +7668,233 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         
         public int getWidth(){
-            if (width > 0){
-                return width;
-            } else if (img != null && loaded){
-                return img.getNaturalWidth(); 
-                
-            } else if (mutableGraphics != null){
-                return mutableGraphics.getCanvas().getWidth();
-                    
-            } else {
-                return 10;
-            }
+            return JavaScriptNativeImageAdapter.resolveWidth(new JavaScriptNativeImageAdapter.ImageModel() {
+                @Override
+                public int getExplicitWidth() {
+                    return width;
+                }
+
+                @Override
+                public int getExplicitHeight() {
+                    return height;
+                }
+
+                @Override
+                public boolean hasLoadedImage() {
+                    return img != null && loaded;
+                }
+
+                @Override
+                public int getLoadedImageWidth() {
+                    return img.getNaturalWidth();
+                }
+
+                @Override
+                public int getLoadedImageHeight() {
+                    return img.getNaturalHeight();
+                }
+
+                @Override
+                public boolean hasMutableSurface() {
+                    return mutableGraphics != null;
+                }
+
+                @Override
+                public int getMutableSurfaceWidth() {
+                    return mutableGraphics.getCanvas().getWidth();
+                }
+
+                @Override
+                public int getMutableSurfaceHeight() {
+                    return mutableGraphics.getCanvas().getHeight();
+                }
+            });
         }
         
         public int getHeight(){
-            if (height > 0){
-                return height;
-            } else if (img != null && loaded){
-                return img.getNaturalHeight();
-            } else if (mutableGraphics != null){
-                return mutableGraphics.getCanvas().getHeight();
-            } else {
-                return 10;
-            }
+            return JavaScriptNativeImageAdapter.resolveHeight(new JavaScriptNativeImageAdapter.ImageModel() {
+                @Override
+                public int getExplicitWidth() {
+                    return width;
+                }
+
+                @Override
+                public int getExplicitHeight() {
+                    return height;
+                }
+
+                @Override
+                public boolean hasLoadedImage() {
+                    return img != null && loaded;
+                }
+
+                @Override
+                public int getLoadedImageWidth() {
+                    return img.getNaturalWidth();
+                }
+
+                @Override
+                public int getLoadedImageHeight() {
+                    return img.getNaturalHeight();
+                }
+
+                @Override
+                public boolean hasMutableSurface() {
+                    return mutableGraphics != null;
+                }
+
+                @Override
+                public int getMutableSurfaceWidth() {
+                    return mutableGraphics.getCanvas().getWidth();
+                }
+
+                @Override
+                public int getMutableSurfaceHeight() {
+                    return mutableGraphics.getCanvas().getHeight();
+                }
+            });
         }
         
         public void draw(CanvasRenderingContext2D ctx, int x, int y, int width, int height){
-            if (width <= 0 || height <= 0) {
-                return;
-            }
-            if (img != null && loaded){
-                ctx.drawImage(img, x, y, width, height);
-            } else if (mutableGraphics != null){
-                ctx.drawImage(mutableGraphics.getCanvas(), x, y, width, height);
-            } else {
-               
-            }
+            JavaScriptNativeImageAdapter.draw(new JavaScriptNativeImageAdapter.ImageModel() {
+                @Override
+                public int getExplicitWidth() {
+                    return NativeImage.this.width;
+                }
+
+                @Override
+                public int getExplicitHeight() {
+                    return NativeImage.this.height;
+                }
+
+                @Override
+                public boolean hasLoadedImage() {
+                    return img != null && loaded;
+                }
+
+                @Override
+                public int getLoadedImageWidth() {
+                    return img.getNaturalWidth();
+                }
+
+                @Override
+                public int getLoadedImageHeight() {
+                    return img.getNaturalHeight();
+                }
+
+                @Override
+                public boolean hasMutableSurface() {
+                    return mutableGraphics != null;
+                }
+
+                @Override
+                public int getMutableSurfaceWidth() {
+                    return mutableGraphics.getCanvas().getWidth();
+                }
+
+                @Override
+                public int getMutableSurfaceHeight() {
+                    return mutableGraphics.getCanvas().getHeight();
+                }
+            }, new JavaScriptNativeImageAdapter.ImageTarget() {
+                @Override
+                public void drawLoadedImage(int drawX, int drawY, int drawWidth, int drawHeight) {
+                    ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                }
+
+                @Override
+                public void drawMutableSurface(int drawX, int drawY, int drawWidth, int drawHeight) {
+                    ctx.drawImage(mutableGraphics.getCanvas(), drawX, drawY, drawWidth, drawHeight);
+                }
+
+                @Override
+                public void tileLoadedImage(int tileX, int tileY, int tileWidth, int tileHeight) {
+                }
+
+                @Override
+                public void tileMutableSurface(int tileX, int tileY, int tileWidth, int tileHeight) {
+                }
+            }, x, y, width, height);
         }
         
         public void tile(CanvasRenderingContext2D ctx, int x, int y, int width, int height) {
-            if (width <= 0 || height <= 0) {
+            if (pattern != null) {
+                ctx.setFillStyle(pattern);
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.fillRect(0, 0, width, height);
+                ctx.restore();
                 return;
             }
-            if (pattern != null) {
-             
-                ctx.setFillStyle(pattern);
-                //ctx.beginPath();
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.fillRect(0, 0, width, height);
-                ctx.restore();
-                //ctx.rect(x, y, width, height);
-                //ctx.fill();
-            } else if (img != null && loaded){
-                pattern = ctx.createPattern(img, "repeat");
-                ctx.setFillStyle(pattern);
-                //ctx.beginPath();
-                //ctx.rect(x, y, width, height);
-                //ctx.fill();
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.fillRect(0, 0, width, height);
-                ctx.restore();
-                
-            } else if (mutableGraphics != null){
-                pattern = ctx.createPattern(mutableGraphics.getCanvas(), "repeat");
-                ctx.setFillStyle(pattern);
-                //ctx.beginPath();
-                //ctx.rect(x, y, width, height);
-                //ctx.fill();
-                ctx.save();
-                ctx.translate(x,y);
-                ctx.fillRect(0, 0, width, height);
-                ctx.restore();
-            } else {
-               
-            }
+            JavaScriptNativeImageAdapter.tile(new JavaScriptNativeImageAdapter.ImageModel() {
+                @Override
+                public int getExplicitWidth() {
+                    return NativeImage.this.width;
+                }
+
+                @Override
+                public int getExplicitHeight() {
+                    return NativeImage.this.height;
+                }
+
+                @Override
+                public boolean hasLoadedImage() {
+                    return img != null && loaded;
+                }
+
+                @Override
+                public int getLoadedImageWidth() {
+                    return img.getNaturalWidth();
+                }
+
+                @Override
+                public int getLoadedImageHeight() {
+                    return img.getNaturalHeight();
+                }
+
+                @Override
+                public boolean hasMutableSurface() {
+                    return mutableGraphics != null;
+                }
+
+                @Override
+                public int getMutableSurfaceWidth() {
+                    return mutableGraphics.getCanvas().getWidth();
+                }
+
+                @Override
+                public int getMutableSurfaceHeight() {
+                    return mutableGraphics.getCanvas().getHeight();
+                }
+            }, new JavaScriptNativeImageAdapter.ImageTarget() {
+                @Override
+                public void drawLoadedImage(int drawX, int drawY, int drawWidth, int drawHeight) {
+                }
+
+                @Override
+                public void drawMutableSurface(int drawX, int drawY, int drawWidth, int drawHeight) {
+                }
+
+                @Override
+                public void tileLoadedImage(int tileX, int tileY, int tileWidth, int tileHeight) {
+                    pattern = ctx.createPattern(img, "repeat");
+                    ctx.setFillStyle(pattern);
+                    ctx.save();
+                    ctx.translate(tileX, tileY);
+                    ctx.fillRect(0, 0, tileWidth, tileHeight);
+                    ctx.restore();
+                }
+
+                @Override
+                public void tileMutableSurface(int tileX, int tileY, int tileWidth, int tileHeight) {
+                    pattern = ctx.createPattern(mutableGraphics.getCanvas(), "repeat");
+                    ctx.setFillStyle(pattern);
+                    ctx.save();
+                    ctx.translate(tileX, tileY);
+                    ctx.fillRect(0, 0, tileWidth, tileHeight);
+                    ctx.restore();
+                }
+            }, x, y, width, height);
         }
         
         public void draw(CanvasRenderingContext2D ctx, int x, int y){
