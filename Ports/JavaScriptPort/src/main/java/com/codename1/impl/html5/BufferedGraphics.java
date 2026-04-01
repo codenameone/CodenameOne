@@ -68,6 +68,22 @@ public class BufferedGraphics extends HTML5Graphics {
                             upcoming.add(operation);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
+    private final JavaScriptImageTransformRenderAdapter<NativeImage, Shape, JSAffineTransform, ExecutableOp> imageTransformRenderAdapter =
+            new JavaScriptImageTransformRenderAdapter<NativeImage, Shape, JSAffineTransform, ExecutableOp>(getRenderState(),
+                    new JavaScriptImageTransformRenderAdapter.OperationSink<ExecutableOp>() {
+                        @Override
+                        public void submit(ExecutableOp operation) {
+                            upcoming.add(operation);
+                        }
+                    }, JavaScriptExecutableOpFactory.INSTANCE);
+    private final JavaScriptShapeGradientRenderAdapter<Shape, Stroke, ExecutableOp> shapeGradientRenderAdapter =
+            new JavaScriptShapeGradientRenderAdapter<Shape, Stroke, ExecutableOp>(getRenderState(),
+                    new JavaScriptShapeGradientRenderAdapter.OperationSink<ExecutableOp>() {
+                        @Override
+                        public void submit(ExecutableOp operation) {
+                            upcoming.add(operation);
+                        }
+                    }, JavaScriptExecutableOpFactory.INSTANCE);
     
     public BufferedGraphics(HTML5Implementation impl, HTMLCanvasElement canvas) {
         super(impl, canvas);
@@ -75,17 +91,17 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void drawImage(Object img, int x, int y) {
-        upcoming.add(new DrawImage((NativeImage)img, x, y, getAlpha()));
+        imageTransformRenderAdapter.drawImage((NativeImage)img, x, y);
     }
 
     @Override
     public void drawImage(Object img, int x, int y, int w, int h) {
-        upcoming.add(new DrawImage((NativeImage)img, x, y, getAlpha(), w, h));
+        imageTransformRenderAdapter.drawImage((NativeImage)img, x, y, w, h);
     }
 
     @Override
     public void tileImage(Object img, int x, int y, int w, int h) {
-        upcoming.add(new TileImage((NativeImage)img, x, y, w, h, getAlpha()));
+        imageTransformRenderAdapter.tileImage((NativeImage)img, x, y, w, h);
     }
     
     
@@ -139,12 +155,12 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void drawShape(Shape shape, Stroke stroke) {
-        upcoming.add(new DrawShape(shape, stroke, getColor(), getAlpha()));
+        shapeGradientRenderAdapter.drawShape(shape, stroke);
     }
     
     @Override
     public void fillShape(Shape shape) {
-        upcoming.add(new FillShape(shape, getColor(), getAlpha()));
+        shapeGradientRenderAdapter.fillShape(shape);
     }
 
     @Override
@@ -166,7 +182,7 @@ public class BufferedGraphics extends HTML5Graphics {
     @Override
     public void applyTransform() {
         if (!transformApplied) {
-            upcoming.add(new SetTransform(((JSAffineTransform)transform.getNativeTransform()).cloneTransform(), true));
+            imageTransformRenderAdapter.applyTransform(((JSAffineTransform)transform.getNativeTransform()).cloneTransform(), true);
             transformApplied = true;
         }
     }
@@ -319,7 +335,7 @@ public class BufferedGraphics extends HTML5Graphics {
             t = (JSAffineTransform)transform.getNativeTransform();
         }
         clipBoundsDirty = true;
-        upcoming.add(new ClipShape(shape, t, getClipState()));
+        imageTransformRenderAdapter.setClipShape(shape, t);
     }
     
     private void clipShape(Shape shape) {
@@ -398,17 +414,17 @@ public class BufferedGraphics extends HTML5Graphics {
     
     @Override
     public void fillLinearGradient(int x, int y, int width, int height, int startColor, int endColor, boolean horizontal) {
-        upcoming.add(new FillLinearGradient(x, y, width, height, startColor, endColor, horizontal, getAlpha()));
+        shapeGradientRenderAdapter.fillLinearGradient(x, y, width, height, startColor, endColor, horizontal);
     }
 
     @Override
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        upcoming.add(new FillRadialGradient(x, y, width, height, startColor, endColor, getAlpha(), startAngle, arcAngle));
+        shapeGradientRenderAdapter.fillRadialGradient(x, y, width, height, startColor, endColor, startAngle, arcAngle);
     }
     
     @Override
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
-        upcoming.add(new FillRadialGradient(x, y, width, height, startColor, endColor, getAlpha(), 0, 360));
+        shapeGradientRenderAdapter.fillRadialGradient(x, y, width, height, startColor, endColor, 0, 360);
     }
     
     @Override

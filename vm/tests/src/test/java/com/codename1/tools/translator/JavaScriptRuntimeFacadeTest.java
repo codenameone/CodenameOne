@@ -29,6 +29,10 @@ class JavaScriptRuntimeFacadeTest {
     private static final Path RENDER_QUEUE_STATE_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptRenderQueueState.java");
     private static final Path RENDER_STATE_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptRenderState.java");
     private static final Path PRIMITIVE_RENDER_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptPrimitiveRenderAdapter.java");
+    private static final Path IMAGE_TRANSFORM_RENDER_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptImageTransformRenderAdapter.java");
+    private static final Path SHAPE_GRADIENT_RENDER_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptShapeGradientRenderAdapter.java");
+    private static final Path TEXT_METRICS_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptTextMetricsAdapter.java");
+    private static final Path CANVAS_IMAGE_BUFFER_LIFECYCLE_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptCanvasImageBufferLifecycle.java");
     private static final Path EXECUTABLE_OP_FACTORY_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptExecutableOpFactory.java");
     private static final Path STORAGE_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptStorageAdapter.java");
     private static final Path NETWORK_ADAPTER_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptNetworkAdapter.java");
@@ -157,8 +161,46 @@ class JavaScriptRuntimeFacadeTest {
                 "HTML5Graphics should route drawString through the primitive render adapter");
         assertTrue(html5GraphicsSource.contains("primitiveRenderAdapter.setClipRect("),
                 "HTML5Graphics should route clip-rect updates through the primitive render adapter");
+        assertTrue(html5GraphicsSource.contains("new JavaScriptImageTransformRenderAdapter<NativeImage, Shape, JSAffineTransform, ExecutableOp>("),
+                "HTML5Graphics should delegate image, transform, and clip-shape ops to the shared image/transform adapter");
+        assertTrue(html5GraphicsSource.contains("imageTransformRenderAdapter.drawImage("),
+                "HTML5Graphics should route image draws through the shared image/transform adapter");
+        assertTrue(html5GraphicsSource.contains("imageTransformRenderAdapter.tileImage("),
+                "HTML5Graphics should route image tiling through the shared image/transform adapter");
+        assertTrue(html5GraphicsSource.contains("imageTransformRenderAdapter.applyTransform("),
+                "HTML5Graphics should route transform application through the shared image/transform adapter");
+        assertTrue(html5GraphicsSource.contains("imageTransformRenderAdapter.setClipShape("),
+                "HTML5Graphics should route clip-shape updates through the shared image/transform adapter");
+        assertTrue(html5GraphicsSource.contains("new JavaScriptShapeGradientRenderAdapter<Shape, Stroke, ExecutableOp>("),
+                "HTML5Graphics should delegate shape and gradient ops to the shared shape/gradient adapter");
+        assertTrue(html5GraphicsSource.contains("shapeGradientRenderAdapter.drawShape("),
+                "HTML5Graphics should route drawShape through the shape/gradient adapter");
+        assertTrue(html5GraphicsSource.contains("shapeGradientRenderAdapter.fillShape("),
+                "HTML5Graphics should route fillShape through the shape/gradient adapter");
+        assertTrue(html5GraphicsSource.contains("shapeGradientRenderAdapter.fillLinearGradient("),
+                "HTML5Graphics should route linear gradients through the shape/gradient adapter");
+        assertTrue(html5GraphicsSource.contains("shapeGradientRenderAdapter.fillRadialGradient("),
+                "HTML5Graphics should route radial gradients through the shape/gradient adapter");
+        assertTrue(html5GraphicsSource.contains("JavaScriptTextMetricsAdapter.charsWidth("),
+                "HTML5Graphics should delegate char measurement to the text metrics adapter");
+        assertTrue(html5GraphicsSource.contains("JavaScriptTextMetricsAdapter.stringWidth("),
+                "HTML5Graphics should delegate string measurement to the text metrics adapter");
+        assertTrue(html5GraphicsSource.contains("JavaScriptTextMetricsAdapter.getFontHeight("),
+                "HTML5Graphics should delegate font height to the text metrics adapter");
+        assertTrue(html5GraphicsSource.contains("JavaScriptTextMetricsAdapter.getFontDescent("),
+                "HTML5Graphics should delegate font descent to the text metrics adapter");
         assertTrue(bufferedGraphicsSource.contains("new JavaScriptPrimitiveRenderAdapter<NativeFont, ExecutableOp>("),
                 "BufferedGraphics should share the primitive render adapter for buffered primitive ops");
+        assertTrue(bufferedGraphicsSource.contains("new JavaScriptImageTransformRenderAdapter<NativeImage, Shape, JSAffineTransform, ExecutableOp>("),
+                "BufferedGraphics should share the image/transform render adapter for buffered image and transform ops");
+        assertTrue(bufferedGraphicsSource.contains("new JavaScriptShapeGradientRenderAdapter<Shape, Stroke, ExecutableOp>("),
+                "BufferedGraphics should share the shape/gradient render adapter for buffered shape and gradient ops");
+        assertTrue(html5Source.contains("JavaScriptCanvasImageBufferLifecycle.ensureScratchBuffer("),
+                "HTML5Implementation should delegate scratch canvas lifecycle to the buffer lifecycle helper");
+        assertTrue(html5Source.contains("JavaScriptCanvasImageBufferLifecycle.createBlankBuffer("),
+                "HTML5Implementation should delegate blank canvas-backed image buffers to the buffer lifecycle helper");
+        assertTrue(html5Source.contains("JavaScriptCanvasImageBufferLifecycle.createMutableBuffer("),
+                "HTML5Implementation should delegate mutable canvas-backed image buffers to the buffer lifecycle helper");
         assertTrue(bootstrapSource.contains("JavaScriptRuntimeFacade.proxifyUrl("),
                 "JavaScriptPortBootstrap should delegate proxy decisions to the runtime facade");
         assertTrue(bootstrapSource.contains("JavaScriptBootstrapCoordinator.createLifecycle(className)"),
@@ -833,5 +875,222 @@ class JavaScriptRuntimeFacadeTest {
         assertEquals("drawLine:1193046:77", submitted.get(3));
         assertEquals("drawString:1193046:77:body-font", submitted.get(4));
         assertEquals("clip:ClipState", submitted.get(5));
+    }
+
+    @Test
+    void extractedImageTransformRenderAdapterCompilesAndPreservesMinimalBehavior() throws Exception {
+        Path sourceDir = Files.createTempDirectory("js-image-transform-render-src");
+        Path classesDir = Files.createTempDirectory("js-image-transform-render-classes");
+        Path html5PackageDir = sourceDir.resolve(Paths.get("com", "codename1", "impl", "html5"));
+        Path graphicsPackageDir = sourceDir.resolve(Paths.get("com", "codename1", "impl", "html5", "graphics"));
+        Files.createDirectories(html5PackageDir);
+        Files.createDirectories(graphicsPackageDir);
+        Files.copy(RENDER_STATE_SOURCE, html5PackageDir.resolve("JavaScriptRenderState.java"));
+        Files.copy(IMAGE_TRANSFORM_RENDER_ADAPTER_SOURCE, html5PackageDir.resolve("JavaScriptImageTransformRenderAdapter.java"));
+        Files.copy(Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "graphics", "ClipState.java"),
+                graphicsPackageDir.resolve("ClipState.java"));
+
+        CompilerHelper.CompilerConfig config = CompilerHelper.getAvailableCompilers("1.8").get(0);
+        int compileResult = CompilerHelper.compile(config.jdkHome, java.util.Arrays.asList(
+                "-source", config.targetVersion,
+                "-target", config.targetVersion,
+                "-d", classesDir.toString(),
+                graphicsPackageDir.resolve("ClipState.java").toString(),
+                html5PackageDir.resolve("JavaScriptRenderState.java").toString(),
+                html5PackageDir.resolve("JavaScriptImageTransformRenderAdapter.java").toString()
+        ));
+        assertEquals(0, compileResult, "Image/transform render adapter should compile as a standalone Java helper");
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classesDir.toUri().toURL()});
+        Class<?> renderStateClass = loader.loadClass("com.codename1.impl.html5.JavaScriptRenderState");
+        Class<?> adapterClass = loader.loadClass("com.codename1.impl.html5.JavaScriptImageTransformRenderAdapter");
+        Class<?> sinkClass = loader.loadClass("com.codename1.impl.html5.JavaScriptImageTransformRenderAdapter$OperationSink");
+        Class<?> factoryClass = loader.loadClass("com.codename1.impl.html5.JavaScriptImageTransformRenderAdapter$ImageTransformOpFactory");
+
+        Object state = renderStateClass.getConstructor().newInstance();
+        renderStateClass.getMethod("setAlpha", int.class).invoke(state, 88);
+
+        final java.util.List<String> submitted = new java.util.ArrayList<String>();
+        Object sink = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{sinkClass}, (proxy, method, args) -> {
+            submitted.add((String) args[0]);
+            return null;
+        });
+        Object factory = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{factoryClass}, (proxy, method, args) -> {
+            if ("createDrawImage".equals(method.getName()) && args.length == 4) return "drawImage:" + args[3];
+            if ("createDrawImage".equals(method.getName()) && args.length == 6) return "drawImageScaled:" + args[5];
+            if ("createTileImage".equals(method.getName())) return "tile:" + args[5];
+            if ("createTransform".equals(method.getName())) return "transform:" + args[1];
+            if ("createClipShape".equals(method.getName())) return "clipShape:" + args[2].getClass().getSimpleName();
+            throw new UnsupportedOperationException(method.getName());
+        });
+
+        Object adapter = adapterClass.getConstructor(renderStateClass, sinkClass, factoryClass).newInstance(state, sink, factory);
+        adapterClass.getMethod("drawImage", Object.class, int.class, int.class).invoke(adapter, "img", 1, 2);
+        adapterClass.getMethod("drawImage", Object.class, int.class, int.class, int.class, int.class).invoke(adapter, "img", 1, 2, 3, 4);
+        adapterClass.getMethod("tileImage", Object.class, int.class, int.class, int.class, int.class).invoke(adapter, "img", 1, 2, 3, 4);
+        adapterClass.getMethod("applyTransform", Object.class, boolean.class).invoke(adapter, "tx", true);
+        adapterClass.getMethod("setClipShape", Object.class, Object.class).invoke(adapter, "shape", "tx");
+
+        assertEquals("drawImage:88", submitted.get(0));
+        assertEquals("drawImageScaled:88", submitted.get(1));
+        assertEquals("tile:88", submitted.get(2));
+        assertEquals("transform:true", submitted.get(3));
+        assertEquals("clipShape:ClipState", submitted.get(4));
+    }
+
+    @Test
+    void extractedShapeGradientTextAndCanvasBufferHelpersCompileAndPreserveMinimalBehavior() throws Exception {
+        Path sourceDir = Files.createTempDirectory("js-render-deep-src");
+        Path classesDir = Files.createTempDirectory("js-render-deep-classes");
+        Path html5PackageDir = sourceDir.resolve(Paths.get("com", "codename1", "impl", "html5"));
+        Path graphicsPackageDir = sourceDir.resolve(Paths.get("com", "codename1", "impl", "html5", "graphics"));
+        Files.createDirectories(html5PackageDir);
+        Files.createDirectories(graphicsPackageDir);
+        Files.copy(RENDER_STATE_SOURCE, html5PackageDir.resolve("JavaScriptRenderState.java"));
+        Files.copy(SHAPE_GRADIENT_RENDER_ADAPTER_SOURCE, html5PackageDir.resolve("JavaScriptShapeGradientRenderAdapter.java"));
+        Files.copy(TEXT_METRICS_ADAPTER_SOURCE, html5PackageDir.resolve("JavaScriptTextMetricsAdapter.java"));
+        Files.copy(CANVAS_IMAGE_BUFFER_LIFECYCLE_SOURCE, html5PackageDir.resolve("JavaScriptCanvasImageBufferLifecycle.java"));
+        Files.copy(Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "graphics", "ClipState.java"),
+                graphicsPackageDir.resolve("ClipState.java"));
+
+        CompilerHelper.CompilerConfig config = CompilerHelper.getAvailableCompilers("1.8").get(0);
+        int compileResult = CompilerHelper.compile(config.jdkHome, java.util.Arrays.asList(
+                "-source", config.targetVersion,
+                "-target", config.targetVersion,
+                "-d", classesDir.toString(),
+                graphicsPackageDir.resolve("ClipState.java").toString(),
+                html5PackageDir.resolve("JavaScriptRenderState.java").toString(),
+                html5PackageDir.resolve("JavaScriptShapeGradientRenderAdapter.java").toString(),
+                html5PackageDir.resolve("JavaScriptTextMetricsAdapter.java").toString(),
+                html5PackageDir.resolve("JavaScriptCanvasImageBufferLifecycle.java").toString()
+        ));
+        assertEquals(0, compileResult, "Shape/gradient, text metrics, and canvas buffer helpers should compile as standalone Java helpers");
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classesDir.toUri().toURL()});
+
+        Class<?> renderStateClass = loader.loadClass("com.codename1.impl.html5.JavaScriptRenderState");
+        Class<?> shapeAdapterClass = loader.loadClass("com.codename1.impl.html5.JavaScriptShapeGradientRenderAdapter");
+        Class<?> shapeSinkClass = loader.loadClass("com.codename1.impl.html5.JavaScriptShapeGradientRenderAdapter$OperationSink");
+        Class<?> shapeFactoryClass = loader.loadClass("com.codename1.impl.html5.JavaScriptShapeGradientRenderAdapter$ShapeGradientOpFactory");
+        Object renderState = renderStateClass.getConstructor().newInstance();
+        renderStateClass.getMethod("setColor", int.class).invoke(renderState, 0xabcdef);
+        renderStateClass.getMethod("setAlpha", int.class).invoke(renderState, 91);
+        final java.util.List<String> shapeOps = new java.util.ArrayList<String>();
+        Object shapeSink = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{shapeSinkClass}, (proxy, method, args) -> {
+            shapeOps.add((String) args[0]);
+            return null;
+        });
+        Object shapeFactory = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{shapeFactoryClass}, (proxy, method, args) -> {
+            if ("createDrawShape".equals(method.getName())) return "drawShape:" + args[2] + ":" + args[3];
+            if ("createFillShape".equals(method.getName())) return "fillShape:" + args[1] + ":" + args[2];
+            if ("createFillLinearGradient".equals(method.getName())) return "linear:" + args[7];
+            if ("createFillRadialGradient".equals(method.getName())) return "radial:" + args[6] + ":" + args[7] + ":" + args[8];
+            throw new UnsupportedOperationException(method.getName());
+        });
+        Object shapeAdapter = shapeAdapterClass.getConstructor(renderStateClass, shapeSinkClass, shapeFactoryClass).newInstance(renderState, shapeSink, shapeFactory);
+        shapeAdapterClass.getMethod("drawShape", Object.class, Object.class).invoke(shapeAdapter, "shape", "stroke");
+        shapeAdapterClass.getMethod("fillShape", Object.class).invoke(shapeAdapter, "shape");
+        shapeAdapterClass.getMethod("fillLinearGradient", int.class, int.class, int.class, int.class, int.class, int.class, boolean.class)
+                .invoke(shapeAdapter, 1, 2, 3, 4, 5, 6, true);
+        shapeAdapterClass.getMethod("fillRadialGradient", int.class, int.class, int.class, int.class, int.class, int.class, int.class, int.class)
+                .invoke(shapeAdapter, 1, 2, 3, 4, 5, 6, 7, 8);
+        assertEquals("drawShape:11259375:91", shapeOps.get(0));
+        assertEquals("fillShape:11259375:91", shapeOps.get(1));
+        assertEquals("linear:91", shapeOps.get(2));
+        assertEquals("radial:91:7:8", shapeOps.get(3));
+
+        Class<?> textAdapterClass = loader.loadClass("com.codename1.impl.html5.JavaScriptTextMetricsAdapter");
+        Class<?> metricsContextClass = loader.loadClass("com.codename1.impl.html5.JavaScriptTextMetricsAdapter$FontMetricsContext");
+        Class<?> cssSupplierClass = loader.loadClass("com.codename1.impl.html5.JavaScriptTextMetricsAdapter$FontCssSupplier");
+        final String[] currentFont = new String[]{"old"};
+        Object metricsContext = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{metricsContextClass}, (proxy, method, args) -> {
+            if ("getCurrentFont".equals(method.getName())) return currentFont[0];
+            if ("setCurrentFont".equals(method.getName())) {
+                currentFont[0] = (String) args[0];
+                return null;
+            }
+            if ("measureWidth".equals(method.getName())) return ((String) args[0]).length() * 10;
+            throw new UnsupportedOperationException(method.getName());
+        });
+        Object cssSupplier = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{cssSupplierClass}, (proxy, method, args) -> {
+            if ("getCss".equals(method.getName())) return "font-css";
+            if ("getHeight".equals(method.getName())) return 18;
+            if ("getAscent".equals(method.getName())) return 13;
+            throw new UnsupportedOperationException(method.getName());
+        });
+        assertEquals(31, textAdapterClass.getMethod("charsWidth", metricsContextClass, cssSupplierClass, Object.class, char[].class, int.class, int.class)
+                .invoke(null, metricsContext, cssSupplier, "font", new char[]{'a', 'b', 'c'}, 0, 3));
+        currentFont[0] = "old";
+        assertEquals(21, textAdapterClass.getMethod("stringWidth", metricsContextClass, cssSupplierClass, Object.class, String.class)
+                .invoke(null, metricsContext, cssSupplier, "font", "ab"));
+        assertEquals("old", currentFont[0]);
+        assertEquals(18, textAdapterClass.getMethod("getFontHeight", cssSupplierClass, Object.class).invoke(null, cssSupplier, "font"));
+        assertEquals(5, textAdapterClass.getMethod("getFontDescent", cssSupplierClass, Object.class).invoke(null, cssSupplier, "font"));
+
+        Class<?> lifecycleClass = loader.loadClass("com.codename1.impl.html5.JavaScriptCanvasImageBufferLifecycle");
+        Class<?> scratchFactoryClass = loader.loadClass("com.codename1.impl.html5.JavaScriptCanvasImageBufferLifecycle$ScratchCanvasFactory");
+        Class<?> sizedCanvasFactoryClass = loader.loadClass("com.codename1.impl.html5.JavaScriptCanvasImageBufferLifecycle$SizedCanvasFactory");
+        Class<?> sizeAccessClass = loader.loadClass("com.codename1.impl.html5.JavaScriptCanvasImageBufferLifecycle$CanvasSizeAccess");
+        Class<?> graphicsFactoryClass = loader.loadClass("com.codename1.impl.html5.JavaScriptCanvasImageBufferLifecycle$GraphicsFactory");
+        Class<?> bufferClass = loader.loadClass("com.codename1.impl.html5.JavaScriptCanvasImageBufferLifecycle$CanvasImageBuffer");
+
+        final class CanvasState {
+            int width;
+            int height;
+        }
+        Object scratchFactory = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{scratchFactoryClass}, (proxy, method, args) -> {
+            CanvasState stateObj = new CanvasState();
+            return stateObj;
+        });
+        Object sizeAccess = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{sizeAccessClass}, (proxy, method, args) -> {
+            CanvasState stateObj = (CanvasState) args[0];
+            if ("getWidth".equals(method.getName())) return stateObj.width;
+            if ("getHeight".equals(method.getName())) return stateObj.height;
+            if ("setWidth".equals(method.getName())) {
+                stateObj.width = (Integer) args[1];
+                return null;
+            }
+            if ("setHeight".equals(method.getName())) {
+                stateObj.height = (Integer) args[1];
+                return null;
+            }
+            throw new UnsupportedOperationException(method.getName());
+        });
+        Object scratch = lifecycleClass.getMethod("ensureScratchBuffer", Object.class, int.class, int.class, scratchFactoryClass, sizeAccessClass)
+                .invoke(null, null, 100, 50, scratchFactory, sizeAccess);
+        assertEquals(100, ((CanvasState) scratch).width);
+        assertEquals(50, ((CanvasState) scratch).height);
+        Object resizedScratch = lifecycleClass.getMethod("ensureScratchBuffer", Object.class, int.class, int.class, scratchFactoryClass, sizeAccessClass)
+                .invoke(null, scratch, 150, 120, scratchFactory, sizeAccess);
+        assertEquals(150, ((CanvasState) resizedScratch).width);
+        assertEquals(120, ((CanvasState) resizedScratch).height);
+
+        Object sizedFactory = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{sizedCanvasFactoryClass}, (proxy, method, args) -> {
+            CanvasState stateObj = new CanvasState();
+            stateObj.width = (Integer) args[0];
+            stateObj.height = (Integer) args[1];
+            return stateObj;
+        });
+        final java.util.List<String> graphicsCalls = new java.util.ArrayList<String>();
+        Object graphicsFactory = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{graphicsFactoryClass}, (proxy, method, args) -> {
+            if ("createGraphics".equals(method.getName())) {
+                CanvasState stateObj = (CanvasState) args[0];
+                return "graphics:" + stateObj.width + "x" + stateObj.height;
+            }
+            if ("fillRect".equals(method.getName())) {
+                graphicsCalls.add(args[1] + ":" + args[2] + "x" + args[3]);
+                return null;
+            }
+            throw new UnsupportedOperationException(method.getName());
+        });
+        Object blank = lifecycleClass.getMethod("createBlankBuffer", int.class, int.class, sizedCanvasFactoryClass, graphicsFactoryClass)
+                .invoke(null, 40, 30, sizedFactory, graphicsFactory);
+        assertEquals(40, bufferClass.getMethod("getWidth").invoke(blank));
+        assertEquals(30, bufferClass.getMethod("getHeight").invoke(blank));
+        assertEquals("graphics:40x30", bufferClass.getMethod("getGraphics").invoke(blank));
+        Object mutable = lifecycleClass.getMethod("createMutableBuffer", int.class, int.class, int.class, sizedCanvasFactoryClass, graphicsFactoryClass)
+                .invoke(null, 20, 10, 0xff336699, sizedFactory, graphicsFactory);
+        assertEquals("graphics:20x10", bufferClass.getMethod("getGraphics").invoke(mutable));
+        assertTrue(graphicsCalls.get(0).endsWith(":20x10"));
     }
 }
