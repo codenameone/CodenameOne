@@ -166,8 +166,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private HTMLCanvasElement canvas;
     private HTMLCanvasElement scratchBuffer;
     HTMLCanvasElement outputCanvas;
-    private boolean mouseIsDown;
-    private boolean touchIsDown;
     private EventListener onMouseDown, onMouseUp, onTouchStart, onTouchEnd, onMouseMove, onTouchMove, hitTest, onPaste;
     
     // This event listener can be assigned to listen to native mouse events
@@ -182,8 +180,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private boolean editingStartingUp;
     private static double devicePixelRatio=-1;
     private EasyThread nativeEdt;
-    private int touchStartX, touchStartY;
-    private long touchStartTime;
     
     // Used for key press/release.  We record the last char code
     // in keypressed because the charcode isn't passed to keydown and keyup
@@ -266,25 +262,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
         this.urlProxifier = urlProxifier;
     }
     
-    private int[] touchesX;
-    private int[] touchesY;
-
-    
-    private int lastTouchUpX;
-    private int lastTouchUpY;
+    private final JavaScriptPointerSessionState pointerState = new JavaScriptPointerSessionState();
     
     public int getLastTouchUpX() {
-        return lastTouchUpX;
+        return pointerState.getLastTouchUpX();
     }
     
     public int getLastTouchUpY() {
-        return lastTouchUpY;
+        return pointerState.getLastTouchUpY();
     }
-    
-    
-    
-    private int lastMouseX;
-    private int lastMouseY;
     
     private HashSet<Integer> keysDown = new HashSet<Integer>();
     
@@ -333,7 +319,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return true;       
                 
     }
-    boolean capturingEvents = true;
+    
     
     @JSBody(params={"event"}, script="cn1CopyEventToNativePeers(event);")
     private native static void copyEventsToNativePeers(Event event);
@@ -495,7 +481,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * Flag that is set on mousedown or touchstart in the cn1 canvas so that 
      * it knows to not pass events to rest of native peers until after mouseup/touchend
      */
-    boolean cn1GrabbedDrag;
+    
 
     
     private class NativeOverlay {
@@ -1206,7 +1192,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
             
         };
-        window.getDocument().addEventListener("paste", onPaste);
+        JavaScriptEventWiring.registerDocumentEvents(new JavaScriptEventWiring.DocumentRegistrar() {
+            @Override
+            public void add(String eventName, Object listener) {
+                window.getDocument().addEventListener(eventName, (EventListener) listener);
+            }
+        }, onPaste);
         
         onMouseDown = new EventListener(){
 
@@ -1226,24 +1217,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 focusInputElement();
                 JavaScriptInputCoordinator.PointerRoutingDecision routing = JavaScriptInputCoordinator.beginPointerRouting(
                         Accessor.getActivePeerCount() > 0 && paintNativePeersBehind(), hitTest(x, y));
-                cn1GrabbedDrag = routing.grabbedDrag();
+                pointerState.setGrabbedDrag(routing.grabbedDrag());
                 if (routing.shouldConsumeEvent()) {
                     evt.preventDefault();
                     evt.stopPropagation();
                 }
-                if (JavaScriptInputCoordinator.shouldIgnoreMousePress(touchIsDown, mouseIsDown, evt.getTarget() == textField || evt.getTarget() == textArea)) {
+                if (JavaScriptInputCoordinator.shouldIgnoreMousePress(pointerState.isTouchDown(), pointerState.isMouseDown(), evt.getTarget() == textField || evt.getTarget() == textArea)) {
                     debugLog("[mouseDown] touchIsDown");
-                    if (touchIsDown) {
-                        mouseIsDown = false;
+                    if (pointerState.isTouchDown()) {
+                        pointerState.setMouseDown(false);
                     }
                     return;
                 }
                 onMouseMoveHandle = EventUtil.addEventListener(peersContainer, "mousemove", onMouseMove, true);
                 onPointerMoveHandle = EventUtil.addEventListener(peersContainer, "pointermove", onMouseMove, true);
                 
-                lastMouseX = x;
-                lastMouseY = y;
-                mouseIsDown = true;
+                pointerState.setLastMousePosition(x, y);
+                pointerState.setMouseDown(true);
                 callSerially(new Runnable() {
                     public void run() {
                         
@@ -1282,35 +1272,34 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
                 debugLog("In mouseUp");
                 MouseEvent me = (MouseEvent)evt;
-                final int x = getClientX(me) == -1 ? lastMouseX : getClientX(me);
-                final int y = getClientY(me) == -1 ? lastMouseY : getClientY(me);
+                final int x = getClientX(me) == -1 ? pointerState.getLastMouseX() : getClientX(me);
+                final int y = getClientY(me) == -1 ? pointerState.getLastMouseY() : getClientY(me);
                 focusInputElement();
-                if (cn1GrabbedDrag) {
+                if (pointerState.isGrabbedDrag()) {
                     evt.preventDefault();
                     evt.stopPropagation();
                 }
-                cn1GrabbedDrag = false;
+                pointerState.setGrabbedDrag(false);
                 
                 // Prevent conflicts with touch events
                 // Guard against mouseUp if the mouse isn't already dwon
-                if (touchIsDown) {
+                if (pointerState.isTouchDown()) {
                     debugLog("[mouseUp] touchIsDown");
-                    mouseIsDown = false;
+                    pointerState.setMouseDown(false);
                     return;
                 }
                 
-                if (!mouseIsDown) {
+                if (!pointerState.isMouseDown()) {
                     return;
                 }
-                mouseIsDown = false;
+                pointerState.setMouseDown(false);
                 
                 
                 
                 EventUtil.removeEventListener(peersContainer, "mousemove", onMouseMoveHandle, true);
                 EventUtil.removeEventListener(peersContainer, "pointermove", onPointerMoveHandle, true);
                 
-                lastTouchUpX = x;
-                lastTouchUpY = y;
+                pointerState.setLastTouchUpPosition(x, y);
                 installBacksideHooksInUserInteraction();
                 nativeCallSerially(new Runnable() {
                     public void run() {
@@ -1351,36 +1340,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     x[i] = getClientX(touches.get(i));
                     y[i] = getClientY(touches.get(i));
                 }
-                touchStartX = x[0];
-                touchStartY = y[0];
-                touchStartTime = currentTimeMillisecondsJS();
+                pointerState.setTouchStart(x[0], y[0], currentTimeMillisecondsJS());
                 
                 focusInputElement();
                 
                 JavaScriptInputCoordinator.PointerRoutingDecision routing = JavaScriptInputCoordinator.beginPointerRouting(
                         Accessor.getActivePeerCount() > 0 && paintNativePeersBehind(), hitTest(x[0], y[0]));
-                cn1GrabbedDrag = routing.grabbedDrag();
+                pointerState.setGrabbedDrag(routing.grabbedDrag());
                 if (routing.shouldConsumeEvent()) {
                     evt.preventDefault();
                     evt.stopPropagation();
                 }
                 JavaScriptInputCoordinator.TouchStartDecision touchDecision = JavaScriptInputCoordinator.resolveTouchStart(
-                        mouseIsDown, touchIsDown, evt.getTarget() == textField || evt.getTarget() == textArea, isEditing && editingStartingUp);
+                        pointerState.isMouseDown(), pointerState.isTouchDown(), evt.getTarget() == textField || evt.getTarget() == textArea, isEditing && editingStartingUp);
                 if (touchDecision.shouldIgnoreEvent()) {
                     return;
                 }
                 if (touchDecision.shouldCancelMouseTracking()) {
                     debugLog("[touchStart] mouseIsDown");
-                    mouseIsDown = false;
+                    pointerState.setMouseDown(false);
                     EventUtil.removeEventListener(peersContainer, "mousemove", onMouseMoveHandle, true);
                     EventUtil.removeEventListener(peersContainer, "pointermove", onPointerMoveHandle, true);
-                    touchIsDown = false;
+                    pointerState.setTouchDown(false);
                 }
-                touchIsDown = true;
+                pointerState.setTouchDown(true);
                 
                 
-                touchesX=x;
-                touchesY=y;
+                pointerState.setTouches(x, y);
                 
                 onTouchMoveHandle = EventUtil.addEventListener(peersContainer, "touchmove", onTouchMove, true);
                 
@@ -1432,25 +1418,25 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 debugLog("In TouchEnd");
                 // Guard against mouse event conflicts
                 // Prevent from firing if touch was not down already.
-                if (JavaScriptInputCoordinator.shouldIgnoreTouchRelease(mouseIsDown, touchIsDown)) {
+                if (JavaScriptInputCoordinator.shouldIgnoreTouchRelease(pointerState.isMouseDown(), pointerState.isTouchDown())) {
                     debugLog("[touchEnd] mouseIsDown");
-                    if (mouseIsDown) {
-                        touchIsDown = false;
+                    if (pointerState.isMouseDown()) {
+                        pointerState.setTouchDown(false);
                     }
                     return;
                 }
-                touchIsDown = false;
+                pointerState.setTouchDown(false);
                 //if (evt.getTarget() == textField || evt.getTarget() == textArea) {
                 //    // We don't want to respond to touch events on teh native input
                 //    // fields because it can result in some infinite looping behaviour.
                 //    return;
                 //}
                 focusInputElement();
-                if (cn1GrabbedDrag) {
+                if (pointerState.isGrabbedDrag()) {
                     evt.preventDefault();
                     evt.stopPropagation();
                 }
-                cn1GrabbedDrag = false;
+                pointerState.setGrabbedDrag(false);
                 
                 TouchEvent me = (TouchEvent)evt;
                 EventUtil.removeEventListener(peersContainer, "touchmove", onTouchMoveHandle, true); 
@@ -1458,15 +1444,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 nativeCallSerially(new Runnable() {
                     @Override
                     public void run() {
-                        lastTouchUpX = touchesX[0];
-                        lastTouchUpY = touchesY[0];
-                        HTML5Implementation.this.pointerReleased(touchesX, touchesY); 
+                        pointerState.setLastTouchUpPosition(pointerState.getTouchesX()[0], pointerState.getTouchesY()[0]);
+                        HTML5Implementation.this.pointerReleased(pointerState.getTouchesX(), pointerState.getTouchesY()); 
                         
                     }
                 });
-                if (JavaScriptInputCoordinator.shouldCreatePreemptiveTextField(usePreemptiveNativeTextFieldApproach(), touchStartTime, currentTimeMillisecondsJS(), touchStartX, touchStartY, touchesX[0], touchesY[0])) {
+                if (JavaScriptInputCoordinator.shouldCreatePreemptiveTextField(usePreemptiveNativeTextFieldApproach(), pointerState.getTouchStartTime(), currentTimeMillisecondsJS(), pointerState.getTouchStartX(), pointerState.getTouchStartY(), pointerState.getTouchesX()[0], pointerState.getTouchesY()[0])) {
                     // Hack for iOS only to anticipate clicking on a text field
-                    createAndFocusTextFieldPreemptively(touchesX[0], touchesY[0]);
+                    createAndFocusTextFieldPreemptively(pointerState.getTouchesX()[0], pointerState.getTouchesY()[0]);
                 }
                 callSerially(new Runnable() {
                     @Override
@@ -1500,20 +1485,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 
                 
                 //focusInputElement();
-                if (cn1GrabbedDrag) {
+                if (pointerState.isGrabbedDrag()) {
                     evt.preventDefault();
                     evt.stopPropagation();
                 }
                 
-                if (JavaScriptInputCoordinator.shouldCancelTouchMove(mouseIsDown)) {
-                    touchIsDown = false;
+                if (JavaScriptInputCoordinator.shouldCancelTouchMove(pointerState.isMouseDown())) {
+                    pointerState.setTouchDown(false);
                     EventUtil.removeEventListener(peersContainer, "touchmove", onTouchMoveHandle, true);
                     return;
                 }
                 
                 
-                touchesX = x;
-                touchesY = y;
+                pointerState.setTouches(x, y);
                 nativeCallSerially(new Runnable() {
                     @Override
                     public void run() {
@@ -1531,21 +1515,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 MouseEvent me = (MouseEvent)evt;
                 final int x = getClientX(me);
                 final int y = getClientY(me);
-                if (cn1GrabbedDrag) {
+                if (pointerState.isGrabbedDrag()) {
                     evt.preventDefault();
                     evt.stopPropagation();
                 }
 
-                if (JavaScriptInputCoordinator.shouldCancelMouseMove(touchIsDown)) {
-                    mouseIsDown = false;
+                if (JavaScriptInputCoordinator.shouldCancelMouseMove(pointerState.isTouchDown())) {
+                    pointerState.setMouseDown(false);
                     EventUtil.removeEventListener(peersContainer, "mousemove", onMouseMoveHandle, true);
                     EventUtil.removeEventListener(peersContainer, "pointermove", onPointerMoveHandle, true);
                     return;
                 }
                 
                 
-                lastMouseX = x;
-                lastMouseY = y;
+                pointerState.setLastMousePosition(x, y);
                 nativeCallSerially(new Runnable() {
 
                     @Override
@@ -1613,18 +1596,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         int y = unscaleCoord(me.getClientY());
                         boolean hitTestResult = false;
                         if (!hitTest(x, y)) {
-                            if (capturingEvents) {
+                            if (pointerState.isCapturingEvents()) {
                                 _debug("4. Failed hit test at "+x+","+y);
                                 _debugObj(evt);
-                                capturingEvents = false;
+                                pointerState.setCapturingEvents(false);
                                 outputCanvas.getStyle().setProperty("pointer-events", "none");
                                 outputCanvas.blur();
                                 evt.stopPropagation();
                                 evt.preventDefault();
                             }
                         } else {
-                            if (!capturingEvents) {
-                                capturingEvents = true;
+                            if (!pointerState.isCapturingEvents()) {
+                                pointerState.setCapturingEvents(true);
                                 
                                 outputCanvas.getStyle().setProperty("pointer-events", "auto");
                                 outputCanvas.focus();
@@ -1637,8 +1620,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                       
                     }
                 } else {
-                    if (!capturingEvents) {
-                        capturingEvents = true;
+                    if (!pointerState.isCapturingEvents()) {
+                        pointerState.setCapturingEvents(true);
                         outputCanvas.getStyle().setProperty("pointer-events", "auto");
                         outputCanvas.focus();
                         evt.stopPropagation();
@@ -1660,8 +1643,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     int y = unscaleCoord(me.getClientY());
 
                    if (!hitTest(x, y)) {
-                        if (capturingEvents) {
-                            capturingEvents = false;
+                        if (pointerState.isCapturingEvents()) {
+                            pointerState.setCapturingEvents(false);
                             _debug("1.Failed hit test at "+x+","+y);
                             _debugObj(evt);
                             outputCanvas.getStyle().setProperty("pointer-events", "none");
@@ -1672,8 +1655,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             
                         }
                     } else {
-                        if (!capturingEvents) {
-                            capturingEvents = true;
+                        if (!pointerState.isCapturingEvents()) {
+                            pointerState.setCapturingEvents(true);
                             _debug("2. Passed hit test at "+x+","+y);
                             _debugObj(evt);
                             outputCanvas.getStyle().setProperty("pointer-events", "auto");
@@ -1684,8 +1667,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     }
 
                 } else {
-                    if (!capturingEvents) {
-                        capturingEvents = true;
+                    if (!pointerState.isCapturingEvents()) {
+                        pointerState.setCapturingEvents(true);
                         outputCanvas.getStyle().setProperty("pointer-events", "auto");
                         outputCanvas.focus();
                         evt.stopPropagation();
@@ -1697,27 +1680,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
         }, true);
         */
-        if (!debugFlag("disableMousedown")) {
-            peersContainer.addEventListener("mousedown", onMouseDown, true);
-            peersContainer.addEventListener("pointerdown", onMouseDown, true);
-        }
-        peersContainer.addEventListener("hittest", hitTest, true);
-        if (!debugFlag("disableMouseup")) {
-            peersContainer.addEventListener("mouseup", onMouseUp, true);
-            peersContainer.addEventListener("pointerup", onMouseUp, true);
-        }
-        if (!debugFlag("disableMouseup")) {
-            peersContainer.addEventListener("mouseout", onMouseUp, true);
-            peersContainer.addEventListener("pointerout", onMouseUp, true);
-        }
-        if (!debugFlag("disableTouchstart")) {
-            peersContainer.addEventListener("touchstart", onTouchStart, true);
-        }
-        if (!debugFlag("disableTouchend")) {
-            peersContainer.addEventListener("touchend", onTouchEnd, true);
-        }
-        if (!debugFlag("disableWheel")) {
-            peersContainer.addEventListener(getWheelEventType(), new EventListener() {
+        final EventListener wheelListener = new EventListener() {
 
                 @Override
                 public void handleEvent(final Event evt) {
@@ -1738,8 +1701,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     }.start();
                 }
 
-            }, true);
-        }
+            };
+        JavaScriptEventWiring.registerPeerPointerEvents(new JavaScriptEventWiring.ElementRegistrar() {
+            @Override
+            public void add(String eventName, Object listener, boolean capture) {
+                peersContainer.addEventListener(eventName, (EventListener) listener, capture);
+            }
+        }, !debugFlag("disableMousedown"), !debugFlag("disableMouseup"), !debugFlag("disableTouchstart"),
+                !debugFlag("disableTouchend"), !debugFlag("disableWheel"), getWheelEventType(),
+                onMouseDown, hitTest, onMouseUp, onTouchStart, onTouchEnd, wheelListener);
         
         /**
          *  The installbacksidehooks event is an event that can be triggered from native javascript to install
