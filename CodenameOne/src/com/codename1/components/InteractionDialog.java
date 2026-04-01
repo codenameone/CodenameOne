@@ -721,7 +721,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         // allows a text area to recalculate its preferred size if embedded within a dialog
         revalidate();
 
-        Style contentPaneStyle = getStyle(); // PMD Fix: UnusedLocalVariable removed redundant contentPane reference
+        Style contentPaneStyle = getDialogStyle();
 
         boolean arrowEnabled = manager.isThemeConstant(getUIID() + "ArrowBool", false);
         Image t = manager.getThemeImageConstant(getUIID() + "ArrowTopImage");
