@@ -152,6 +152,102 @@ class InteractionDialogTest extends UITestBase {
         dialog.dispose();
     }
 
+    @Test
+    void showPopupDialogFallsBackWhenPreferredBottomDoesNotFit() {
+        Form form = new Form(new BorderLayout());
+        implementation.setCurrentForm(form);
+
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setLayout(new FlowLayout());
+        dialog.add(new Label("Popup"));
+        dialog.setAnimateShow(false);
+
+        int displayHeight = implementation.getDisplayHeight();
+        Rectangle rect = new Rectangle(120, Math.max(0, displayHeight - 8), 60, 6);
+        dialog.showPopupDialog(rect, false);
+
+        assertTrue(dialog.getY() + dialog.getHeight() <= rect.getY(),
+                "Expected fallback above when preferred bottom side does not fit");
+        dialog.dispose();
+    }
+
+    @Test
+    void showPopupDialogBiasTruePrefersRightInLandscapeWhenBothFit() {
+        implementation.setPortrait(false);
+        Form form = new Form(new BorderLayout());
+        implementation.setCurrentForm(form);
+
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setLayout(new FlowLayout());
+        dialog.add(new Label("Popup"));
+        dialog.setAnimateShow(false);
+
+        Rectangle rect = new Rectangle(120, 140, 60, 40);
+        dialog.showPopupDialog(rect, true);
+
+        assertTrue(dialog.getX() >= rect.getX() + rect.getWidth(),
+                "Expected popup on right side when prioritizeTopOrRightPosition=true in landscape");
+        dialog.dispose();
+    }
+
+    @Test
+    void showPopupDialogBiasFalsePrefersLeftInLandscapeWhenBothFit() {
+        implementation.setPortrait(false);
+        Form form = new Form(new BorderLayout());
+        implementation.setCurrentForm(form);
+
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setLayout(new FlowLayout());
+        dialog.add(new Label("Popup"));
+        dialog.setAnimateShow(false);
+
+        Rectangle rect = new Rectangle(120, 140, 60, 40);
+        dialog.showPopupDialog(rect, false);
+
+        assertTrue(dialog.getX() + dialog.getWidth() <= rect.getX(),
+                "Expected popup on left side when prioritizeTopOrRightPosition=false in landscape");
+        dialog.dispose();
+    }
+
+    @Test
+    void showPopupDialogFallsBackWhenPreferredRightDoesNotFit() {
+        implementation.setPortrait(false);
+        Form form = new Form(new BorderLayout());
+        implementation.setCurrentForm(form);
+
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setLayout(new FlowLayout());
+        dialog.add(new Label("Popup"));
+        dialog.setAnimateShow(false);
+
+        int displayWidth = implementation.getDisplayWidth();
+        Rectangle rect = new Rectangle(Math.max(0, displayWidth - 8), 140, 6, 40);
+        dialog.showPopupDialog(rect, true);
+
+        assertTrue(dialog.getX() + dialog.getWidth() <= rect.getX(),
+                "Expected fallback to left when preferred right side does not fit");
+        dialog.dispose();
+    }
+
+    @Test
+    void showPopupDialogFallsBackWhenPreferredLeftDoesNotFit() {
+        implementation.setPortrait(false);
+        Form form = new Form(new BorderLayout());
+        implementation.setCurrentForm(form);
+
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setLayout(new FlowLayout());
+        dialog.add(new Label("Popup"));
+        dialog.setAnimateShow(false);
+
+        Rectangle rect = new Rectangle(2, 140, 6, 40);
+        dialog.showPopupDialog(rect, false);
+
+        assertTrue(dialog.getX() >= rect.getX() + rect.getWidth(),
+                "Expected fallback to right when preferred left side does not fit");
+        dialog.dispose();
+    }
+
     private <T> T getPrivateField(Object target, String name, Class<T> type) throws Exception {
         Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);

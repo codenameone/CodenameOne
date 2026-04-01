@@ -12,8 +12,8 @@ import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.util.UITimer;
 
 public class InteractionDialogPopupBiasScreenshotTest extends BaseTest {
-    private InteractionDialog preferredSideDialog;
-    private InteractionDialog fallbackSideDialog;
+    private InteractionDialog topPreferredDialog;
+    private InteractionDialog bottomPreferredDialog;
 
     @Override
     public boolean runTest() {
@@ -23,36 +23,34 @@ public class InteractionDialogPopupBiasScreenshotTest extends BaseTest {
         target.getAllStyles().setPadding(2, 2, 2, 2);
         center.add(target);
         form.add(BorderLayout.CENTER, center);
-        form.add(BorderLayout.NORTH, new Label("Top popup: bias works (prefers top when possible)"));
-        form.add(BorderLayout.SOUTH, new Label("Bottom popup: bias fallback (top requested but unavailable)"));
+        form.add(BorderLayout.NORTH, new Label("bias=true : popup should be ABOVE top target"));
+        form.add(BorderLayout.SOUTH, new Label("bias=false : popup should be BELOW bottom target"));
         form.show();
         return true;
     }
 
     @Override
     protected void registerReadyCallback(Form parent, Runnable run) {
-        preferredSideDialog = createDialog("bias=true -> prefers top");
-        fallbackSideDialog = createDialog("bias=true -> falls back to bottom");
+        topPreferredDialog = createDialog("bias=true -> above target");
+        bottomPreferredDialog = createDialog("bias=false -> below target");
         int width = parent.getWidth();
         int height = parent.getHeight();
 
-        // Center target: enough room above and below, so bias=true should place popup above.
-        Rectangle centerTarget = new Rectangle(width / 2 - 45, height / 2 - 12, 90, 24);
-        preferredSideDialog.showPopupDialog(centerTarget, true);
-
-        // Near top target: not enough room above, so bias=true should fall back below.
-        Rectangle topEdgeTarget = new Rectangle(width / 2 - 45, 4, 90, 24);
-        fallbackSideDialog.showPopupDialog(topEdgeTarget, true);
+        // Keep the targets far apart to avoid overlap in screenshot.
+        Rectangle upperTarget = new Rectangle(width / 2 - 45, height / 3, 90, 24);
+        Rectangle lowerTarget = new Rectangle(width / 2 - 45, (height * 2 / 3) - 24, 90, 24);
+        topPreferredDialog.showPopupDialog(upperTarget, true);
+        bottomPreferredDialog.showPopupDialog(lowerTarget, false);
         UITimer.timer(600, false, parent, run);
     }
 
     @Override
     public void cleanup() {
-        if (preferredSideDialog != null && preferredSideDialog.isShowing()) {
-            preferredSideDialog.dispose();
+        if (topPreferredDialog != null && topPreferredDialog.isShowing()) {
+            topPreferredDialog.dispose();
         }
-        if (fallbackSideDialog != null && fallbackSideDialog.isShowing()) {
-            fallbackSideDialog.dispose();
+        if (bottomPreferredDialog != null && bottomPreferredDialog.isShowing()) {
+            bottomPreferredDialog.dispose();
         }
     }
 
