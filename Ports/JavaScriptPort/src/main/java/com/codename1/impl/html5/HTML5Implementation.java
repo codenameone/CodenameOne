@@ -1224,37 +1224,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 final int y = getClientY(me);
                 debugLog("In mouseDown");
                 focusInputElement();
-                cn1GrabbedDrag = true;
-                if (Accessor.getActivePeerCount() > 0 && paintNativePeersBehind()) {
-                    debugLog("[mouseDown] Native peers active");
-                    if (hitTest(x, y)) {
-                        debugLog("[mouseDown] Passed hittest");
-                        evt.preventDefault();
-                        evt.stopPropagation();
-                    } else {
-                        debugLog("[mouseDown] Failed hittest");
-                        cn1GrabbedDrag = false;
-                    }
-                } else {
+                JavaScriptInputCoordinator.PointerRoutingDecision routing = JavaScriptInputCoordinator.beginPointerRouting(
+                        Accessor.getActivePeerCount() > 0 && paintNativePeersBehind(), hitTest(x, y));
+                cn1GrabbedDrag = routing.grabbedDrag();
+                if (routing.shouldConsumeEvent()) {
                     evt.preventDefault();
                     evt.stopPropagation();
                 }
-                
-                
-                
-                if (touchIsDown) {
+                if (JavaScriptInputCoordinator.shouldIgnoreMousePress(touchIsDown, mouseIsDown, evt.getTarget() == textField || evt.getTarget() == textArea)) {
                     debugLog("[mouseDown] touchIsDown");
-                    mouseIsDown = false;
-                    return;
-                }
-                if (mouseIsDown) {
-                    debugLog("[mouseDown] mouseIsDown");
-                    return;
-                }
-                if (evt.getTarget() == textField || evt.getTarget() == textArea) {
-                    // We don't want to respond to touch events on teh native input
-                    // fields because it can result in some infinite looping behaviour.
-                    //consoleLog("Source was text field");
+                    if (touchIsDown) {
+                        mouseIsDown = false;
+                    }
                     return;
                 }
                 onMouseMoveHandle = EventUtil.addEventListener(peersContainer, "mousemove", onMouseMove, true);
@@ -1376,63 +1357,25 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 
                 focusInputElement();
                 
-                cn1GrabbedDrag = true;
-                if (Accessor.getActivePeerCount() > 0 && paintNativePeersBehind()) {
-                    if (hitTest(x[0], y[0])) {
-                        evt.preventDefault();
-                        evt.stopPropagation();
-                    } else {
-                        cn1GrabbedDrag = false;
-                    }
-                } else {
+                JavaScriptInputCoordinator.PointerRoutingDecision routing = JavaScriptInputCoordinator.beginPointerRouting(
+                        Accessor.getActivePeerCount() > 0 && paintNativePeersBehind(), hitTest(x[0], y[0]));
+                cn1GrabbedDrag = routing.grabbedDrag();
+                if (routing.shouldConsumeEvent()) {
                     evt.preventDefault();
                     evt.stopPropagation();
                 }
-
-                
-               
-                boolean fireTouchStart = true;
-                if (mouseIsDown) {
-                    // Sometimes we route pointer events through the DOM (e.g. BrowserComponent) as 
-                    // mouse events.  In this case, we may receive both the mouse event and the
-                    // touch event.  Since touch events have more information, we'll switch
-                    // to the touch event in these cases.
-                    
-                    // We don'ty need to fire the pointerPressedEvent since it was fired in the
-                    // mousedown event.  
-                    fireTouchStart = false;
-                    
+                JavaScriptInputCoordinator.TouchStartDecision touchDecision = JavaScriptInputCoordinator.resolveTouchStart(
+                        mouseIsDown, touchIsDown, evt.getTarget() == textField || evt.getTarget() == textArea, isEditing && editingStartingUp);
+                if (touchDecision.shouldIgnoreEvent()) {
+                    return;
+                }
+                if (touchDecision.shouldCancelMouseTracking()) {
                     debugLog("[touchStart] mouseIsDown");
-                    
-                    // We need to unset the mouseIsDown flag and remove the mousemove listener
-                    // So that it doesn't conflict with our touchmove.
                     mouseIsDown = false;
                     EventUtil.removeEventListener(peersContainer, "mousemove", onMouseMoveHandle, true);
-                    EventUtil.removeEventListener(peersContainer, "pointermove", onMouseMoveHandle, true);
-                    
+                    EventUtil.removeEventListener(peersContainer, "pointermove", onPointerMoveHandle, true);
                     touchIsDown = false;
-                    //return;
                 }
-                // Guard against mouse event conflicts
-                // Make sure start event doesn't fire if touch is already down
-                if (touchIsDown) {
-                    //consoleLog("Touch is already down");
-                    return;
-                }
-                
-                
-                if (evt.getTarget() == textField || evt.getTarget() == textArea) {
-                    // We don't want to respond to touch events on teh native input
-                    // fields because it can result in some infinite looping behaviour.
-                    //consoleLog("Text field was target");
-                    return;
-                }
-                
-                if (isEditing && editingStartingUp) {
-                    //consoleLog("EditingStarting");
-                    return;
-                }
-                
                 touchIsDown = true;
                 
                 
@@ -1457,7 +1400,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         }
                     }
                 });
-                if (fireTouchStart) {
+                if (touchDecision.shouldFirePointerPressed()) {
                     installBacksideHooksInUserInteraction();
                     nativeCallSerially(new Runnable() {
 
@@ -1489,16 +1432,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 debugLog("In TouchEnd");
                 // Guard against mouse event conflicts
                 // Prevent from firing if touch was not down already.
-                if (mouseIsDown) {
+                if (JavaScriptInputCoordinator.shouldIgnoreTouchRelease(mouseIsDown, touchIsDown)) {
                     debugLog("[touchEnd] mouseIsDown");
-                    touchIsDown = false;
+                    if (mouseIsDown) {
+                        touchIsDown = false;
+                    }
                     return;
                 }
-                
-                if (!touchIsDown) {
-                    return;
-                }
-                
                 touchIsDown = false;
                 //if (evt.getTarget() == textField || evt.getTarget() == textArea) {
                 //    // We don't want to respond to touch events on teh native input
@@ -1524,7 +1464,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         
                     }
                 });
-                if (usePreemptiveNativeTextFieldApproach() && touchStartTime > currentTimeMillisecondsJS() - 200 && Math.abs(touchStartX-touchesX[0]) < 10 && Math.abs(touchStartY-touchesY[0]) < 10) {
+                if (JavaScriptInputCoordinator.shouldCreatePreemptiveTextField(usePreemptiveNativeTextFieldApproach(), touchStartTime, currentTimeMillisecondsJS(), touchStartX, touchStartY, touchesX[0], touchesY[0])) {
                     // Hack for iOS only to anticipate clicking on a text field
                     createAndFocusTextFieldPreemptively(touchesX[0], touchesY[0]);
                 }
@@ -1565,7 +1505,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     evt.stopPropagation();
                 }
                 
-                if (mouseIsDown) {
+                if (JavaScriptInputCoordinator.shouldCancelTouchMove(mouseIsDown)) {
                     touchIsDown = false;
                     EventUtil.removeEventListener(peersContainer, "touchmove", onTouchMoveHandle, true);
                     return;
@@ -1596,7 +1536,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     evt.stopPropagation();
                 }
 
-                if (touchIsDown) {
+                if (JavaScriptInputCoordinator.shouldCancelMouseMove(touchIsDown)) {
                     mouseIsDown = false;
                     EventUtil.removeEventListener(peersContainer, "mousemove", onMouseMoveHandle, true);
                     EventUtil.removeEventListener(peersContainer, "pointermove", onPointerMoveHandle, true);
@@ -2271,7 +2211,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (m instanceof Runnable) {
             //((Runnable)m).run();
         }
-        if (isPhoneOrTablet_()) {
+        if (JavaScriptInputCoordinator.shouldInstallKeyboard(isPhoneOrTablet_())) {
             HTML5Keyboard.install();
         }
         // Set the locale
@@ -2280,27 +2220,53 @@ public class HTML5Implementation extends CodenameOneImplementation {
         
         Font.setDefaultFont(Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
         Display d = Display.getInstance();
-        WindowExt win = (WindowExt)Window.current();
-        Navigator navigator = win.getNavigator();
-        d.setProperty("Platform", navigator.getPlatform());
-        d.setProperty("User-Agent", navigator.getUserAgent());
-        d.setProperty("browser.language", navigator.getLanguage());
-        d.setProperty("browser.name", navigator.getAppName());
-        d.setProperty("browser.codeName", navigator.getAppCodeName());
-        d.setProperty("browser.version", navigator.getAppVersion());
-        d.setProperty("OS", "JS");
-        d.setProperty("OSVer", "1.0");
-        d.setProperty("javascript.deployment.type", win.getCN1DeploymentType());
-        setAppArg(((WindowLocation)Window.current().getLocation()).getHref());
-        this.setDragStartPercentage(1);
-        if (!isIOS()) {
-            // On iOS we can't really use capture constraints yet anyways
-            // https://github.com/collab-project/videojs-record/issues/181
-            // https://github.com/collab-project/videojs-record/issues/332
-            VideoCaptureConstraints.init(new JSVideoCaptureConstraintsCompiler());
-        }
-        registerSaveBlobToFile();
-        GoogleImpl.init();
+        final WindowExt win = (WindowExt)Window.current();
+        final Navigator navigator = win.getNavigator();
+        JavaScriptRuntimeEnvironment environment = createRuntimeEnvironment(win, navigator);
+        JavaScriptInitializationAdapter.applyEnvironment(new JavaScriptInitializationAdapter.PropertySink() {
+            @Override
+            public void setProperty(String key, String value) {
+                d.setProperty(key, value);
+            }
+        }, environment);
+        setAppArg(JavaScriptInitializationAdapter.resolveAppArg(environment));
+        JavaScriptInitializationAdapter.runPostInit(new JavaScriptInitializationAdapter.RuntimeHooks() {
+            @Override
+            public void setDragStartPercentage(int percentage) {
+                HTML5Implementation.this.setDragStartPercentage(percentage);
+            }
+
+            @Override
+            public void initVideoCaptureConstraints() {
+                // On iOS we can't really use capture constraints yet anyways
+                // https://github.com/collab-project/videojs-record/issues/181
+                // https://github.com/collab-project/videojs-record/issues/332
+                VideoCaptureConstraints.init(new JSVideoCaptureConstraintsCompiler());
+            }
+
+            @Override
+            public void registerSaveBlobToFile() {
+                HTML5Implementation.registerSaveBlobToFile();
+            }
+
+            @Override
+            public void initGoogle() {
+                GoogleImpl.init();
+            }
+        }, isIOS());
+    }
+
+    private JavaScriptRuntimeEnvironment createRuntimeEnvironment(final WindowExt win, final Navigator navigator) {
+        return new JavaScriptRuntimeEnvironment(
+                navigator.getPlatform(),
+                navigator.getUserAgent(),
+                navigator.getLanguage(),
+                navigator.getAppName(),
+                navigator.getAppCodeName(),
+                navigator.getAppVersion(),
+                win.getCN1DeploymentType(),
+                ((WindowLocation)Window.current().getLocation()).getHref()
+        );
     }
 
     @JSBody(params={"msg"}, script="window.onbeforeunload=function(){return msg;}")
