@@ -255,6 +255,7 @@ class InteractionDialogTest extends UITestBase {
         implementation.setCurrentForm(form);
 
         InteractionDialog topDialog = new InteractionDialog();
+        topDialog.setUIID("PopupDialog");
         topDialog.setLayout(new FlowLayout());
         topDialog.add(new Label("Popup"));
         topDialog.setAnimateShow(false);
@@ -270,6 +271,7 @@ class InteractionDialogTest extends UITestBase {
         topDialog.dispose();
 
         InteractionDialog bottomDialog = new InteractionDialog();
+        bottomDialog.setUIID("PopupDialog");
         bottomDialog.setLayout(new FlowLayout());
         bottomDialog.add(new Label("Popup"));
         bottomDialog.setAnimateShow(false);
