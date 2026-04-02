@@ -123,21 +123,6 @@ if [ -d "$COMMON_DEPS_DIR" ]; then
   done < <(find "$COMMON_DEPS_DIR" -maxdepth 1 -type f -name '*.jar' -print0 | sort -z)
 fi
 
-bj_log "Preparing JavaScript-port launcher"
-cat > "$LAUNCHER_SRC" <<'EOF'
-import com.codename1.impl.html5.JavaScriptPortBootstrap;
-import com.codenameone.examples.hellocodenameone.HelloCodenameOne;
-
-public final class HelloCodenameOneJavaScriptMain {
-    public static void main(String[] args) {
-        JavaScriptPortBootstrap.bootstrap(new HelloCodenameOne());
-    }
-}
-EOF
-
-find "$PORT_ROOT/src/main/java" -type f -name '*.java' ! -name 'Stub.java' | sort > "$SOURCE_LIST"
-echo "$LAUNCHER_SRC" >> "$SOURCE_LIST"
-
 # TeaVM is optional for ParparVM builds. The legacy JavaScript port requires it,
 # but ParparVM can build without TeaVM dependencies installed.
 TEAVM_VERSION=""
@@ -153,6 +138,49 @@ done
 if [ "$TEAVM_AVAILABLE" -eq 0 ]; then
   bj_log "WARNING: TeaVM JSO compile-time jars not found in ~/.m2/repository"
   bj_log "Skipping TeaVM-dependent JavaScriptPort compilation (ParparVM-only build)"
+fi
+
+# Generate the appropriate launcher based on whether TeaVM is available
+bj_log "Preparing JavaScript-port launcher"
+if [ "$TEAVM_AVAILABLE" -eq 1 ]; then
+  cat > "$LAUNCHER_SRC" <<'EOF'
+import com.codename1.impl.html5.JavaScriptPortBootstrap;
+import com.codenameone.examples.hellocodenameone.HelloCodenameOne;
+
+public final class HelloCodenameOneJavaScriptMain {
+    public static void main(String[] args) {
+        JavaScriptPortBootstrap.bootstrap(new HelloCodenameOne());
+    }
+}
+EOF
+else
+  cat > "$LAUNCHER_SRC" <<'EOF'
+import com.codename1.impl.html5.ParparVMBootstrap;
+import com.codenameone.examples.hellocodenameone.HelloCodenameOne;
+
+public final class HelloCodenameOneJavaScriptMain {
+    public static void main(String[] args) {
+        ParparVMBootstrap.bootstrap(new HelloCodenameOne());
+    }
+}
+EOF
+fi
+
+# Build source list: JavaScriptPort sources (only if TeaVM available) plus the launcher
+SOURCE_LIST="$WORK_DIR/javascript-port-sources.txt"
+
+# When TeaVM is available: compile all JavaScriptPort sources including TeaVM-dependent ones
+# When TeaVM is not available: skip JavaScriptPort compilation - ParparVM runtime will handle JS interop
+if [ "$TEAVM_AVAILABLE" -eq 1 ]; then
+  bj_log "Building source list with TeaVM-dependent sources"
+  find "$PORT_ROOT/src/main/java" -type f -name '*.java' ! -name 'Stub.java' | sort > "$SOURCE_LIST"
+  # Add launcher
+  echo "$LAUNCHER_SRC" >> "$SOURCE_LIST"
+else
+  # For ParparVM-only builds, we don't compile JavaScriptPort sources
+  # The launcher uses ParparVMBootstrap which doesn't require TeaVM
+  bj_log "Building source list for ParparVM (no TeaVM)"
+  echo "$LAUNCHER_SRC" > "$SOURCE_LIST"
 fi
 
 CLASSPATH_ENTRIES=("$STAGE_CLASSES")
@@ -194,14 +222,24 @@ if [ "${#TEAVM_JARS[@]}" -gt 0 ]; then
   rm -rf "$STAGE_CLASSES/org/teavm/classlib/impl/report"
 fi
 
-# Only compile JavaScriptPort sources if TeaVM is available (legacy JavaScript port)
-# ParparVM builds can proceed without these browser-specific implementations
+# Compile JavaScriptPort sources
+# When TeaVM is available: compile all JavaScriptPort sources (legacy JavaScript port)
+# When TeaVM is not available: compile only the launcher (ParparVM uses runtime JS interop)
 if [ "$TEAVM_AVAILABLE" -eq 1 ]; then
-  bj_log "Compiling JavaScript-port runtime sources"
+  bj_log "Compiling JavaScript-port runtime sources (legacy TeaVM)"
   "$JAVAC_BIN" -source 8 -target 8 -cp "$CLASSPATH" -d "$PORT_CLASSES" @"$SOURCE_LIST"
   cp -R "$PORT_CLASSES"/. "$STAGE_CLASSES"/
 else
-  bj_log "Skipping JavaScript-port runtime compilation (TeaVM not available)"
+  bj_log "Skipping JavaScriptPort source compilation (ParparVM-only build)"
+  # For ParparVM,compile only ParparVMBootstrap and the launcher
+  # Note: ParparVMBootstrap doesn't depend on HTML5Implementation or TeaVM classes
+  PARPARVM_BOOTSTRAP="$PORT_ROOT/src/main/java/com/codename1/impl/html5/ParparVMBootstrap.java"
+  PARPARVM_SOURCE_LIST="$WORK_DIR/parparvm-sources.txt"
+  echo "$PARPARVM_BOOTSTRAP" > "$PARPARVM_SOURCE_LIST"
+  echo "$LAUNCHER_SRC" >> "$PARPARVM_SOURCE_LIST"
+  bj_log "Compiling ParparVM bootstrap and launcher"
+  "$JAVAC_BIN" -source 8 -target 8 -cp "$CLASSPATH" -d "$PORT_CLASSES" @"$PARPARVM_SOURCE_LIST"
+  cp -R "$PORT_CLASSES"/. "$STAGE_CLASSES"/
 fi
 
 bj_log "Running ByteCodeTranslator for HelloCodenameOne"
