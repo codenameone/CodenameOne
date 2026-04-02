@@ -743,7 +743,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
         } else {
             Border border = contentPaneStyle.getBorder();
             if (border != null) {
-                border.setTrackComponent(origRect);
+                border.setTrackComponent(rect);
             }
         }
         calcPreferredSize();

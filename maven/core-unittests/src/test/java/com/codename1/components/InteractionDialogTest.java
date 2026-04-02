@@ -8,6 +8,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.Border;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -246,6 +247,51 @@ class InteractionDialogTest extends UITestBase {
         assertTrue(dialog.getX() >= rect.getX() + rect.getWidth(),
                 "Expected fallback to right when preferred left side does not fit");
         dialog.dispose();
+    }
+
+    @Test
+    void showPopupDialogSetsArrowTrackComponentForBothBiasModes() throws Exception {
+        Form form = new Form(new BorderLayout());
+        implementation.setCurrentForm(form);
+
+        InteractionDialog topDialog = new InteractionDialog();
+        topDialog.setLayout(new FlowLayout());
+        topDialog.add(new Label("Popup"));
+        topDialog.setAnimateShow(false);
+        TrackingBorder topBorder = new TrackingBorder();
+        topDialog.getAllStyles().setBorder(topBorder);
+        Rectangle rect = new Rectangle(120, 220, 60, 40);
+        topDialog.showPopupDialog(rect, true);
+        assertNotNull(topBorder.lastTrackRect, "Expected border tracking rectangle to be set");
+        assertEquals(rect.getX(), topBorder.lastTrackRect.getX());
+        assertEquals(rect.getY(), topBorder.lastTrackRect.getY());
+        assertTrue(topDialog.getY() + topDialog.getHeight() <= rect.getY(),
+                "Bias=true should place popup above in this setup");
+        topDialog.dispose();
+
+        InteractionDialog bottomDialog = new InteractionDialog();
+        bottomDialog.setLayout(new FlowLayout());
+        bottomDialog.add(new Label("Popup"));
+        bottomDialog.setAnimateShow(false);
+        TrackingBorder bottomBorder = new TrackingBorder();
+        bottomDialog.getAllStyles().setBorder(bottomBorder);
+        bottomDialog.showPopupDialog(rect, false);
+        assertNotNull(bottomBorder.lastTrackRect, "Expected border tracking rectangle to be set");
+        assertEquals(rect.getX(), bottomBorder.lastTrackRect.getX());
+        assertEquals(rect.getY(), bottomBorder.lastTrackRect.getY());
+        assertTrue(bottomDialog.getY() >= rect.getY() + rect.getHeight(),
+                "Bias=false should place popup below in this setup");
+        bottomDialog.dispose();
+    }
+
+    private static class TrackingBorder extends Border {
+        private Rectangle lastTrackRect;
+
+        @Override
+        public void setTrackComponent(Rectangle trackComponent) {
+            lastTrackRect = trackComponent;
+            super.setTrackComponent(trackComponent);
+        }
     }
 
     private <T> T getPrivateField(Object target, String name, Class<T> type) throws Exception {
