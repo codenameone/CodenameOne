@@ -7,6 +7,7 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.util.StringUtil;
+import com.codenameone.examples.hellocodenameone.NativeInterfaceLanguageValidator;
 import com.codenameone.examples.hellocodenameone.tests.graphics.AffineScale;
 import com.codenameone.examples.hellocodenameone.tests.graphics.Clip;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawArc;
@@ -131,6 +132,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             }
             log("CN1SS:INFO:suite finished test=" + testName);
         }
+        log("CN1SS:INFO:swift_diag_status=" + NativeInterfaceLanguageValidator.getLastStatus());
         log("CN1SS:SUITE:FINISHED");
         TestReporting.getInstance().testExecutionFinished(getClass().getName());
         if (CN.isSimulator()) {
