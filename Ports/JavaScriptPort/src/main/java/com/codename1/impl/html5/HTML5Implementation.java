@@ -15,7 +15,6 @@ import com.codename1.db.Database;
 import com.codename1.teavm.io.ArrayBufferInputStream;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.CodenameOneThread;
-import com.codename1.impl.html5.JSOImplementations.AnimationFrameCallback;
 import com.codename1.impl.html5.JSOImplementations.CN1Native;
 import com.codename1.impl.html5.JSOImplementations.HTMLIFrameElement;
 import com.codename1.impl.html5.JSOImplementations.HTMLMediaElement;
@@ -191,14 +190,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private int defaultFileSystemSize=104857600;  // 100 Megs
 
     final Object editingLock=new Object();
-    
+
     private Form _getCurrent() {
         return getCurrentForm();
     }
         
     
-    private AnimationFrameCallback animationFrameCallback;
-    
+    private JavaScriptAnimationFrameCallback animationFrameHandler;
+
     private JavaScriptRenderQueueState<ExecutableOp> pendingDisplay=new JavaScriptRenderQueueState<ExecutableOp>();
     
     
@@ -2150,55 +2149,54 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }, !debugFlag("disableHover"), cn1InboxListener, popstateListener, resizeListener, hoverListener,
                 installBacksideHooksListener, keydownListener, keyupListener, keypressListener);
         
-        animationFrameCallback = new AnimationFrameCallback(){
-
-            @SuppressSyncErrors
-            @Override
-            public void onAnimationFrame(int time) {
-                
-                if (graphicsLocked){
-                    // If the graphics is locked, we don't do anything
-                    ((WindowExt)window).requestAnimationFrame(animationFrameCallback);
-                    return;
-
-                }
-
-                JavaScriptRenderQueueState.FrameSnapshot<ExecutableOp> frame =
-                        JavaScriptRenderQueueCoordinator.beginFrame(new JavaScriptRenderQueueCoordinator.GraphicsLock() {
-                            @Override
-                            public void setGraphicsLocked(boolean locked) {
-                                graphicsLocked = locked;
-                            }
-                        }, pendingDisplay);
-
-                if (!frame.isEmpty()){
-                    CanvasRenderingContext2D context = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
-                    //double ratio = getDevicePixelRatio();
-                    //if (ratio > 1.5) {
-                    //    context.scale(ratio, ratio);
-                    //}
-                    context.save();
-                    //context.setTransform(1, 0, 0, 1, 0, 0);
-                    context.beginPath();
-                    context.rect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
-                    context.clip();
-
-                    for (ExecutableOp op : frame.getOps()){
-                        op.execute(context);
-                    }
-                    ClipRect.resetClip(context, graphics.getClipState());
-                    context.restore();
-                    
-
-                }
-                ((WindowExt)window).requestAnimationFrame(animationFrameCallback);
-
-            }
-            
-        };
-        ((WindowExt)window).requestAnimationFrame(animationFrameCallback);
+        animationFrameHandler = new JavaScriptAnimationFrameCallback(this);
+        if (debugFlag("__retainAnimationFrameCallback")) {
+            animationFrameHandler.onAnimationFrame(0);
+        }
+        scheduleAnimationFrame();
         
     }
+
+    @SuppressSyncErrors
+    public void handleAnimationFrame(double time) {
+
+        if (graphicsLocked){
+            // If the graphics is locked, we don't do anything
+            scheduleAnimationFrame();
+            return;
+
+        }
+
+        JavaScriptRenderQueueState.FrameSnapshot<ExecutableOp> frame =
+                JavaScriptRenderQueueCoordinator.beginFrame(new JavaScriptRenderQueueCoordinator.GraphicsLock() {
+                    @Override
+                    public void setGraphicsLocked(boolean locked) {
+                        graphicsLocked = locked;
+                    }
+                }, pendingDisplay);
+
+        if (!frame.isEmpty()){
+            CanvasRenderingContext2D context = (CanvasRenderingContext2D)outputCanvas.getContext("2d");
+            context.save();
+            context.beginPath();
+            context.rect(frame.getCropX(), frame.getCropY(), frame.getCropW(), frame.getCropH());
+            context.clip();
+
+            for (ExecutableOp op : frame.getOps()){
+                op.execute(context);
+            }
+            ClipRect.resetClip(context, graphics.getClipState());
+            context.restore();
+        }
+        scheduleAnimationFrame();
+
+    }
+
+    private void scheduleAnimationFrame() {
+        requestAnimationFrameNative(animationFrameHandler);
+    }
+
+    private static native int requestAnimationFrameNative(JavaScriptAnimationFrameCallback handler);
     
     public static void callSerially(final Runnable r) {
         new Thread() {
@@ -2505,12 +2503,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
             @Override
             public void initGoogle() {
-                try {
-                    Class<?> googleImpl = Class.forName("com.codename1.social.GoogleImpl");
-                    googleImpl.getMethod("init").invoke(null);
-                } catch (Throwable ignored) {
-                    // Google integration is optional in this runtime path.
-                }
+                // Optional Google integration is intentionally disabled in the
+                // ParparVM runtime path until reflective class loading is supported.
             }
         }, isIOS());
     }

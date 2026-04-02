@@ -97,3 +97,5 @@ dependency-reduced-pom.xml
 /docs/website/.youtube-oauth-token.json
 /docs/website/client_secret.json
 /.playwright-cli
+package-lock.json
+package.json

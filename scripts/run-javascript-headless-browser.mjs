@@ -1,5 +1,18 @@
-import { chromium } from 'playwright';
 import fs from 'node:fs';
+
+let chromium;
+try {
+  ({ chromium } = await import('playwright'));
+} catch (playwrightError) {
+  try {
+    ({ chromium } = await import('@playwright/test'));
+  } catch (playwrightTestError) {
+    console.error('Unable to load Playwright. Install either "playwright" or "@playwright/test".');
+    console.error(String(playwrightError));
+    console.error(String(playwrightTestError));
+    process.exit(2);
+  }
+}
 
 const url = process.env.URL;
 const logFile = process.env.LOG_FILE;

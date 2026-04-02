@@ -35,7 +35,11 @@ OUTPUT_ZIP="${1:-$HELLO_ROOT/parparvm/target/hellocodenameone-javascript-port.zi
 TMPDIR="${TMPDIR:-/tmp}"
 TMPDIR="${TMPDIR%/}"
 WORK_DIR="$(mktemp -d "${TMPDIR}/cn1-jsport-build-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1-jsport-build")"
-trap 'rm -rf "$WORK_DIR" 2>/dev/null || true' EXIT
+if [ "${KEEP_JS_BUILD_DIR:-0}" = "1" ]; then
+  bj_log "Keeping build directory at $WORK_DIR"
+else
+  trap 'rm -rf "$WORK_DIR" 2>/dev/null || true' EXIT
+fi
 
 JAVA_HOME="${JAVA_HOME:-}"
 JAVA_BIN="${JAVA_HOME:+$JAVA_HOME/bin/java}"
@@ -64,7 +68,7 @@ if [ "${SKIP_MAVEN_BUILD:-0}" != "1" ] && [ "${SKIP_COMMON_BUILD:-0}" != "1" ]; 
   bj_log "Building HelloCodenameOne common module and compile-scope dependencies"
   mkdir -p "$HOME/.codenameone"
   if [ -f "$REPO_ROOT/maven/UpdateCodenameOne.jar" ]; then
-    cp "$REPO_ROOT/maven/UpdateCodenameOne.jar" "$HOME/.codenameone/"
+    cp "$REPO_ROOT/maven/UpdateCodenameOne.jar" "$HOME/.codenameone/" 2>/dev/null || true
   fi
   (
     cd "$HELLO_ROOT"
@@ -91,6 +95,8 @@ PORT_CLASSES="$WORK_DIR/port-classes"
 SOURCE_LIST="$WORK_DIR/javascript-port-sources.txt"
 LAUNCHER_SRC="$WORK_DIR/HelloCodenameOneJavaScriptMain.java"
 TRANSLATOR_OUT="$WORK_DIR/translator-output"
+TRANSLATOR_APP_NAME="HelloCodenameOneJavaScriptMain"
+DIST_APP_NAME="HelloCodenameOne"
 mkdir -p "$STAGE_CLASSES" "$PORT_CLASSES" "$TRANSLATOR_OUT"
 
 bj_log "Staging JavaAPI and application classes"
@@ -190,14 +196,14 @@ bj_log "Running ByteCodeTranslator for HelloCodenameOne"
   javascript \
   "$STAGE_CLASSES" \
   "$TRANSLATOR_OUT" \
-  "HelloCodenameOne" \
+  "$TRANSLATOR_APP_NAME" \
   "com.codenameone.examples.hellocodenameone" \
   "HelloCodenameOne" \
   "1.0" \
   "ios" \
   "none"
 
-DIST_DIR="$TRANSLATOR_OUT/dist/HelloCodenameOne-js"
+DIST_DIR="$TRANSLATOR_OUT/dist/$TRANSLATOR_APP_NAME-js"
 if [ ! -d "$DIST_DIR" ]; then
   DIST_DIR="$(find "$TRANSLATOR_OUT/dist" -mindepth 1 -maxdepth 2 -type f -name worker.js -print | head -n 1 | xargs -I{} dirname "{}" 2>/dev/null || true)"
 fi
@@ -218,11 +224,18 @@ while IFS= read -r -d '' entry; do
   fi
 done < <(find "$TRANSLATOR_OUT" -mindepth 1 -maxdepth 1 -print0)
 
+FINAL_DIST_DIR="$TRANSLATOR_OUT/dist/$DIST_APP_NAME-js"
+if [ "$DIST_DIR" != "$FINAL_DIST_DIR" ]; then
+  rm -rf "$FINAL_DIST_DIR"
+  mv "$DIST_DIR" "$FINAL_DIST_DIR"
+  DIST_DIR="$FINAL_DIST_DIR"
+fi
+
 mkdir -p "$(dirname "$OUTPUT_ZIP")"
 rm -f "$OUTPUT_ZIP"
 (
   cd "$TRANSLATOR_OUT/dist"
-  zip -qr "$OUTPUT_ZIP" "HelloCodenameOne-js"
+  zip -qr "$OUTPUT_ZIP" "$DIST_APP_NAME-js"
 )
 
 bj_log "Wrote browser bundle to $OUTPUT_ZIP"

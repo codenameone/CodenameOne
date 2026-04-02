@@ -13,6 +13,7 @@ import org.teavm.jso.JSBody;
 import org.teavm.jso.JSFunctor;
 import org.teavm.jso.JSObject;
 import org.teavm.jso.JSProperty;
+import org.teavm.jso.browser.AnimationFrameCallback;
 import org.teavm.jso.browser.Window;
 import org.teavm.jso.core.JSString;
 import org.teavm.jso.dom.events.Event;
@@ -31,11 +32,6 @@ import org.teavm.jso.typedarrays.ArrayBuffer;
  */
 public class JSOImplementations {
     
-    
-    @JSFunctor
-    public interface AnimationFrameCallback extends JSObject {
-        void onAnimationFrame(int time);
-    }
     
     public interface Console extends JSObject {
         void log(String str);
