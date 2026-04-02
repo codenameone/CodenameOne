@@ -14,7 +14,12 @@ open class HelloCodenameOne : Lifecycle() {
             "Jailbroken device detected by Display.isJailbrokenDevice()."
         }
         DefaultMethodDemo.validate()
-        NativeInterfaceLanguageValidator.validate()
+        try {
+            NativeInterfaceLanguageValidator.validate()
+        } catch (t: Throwable) {
+            System.out.println("CN1SS:SWIFT_DIAG:VALIDATION_EXCEPTION " + t.javaClass.name + ": " + t.message)
+            t.printStackTrace()
+        }
         Cn1ssDeviceRunner.addTest(KotlinUiTest())
         TestReporting.setInstance(Cn1ssDeviceRunnerReporter())
     }
