@@ -20,7 +20,10 @@ public final class NativeInterfaceLanguageValidator {
 
         SwiftKotlinNative nativeImpl = NativeLookup.create(SwiftKotlinNative.class);
         System.out.println("CN1SS:SWIFT_DIAG:NATIVE_LOOKUP result=" + (nativeImpl == null ? "null" : nativeImpl.getClass().getName()));
-        if (nativeImpl == null || !nativeImpl.isSupported()) {
+        if (nativeImpl == null) {
+            throw new IllegalStateException("SwiftKotlinNative lookup returned null on " + platformName);
+        }
+        if (!nativeImpl.isSupported()) {
             throw new IllegalStateException("SwiftKotlinNative is not available on " + platformName);
         }
 
