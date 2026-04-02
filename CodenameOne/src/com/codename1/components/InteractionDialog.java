@@ -43,6 +43,7 @@ import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.animations.Transition;
@@ -813,6 +814,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
                 // popup downwards
                 y = rect.getY() + rect.getHeight();
                 int height = Math.min(prefHeight, Math.max(0, availableHeight - y));
+                setTrackedArrowSide(contentPaneStyle.getBorder(), TOP);
                 padOrientation(contentPaneStyle, BOTTOM, 1);
                 show(Math.max(0, y), Math.max(0, availableHeight - height - y),
                         Math.max(0, x), Math.max(0, availableWidth - width - x));
@@ -821,6 +823,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
                 // popup upwards
                 int height = Math.min(prefHeight, rect.getY());
                 y = rect.getY() - height;
+                setTrackedArrowSide(contentPaneStyle.getBorder(), BOTTOM);
                 padOrientation(contentPaneStyle, TOP, 1);
                 show(y, Math.max(0, availableHeight - rect.getY()), x, Math.max(0, availableWidth - width - x));
                 padOrientation(contentPaneStyle, TOP, -1);
@@ -854,12 +857,20 @@ public class InteractionDialog extends Container implements AbstractDialog {
                 // popup right
                 x = rect.getX() + rect.getWidth();
                 width = Math.min(prefWidth, availableWidth - x);
+                setTrackedArrowSide(contentPaneStyle.getBorder(), LEFT);
             } else {
                 // popup left
                 width = Math.min(prefWidth, rect.getX());
                 x = rect.getX() - width;
+                setTrackedArrowSide(contentPaneStyle.getBorder(), RIGHT);
             }
             show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x));
+        }
+    }
+
+    private void setTrackedArrowSide(Border border, int side) {
+        if (border instanceof RoundRectBorder) {
+            ((RoundRectBorder) border).trackComponentSide(side);
         }
     }
 

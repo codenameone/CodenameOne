@@ -321,6 +321,7 @@ class InteractionDialogTest extends UITestBase {
         dialog.setAnimateShow(false);
         TrackingBorder border = new TrackingBorder();
         dialog.getAllStyles().setBorder(border);
+        dialog.getDialogStyle().setBorder(border);
         dialog.add(new Label("Popup"));
         dialog.showPopupDialog(new Rectangle(120, 220, 60, 40), true);
 
@@ -349,6 +350,7 @@ class InteractionDialogTest extends UITestBase {
         dialog.setAnimateShow(false);
         TrackingBorder border = new TrackingBorder();
         dialog.getAllStyles().setBorder(border);
+        dialog.getDialogStyle().setBorder(border);
         dialog.add(new Label("Popup"));
         dialog.showPopupDialog(new Rectangle(120, 220, 60, 40), true);
 
