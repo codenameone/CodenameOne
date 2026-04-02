@@ -313,7 +313,7 @@ class InteractionDialogTest extends UITestBase {
 
         String uiid = "UnitTestPopupNoImages";
         Hashtable<String, Object> themeProps = new Hashtable<>();
-        themeProps.put(uiid + "ArrowBool", "true");
+        themeProps.put(uiid + "ArrowBool", Boolean.TRUE);
         UIManager.getInstance().addThemeProps(themeProps);
 
         InteractionDialog dialog = new InteractionDialog();
@@ -336,7 +336,7 @@ class InteractionDialogTest extends UITestBase {
 
         String uiid = "UnitTestPopupWithImages";
         Hashtable<String, Object> themeProps = new Hashtable<>();
-        themeProps.put(uiid + "ArrowBool", "true");
+        themeProps.put(uiid + "ArrowBool", Boolean.TRUE);
         Image img = Image.createImage(4, 4);
         themeProps.put(uiid + "ArrowTopImage", img);
         themeProps.put(uiid + "ArrowBottomImage", img);
