@@ -1,4 +1,10 @@
 (function(global) {
+  function log(line) {
+    if (global.console && typeof global.console.log === 'function') {
+      global.console.log('PARPAR:' + line);
+    }
+  }
+
   function postHostCallback(target, id, value, errorMessage) {
     var message;
     if (errorMessage == null) {
@@ -72,6 +78,7 @@
   }
 
   function installWorkerMode() {
+    log('worker-mode');
     var worker = new Worker('worker.js');
     global.__parparWorker = worker;
     worker.onmessage = function(event) {
@@ -87,6 +94,7 @@
   }
 
   function loadScript(src, callback) {
+    log('load-script:' + src);
     var script = document.createElement('script');
     script.src = src;
     script.onload = function() {
@@ -99,6 +107,7 @@
   }
 
   function installMainThreadMode(onReady) {
+    log('main-thread-mode');
     global.__cn1ParparDispatchMessage = function(data) {
       handleVmMessage(data, null);
     };
@@ -112,6 +121,7 @@
           global.__parparError = { type: 'error', message: String(appErr) };
           return;
         }
+        log('translated-app-ready');
         onReady();
       });
     });
@@ -120,8 +130,10 @@
   var appStarter = null;
 
   global.startParparVmApp = function() {
+    log('startParparVmApp');
     global.cn1Initialized = true;
     if (appStarter) {
+      log('appStarter-present');
       appStarter();
     }
   };
@@ -135,9 +147,12 @@
     installMainThreadMode(function() {
       appStarter = function() {
         if (global.jvm && typeof global.jvm.start === 'function') {
+          log('jvm.start.begin');
           global.jvm.start();
+          log('jvm.start.end');
         }
       };
+      log('appStarter-ready');
       if (global.cn1Initialized) {
         appStarter();
       }

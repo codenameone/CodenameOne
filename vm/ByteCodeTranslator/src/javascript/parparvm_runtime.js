@@ -54,6 +54,22 @@ function emitVmMessage(message) {
   }
   global.postMessage(message);
 }
+function vmTrace(line) {
+  if (global.console && typeof global.console.log === "function") {
+    global.console.log("PARPAR:" + line);
+  }
+}
+function threadDebugLabel(threadObject) {
+  if (!threadObject) {
+    return "thread:null";
+  }
+  const name = jvm && typeof jvm.toNativeString === "function"
+    ? jvm.toNativeString(threadObject[CN1_THREAD_NAME])
+    : "";
+  const target = threadObject[CN1_THREAD_TARGET];
+  const targetClass = target && target.__class ? target.__class : "null";
+  return "thread:" + (name || "null") + ":target:" + targetClass;
+}
 const jvm = {
   classes: {},
   literalStrings: Object.create(null),
@@ -526,7 +542,7 @@ const jvm = {
     if (this.instanceOf(value, "org_teavm_jso_dom_events_EventListener")) {
       return this.toNativeEventListener(value);
     }
-    if (this.instanceOf(value, "com_codename1_impl_html5_JSOImplementations_AnimationFrameCallback")) {
+    if (this.instanceOf(value, "org_teavm_jso_browser_AnimationFrameCallback")) {
       return this.toNativeAnimationFrameCallback(value);
     }
     return value;
@@ -554,8 +570,8 @@ const jvm = {
     const self = this;
     callback.__nativeAnimationFrameCallback = function(time) {
       try {
-        const method = self.resolveVirtual(callback.__class, "cn1_com_codename1_impl_html5_JSOImplementations_AnimationFrameCallback_onAnimationFrame_int");
-        self.spawn(null, method(callback, time | 0));
+        const method = self.resolveVirtual(callback.__class, "cn1_org_teavm_jso_browser_AnimationFrameCallback_onAnimationFrame_double");
+        self.spawn(null, method(callback, +time));
       } catch (err) {
         self.fail(err);
       }
@@ -680,7 +696,10 @@ const jvm = {
       return "org_teavm_jso_dom_css_CSSStyleDeclaration";
     }
     if (value && value.href != null && value.assign && value.replace) {
-      return expectedClass || "com_codename1_impl_html5_JSOImplementations_WindowLocation";
+      if (this.classes["com_codename1_impl_html5_JSOImplementations_WindowLocation"]) {
+        return "com_codename1_impl_html5_JSOImplementations_WindowLocation";
+      }
+      return expectedClass || "org_teavm_jso_browser_Location";
     }
     if (value && value.tagName) {
       const tagName = String(value.tagName).toUpperCase();
@@ -737,6 +756,10 @@ const jvm = {
   spawn(threadObject, generator) {
     const thread = { id: this.nextThreadId++, object: threadObject, generator: generator, waiting: null, interrupted: false, done: false };
     this.threads.push(thread);
+    vmTrace("runtime.spawn.thread-" + thread.id + ":" + threadDebugLabel(threadObject));
+    if (thread.id > 1) {
+      vmTrace("runtime.spawn.stack.thread-" + thread.id + ":" + String(new Error().stack || ""));
+    }
     this.enqueue(thread);
     return thread;
   },
@@ -746,18 +769,46 @@ const jvm = {
     this.runnable.push(thread);
     this.drain();
   },
+  schedulerNow() {
+    if (typeof global.performance !== "undefined" && global.performance
+            && typeof global.performance.now === "function") {
+      return global.performance.now();
+    }
+    return Date.now();
+  },
+  scheduleDrain() {
+    if (this.draining || this.drainScheduled) {
+      return;
+    }
+    this.drainScheduled = true;
+    const self = this;
+    setTimeout(function() {
+      self.drainScheduled = false;
+      self.drain();
+    }, 0);
+  },
   drain() {
     if (this.draining) {
       return;
     }
     this.draining = true;
+    const deadline = this.schedulerNow() + 8;
+    let steps = 0;
     try {
       while (this.runnable.length) {
+        if (steps++ > 2048 || this.schedulerNow() >= deadline) {
+          this.scheduleDrain();
+          break;
+        }
         const thread = this.runnable.shift();
         if (thread.done) {
           continue;
         }
         this.currentThread = thread;
+        if (!thread.__cn1LoggedFirstStep) {
+          thread.__cn1LoggedFirstStep = true;
+          vmTrace("runtime.drain.first-step.thread-" + thread.id + ":" + threadDebugLabel(thread.object));
+        }
         let result;
         if (thread.resumeError) {
           const resumeError = thread.resumeError;
@@ -785,6 +836,9 @@ const jvm = {
     }
   },
   handleYield(thread, yielded) {
+    vmTrace("runtime.handleYield.thread-" + thread.id + ":" +
+            threadDebugLabel(thread.object) +
+            ":" + (yielded && yielded.op ? yielded.op : "requeue"));
     if (!yielded || !yielded.op) {
       this.enqueue(thread, yielded);
       return;
@@ -934,12 +988,19 @@ const jvm = {
     if (!this.mainClass || !this.mainMethod) {
       throw new Error("No main class configured for javascript backend");
     }
+    vmTrace("runtime.start.before-main-generator");
     const mainArgs = this.newArray(0, "java_lang_String", 1);
     const mainThreadObject = this.newObject("java_lang_Thread");
     mainThreadObject[CN1_THREAD_ALIVE] = 1;
     mainThreadObject[CN1_THREAD_NAME] = this.createStringLiteral("main");
-    const mainThread = this.spawn(mainThreadObject, global[this.mainMethod](mainArgs));
+    const mainGenerator = global[this.mainMethod](mainArgs);
+    vmTrace("runtime.start.after-main-generator");
+    const mainThread = this.spawn(mainThreadObject, mainGenerator);
+    vmTrace("runtime.start.after-spawn");
     this.currentThread = mainThread;
+    vmTrace("runtime.start.before-drain");
+    this.drain();
+    vmTrace("runtime.start.after-drain");
   },
   describeProtocol() {
     return {
@@ -1303,6 +1364,23 @@ function isPhoneOrTabletUserAgent() {
   const prefixRegex = /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i;
   return mobileOrTabletRegex.test(agent) || prefixRegex.test(agent.substring(0, 4));
 }
+function isIOSUserAgent() {
+  const nav = global.navigator || {};
+  const ua = String(nav.userAgent || "");
+  const platform = String(nav.platform || "");
+  const maxTouchPoints = Number(nav.maxTouchPoints || 0);
+  return (/iPad|iPhone|iPod/.test(ua) && !global.MSStream) || (platform === "MacIntel" && maxTouchPoints > 1);
+}
+function isMacUserAgent() {
+  return /Mac/.test(getUserAgentString());
+}
+function isIPadUserAgent() {
+  const nav = global.navigator || {};
+  const ua = String(nav.userAgent || "");
+  const platform = String(nav.platform || "");
+  const maxTouchPoints = Number(nav.maxTouchPoints || 0);
+  return /iPad/i.test(ua) || (platform === "MacIntel" && maxTouchPoints > 1);
+}
 bindNative(["cn1_org_teavm_jso_core_JSArray_create_R_org_teavm_jso_core_JSArray", "cn1_org_teavm_jso_core_JSArray_create___R_org_teavm_jso_core_JSArray"], function*() {
   return [];
 });
@@ -1370,6 +1448,15 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhone__R_boolean
 bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet__R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet___R_boolean"], function*() {
   return isPhoneOrTabletUserAgent() ? 1 : 0;
 });
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isIOS_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isIOS___R_boolean"], function*() {
+  return isIOSUserAgent() ? 1 : 0;
+});
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isMac_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isMac___R_boolean"], function*() {
+  return isMacUserAgent() ? 1 : 0;
+});
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isIPad_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isIPad___R_boolean"], function*() {
+  return isIPadUserAgent() ? 1 : 0;
+});
 bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage___R_java_lang_String"], function*() {
   const nav = global.navigator || {};
   const value = nav.language || nav.browserLanguage || "";
@@ -1395,10 +1482,88 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_
   }
   return jvm.createStringLiteral(String(value));
 });
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_installBeforeUnload",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_installBeforeUnload__"
+], function*() {
+  const win = global.window || global;
+  win.onbeforeunload = function() {
+    return "Leaving or refreshing the page may cause you to lose unsaved data.";
+  };
+  return null;
+});
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_getBeforeUnloadHandler_R_org_teavm_jso_JSObject",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_getBeforeUnloadHandler___R_org_teavm_jso_JSObject"
+], function*() {
+  const win = global.window || global;
+  const handler = win.onbeforeunload;
+  return handler == null ? null : jvm.wrapJsObject(handler, "org_teavm_jso_JSObject");
+});
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadHandler_org_teavm_jso_JSObject",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadHandler___org_teavm_jso_JSObject"
+], function*(handler) {
+  const win = global.window || global;
+  win.onbeforeunload = handler == null ? null : jvm.unwrapJsValue(handler);
+  return null;
+});
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadMessage_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadMessage___java_lang_String"
+], function*(msg) {
+  const win = global.window || global;
+  const value = msg == null ? "" : jvm.toNativeString(msg);
+  win.onbeforeunload = function() {
+    return value;
+  };
+  return null;
+});
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_removeBeforeUnload",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_removeBeforeUnload__"
+], function*() {
+  const win = global.window || global;
+  win.onbeforeunload = function() {};
+  return null;
+});
+bindNative([
+  "cn1_com_codename1_teavm_io_BlobUtil_installNativeBlobToFileConverter_com_codename1_teavm_io_BlobUtil_BlobToFileFunc",
+  "cn1_com_codename1_teavm_io_BlobUtil_installNativeBlobToFileConverter___com_codename1_teavm_io_BlobUtil_BlobToFileFunc"
+], function*(_func) {
+  const win = global.window || global;
+  win.saveBlobToFile = function(_blob, _fileName, callback) {
+    if (callback && typeof callback.error === "function") {
+      callback.error("Blob-to-file conversion is not implemented in the ParparVM runtime yet.");
+    }
+  };
+  return null;
+});
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_requestAnimationFrameNative_com_codename1_impl_html5_JavaScriptAnimationFrameCallback_R_int",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_requestAnimationFrameNative___com_codename1_impl_html5_JavaScriptAnimationFrameCallback_R_int"
+], function*(handler) {
+  const win = global.window || global;
+  return (win.requestAnimationFrame || function(cb) { return win.setTimeout(function() { cb(Date.now()); }, 16); })(function(time) {
+    try {
+      const method = jvm.resolveVirtual(handler.__class, "cn1_com_codename1_impl_html5_JavaScriptAnimationFrameCallback_onAnimationFrame_double");
+      jvm.spawn(null, method(handler, +time));
+    } catch (err) {
+      jvm.fail(err);
+    }
+  }) | 0;
+});
 bindNative(["cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled_R_boolean", "cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled___R_boolean"], function*() {
   return 0;
 });
-bindNative(["cn1_java_lang_Object_wait_long_int", "cn1_java_lang_Object_wait___long_int"], function*(__cn1ThisObject, timeout, nanos) {
+bindNative([
+  "cn1_java_lang_Object_wait",
+  "cn1_java_lang_Object_wait__",
+  "cn1_java_lang_Object_wait_long",
+  "cn1_java_lang_Object_wait___long",
+  "cn1_java_lang_Object_wait_long_int",
+  "cn1_java_lang_Object_wait___long_int"
+], function*(__cn1ThisObject, timeout, nanos) {
   const resumed = yield jvm.waitOn(jvm.currentThread, __cn1ThisObject, timeout || 0);
   if (resumed && resumed.interrupted) {
     yield* throwInterruptedException();

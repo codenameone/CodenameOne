@@ -63,7 +63,13 @@ PROBE_JS = r"""
     send('BROWSER:REJECTION:' + stringify(event.reason || event));
   });
 
+  var lastState = '';
   setInterval(function() {
+    var state = 'initialized=' + (!!window.cn1Initialized) + ' started=' + (!!window.cn1Started);
+    if (state !== lastState) {
+      lastState = state;
+      send('BROWSER:STATE:' + state);
+    }
     if (window.__parparError) {
       send('BROWSER:PARPAR_ERROR:' + stringify(window.__parparError));
     }
