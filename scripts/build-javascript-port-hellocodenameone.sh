@@ -138,29 +138,36 @@ EOF
 find "$PORT_ROOT/src/main/java" -type f -name '*.java' ! -name 'Stub.java' | sort > "$SOURCE_LIST"
 echo "$LAUNCHER_SRC" >> "$SOURCE_LIST"
 
+# TeaVM is optional for ParparVM builds. The legacy JavaScript port requires it,
+# but ParparVM can build without TeaVM dependencies installed.
 TEAVM_VERSION=""
+TEAVM_AVAILABLE=0
 for candidate in 0.6.0-cn1-006 0.8.1; do
   if [ -f "$HOME/.m2/repository/org/teavm/teavm-jso/$candidate/teavm-jso-$candidate.jar" ]; then
     TEAVM_VERSION="$candidate"
+    TEAVM_AVAILABLE=1
     break
   fi
 done
-if [ -z "$TEAVM_VERSION" ]; then
-  bj_log "Unable to locate TeaVM JSO compile-time jars in ~/.m2/repository" >&2
-  exit 4
+
+if [ "$TEAVM_AVAILABLE" -eq 0 ]; then
+  bj_log "WARNING: TeaVM JSO compile-time jars not found in ~/.m2/repository"
+  bj_log "Skipping TeaVM-dependent JavaScriptPort compilation (ParparVM-only build)"
 fi
 
 CLASSPATH_ENTRIES=("$STAGE_CLASSES")
 TEAVM_JARS=()
-while IFS= read -r -d '' jar_file; do
-  jar_name="$(basename "$jar_file")"
-  case "$jar_name" in
-    teavm-jso-*.jar|teavm-jso.jar|teavm-jso-apis-*.jar|teavm-jso-impl-*.jar|teavm-platform-*.jar|teavm-classlib-*.jar|teavm-interop-*.jar)
-      TEAVM_JARS+=("$jar_file")
-      ;;
-  esac
-  CLASSPATH_ENTRIES+=("$jar_file")
-done < <(find "$HOME/.m2/repository/org/teavm" -path "*$TEAVM_VERSION/*.jar" -type f -print0 | sort -z)
+if [ "$TEAVM_AVAILABLE" -eq 1 ]; then
+  while IFS= read -r -d '' jar_file; do
+    jar_name="$(basename "$jar_file")"
+    case "$jar_name" in
+      teavm-jso-*.jar|teavm-jso.jar|teavm-jso-apis-*.jar|teavm-jso-impl-*.jar|teavm-platform-*.jar|teavm-classlib-*.jar|teavm-interop-*.jar)
+        TEAVM_JARS+=("$jar_file")
+        ;;
+    esac
+    CLASSPATH_ENTRIES+=("$jar_file")
+  done < <(find "$HOME/.m2/repository/org/teavm" -path "*$TEAVM_VERSION/*.jar" -type f -print0 | sort -z)
+fi
 if [ -d "$COMMON_DEPS_DIR" ]; then
   while IFS= read -r -d '' jar_file; do
     CLASSPATH_ENTRIES+=("$jar_file")
@@ -187,9 +194,15 @@ if [ "${#TEAVM_JARS[@]}" -gt 0 ]; then
   rm -rf "$STAGE_CLASSES/org/teavm/classlib/impl/report"
 fi
 
-bj_log "Compiling JavaScript-port runtime sources"
-"$JAVAC_BIN" -source 8 -target 8 -cp "$CLASSPATH" -d "$PORT_CLASSES" @"$SOURCE_LIST"
-cp -R "$PORT_CLASSES"/. "$STAGE_CLASSES"/
+# Only compile JavaScriptPort sources if TeaVM is available (legacy JavaScript port)
+# ParparVM builds can proceed without these browser-specific implementations
+if [ "$TEAVM_AVAILABLE" -eq 1 ]; then
+  bj_log "Compiling JavaScript-port runtime sources"
+  "$JAVAC_BIN" -source 8 -target 8 -cp "$CLASSPATH" -d "$PORT_CLASSES" @"$SOURCE_LIST"
+  cp -R "$PORT_CLASSES"/. "$STAGE_CLASSES"/
+else
+  bj_log "Skipping JavaScript-port runtime compilation (TeaVM not available)"
+fi
 
 bj_log "Running ByteCodeTranslator for HelloCodenameOne"
 "$JAVA_BIN" -cp "$PARPARVM_COMPILER" com.codename1.tools.translator.ByteCodeTranslator \
