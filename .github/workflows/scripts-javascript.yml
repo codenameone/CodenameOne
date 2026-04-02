@@ -62,6 +62,11 @@ jobs:
           java-version: '8'
           cache: 'maven'
 
+      - name: Prepare Codename One binaries for Maven plugin
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+
       - name: Build ParparVM compiler bundle
         run: mvn -B -f maven/pom.xml -pl parparvm -am -DskipTests -Dmaven.javadoc.skip=true package
 
@@ -76,15 +81,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Install Playwright Chromium
         run: |
           npm install -g playwright
           npx playwright install --with-deps chromium
 
+      - name: Install Xvfb for headless Java AWT
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Setup workspace
-        run: ./scripts/setup-workspace.sh -q -DskipTests
+        run: xvfb-run ./scripts/setup-workspace.sh -q -DskipTests
 
       - name: Build HelloCodenameOne JavaScript port bundle
         run: |

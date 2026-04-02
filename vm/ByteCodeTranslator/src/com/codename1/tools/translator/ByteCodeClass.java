@@ -164,15 +164,13 @@ public class ByteCodeClass {
     
     public void addMethod(BytecodeMethod m) {
         if(m.isMain()) {
-            if (clsName.equals(preferredMainClass)) {
+            if (preferredMainClass != null) {
+                if (clsName.equals(preferredMainClass)) {
+                    mainClass = this;
+                }
+            } else if (mainClass == null) {
                 mainClass = this;
-                return;
-            }
-            if (mainClass == null) {
-                mainClass = this;
-                return;
-            }
-            if (preferredMainClass == null) {
+            } else {
                 throw new RuntimeException("Multiple main classes: "+mainClass.clsName+" and "+this.clsName);
             }
         }
