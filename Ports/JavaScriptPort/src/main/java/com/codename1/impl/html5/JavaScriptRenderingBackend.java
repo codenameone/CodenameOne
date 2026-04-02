@@ -7,6 +7,7 @@
 package com.codename1.impl.html5;
 
 import com.codename1.teavm.jso.io.Blob;
+import java.io.IOException;
 import org.teavm.jso.canvas.CanvasPattern;
 import org.teavm.jso.canvas.CanvasRenderingContext2D;
 import org.teavm.jso.canvas.ImageData;
@@ -29,6 +30,6 @@ public interface JavaScriptRenderingBackend {
     void writeImageData(HTMLCanvasElement canvas, ImageData imageData, int width, int height);
     void scaleLoadedImageToCanvas(HTMLCanvasElement canvas, HTMLImageElement image, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight);
     void scaleMutableSurfaceToCanvas(HTMLCanvasElement canvas, HTMLCanvasElement sourceCanvas, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight);
-    Blob toImageBlob(HTMLCanvasElement canvas, String mimeType, float quality);
+    Blob toImageBlob(HTMLCanvasElement canvas, String mimeType, float quality) throws IOException;
     void repaintCurrentForm();
 }

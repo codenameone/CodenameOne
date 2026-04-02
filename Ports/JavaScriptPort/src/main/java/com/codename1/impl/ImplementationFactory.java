@@ -14,7 +14,7 @@ import com.codename1.ui.Display;
 public class ImplementationFactory {
     private static ImplementationFactory instance = new ImplementationFactory();
 
-    protected ImplementationFactory() {
+    public ImplementationFactory() {
     }
 
     public static ImplementationFactory getInstance() {

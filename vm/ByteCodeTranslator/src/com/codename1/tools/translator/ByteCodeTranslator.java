@@ -272,6 +272,7 @@ public class ByteCodeTranslator {
         }
         File srcRoot = new File(root, appName + "-js");
         srcRoot.mkdirs();
+        ByteCodeClass.setPreferredMainClass(appName);
         b.execute(sources, srcRoot);
         Parser.writeOutput(srcRoot);
     }

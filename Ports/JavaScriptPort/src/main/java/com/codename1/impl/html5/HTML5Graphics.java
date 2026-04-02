@@ -57,6 +57,7 @@ import org.teavm.jso.dom.html.HTMLCanvasElement;
 public class HTML5Graphics {
 
     private final JavaScriptRenderState<NativeFont> renderState = new JavaScriptRenderState<NativeFont>();
+    private Runnable mutationListener;
     private HTMLCanvasElement canvas;
     private CanvasRenderingContext2D context;
     //private Paint paint;
@@ -77,6 +78,7 @@ public class HTML5Graphics {
                     new JavaScriptPrimitiveRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
+                            notifyMutation();
                             operation.execute(context);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
@@ -85,6 +87,7 @@ public class HTML5Graphics {
                     new JavaScriptImageTransformRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
+                            notifyMutation();
                             operation.execute(context);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
@@ -93,6 +96,7 @@ public class HTML5Graphics {
                     new JavaScriptShapeGradientRenderAdapter.OperationSink<ExecutableOp>() {
                         @Override
                         public void submit(ExecutableOp operation) {
+                            notifyMutation();
                             operation.execute(context);
                         }
                     }, JavaScriptExecutableOpFactory.INSTANCE);
@@ -201,6 +205,16 @@ public class HTML5Graphics {
 
     CanvasRenderingContext2D getContext() {
         return context;
+    }
+
+    void setMutationListener(Runnable mutationListener) {
+        this.mutationListener = mutationListener;
+    }
+
+    private void notifyMutation() {
+        if (mutationListener != null) {
+            mutationListener.run();
+        }
     }
 
 

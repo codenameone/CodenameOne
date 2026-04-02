@@ -18,3 +18,8 @@ and asserts a key set of `com.codename1.ui.*` classes (including `Component`,
 `Form`, `Container`, `Dialog`, `Display`, etc.) exist in the generated output
 before running the Java smoke harness. It also asserts known internal classes
 (`com.codename1.ui.Accessor`, `com.codename1.io.IOAccessor`) are not emitted.
+
+`compare-javascript-bundles.sh` compares a legacy JavaScript playground output
+with a ParparVM JavaScript-port artifact and reports total bundle size plus key
+payload file sizes. This is intended as the first regression tool for keeping
+the new port in the same size scale before hard thresholds are added.

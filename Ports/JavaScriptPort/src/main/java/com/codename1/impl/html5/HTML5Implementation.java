@@ -43,7 +43,6 @@ import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.messaging.Message;
 import com.codename1.push.PushCallback;
-import com.codename1.social.GoogleImpl;
 import com.codename1.teavm.ext.localforage.LocalForage;
 import com.codename1.teavm.ext.localforage.LocalForage.ItemSavedListener;
 import com.codename1.teavm.ext.usermedia.PhotoCapture;
@@ -302,7 +301,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
 
         @Override
-        public Blob toImageBlob(HTMLCanvasElement canvas, String mimeType, float quality) {
+        public Blob toImageBlob(HTMLCanvasElement canvas, String mimeType, float quality) throws IOException {
             return BlobUtil.canvasToBlob(canvas, mimeType, quality);
         }
 
@@ -2506,7 +2505,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
             @Override
             public void initGoogle() {
-                GoogleImpl.init();
+                try {
+                    Class<?> googleImpl = Class.forName("com.codename1.social.GoogleImpl");
+                    googleImpl.getMethod("init").invoke(null);
+                } catch (Throwable ignored) {
+                    // Google integration is optional in this runtime path.
+                }
             }
         }, isIOS());
     }
