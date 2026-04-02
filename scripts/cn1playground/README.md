@@ -187,6 +187,22 @@ The playground includes an **Inspector** tab that displays the component hierarc
 
 Changes made in the property editor are immediately reflected in the preview. The component tree updates automatically when your script re-runs.
 
+## JavaScript Port Tracking
+
+The current `javascript` module still represents the legacy JavaScript build
+path. While the new ParparVM-backed JavaScript port is being integrated, you
+can compare bundle size against a ParparVM artifact with:
+
+```bash
+PLAYGROUND_PARPARVM_BUNDLE=/path/to/parparvm/dist ./build.sh javascript_compare
+```
+
+This uses
+[`compare-javascript-bundles.sh`](/Users/shai/dev/cn1/scripts/cn1playground/tools/compare-javascript-bundles.sh)
+to report total and JavaScript payload sizes. The long-term goal is to replace
+the legacy `javascript` module build itself with the ParparVM-backed port once
+the runtime and browser harness are complete.
+
 ## BeanShell Interpreter Tradeoffs
 
 The playground uses a customized version of [BeanShell](https://github.com/beanshell/beanshell) with several Codename One-specific adaptations.

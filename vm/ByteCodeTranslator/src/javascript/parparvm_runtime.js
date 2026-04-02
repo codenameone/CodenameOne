@@ -46,6 +46,14 @@ const PRIMITIVE_INFO = {
   JAVA_INT: { javaName: "int", descriptor: "I" },
   JAVA_LONG: { javaName: "long", descriptor: "J" }
 };
+const jsObjectWrappers = typeof WeakMap === "function" ? new WeakMap() : null;
+function emitVmMessage(message) {
+  if (typeof global.__cn1ParparDispatchMessage === "function") {
+    global.__cn1ParparDispatchMessage(message);
+    return;
+  }
+  global.postMessage(message);
+}
 const jvm = {
   classes: {},
   literalStrings: Object.create(null),
@@ -79,7 +87,7 @@ const jvm = {
     this.classes[def.name] = def;
   },
   addVirtualMethod(className, methodId, fn) {
-    this.classes[className].methods[methodId] = fn;
+    this.classes[className].methods[methodId] = typeof this[methodId] === "function" ? this[methodId] : fn;
   },
   setMain(className, methodName) {
     this.mainClass = className;
@@ -297,7 +305,111 @@ const jvm = {
       }
       current = cls ? cls.baseClass : null;
     }
+    if (this.isJsoBridgeClass(className)) {
+      cached = this.createJsoBridgeMethod(className, methodId);
+      this.resolvedVirtualCache[cacheKey] = cached;
+      return cached;
+    }
     throw new Error("Missing virtual method " + methodId + " on " + className);
+  },
+  isJsoBridgeClass(className) {
+    if (!className) {
+      return false;
+    }
+    if (className.indexOf("org_teavm_jso_") === 0 || className.indexOf("com_codename1_impl_html5_JSOImplementations_") === 0) {
+      return true;
+    }
+    const cls = this.classes[className];
+    return !!(cls && cls.assignableTo && cls.assignableTo["org_teavm_jso_JSObject"]);
+  },
+  createJsoBridgeMethod(className, methodId) {
+    const self = this;
+    return function*(__cn1ThisObject) {
+      const args = new Array(Math.max(0, arguments.length - 1));
+      for (let i = 1; i < arguments.length; i++) {
+        args[i - 1] = arguments[i];
+      }
+      return yield* self.invokeJsoBridge(__cn1ThisObject, className, methodId, args);
+    };
+  },
+  invokeJsoBridge(__cn1ThisObject, className, methodId, args) {
+    const self = this;
+    return (function*() {
+      const receiver = self.unwrapJsValue(__cn1ThisObject);
+      if (receiver == null) {
+        throw new Error("Null JS interop receiver for " + methodId);
+      }
+      const bridge = self.parseJsoBridgeMethod(className, methodId);
+      const nativeArgs = self.toNativeJsArgs(args || []);
+      let result;
+      if (bridge.kind === "getter") {
+        result = receiver[bridge.member];
+      } else if (bridge.kind === "setter") {
+        receiver[bridge.member] = nativeArgs.length ? nativeArgs[0] : null;
+        result = null;
+      } else {
+        const fn = receiver[bridge.member];
+        if (typeof fn === "function") {
+          result = fn.apply(receiver, nativeArgs);
+        } else if (!nativeArgs.length && Object.prototype.hasOwnProperty.call(receiver, bridge.member)) {
+          result = receiver[bridge.member];
+        } else {
+          throw new Error("Missing JS member " + bridge.member + " for " + methodId);
+        }
+      }
+      return self.wrapJsResult(result, bridge.returnClass);
+    })();
+  },
+  parseJsoBridgeMethod(className, methodId) {
+    const prefix = "cn1_" + className + "_";
+    let remainder = methodId.indexOf(prefix) === 0 ? methodId.substring(prefix.length) : methodId;
+    let returnClass = null;
+    const returnMarker = remainder.lastIndexOf("_R_");
+    if (returnMarker >= 0) {
+      returnClass = remainder.substring(returnMarker + 3);
+      remainder = remainder.substring(0, returnMarker);
+    }
+    let member;
+    let hasParameters;
+    if (remainder.indexOf("cn1_") === 0) {
+      const inferred = this.inferJsoBridgeMember(remainder);
+      member = inferred.member;
+      hasParameters = inferred.hasParameters;
+    } else {
+      const firstUnderscore = remainder.indexOf("_");
+      member = firstUnderscore >= 0 ? remainder.substring(0, firstUnderscore) : remainder;
+      hasParameters = firstUnderscore >= 0;
+    }
+    if (!hasParameters && member.indexOf("get") === 0 && member.length > 3) {
+      return { kind: "getter", member: lowerFirst(member.substring(3)), returnClass: returnClass };
+    }
+    if (!hasParameters && member.indexOf("is") === 0 && member.length > 2) {
+      return { kind: "getter", member: lowerFirst(member.substring(2)), returnClass: returnClass || "boolean" };
+    }
+    if (member.indexOf("set") === 0 && member.length > 3 && remainder.indexOf("_") > -1 && member !== "setAttribute" && member !== "setProperty") {
+      return { kind: "setter", member: lowerFirst(member.substring(3)), returnClass: returnClass };
+    }
+    return { kind: "method", member: member, returnClass: returnClass };
+  },
+  inferJsoBridgeMember(remainder) {
+    const body = remainder.indexOf("cn1_") === 0 ? remainder.substring(4) : remainder;
+    const tokens = body.split("_");
+    for (let i = 1; i < tokens.length; i++) {
+      const previous = tokens[i - 1];
+      const current = tokens[i];
+      if (previous && current && this.isEncodedClassToken(previous) && this.isEncodedMethodToken(current)) {
+        return { member: current, hasParameters: i < tokens.length - 1 };
+      }
+    }
+    return { member: tokens.length ? tokens[tokens.length - 1] : body, hasParameters: tokens.length > 1 };
+  },
+  isEncodedClassToken(token) {
+    const ch = token && token.charAt(0);
+    return !!(ch && ch >= "A" && ch <= "Z");
+  },
+  isEncodedMethodToken(token) {
+    const ch = token && token.charAt(0);
+    return !!(ch && ch >= "a" && ch <= "z");
   },
   methodTail(methodId) {
     let cached = this.methodTailCache[methodId];
@@ -391,14 +503,217 @@ const jvm = {
     }
     return "" + value;
   },
+  toNativeJsArgs(args) {
+    const out = new Array(args.length);
+    for (let i = 0; i < args.length; i++) {
+      out[i] = this.toNativeJsArg(args[i]);
+    }
+    return out;
+  },
+  toNativeJsArg(value) {
+    if (value == null) {
+      return value;
+    }
+    if (value.__jsValue !== undefined) {
+      return value.__jsValue;
+    }
+    if (typeof value === "string") {
+      return value;
+    }
+    if (value.__class === "java_lang_String" || value.__nativeString != null) {
+      return this.toNativeString(value);
+    }
+    if (this.instanceOf(value, "org_teavm_jso_dom_events_EventListener")) {
+      return this.toNativeEventListener(value);
+    }
+    if (this.instanceOf(value, "com_codename1_impl_html5_JSOImplementations_AnimationFrameCallback")) {
+      return this.toNativeAnimationFrameCallback(value);
+    }
+    return value;
+  },
+  toNativeEventListener(listener) {
+    if (listener.__nativeEventListener) {
+      return listener.__nativeEventListener;
+    }
+    const self = this;
+    listener.__nativeEventListener = function(event) {
+      try {
+        const wrappedEvent = self.wrapJsResult(event, "org_teavm_jso_dom_events_Event");
+        const method = self.resolveVirtual(listener.__class, "cn1_org_teavm_jso_dom_events_EventListener_handleEvent_org_teavm_jso_dom_events_Event");
+        self.spawn(null, method(listener, wrappedEvent));
+      } catch (err) {
+        self.fail(err);
+      }
+    };
+    return listener.__nativeEventListener;
+  },
+  toNativeAnimationFrameCallback(callback) {
+    if (callback.__nativeAnimationFrameCallback) {
+      return callback.__nativeAnimationFrameCallback;
+    }
+    const self = this;
+    callback.__nativeAnimationFrameCallback = function(time) {
+      try {
+        const method = self.resolveVirtual(callback.__class, "cn1_com_codename1_impl_html5_JSOImplementations_AnimationFrameCallback_onAnimationFrame_int");
+        self.spawn(null, method(callback, time | 0));
+      } catch (err) {
+        self.fail(err);
+      }
+    };
+    return callback.__nativeAnimationFrameCallback;
+  },
+  unwrapJsValue(value) {
+    return value && value.__jsValue !== undefined ? value.__jsValue : value;
+  },
+  wrapJsResult(value, expectedClass) {
+    if (value == null) {
+      return null;
+    }
+    if (!expectedClass) {
+      return value;
+    }
+    switch (expectedClass) {
+      case "java_lang_String":
+        return createJavaString(String(value));
+      case "boolean":
+        return value ? 1 : 0;
+      case "byte":
+      case "short":
+      case "char":
+      case "int":
+        return value | 0;
+      case "float":
+      case "double":
+      case "long":
+        return Number(value);
+      default:
+        break;
+    }
+    if (typeof value === "string") {
+      return createJavaString(value);
+    }
+    if (value && value.__classDef) {
+      return value;
+    }
+    return this.wrapJsObject(value, expectedClass);
+  },
+  wrapJsObject(value, expectedClass) {
+    if (value == null || (typeof value !== "object" && typeof value !== "function")) {
+      return value;
+    }
+    let wrapper = jsObjectWrappers ? jsObjectWrappers.get(value) : null;
+    const resolvedClass = this.inferJsObjectClass(value, expectedClass);
+    const classDef = this.classes[resolvedClass] || this.classes[expectedClass] || null;
+    if (wrapper) {
+      wrapper.__class = resolvedClass;
+      this.enhanceJsWrapper(wrapper, resolvedClass);
+      if (expectedClass && expectedClass !== resolvedClass) {
+        this.enhanceJsWrapper(wrapper, expectedClass);
+      }
+      return wrapper;
+    }
+    wrapper = {
+      __class: resolvedClass,
+      __classDef: classDef,
+      __jsValue: value,
+      __id: this.nextIdentity++,
+      __monitor: this.createMonitor()
+    };
+    if (jsObjectWrappers) {
+      jsObjectWrappers.set(value, wrapper);
+    }
+    this.enhanceJsWrapper(wrapper, resolvedClass);
+    if (expectedClass && expectedClass !== resolvedClass) {
+      this.enhanceJsWrapper(wrapper, expectedClass);
+    }
+    return wrapper;
+  },
+  enhanceJsWrapper(wrapper, className) {
+    if (!wrapper || !className) {
+      return;
+    }
+    const sourceDef = this.classes[className];
+    if (!sourceDef) {
+      return;
+    }
+    let targetDef = wrapper.__classDef;
+    if (!targetDef) {
+      wrapper.__classDef = sourceDef;
+      return;
+    }
+    if (targetDef === sourceDef) {
+      return;
+    }
+    if (!targetDef.__cn1MergedJsWrapper) {
+      targetDef = {
+        name: wrapper.__class,
+        methods: Object.assign({}, targetDef.methods || {}),
+        assignableTo: Object.assign({}, targetDef.assignableTo || {}),
+        __cn1MergedJsWrapper: true
+      };
+      if (wrapper.__class) {
+        targetDef.assignableTo[wrapper.__class] = true;
+      }
+      wrapper.__classDef = targetDef;
+    }
+    Object.assign(targetDef.methods, sourceDef.methods || {});
+    Object.assign(targetDef.assignableTo, sourceDef.assignableTo || {});
+    targetDef.assignableTo[className] = true;
+  },
+  inferJsObjectClass(value, expectedClass) {
+    if (value && value.__classDef && value.__jsValue === undefined) {
+      return value.__class;
+    }
+    if (value === (global.window || global.self || global)) {
+      return "org_teavm_jso_browser_Window";
+    }
+    if (value && value.nodeType === 9) {
+      return "org_teavm_jso_dom_html_HTMLDocument";
+    }
+    if (value && value.canvas && typeof value.drawImage === "function" && typeof value.fillRect === "function") {
+      return "org_teavm_jso_canvas_CanvasRenderingContext2D";
+    }
+    if (value && value.data && value.width !== undefined && value.height !== undefined && typeof value.data.length === "number") {
+      return "org_teavm_jso_canvas_ImageData";
+    }
+    if (value && value.setProperty && value.removeProperty) {
+      return "org_teavm_jso_dom_css_CSSStyleDeclaration";
+    }
+    if (value && value.href != null && value.assign && value.replace) {
+      return expectedClass || "com_codename1_impl_html5_JSOImplementations_WindowLocation";
+    }
+    if (value && value.tagName) {
+      const tagName = String(value.tagName).toUpperCase();
+      switch (tagName) {
+        case "CANVAS":
+          return "org_teavm_jso_dom_html_HTMLCanvasElement";
+        case "IMG":
+          return "org_teavm_jso_dom_html_HTMLImageElement";
+        case "INPUT":
+          return "org_teavm_jso_dom_html_HTMLInputElement";
+        case "TEXTAREA":
+          return "org_teavm_jso_dom_html_HTMLTextAreaElement";
+        case "BODY":
+          return "org_teavm_jso_dom_html_HTMLBodyElement";
+        case "IFRAME":
+          return this.classes["com_codename1_impl_html5_JSOImplementations_HTMLIFrameElement"] ? "com_codename1_impl_html5_JSOImplementations_HTMLIFrameElement" : "org_teavm_jso_dom_html_HTMLElement";
+        default:
+          return expectedClass || "org_teavm_jso_dom_html_HTMLElement";
+      }
+    }
+    if (value && value.type !== undefined && value.target !== undefined) {
+      return expectedClass || "org_teavm_jso_dom_events_Event";
+    }
+    return expectedClass || "org_teavm_jso_JSObject";
+  },
   log(message) {
-    global.postMessage({ type: this.protocol.messages.LOG, message: message });
+    emitVmMessage({ type: this.protocol.messages.LOG, message: message });
   },
   finish(result) {
-    global.postMessage({ type: this.protocol.messages.RESULT, result: result });
+    emitVmMessage({ type: this.protocol.messages.RESULT, result: result });
   },
   fail(error) {
-    global.postMessage({ type: this.protocol.messages.ERROR, message: "" + error, stack: error && error.stack ? error.stack : null });
+    emitVmMessage({ type: this.protocol.messages.ERROR, message: "" + error, stack: error && error.stack ? error.stack : null });
   },
   invokeHostNative(symbol, args) {
     return { op: this.protocol.messages.HOST_CALL, id: this.nextHostCallId++, symbol: symbol, args: args || [] };
@@ -491,7 +806,7 @@ const jvm = {
     if (yielded.op === this.protocol.messages.HOST_CALL) {
       thread.waiting = { op: this.protocol.messages.HOST_CALL, id: yielded.id };
       this.pendingHostCalls[yielded.id] = { thread: thread };
-      global.postMessage({ type: this.protocol.messages.HOST_CALL, id: yielded.id, symbol: yielded.symbol, args: yielded.args || [] });
+      emitVmMessage({ type: this.protocol.messages.HOST_CALL, id: yielded.id, symbol: yielded.symbol, args: yielded.args || [] });
       return;
     }
     throw new Error("Unsupported yield op " + yielded.op);
@@ -638,7 +953,7 @@ const jvm = {
       return false;
     }
     if (message.type === this.protocol.messages.PROTOCOL_INFO) {
-      global.postMessage(this.describeProtocol());
+      emitVmMessage(this.describeProtocol());
       return true;
     }
     if (message.type === this.protocol.messages.HOST_CALLBACK) {
@@ -658,6 +973,12 @@ const jvm = {
 };
 
 global.jvm = jvm;
+function lowerFirst(value) {
+  if (!value) {
+    return value;
+  }
+  return value.charAt(0).toLowerCase() + value.substring(1);
+}
 function createJavaString(value) {
   value = value == null ? "" : String(value);
   return jvm.createStringLiteral(value);
@@ -934,6 +1255,149 @@ function bindNative(names, fn) {
   }
   return fn;
 }
+function getQueryParameter(name) {
+  const loc = (global.window || global).location;
+  if (!loc || !loc.search) {
+    return null;
+  }
+  const search = String(loc.search).charAt(0) === "?" ? String(loc.search).substring(1) : String(loc.search);
+  if (!search) {
+    return null;
+  }
+  const pairs = search.split("&");
+  for (let i = 0; i < pairs.length; i++) {
+    const part = pairs[i];
+    if (!part) {
+      continue;
+    }
+    const eq = part.indexOf("=");
+    const rawKey = eq >= 0 ? part.substring(0, eq) : part;
+    if (decodeURIComponent(rawKey.replace(/\+/g, " ")) !== name) {
+      continue;
+    }
+    const rawValue = eq >= 0 ? part.substring(eq + 1) : "";
+    return decodeURIComponent(rawValue.replace(/\+/g, " "));
+  }
+  return null;
+}
+function getUserAgentString() {
+  const nav = global.navigator;
+  const win = global.window || global;
+  return String((nav && (nav.userAgent || nav.vendor)) || win.opera || "");
+}
+function isPhoneUserAgent() {
+  const agent = getUserAgentString();
+  if (!agent) {
+    return false;
+  }
+  const mobileRegex = /(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino/i;
+  const prefixRegex = /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i;
+  return mobileRegex.test(agent) || prefixRegex.test(agent.substring(0, 4));
+}
+function isPhoneOrTabletUserAgent() {
+  const agent = getUserAgentString();
+  if (!agent) {
+    return false;
+  }
+  const mobileOrTabletRegex = /(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino|android|ipad|playbook|silk/i;
+  const prefixRegex = /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i;
+  return mobileOrTabletRegex.test(agent) || prefixRegex.test(agent.substring(0, 4));
+}
+bindNative(["cn1_org_teavm_jso_core_JSArray_create_R_org_teavm_jso_core_JSArray", "cn1_org_teavm_jso_core_JSArray_create___R_org_teavm_jso_core_JSArray"], function*() {
+  return [];
+});
+bindNative(["cn1_org_teavm_jso_core_JSArray_create_int_R_org_teavm_jso_core_JSArray", "cn1_org_teavm_jso_core_JSArray_create___int_R_org_teavm_jso_core_JSArray"], function*(length) {
+  const size = Math.max(0, length | 0);
+  const out = new Array(size);
+  for (let i = 0; i < size; i++) {
+    out[i] = null;
+  }
+  return out;
+});
+bindNative(["cn1_org_teavm_jso_browser_Window_current_R_org_teavm_jso_browser_Window", "cn1_org_teavm_jso_browser_Window_current___R_org_teavm_jso_browser_Window"], function*() {
+  const wrapper = jvm.wrapJsObject(global.window || global.self || global, "org_teavm_jso_browser_Window");
+  jvm.enhanceJsWrapper(wrapper, "com_codename1_impl_html5_JSOImplementations_WindowExt");
+  return wrapper;
+});
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName_java_lang_String_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName___java_lang_String_R_java_lang_String"], function*(name) {
+  const value = getQueryParameter(jvm.toNativeString(name));
+  return value == null ? null : jvm.createStringLiteral(value);
+});
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio__R_double", "cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio___R_double"], function*() {
+  const ratioOverride = getQueryParameter("pixelRatio");
+  const win = global.window || global;
+  if (ratioOverride != null && ratioOverride !== "") {
+    const parsed = Number(ratioOverride);
+    if (!isNaN(parsed) && parsed > 0) {
+      win.overridePixelRatio = parsed;
+    } else {
+      win.overridePixelRatio = 0;
+    }
+  } else if (typeof win.overridePixelRatio === "undefined") {
+    win.overridePixelRatio = 0;
+  }
+  if (typeof win.cn1ScaleCoord === "undefined") {
+    win.cn1ScaleCoord = function(x) {
+      return x === -1 ? -1 : x / (win.overridePixelRatio || win.devicePixelRatio || 1.0);
+    };
+  }
+  if (typeof win.cn1UnscaleCoord === "undefined") {
+    win.cn1UnscaleCoord = function(x) {
+      return x === -1 ? -1 : x * (win.overridePixelRatio || win.devicePixelRatio || 1.0);
+    };
+  }
+  return Number(win.overridePixelRatio || win.devicePixelRatio || 1.0);
+});
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize_R_int", "cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize___R_int"], function*() {
+  const value = getQueryParameter("baseFont");
+  if (value == null || value === "") {
+    return 0;
+  }
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? 0 : parsed | 0;
+});
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride_R_int", "cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride___R_int"], function*() {
+  const value = getQueryParameter("density");
+  if (value == null || value === "") {
+    return 0;
+  }
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? 0 : parsed | 0;
+});
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhone__R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isPhone___R_boolean"], function*() {
+  return isPhoneUserAgent() ? 1 : 0;
+});
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet__R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet___R_boolean"], function*() {
+  return isPhoneOrTabletUserAgent() ? 1 : 0;
+});
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage___R_java_lang_String"], function*() {
+  const nav = global.navigator || {};
+  const value = nav.language || nav.browserLanguage || "";
+  return jvm.createStringLiteral(String(value));
+});
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag___java_lang_String_R_boolean"], function*(name) {
+  const win = global.window || global;
+  const flags = win.cn1_debug_flags;
+  if (!flags) {
+    return 0;
+  }
+  return flags[jvm.toNativeString(name)] ? 1 : 0;
+});
+bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType___R_java_lang_String"], function*() {
+  const win = global.window || global;
+  const normalizeWheel = win.cn1NormalizeWheel;
+  let value = "wheel";
+  if (normalizeWheel && typeof normalizeWheel.getEventType === "function") {
+    try {
+      value = normalizeWheel.getEventType() || value;
+    } catch (e) {
+    }
+  }
+  return jvm.createStringLiteral(String(value));
+});
+bindNative(["cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled_R_boolean", "cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled___R_boolean"], function*() {
+  return 0;
+});
 bindNative(["cn1_java_lang_Object_wait_long_int", "cn1_java_lang_Object_wait___long_int"], function*(__cn1ThisObject, timeout, nanos) {
   const resumed = yield jvm.waitOn(jvm.currentThread, __cn1ThisObject, timeout || 0);
   if (resumed && resumed.interrupted) {
@@ -1029,9 +1493,21 @@ bindNative(["cn1_java_lang_Double_doubleToLongBits_double_R_long"], function*(v)
 bindNative(["cn1_java_lang_Double_longBitsToDouble_long_R_double"], function*(bits) { return doubleFromLongBits(bits); });
 bindNative(["cn1_java_lang_Double_toStringImpl_double_boolean_R_java_lang_String"], function*(v) { return createJavaString(String(v)); });
 bindNative(["cn1_java_lang_StringBuilder_append_char_R_java_lang_StringBuilder"], function*(__cn1ThisObject, ch) { return sbAppendNativeString(__cn1ThisObject, String.fromCharCode(ch | 0)); });
+bindNative(["cn1_java_lang_StringBuilder_append_int_R_java_lang_StringBuilder"], function*(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, String(value | 0)); });
+bindNative(["cn1_java_lang_StringBuilder_append_long_R_java_lang_StringBuilder"], function*(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, String(Math.trunc(value))); });
 bindNative(["cn1_java_lang_StringBuilder_append_java_lang_Object_R_java_lang_StringBuilder"], function*(__cn1ThisObject, obj) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(obj)); });
 bindNative(["cn1_java_lang_StringBuilder_append_java_lang_String_R_java_lang_StringBuilder"], function*(__cn1ThisObject, str) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(str)); });
 bindNative(["cn1_java_lang_StringBuilder_charAt_int_R_char"], function*(__cn1ThisObject, index) { return (__cn1ThisObject[CN1_SB_VALUE][index | 0] || 0) | 0; });
+bindNative(["cn1_java_lang_StringBuilder_length_R_int"], function*(__cn1ThisObject) { return __cn1ThisObject[CN1_SB_COUNT] | 0; });
+bindNative(["cn1_java_lang_StringBuilder_toString_R_java_lang_String"], function*(__cn1ThisObject) {
+  const count = __cn1ThisObject[CN1_SB_COUNT] | 0;
+  const data = __cn1ThisObject[CN1_SB_VALUE];
+  let out = "";
+  for (let i = 0; i < count; i++) {
+    out += String.fromCharCode(data[i] | 0);
+  }
+  return createJavaString(out);
+});
 bindNative(["cn1_java_lang_StringBuilder_getChars_int_int_char_1ARRAY_int"], function*(__cn1ThisObject, start, end, dst, dstStart) {
   const value = __cn1ThisObject[CN1_SB_VALUE];
   for (let i = start | 0; i < (end | 0); i++) {

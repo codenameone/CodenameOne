@@ -90,6 +90,7 @@ public class ByteCodeClass {
     
     private boolean marked;
     private static ByteCodeClass mainClass;
+    private static String preferredMainClass;
     private boolean finalClass;
     private boolean isEnum;
     private static Set<String> writableFields = new HashSet<String>();
@@ -98,6 +99,7 @@ public class ByteCodeClass {
         arrayTypes.clear();
         writableFields.clear();
         mainClass = null;
+        preferredMainClass = null;
         saveUnitTests = false;
     }
     
@@ -151,6 +153,10 @@ public class ByteCodeClass {
     static ByteCodeClass getMainClass() {
 		return mainClass;
     }
+
+    static void setPreferredMainClass(String preferredMainClassName) {
+        preferredMainClass = preferredMainClassName;
+    }
     
     static void setSaveUnitTests(boolean save) {
         saveUnitTests = save;
@@ -158,9 +164,15 @@ public class ByteCodeClass {
     
     public void addMethod(BytecodeMethod m) {
         if(m.isMain()) {
+            if (clsName.equals(preferredMainClass)) {
+                mainClass = this;
+                return;
+            }
             if (mainClass == null) {
                 mainClass = this;
-            } else {
+                return;
+            }
+            if (preferredMainClass == null) {
                 throw new RuntimeException("Multiple main classes: "+mainClass.clsName+" and "+this.clsName);
             }
         }

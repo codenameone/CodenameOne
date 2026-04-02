@@ -227,6 +227,81 @@ class JavascriptTargetIntegrationTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void syntheticAccessorAnonymousRunnableFallsBackWithoutCrashing(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-captured-runnable-sources");
+        Path classesDir = Files.createTempDirectory("js-captured-runnable-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-captured-runnable-classes");
+
+        Files.write(sourceDir.resolve("JsCapturedRunnable.java"), loadFixture("JsCapturedRunnable.java").getBytes(StandardCharsets.UTF_8));
+
+        compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-captured-runnable-output");
+        runJavascriptTranslator(classesDir, outputDir, "JsCapturedRunnable");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsCapturedRunnable-js");
+        String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
+
+        assertTrue(translatedApp.contains("JsCapturedRunnable"),
+                "Translator should emit a bundle for the synthetic-accessor runnable fixture");
+        assertTrue(translatedApp.contains("jvm.setMain(\"JsCapturedRunnable\""),
+                "Translator should complete bundle generation for the synthetic-accessor runnable fixture");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void auxiliaryMainMethodsDoNotOverrideBundleEntrypoint(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-aux-main-sources");
+        Path classesDir = Files.createTempDirectory("js-aux-main-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-aux-main-classes");
+
+        Files.write(sourceDir.resolve("JsAuxiliaryMainApp.java"), loadFixture("JsAuxiliaryMainApp.java").getBytes(StandardCharsets.UTF_8));
+
+        compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-aux-main-output");
+        runJavascriptTranslator(classesDir, outputDir, "JsAuxiliaryMainApp");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsAuxiliaryMainApp-js");
+        String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
+
+        assertTrue(translatedApp.contains("jvm.setMain(\"JsAuxiliaryMainApp\""),
+                "Translator should keep the first application main as the bundle entrypoint");
+        assertTrue(translatedApp.contains("HelperMain"),
+                "Translator should still include auxiliary classes that happen to declare a main()");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void lambdaConstructorShapeTranslatesWithoutBasicVarOpcodeFailure(CompilerHelper.CompilerConfig config) throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("js-lambda-capture-sources");
+        Path classesDir = Files.createTempDirectory("js-lambda-capture-classes");
+        Path javaApiDir = Files.createTempDirectory("java-api-lambda-capture-classes");
+
+        Files.write(sourceDir.resolve("JsLambdaCapture.java"), loadFixture("JsLambdaCapture.java").getBytes(StandardCharsets.UTF_8));
+
+        compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
+
+        Path outputDir = Files.createTempDirectory("js-lambda-capture-output");
+        runJavascriptTranslator(classesDir, outputDir, "JsLambdaCapture");
+
+        Path distDir = outputDir.resolve("dist").resolve("JsLambdaCapture-js");
+        String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
+
+        assertTrue(translatedApp.contains("jvm.setMain(\"JsLambdaCapture\""),
+                "Translator should complete bundle generation for the lambda-capture fixture");
+        assertTrue(translatedApp.contains("JsLambdaCapture"),
+                "Translated output should include the lambda-capture fixture classes");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
     void repeatedStaticAccessesOnlyEmitOneClassInitCheckInStraightLineMode(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 

@@ -397,65 +397,72 @@ final class JavascriptMethodGenerator {
         if (!isStraightLineEligible(method, instructions)) {
             return false;
         }
-        StringBuilder setup = new StringBuilder();
-        StringBuilder instructionBody = new StringBuilder();
-        StringBuilder body = new StringBuilder();
-        StraightLineContext ctx = new StraightLineContext(method.getMaxLocals(), method.getMaxStack());
-        if (isWrappedStaticMethod(method)) {
-            ctx.initializedClasses.add(cls.getClsName());
-        }
-        if (!method.isStatic()) {
-            setup.append("  let l0 = __cn1ThisObject;\n");
-            ctx.localsInitialized[0] = true;
-            ctx.localsUsed[0] = true;
-        }
-        List<ByteCodeMethodArg> arguments = method.getArguments();
-        int localIndex = method.isStatic() ? 0 : 1;
-        for (int i = 0; i < arguments.size(); i++) {
-            setup.append("  let l").append(localIndex).append(" = __cn1Arg").append(i + 1).append(";\n");
-            ctx.localsInitialized[localIndex] = true;
-            ctx.localsUsed[localIndex] = true;
-            localIndex++;
-            if (arguments.get(i).isDoubleOrLong()) {
-                localIndex++;
+        try {
+            StringBuilder setup = new StringBuilder();
+            StringBuilder instructionBody = new StringBuilder();
+            StringBuilder body = new StringBuilder();
+            StraightLineContext ctx = new StraightLineContext(method.getMaxLocals(), method.getMaxStack());
+            if (isWrappedStaticMethod(method)) {
+                ctx.initializedClasses.add(cls.getClsName());
             }
-        }
-        for (int i = 0; i < instructions.size(); i++) {
-            Instruction instruction = instructions.get(i);
-            if (!appendStraightLineInstruction(instructionBody, method, instruction, ctx)) {
+            if (!method.isStatic()) {
+                setup.append("  let l0 = __cn1ThisObject;\n");
+                ctx.localsInitialized[0] = true;
+                ctx.localsUsed[0] = true;
+            }
+            List<ByteCodeMethodArg> arguments = method.getArguments();
+            int localIndex = method.isStatic() ? 0 : 1;
+            for (int i = 0; i < arguments.size(); i++) {
+                setup.append("  let l").append(localIndex).append(" = __cn1Arg").append(i + 1).append(";\n");
+                ctx.localsInitialized[localIndex] = true;
+                ctx.localsUsed[localIndex] = true;
+                localIndex++;
+                if (arguments.get(i).isDoubleOrLong()) {
+                    localIndex++;
+                }
+            }
+            for (int i = 0; i < instructions.size(); i++) {
+                Instruction instruction = instructions.get(i);
+                if (!appendStraightLineInstruction(instructionBody, method, instruction, ctx)) {
+                    return false;
+                }
+            }
+            body.append(setup);
+            for (int i = 0; i < method.getMaxLocals(); i++) {
+                if (!ctx.localsInitialized[i] && ctx.localsUsed[i]) {
+                    body.append("  let l").append(i).append(" = null;\n");
+                }
+            }
+            for (int i = 0; i < ctx.getMaxObservedStack(); i++) {
+                body.append("  let s").append(i).append(" = null;\n");
+            }
+            if (method.isSynchronizedMethod()) {
+                body.append("  const __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
+                body.append("  jvm.monitorEnter(jvm.currentThread, __cn1Monitor);\n");
+                body.append("  try {\n");
+            }
+            body.append(instructionBody);
+            if (method.isSynchronizedMethod()) {
+                body.append("  } finally {\n");
+                body.append("    jvm.monitorExit(jvm.currentThread, __cn1Monitor);\n");
+                body.append("  }\n");
+            }
+            out.append(body);
+            out.append("}\n");
+            if ("__CLINIT__".equals(method.getMethodName())) {
+                out.append("jvm.classes[\"").append(cls.getClsName()).append("\"].clinit = ").append(jsMethodName).append(";\n");
+            }
+            if (!method.isStatic() && !method.isConstructor()) {
+                out.append("jvm.addVirtualMethod(\"").append(cls.getClsName()).append("\", \"")
+                        .append(jsMethodName).append("\", ").append(jsMethodName).append(");\n");
+            }
+            return true;
+        } catch (IllegalStateException ex) {
+            if (ex.getMessage() != null && ex.getMessage().startsWith("Straight-line JS lowering")) {
                 return false;
             }
+            throw ex;
         }
-        body.append(setup);
-        for (int i = 0; i < method.getMaxLocals(); i++) {
-            if (!ctx.localsInitialized[i] && ctx.localsUsed[i]) {
-                body.append("  let l").append(i).append(" = null;\n");
-            }
-        }
-        for (int i = 0; i < ctx.getMaxObservedStack(); i++) {
-            body.append("  let s").append(i).append(" = null;\n");
-        }
-        if (method.isSynchronizedMethod()) {
-            body.append("  const __cn1Monitor = ").append(method.isStatic() ? "jvm.getClassObject(\"" + cls.getClsName() + "\")" : "__cn1ThisObject").append(";\n");
-            body.append("  jvm.monitorEnter(jvm.currentThread, __cn1Monitor);\n");
-            body.append("  try {\n");
-        }
-        body.append(instructionBody);
-        if (method.isSynchronizedMethod()) {
-            body.append("  } finally {\n");
-            body.append("    jvm.monitorExit(jvm.currentThread, __cn1Monitor);\n");
-            body.append("  }\n");
-        }
-        out.append(body);
-        out.append("}\n");
-        if ("__CLINIT__".equals(method.getMethodName())) {
-            out.append("jvm.classes[\"").append(cls.getClsName()).append("\"].clinit = ").append(jsMethodName).append(";\n");
-        }
-        if (!method.isStatic() && !method.isConstructor()) {
-            out.append("jvm.addVirtualMethod(\"").append(cls.getClsName()).append("\", \"")
-                    .append(jsMethodName).append("\", ").append(jsMethodName).append(");\n");
-        }
-        return true;
     }
 
     private static boolean isStraightLineEligible(BytecodeMethod method, List<Instruction> instructions) {
@@ -550,6 +557,22 @@ final class JavascriptMethodGenerator {
             case Opcodes.BIPUSH:
             case Opcodes.SIPUSH:
                 out.append("  ").append(ctx.push(Integer.toString(instruction.getValue()))).append(";\n");
+                return true;
+            case Opcodes.ILOAD:
+            case Opcodes.LLOAD:
+            case Opcodes.FLOAD:
+            case Opcodes.DLOAD:
+            case Opcodes.ALOAD:
+                ctx.localsUsed[instruction.getValue()] = true;
+                out.append("  ").append(ctx.push("l" + instruction.getValue())).append(";\n");
+                return true;
+            case Opcodes.ISTORE:
+            case Opcodes.LSTORE:
+            case Opcodes.FSTORE:
+            case Opcodes.DSTORE:
+            case Opcodes.ASTORE:
+                ctx.localsUsed[instruction.getValue()] = true;
+                out.append("  l").append(instruction.getValue()).append(" = ").append(ctx.pop()).append(";\n");
                 return true;
             case Opcodes.POP:
                 ctx.pop();
@@ -1308,6 +1331,20 @@ final class JavascriptMethodGenerator {
             case Opcodes.BIPUSH:
             case Opcodes.SIPUSH:
                 out.append("        stack.push(").append(instruction.getValue()).append("); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.ILOAD:
+            case Opcodes.LLOAD:
+            case Opcodes.FLOAD:
+            case Opcodes.DLOAD:
+            case Opcodes.ALOAD:
+                out.append("        stack.push(locals[").append(instruction.getValue()).append("]); pc = ").append(index + 1).append("; break;\n");
+                return;
+            case Opcodes.ISTORE:
+            case Opcodes.LSTORE:
+            case Opcodes.FSTORE:
+            case Opcodes.DSTORE:
+            case Opcodes.ASTORE:
+                out.append("        locals[").append(instruction.getValue()).append("] = stack.pop(); pc = ").append(index + 1).append("; break;\n");
                 return;
             case Opcodes.POP:
                 out.append("        stack.pop(); pc = ").append(index + 1).append("; break;\n");
