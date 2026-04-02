@@ -93,27 +93,17 @@ jobs:
       - name: Setup workspace
         run: xvfb-run ./scripts/setup-workspace.sh -q -DskipTests
 
-      - name: Restore Java 17 environment for JavaScript build
-        run: |
-          # setup-workspace.sh sets JAVA_HOME to Java 8 in its env.sh for its own build needs.
-          # For the JavaScript port build (including CSS compilation), we need Java 17.
-          # The env.sh file at /tmp/codenameone-tools/tools/env.sh contains JAVA17_HOME.
-          ENV_FILE="/tmp/codenameone-tools/tools/env.sh"
-          if [ -f "$ENV_FILE" ]; then
-            echo "Sourcing workspace environment from $ENV_FILE"
-            source "$ENV_FILE"
-            echo "Restoring JAVA_HOME to Java 17 for CSS compilation"
-            export JAVA_HOME="$JAVA17_HOME"
-            echo "JAVA_HOME=$JAVA_HOME"
-            echo "PATH=$PATH"
-          fi
-          # Make JAVA_HOME available to subsequent steps
-          echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
-          echo "$JAVA_HOME/bin" >> "$GITHUB_PATH"
-
       - name: Build HelloCodenameOne JavaScript port bundle
         run: |
-          SKIP_PARPARVM_BUILD=1 ./scripts/build-javascript-port-hellocodenameone.sh "${GITHUB_WORKSPACE}/artifacts/javascript-ui-tests/hellocodenameone-javascript-port.zip"
+          # Use JAVA_HOME set by actions/setup-java for Java 17
+          # (JAVA_HOME_17_X64 is always available after setup-java@v4)
+          export JAVA_HOME="${JAVA_HOME_17_X64}"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          echo "Using JAVA_HOME=$JAVA_HOME"
+          java -version
+
+          # xvfb-run is required for CSS compilation which uses java.awt
+          SKIP_PARPARVM_BUILD=1 xvfb-run ./scripts/build-javascript-port-hellocodenameone.sh "${GITHUB_WORKSPACE}/artifacts/javascript-ui-tests/hellocodenameone-javascript-port.zip"
 
       - name: Locate JavaScript bundle
         id: locate_bundle
