@@ -4,16 +4,19 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.UIManager;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
+import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -288,12 +291,69 @@ class InteractionDialogTest extends UITestBase {
 
     private static class TrackingBorder extends Border {
         private Rectangle lastTrackRect;
+        private boolean imageTileCalled;
 
         @Override
         public void setTrackComponent(Rectangle trackComponent) {
             lastTrackRect = trackComponent;
             super.setTrackComponent(trackComponent);
         }
+
+        @Override
+        public void setImageBorderSpecialTile(Image tileTop, Image tileBottom, Image tileLeft, Image tileRight, Rectangle trackComponent) {
+            imageTileCalled = true;
+            super.setImageBorderSpecialTile(tileTop, tileBottom, tileLeft, tileRight, trackComponent);
+        }
+    }
+
+    @Test
+    void showPopupDialogUsesTrackFallbackWhenArrowImagesMissing() {
+        Form form = new Form(new BorderLayout());
+        implementation.setCurrentForm(form);
+
+        String uiid = "UnitTestPopupNoImages";
+        Hashtable<String, Object> themeProps = new Hashtable<>();
+        themeProps.put(uiid + "ArrowBool", "true");
+        UIManager.getInstance().addThemeProps(themeProps);
+
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setUIID(uiid);
+        dialog.setAnimateShow(false);
+        TrackingBorder border = new TrackingBorder();
+        dialog.getAllStyles().setBorder(border);
+        dialog.add(new Label("Popup"));
+        dialog.showPopupDialog(new Rectangle(120, 220, 60, 40), true);
+
+        assertNotNull(border.lastTrackRect, "Expected tracked rectangle fallback when arrow images are missing");
+        assertFalse(border.imageTileCalled, "Should not use image-border tiles when no arrow images are provided");
+        dialog.dispose();
+    }
+
+    @Test
+    void showPopupDialogUsesImageTilesWhenArrowImagesProvided() {
+        Form form = new Form(new BorderLayout());
+        implementation.setCurrentForm(form);
+
+        String uiid = "UnitTestPopupWithImages";
+        Hashtable<String, Object> themeProps = new Hashtable<>();
+        themeProps.put(uiid + "ArrowBool", "true");
+        Image img = Image.createImage(4, 4);
+        themeProps.put(uiid + "ArrowTopImage", img);
+        themeProps.put(uiid + "ArrowBottomImage", img);
+        themeProps.put(uiid + "ArrowLeftImage", img);
+        themeProps.put(uiid + "ArrowRightImage", img);
+        UIManager.getInstance().addThemeProps(themeProps);
+
+        InteractionDialog dialog = new InteractionDialog();
+        dialog.setUIID(uiid);
+        dialog.setAnimateShow(false);
+        TrackingBorder border = new TrackingBorder();
+        dialog.getAllStyles().setBorder(border);
+        dialog.add(new Label("Popup"));
+        dialog.showPopupDialog(new Rectangle(120, 220, 60, 40), true);
+
+        assertTrue(border.imageTileCalled, "Expected image-border tile path when arrow images are provided");
+        dialog.dispose();
     }
 
     private <T> T getPrivateField(Object target, String name, Class<T> type) throws Exception {
