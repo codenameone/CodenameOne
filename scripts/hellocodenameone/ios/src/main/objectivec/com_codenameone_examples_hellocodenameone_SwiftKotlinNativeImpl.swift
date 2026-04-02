@@ -1,7 +1,8 @@
 import Foundation
 
-@objc(com_codenameone_examples_hellocodenameone_SwiftKotlinNativeImpl)
-class com_codenameone_examples_hellocodenameone_SwiftKotlinNativeImpl: NSObject {
+@objc(CN1SwiftKotlinNativeBridge)
+@objcMembers
+public class CN1SwiftKotlinNativeBridge: NSObject {
     @objc func implementationLanguage() -> String {
         return "swift"
     }
