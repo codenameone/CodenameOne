@@ -738,12 +738,12 @@ public class InteractionDialog extends Container implements AbstractDialog {
         if (arrowEnabled && hasArrowImages) {
             Border border = contentPaneStyle.getBorder();
             if (border != null) {
-                border.setImageBorderSpecialTile(t, b, l, r, rect);
+                border.setImageBorderSpecialTile(t, b, l, r, origRect);
             }
         } else {
             Border border = contentPaneStyle.getBorder();
             if (border != null) {
-                border.setTrackComponent(rect);
+                border.setTrackComponent(origRect);
             }
         }
         calcPreferredSize();
