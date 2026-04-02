@@ -736,13 +736,14 @@ public class InteractionDialog extends Container implements AbstractDialog {
         Image l = manager.getThemeImageConstant(getUIID() + "ArrowLeftImage");
         Image r = manager.getThemeImageConstant(getUIID() + "ArrowRightImage");
         boolean hasArrowImages = t != null || b != null || l != null || r != null;
-        if (arrowEnabled && hasArrowImages) {
-            Border border = contentPaneStyle.getBorder();
+        Border border = contentPaneStyle.getBorder();
+        if (border instanceof RoundRectBorder) {
+            border.setTrackComponent(origRect);
+        } else if (arrowEnabled && hasArrowImages) {
             if (border != null) {
                 border.setImageBorderSpecialTile(t, b, l, r, origRect);
             }
         } else {
-            Border border = contentPaneStyle.getBorder();
             if (border != null) {
                 border.setTrackComponent(origRect);
             }
