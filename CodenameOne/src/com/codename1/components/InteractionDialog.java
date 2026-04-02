@@ -721,7 +721,13 @@ public class InteractionDialog extends Container implements AbstractDialog {
         // allows a text area to recalculate its preferred size if embedded within a dialog
         revalidate();
 
-        Style contentPaneStyle = getDialogStyle();
+        // Popup border can be defined either on the dialog style (PopupDialog) or the content pane style
+        // (PopupContentPane), depending on theme/platform. Prefer dialog style for arrows, and fall back
+        // to dialog content style if needed.
+        Style contentPaneStyle = getStyle();
+        if (contentPaneStyle.getBorder() == null) {
+            contentPaneStyle = getDialogStyle();
+        }
 
         boolean arrowEnabled = manager.isThemeConstant(getUIID() + "ArrowBool", false);
         Image t = manager.getThemeImageConstant(getUIID() + "ArrowTopImage");
