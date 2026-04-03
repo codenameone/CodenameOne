@@ -40,12 +40,12 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSFunctor;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.browser.Window;
-import org.teavm.jso.dom.events.Event;
-import org.teavm.jso.typedarrays.Float32Array;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSFunctor;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.browser.Window;
+import com.codename1.html5.js.dom.Event;
+import com.codename1.html5.js.typedarrays.Float32Array;
 
 /**
  *
@@ -1079,7 +1079,7 @@ public class HTML5MediaRecorder extends AbstractMedia {
     
     @JSFunctor
     public interface CN1AudioProcessor extends JSObject {
-        public void onAudioProcess(int sampleRate, int numChannels, org.teavm.jso.typedarrays.Float32Array data);
+        public void onAudioProcess(int sampleRate, int numChannels, com.codename1.html5.js.typedarrays.Float32Array data);
     }
     
     

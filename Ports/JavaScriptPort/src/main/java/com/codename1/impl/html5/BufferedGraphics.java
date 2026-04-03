@@ -40,9 +40,9 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.dom.html.HTMLCanvasElement;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.dom.HTMLCanvasElement;
 
 /**
  *

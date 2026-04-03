@@ -16,11 +16,11 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.browser.Window;
-import org.teavm.jso.dom.events.Event;
-import org.teavm.jso.dom.events.EventListener;
-import org.teavm.jso.dom.html.HTMLScriptElement;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.browser.Window;
+import com.codename1.html5.js.dom.Event;
+import com.codename1.html5.js.dom.EventListener;
+import com.codename1.html5.js.dom.HTMLScriptElement;
 
 /**
  *

@@ -20,8 +20,8 @@ import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.spinner.SpinnerAccessor;
 import com.codename1.ui.util.UITimer;
-import org.teavm.jso.dom.events.Event;
-import org.teavm.jso.dom.events.EventListener;
+import com.codename1.html5.js.dom.Event;
+import com.codename1.html5.js.dom.EventListener;
 
 
 /**

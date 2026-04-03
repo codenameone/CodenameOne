@@ -11,9 +11,9 @@ import static com.codename1.impl.html5.HTML5Implementation._log;
 import com.codename1.impl.html5.JSOImplementations.HTMLAudioElement;
 import com.codename1.impl.html5.JSOImplementations.HTMLMediaElement;
 import java.util.ArrayList;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.browser.Window;
-import org.teavm.jso.dom.html.HTMLElement;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.browser.Window;
+import com.codename1.html5.js.dom.HTMLElement;
 
 /**
  *

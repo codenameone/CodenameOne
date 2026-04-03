@@ -8,12 +8,12 @@
 package com.codename1.teavm.geom;
 
 import java.util.Objects;
-import org.teavm.jso.canvas.CanvasRenderingContext2D;
+import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
-import org.teavm.jso.JSBody;
+import com.codename1.html5.js.JSBody;
 
-import org.teavm.jso.JSObject;
-import org.teavm.jso.typedarrays.Float64Array;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.typedarrays.Float64Array;
 
 /**
  *

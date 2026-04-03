@@ -13,9 +13,9 @@ import com.codename1.ui.Display;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSFunctor;
-import org.teavm.jso.JSObject;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSFunctor;
+import com.codename1.html5.js.JSObject;
 
 /**
  *

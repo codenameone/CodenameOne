@@ -10,10 +10,9 @@ package com.codename1.impl.html5.graphics;
 import com.codename1.impl.html5.HTML5Graphics;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.GeneralPath;
-import org.teavm.interop.Sync;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.canvas.CanvasRenderingContext2D;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
 /**
  *

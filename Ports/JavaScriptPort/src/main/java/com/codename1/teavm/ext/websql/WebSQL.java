@@ -15,12 +15,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSFunctor;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.JSProperty;
-import org.teavm.jso.core.JSArray;
-import org.teavm.jso.core.JSString;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSFunctor;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.JSProperty;
+import com.codename1.html5.js.core.JSArray;
+import com.codename1.html5.js.core.JSString;
 
 /**
  *

@@ -13,13 +13,13 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.plaf.Style;
-import org.teavm.jso.dom.html.HTMLElement;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.JSProperty;
-import org.teavm.jso.JSMethod;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.dom.html.HTMLInputElement;
-import org.teavm.jso.dom.html.HTMLDocument;
+import com.codename1.html5.js.dom.HTMLElement;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.JSProperty;
+import com.codename1.html5.js.JSMethod;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.dom.HTMLInputElement;
+import com.codename1.html5.js.dom.HTMLDocument;
 
 
 

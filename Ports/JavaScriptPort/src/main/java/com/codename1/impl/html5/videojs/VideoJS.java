@@ -16,14 +16,14 @@ import com.codename1.ui.CN;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.JSProperty;
-import org.teavm.jso.browser.TimerHandler;
-import org.teavm.jso.browser.Window;
-import org.teavm.jso.dom.events.Event;
-import org.teavm.jso.dom.events.EventListener;
-import org.teavm.jso.dom.html.HTMLVideoElement;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.JSProperty;
+import com.codename1.html5.js.browser.TimerHandler;
+import com.codename1.html5.js.browser.Window;
+import com.codename1.html5.js.dom.Event;
+import com.codename1.html5.js.dom.EventListener;
+import com.codename1.html5.js.dom.HTMLVideoElement;
 
 /**
  *
@@ -84,11 +84,11 @@ public class VideoJS {
             videoElement.setAttribute("muted", "");
             videoElement.setAttribute("playsinline", "");
         }
-        fitVideoTimeoutHandle = Window.current().setInterval(new TimerHandler() {
+        fitVideoTimeoutHandle = Window.setInterval(new TimerHandler() {
             @Override
             public void onTimer() {
                 if (videoElement == null || videoElement.getParentNode() == null) {
-                    Window.current().clearInterval(fitVideoTimeoutHandle);
+                    Window.clearInterval(fitVideoTimeoutHandle);
                     return;
                 }
                 fitVideo(videoElement);

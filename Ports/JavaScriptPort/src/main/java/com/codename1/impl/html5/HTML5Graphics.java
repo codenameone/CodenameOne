@@ -42,11 +42,11 @@ import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
 
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.canvas.CanvasRenderingContext2D;
-import org.teavm.jso.canvas.ImageData;
-import org.teavm.jso.dom.html.HTMLCanvasElement;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
+import com.codename1.html5.js.canvas.ImageData;
+import com.codename1.html5.js.dom.HTMLCanvasElement;
 
 /**
  * #######################################################################
@@ -546,7 +546,7 @@ public class HTML5Graphics {
 
             @Override
             public int measureWidth(String text) {
-                return context.measureText(text).getWidth();
+                return (int)context.measureText(text).getWidth();
             }
         }, new JavaScriptTextMetricsAdapter.FontCssSupplier<NativeFont>() {
             @Override
@@ -580,7 +580,7 @@ public class HTML5Graphics {
 
             @Override
             public int measureWidth(String text) {
-                return context.measureText(text).getWidth();
+                return (int)context.measureText(text).getWidth();
             }
         }, new JavaScriptTextMetricsAdapter.FontCssSupplier<NativeFont>() {
             @Override

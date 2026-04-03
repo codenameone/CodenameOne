@@ -12,10 +12,9 @@ import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
-import org.teavm.interop.Sync;
-import org.teavm.jso.canvas.CanvasRenderingContext2D;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSObject;
+import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSObject;
 
 /**
  *

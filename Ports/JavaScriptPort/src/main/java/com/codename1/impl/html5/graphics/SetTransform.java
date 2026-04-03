@@ -8,9 +8,9 @@
 package com.codename1.impl.html5.graphics;
 
 import com.codename1.teavm.geom.JSAffineTransform;
-import org.teavm.jso.canvas.CanvasRenderingContext2D;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSObject;
+import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSObject;
 
 /**
  *

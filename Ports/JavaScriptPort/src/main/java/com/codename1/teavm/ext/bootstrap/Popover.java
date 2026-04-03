@@ -9,9 +9,9 @@ package com.codename1.teavm.ext.bootstrap;
 
 import com.codename1.teavm.ext.jquery.JQuery;
 
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.dom.html.HTMLElement;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.dom.HTMLElement;
 
 /**
  *

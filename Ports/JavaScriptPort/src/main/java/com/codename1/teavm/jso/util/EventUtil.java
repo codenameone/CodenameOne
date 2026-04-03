@@ -8,11 +8,11 @@
 package com.codename1.teavm.jso.util;
 
 
-import org.teavm.jso.JSBody;
+import com.codename1.html5.js.JSBody;
 
-import org.teavm.jso.JSObject;
-import org.teavm.jso.core.JSFunction;
-import org.teavm.jso.dom.events.EventListener;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.core.JSFunction;
+import com.codename1.html5.js.dom.EventListener;
 
 /**
  *

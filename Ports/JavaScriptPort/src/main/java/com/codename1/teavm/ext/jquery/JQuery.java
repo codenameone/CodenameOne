@@ -9,10 +9,10 @@ package com.codename1.teavm.ext.jquery;
 
 import java.util.Map;
 
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSFunctor;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.core.JSBoolean;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSFunctor;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.core.JSBoolean;
 
 /**
  *

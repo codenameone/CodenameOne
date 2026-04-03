@@ -9,8 +9,8 @@ package com.codename1.impl.html5.tools;
 
 import java.util.HashSet;
 import java.util.Set;
-import org.teavm.jso.browser.Window;
-import org.teavm.jso.dom.html.HTMLLinkElement;
+import com.codename1.html5.js.browser.Window;
+import com.codename1.html5.js.dom.HTMLLinkElement;
 
 /**
  *

@@ -113,39 +113,37 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
-import org.teavm.classlib.impl.tz.DateTimeZone;
-import org.teavm.classlib.impl.tz.DateTimeZoneProvider;
-import org.teavm.interop.SuppressSyncErrors;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSFunctor;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.JSProperty;
-import org.teavm.jso.ajax.ReadyStateChangeHandler;
-import org.teavm.jso.ajax.XMLHttpRequest;
-import org.teavm.jso.browser.TimerHandler;
-import org.teavm.jso.browser.Window;
-import org.teavm.jso.canvas.CanvasPattern;
-import org.teavm.jso.canvas.CanvasRenderingContext2D;
-import org.teavm.jso.canvas.ImageData;
-import org.teavm.jso.core.JSArray;
-import org.teavm.jso.core.JSFunction;
-import org.teavm.jso.core.JSNumber;
-import org.teavm.jso.core.JSString;
-import org.teavm.jso.dom.css.CSSStyleDeclaration;
-import org.teavm.jso.dom.events.Event;
-import org.teavm.jso.dom.events.EventListener;
-import org.teavm.jso.dom.events.MouseEvent;
-import org.teavm.jso.dom.html.HTMLButtonElement;
-import org.teavm.jso.dom.html.HTMLCanvasElement;
-import org.teavm.jso.dom.html.HTMLDocument;
-import org.teavm.jso.dom.html.HTMLElement;
-import org.teavm.jso.dom.html.HTMLImageElement;
-import org.teavm.jso.dom.html.HTMLInputElement;
-import org.teavm.jso.dom.html.HTMLTextAreaElement;
-import org.teavm.jso.typedarrays.ArrayBuffer;
-import org.teavm.jso.typedarrays.Float64Array;
-import org.teavm.jso.typedarrays.Uint8Array;
-import org.teavm.jso.typedarrays.Uint8ClampedArray;
+import com.codename1.html5.interop.SuppressSyncErrors;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSFunctor;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.JSProperty;
+import com.codename1.html5.js.ajax.ReadyStateChangeHandler;
+import com.codename1.html5.js.ajax.XMLHttpRequest;
+import com.codename1.html5.js.browser.TimerHandler;
+import com.codename1.html5.js.browser.Window;
+import com.codename1.html5.js.canvas.CanvasPattern;
+import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
+import com.codename1.html5.js.canvas.ImageData;
+import com.codename1.html5.js.core.JSArray;
+import com.codename1.html5.js.core.JSFunction;
+import com.codename1.html5.js.core.JSNumber;
+import com.codename1.html5.js.core.JSString;
+import com.codename1.html5.js.dom.CSSStyleDeclaration;
+import com.codename1.html5.js.dom.Event;
+import com.codename1.html5.js.dom.EventListener;
+import com.codename1.html5.js.dom.MouseEvent;
+import com.codename1.html5.js.dom.HTMLButtonElement;
+import com.codename1.html5.js.dom.HTMLCanvasElement;
+import com.codename1.html5.js.dom.HTMLDocument;
+import com.codename1.html5.js.dom.HTMLElement;
+import com.codename1.html5.js.dom.HTMLImageElement;
+import com.codename1.html5.js.dom.HTMLInputElement;
+import com.codename1.html5.js.dom.HTMLTextAreaElement;
+import com.codename1.html5.js.typedarrays.ArrayBuffer;
+import com.codename1.html5.js.typedarrays.Float64Array;
+import com.codename1.html5.js.typedarrays.Uint8Array;
+import com.codename1.html5.js.typedarrays.Uint8ClampedArray;
 
 /**
  *
@@ -2593,12 +2591,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return ((WindowLocation)Window.current().getLocation()).getHostname();
         }
         if ("browser.timezone".equals(key)) {
-            DateTimeZone tz = DateTimeZoneProvider.detectTimezone();
-            if (tz != null) {
-                return tz.getID();
-            } else {
-                return defaultValue;
-            }
+            String tz = detectTimezone();
+            return tz != null ? tz : defaultValue;
         }
         if ("HTML5.platformName".equals(key)) {
             if (isAndroid_()) {
@@ -2983,7 +2977,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final EventListener errorListener = new EventListener() {
             @Override
             public void handleEvent(final Event evt) {
-                _logObj(((org.teavm.jso.dom.html.HTMLMediaElement)evt.getTarget()).getError());
+                _logObj(((com.codename1.html5.js.dom.HTMLMediaElement)evt.getTarget()).getError());
                 new Thread() {
                     public void run() {
                         _log("error event received loading stream");
@@ -3052,7 +3046,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final EventListener errorListener = new EventListener() {
             @Override
             public void handleEvent(Event evt) {
-                _logObj(((org.teavm.jso.dom.html.HTMLMediaElement)evt.getTarget()).getError());
+                _logObj(((com.codename1.html5.js.dom.HTMLMediaElement)evt.getTarget()).getError());
                 new Thread() {
                     public void run() {
                         _log("error event received loading stream");
@@ -3154,7 +3148,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             final EventListener errorListener = new EventListener() {
                 @Override
                 public void handleEvent(Event evt) {
-                    _logObj(((org.teavm.jso.dom.html.HTMLMediaElement)evt.getTarget()).getError());
+                    _logObj(((com.codename1.html5.js.dom.HTMLMediaElement)evt.getTarget()).getError());
                     new Thread() {
                         public void run() {
                             synchronized(complete) {
@@ -4579,7 +4573,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 public void onTimer() {
                     if (!intervalCleared[0]) {
                         intervalCleared[0] = true;
-                        window.clearInterval(intervalHandle);
+                        Window.clearInterval(intervalHandle);
                     }
                 }
             }, 2000);
@@ -4623,7 +4617,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         EventUtil.removeEventListener(window, "resize", resizeHandle);
                         if (!intervalCleared[0]) {
                             intervalCleared[0] = true;
-                            window.clearInterval(intervalHandle);
+                            Window.clearInterval(intervalHandle);
                         }
 
                         ta.removeFocusListener(focusListener);
@@ -6935,6 +6929,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @JSBody(params={}, script="return navigator.language || navigator.browserLanguage")
     private static native String getBrowserLanguage();
+    
+    @JSBody(params={}, script="try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch(e) { return null; }")
+    private static native String detectTimezone();
    
     @Override
     public L10NManager getLocalizationManager() {
@@ -7330,7 +7327,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 url = url.substring(1);
             }
             
-            String currPath = window.getLocation().getPathName();
+            String currPath = window.getLocation().getPathname();
             String dirPath = currPath;
             if (dirPath.indexOf("/") != -1){
                 dirPath = dirPath.substring(0, dirPath.lastIndexOf("/"));

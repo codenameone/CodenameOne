@@ -10,10 +10,10 @@ package com.codename1.impl.html5.tools;
 import com.codename1.teavm.io.BlobUtil;
 import com.codename1.teavm.jso.io.Blob;
 import java.io.IOException;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSFunctor;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.dom.html.HTMLCanvasElement;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSFunctor;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.dom.HTMLCanvasElement;
 
 /**
  *

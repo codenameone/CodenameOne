@@ -12,7 +12,7 @@ import com.codename1.impl.html5.JavaScriptShapePathAdapter;
 import com.codename1.teavm.geom.JSAffineTransform;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Shape;
-import org.teavm.jso.canvas.CanvasRenderingContext2D;
+import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
 /**
  *

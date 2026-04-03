@@ -9,10 +9,10 @@ package com.codename1.impl.html5.videojs;
 
 import com.codename1.io.Log;
 import com.codename1.io.Util;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSFunctor;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.JSProperty;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSFunctor;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.JSProperty;
 
 /**
  *

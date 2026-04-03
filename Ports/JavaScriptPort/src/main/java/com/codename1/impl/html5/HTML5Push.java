@@ -12,11 +12,11 @@ import com.codename1.push.PushActionCategory;
 import com.codename1.push.PushActionsProvider;
 import com.codename1.push.PushCallback;
 import com.codename1.ui.Display;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSFunctor;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.core.JSArray;
-import org.teavm.jso.core.JSString;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSFunctor;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.core.JSArray;
+import com.codename1.html5.js.core.JSString;
 
 
 /**

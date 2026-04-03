@@ -20,19 +20,19 @@ import com.codename1.teavm.jso.util.JS;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.browser.Window;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.browser.Window;
 
-import org.teavm.jso.JSFunctor;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.JSProperty;
-import org.teavm.jso.core.JSArray;
-import org.teavm.jso.core.JSString;
-import org.teavm.jso.dom.events.Event;
-import org.teavm.jso.dom.events.EventListener;
-import org.teavm.jso.dom.html.HTMLCanvasElement;
-import org.teavm.jso.typedarrays.ArrayBuffer;
-import org.teavm.jso.typedarrays.Uint8Array;
+import com.codename1.html5.js.JSFunctor;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.JSProperty;
+import com.codename1.html5.js.core.JSArray;
+import com.codename1.html5.js.core.JSString;
+import com.codename1.html5.js.dom.Event;
+import com.codename1.html5.js.dom.EventListener;
+import com.codename1.html5.js.dom.HTMLCanvasElement;
+import com.codename1.html5.js.typedarrays.ArrayBuffer;
+import com.codename1.html5.js.typedarrays.Uint8Array;
 
 /**
  *

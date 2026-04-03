@@ -25,25 +25,25 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BorderLayout;
 import java.io.IOException;
 
-import org.teavm.jso.browser.Window;
-import org.teavm.jso.canvas.CanvasImageSource;
-import org.teavm.jso.canvas.CanvasRenderingContext2D;
+import com.codename1.html5.js.browser.Window;
+import com.codename1.html5.js.canvas.CanvasImageSource;
+import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
 
-import org.teavm.jso.JSBody;
+import com.codename1.html5.js.JSBody;
 
-import org.teavm.jso.JSFunctor;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.JSProperty;
-import org.teavm.jso.browser.TimerHandler;
-import org.teavm.jso.core.JSFunction;
-import org.teavm.jso.dom.events.Event;
-import org.teavm.jso.dom.events.EventListener;
-import org.teavm.jso.dom.html.HTMLCanvasElement;
-import org.teavm.jso.dom.html.HTMLDocument;
-import org.teavm.jso.dom.html.HTMLElement;
-import org.teavm.jso.dom.html.HTMLInputElement;
-import org.teavm.jso.dom.html.HTMLVideoElement;
+import com.codename1.html5.js.JSFunctor;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.JSProperty;
+import com.codename1.html5.js.browser.TimerHandler;
+import com.codename1.html5.js.core.JSFunction;
+import com.codename1.html5.js.dom.Event;
+import com.codename1.html5.js.dom.EventListener;
+import com.codename1.html5.js.dom.HTMLCanvasElement;
+import com.codename1.html5.js.dom.HTMLDocument;
+import com.codename1.html5.js.dom.HTMLElement;
+import com.codename1.html5.js.dom.HTMLInputElement;
+import com.codename1.html5.js.dom.HTMLVideoElement;
 
 /**
  *

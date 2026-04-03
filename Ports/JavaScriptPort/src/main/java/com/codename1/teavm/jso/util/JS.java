@@ -7,16 +7,16 @@
 
 package com.codename1.teavm.jso.util;
 
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.browser.Window;
-import org.teavm.jso.core.JSArray;
-import org.teavm.jso.core.JSString;
-import org.teavm.jso.typedarrays.ArrayBuffer;
-import org.teavm.jso.typedarrays.ArrayBufferView;
-import org.teavm.jso.typedarrays.Int16Array;
-import org.teavm.jso.typedarrays.Int32Array;
-import org.teavm.jso.typedarrays.Uint8Array;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.browser.Window;
+import com.codename1.html5.js.core.JSArray;
+import com.codename1.html5.js.core.JSString;
+import com.codename1.html5.js.typedarrays.ArrayBuffer;
+import com.codename1.html5.js.typedarrays.ArrayBufferView;
+import com.codename1.html5.js.typedarrays.Int16Array;
+import com.codename1.html5.js.typedarrays.Int32Array;
+import com.codename1.html5.js.typedarrays.Uint8Array;
 
 /**
  *
@@ -49,6 +49,10 @@ public class JS {
     
     @JSBody(params={"o"}, script="return (o === undefined)")
     public static native boolean isUndefined(JSObject o);
+    
+    public static boolean isUndefined(Object o) {
+        return o == null || (o instanceof JSObject && isUndefined((JSObject)o));
+    }
     
     public static String unwrapString(JSObject o) {
         if (isUndefined(o)) {
@@ -84,9 +88,9 @@ public class JS {
             int len = jarr.getLength();
             byte[] out = new byte[len];
             
-            for (int i=0; i<len; i++) {
-                out[i] = (byte)(unwrapInt(jarr.get(i)) & 0xff);
-            }
+for (int i=0; i<len; i++) {
+            out[i] = (byte)(unwrapInt((JSObject)jarr.get(i)) & 0xff);
+        }
             return out;
         } else if (isArrayBuffer(arr)) {
             Uint8Array uarr = Uint8Array.create((ArrayBuffer)arr);
@@ -111,9 +115,9 @@ public class JS {
             int len = jarr.getLength();
             int[] out = new int[len];
             
-            for (int i=0; i<len; i++) {
-                out[i] = (int)(unwrapInt(jarr.get(i)) );
-            }
+for (int i=0; i<len; i++) {
+            out[i] = (int)(unwrapInt((JSObject)jarr.get(i)) );
+        }
             return out;
         } else if (isArrayBuffer(arr)) {
             Int32Array uarr = Int32Array.create((ArrayBuffer)arr);
@@ -164,9 +168,9 @@ public class JS {
             int len = jarr.getLength();
             short[] out = new short[len];
             
-            for (int i=0; i<len; i++) {
-                out[i] = (short)(unwrapInt(jarr.get(i)) );
-            }
+for (int i=0; i<len; i++) {
+            out[i] = (short)(unwrapInt((JSObject)jarr.get(i)) );
+        }
             return out;
         } else if (isArrayBuffer(arr)) {
             Int16Array uarr = Int16Array.create((ArrayBuffer)arr);
@@ -191,9 +195,9 @@ public class JS {
             int len = jarr.getLength();
             double[] out = new double[len];
             
-            for (int i=0; i<len; i++) {
-                out[i] = (double)(unwrapDouble(jarr.get(i)) );
-            }
+for (int i=0; i<len; i++) {
+            out[i] = (double)(unwrapDouble((JSObject)jarr.get(i)) );
+        }
             return out;
         } 
         return null;
@@ -205,9 +209,9 @@ public class JS {
             int len = jarr.getLength();
             char[] out = new char[len];
             
-            for (int i=0; i<len; i++) {
-                out[i] = (char)(unwrapString(jarr.get(i)).charAt(0) );
-            }
+for (int i=0; i<len; i++) {
+            out[i] = (char)(unwrapString((JSObject)jarr.get(i)).charAt(0) );
+        }
             return out;
         } else if (JSType.STRING.equals(getType(arr))) {
             return unwrapString(arr).toCharArray();
@@ -221,9 +225,9 @@ public class JS {
             int len = jarr.getLength();
             boolean[] out = new boolean[len];
             
-            for (int i=0; i<len; i++) {
-                out[i] = (boolean)(unwrapBoolean(jarr.get(i)) );
-            }
+for (int i=0; i<len; i++) {
+            out[i] = (boolean)(unwrapBoolean((JSObject)jarr.get(i)) );
+        }
             return out;
         } 
         return null;

@@ -11,7 +11,7 @@ package com.codename1.teavm.io;
 import com.codename1.teavm.jso.io.Blob;
 import java.io.IOException;
 import java.io.InputStream;
-import org.teavm.jso.typedarrays.Uint8Array;
+import com.codename1.html5.js.typedarrays.Uint8Array;
 
 
 /**

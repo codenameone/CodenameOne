@@ -7,8 +7,8 @@
 
 package com.codename1.impl.html5;
 
-import org.teavm.jso.JSBody;
-import org.teavm.jso.dom.html.HTMLInputElement;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.dom.HTMLInputElement;
 
 /**
  *

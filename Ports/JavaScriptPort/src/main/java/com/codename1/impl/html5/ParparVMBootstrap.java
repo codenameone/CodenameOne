@@ -9,9 +9,9 @@ package com.codename1.impl.html5;
 import com.codename1.io.Log;
 import com.codename1.system.Lifecycle;
 import com.codename1.ui.Display;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.browser.Window;
-import org.teavm.jso.dom.events.Event;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.browser.Window;
+import com.codename1.html5.js.dom.Event;
 
 /**
  * Bootstrap for ParparVM JavaScript builds.

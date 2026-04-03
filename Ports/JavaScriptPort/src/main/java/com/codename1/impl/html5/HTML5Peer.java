@@ -11,9 +11,9 @@ import com.codename1.charts.util.ColorUtil;
 import com.codename1.impl.html5.HTML5Implementation.NativeFont;
 import com.codename1.teavm.jso.util.JS;
 import com.codename1.ui.PeerComponent;
-import org.teavm.jso.browser.Window;
-import org.teavm.jso.dom.css.CSSStyleDeclaration;
-import org.teavm.jso.dom.html.HTMLElement;
+import com.codename1.html5.js.browser.Window;
+import com.codename1.html5.js.dom.CSSStyleDeclaration;
+import com.codename1.html5.js.dom.HTMLElement;
 import static com.codename1.impl.html5.HTML5Implementation.scaleCoord;
 import static com.codename1.impl.html5.HTML5Implementation.unscaleCoord;
 import com.codename1.ui.CN;
@@ -25,9 +25,9 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.dom.html.HTMLOptionElement;
-import org.teavm.jso.dom.xml.NodeList;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.dom.HTMLOptionElement;
+import com.codename1.html5.js.dom.NodeList;
 import org.w3c.dom.html.HTMLStyleElement;
 
 

@@ -8,11 +8,11 @@ package com.codename1.impl.html5;
 
 import com.codename1.teavm.jso.io.Blob;
 import java.io.IOException;
-import org.teavm.jso.canvas.CanvasPattern;
-import org.teavm.jso.canvas.CanvasRenderingContext2D;
-import org.teavm.jso.canvas.ImageData;
-import org.teavm.jso.dom.html.HTMLCanvasElement;
-import org.teavm.jso.dom.html.HTMLImageElement;
+import com.codename1.html5.js.canvas.CanvasPattern;
+import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
+import com.codename1.html5.js.canvas.ImageData;
+import com.codename1.html5.js.dom.HTMLCanvasElement;
+import com.codename1.html5.js.dom.HTMLImageElement;
 
 public interface JavaScriptRenderingBackend {
     HTMLCanvasElement createCanvas(int width, int height);

@@ -15,11 +15,11 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
 import java.util.Objects;
 import java.util.Timer;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.browser.TimerHandler;
-import org.teavm.jso.browser.Window;
-import org.teavm.jso.dom.events.Event;
-import org.teavm.jso.dom.events.EventListener;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.browser.TimerHandler;
+import com.codename1.html5.js.browser.Window;
+import com.codename1.html5.js.dom.Event;
+import com.codename1.html5.js.dom.EventListener;
 
 
 /**

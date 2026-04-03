@@ -7,9 +7,9 @@
 
 package com.codename1.teavm.jso.util;
 
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.JSProperty;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.JSProperty;
 
 /**
  *

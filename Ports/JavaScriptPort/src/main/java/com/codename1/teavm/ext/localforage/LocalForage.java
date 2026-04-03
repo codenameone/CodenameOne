@@ -18,16 +18,15 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import org.teavm.interop.Async;
-import org.teavm.jso.browser.Window;
-import org.teavm.jso.typedarrays.Uint8Array;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSFunctor;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.JSProperty;
-import org.teavm.jso.core.JSArray;
-import org.teavm.jso.core.JSString;
-import org.teavm.interop.AsyncCallback;
+import com.codename1.html5.interop.AsyncCallback;
+import com.codename1.html5.js.browser.Window;
+import com.codename1.html5.js.typedarrays.Uint8Array;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSFunctor;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.JSProperty;
+import com.codename1.html5.js.core.JSArray;
+import com.codename1.html5.js.core.JSString;
 
 /**
  *
@@ -364,108 +363,213 @@ public class LocalForage {
     
     
     
-    @Async
-    private native static JSObject setValue(LocalForageImpl impl, String key, JSObject value) throws IOException;
-    private static void setValue(LocalForageImpl impl, String key, JSObject value, final AsyncCallback<JSObject> callback) {
+    private static JSObject setValue(LocalForageImpl impl, String key, JSObject value) throws IOException {
+        final Object[] result = new Object[1];
+        final IOException[] error = new IOException[1];
+        final boolean[] done = new boolean[1];
+        
         impl.setItem(key, value, new SetItemCallback(){
-
             @Override
-            public void callback(JSObject error, JSObject value) {
-                if (JS.isUndefined(error) || error == null){
-                    callback.complete(value);
-                } else {
-                    HTML5Implementation._logObj(error);
-                    callback.error(new QuotaExceededException("Failed to set value "));
+            public void callback(JSObject err, JSObject val) {
+                synchronized(done) {
+                    if (err != null && !JS.isUndefined(err)) {
+                        HTML5Implementation._logObj(err);
+                        error[0] = new QuotaExceededException("Failed to set value");
+                    } else {
+                        result[0] = val;
+                    }
+                    done[0] = true;
+                    done.notifyAll();
                 }
             }
-            
         });
+        
+        synchronized(done) {
+            while (!done[0]) {
+                try {
+                    done.wait();
+                } catch (InterruptedException e) {
+                    throw new IOException("Interrupted", e);
+                }
+            }
+        }
+        
+        if (error[0] != null) {
+            throw error[0];
+        }
+        return (JSObject) result[0];
     }
     
-    @Async
-    private native static JSObject getValue(LocalForageImpl impl, String key) throws IOException;
-    private static void getValue(LocalForageImpl impl, String key, final AsyncCallback<JSObject> callback) {
+    private static JSObject getValue(LocalForageImpl impl, String key) throws IOException {
+        final Object[] result = new Object[1];
+        final IOException[] error = new IOException[1];
+        final boolean[] done = new boolean[1];
+        
         impl.getItem(key, new GetItemCallback(){
-
             @Override
-            public void callback(JSObject error, JSObject value) {
-                if (JS.isUndefined(error) || error == null){
-                    callback.complete(value);
-                } else {
-                    String errorMsg = "undefined";
-                    callback.error(new IOException(JS.unwrapString(error)));
+            public void callback(JSObject err, JSObject val) {
+                synchronized(done) {
+                    if (err != null && !JS.isUndefined(err)) {
+                        error[0] = new IOException(JS.unwrapString(err));
+                    } else {
+                        result[0] = val;
+                    }
+                    done[0] = true;
+                    done.notifyAll();
                 }
             }
-            
         });
+        
+        synchronized(done) {
+            while (!done[0]) {
+                try {
+                    done.wait();
+                } catch (InterruptedException e) {
+                    throw new IOException("Interrupted", e);
+                }
+            }
+        }
+        
+        if (error[0] != null) {
+            throw error[0];
+        }
+        return (JSObject) result[0];
     }
     
-    @Async
-    private native static void removeItem(LocalForageImpl impl, String key) throws IOException;
-    private static void removeItem(LocalForageImpl impl, String key, final AsyncCallback<Void> callback) {
+    private static void removeItem(LocalForageImpl impl, String key) throws IOException {
+        final IOException[] error = new IOException[1];
+        final boolean[] done = new boolean[1];
+        
         impl.removeItem(key, new SuccessCallback(){
-
             @Override
-            public void callback(JSObject error) {
-                if (JS.isUndefined(error) || error == null){
-                    callback.complete(null);
-                } else {
-                    callback.error(new IOException("Failed to delete value "));
+            public void callback(JSObject err) {
+                synchronized(done) {
+                    if (err != null && !JS.isUndefined(err)) {
+                        error[0] = new IOException("Failed to delete value");
+                    }
+                    done[0] = true;
+                    done.notifyAll();
                 }
             }
-            
         });
+        
+        synchronized(done) {
+            while (!done[0]) {
+                try {
+                    done.wait();
+                } catch (InterruptedException e) {
+                    throw new IOException("Interrupted", e);
+                }
+            }
+        }
+        
+        if (error[0] != null) {
+            throw error[0];
+        }
     }
     
-    @Async
-    private native static void clear(LocalForageImpl impl) throws IOException;
-    private static void clear(LocalForageImpl impl, final AsyncCallback<Void> callback) {
+    private static void clear(LocalForageImpl impl) throws IOException {
+        final IOException[] error = new IOException[1];
+        final boolean[] done = new boolean[1];
+        
         impl.clear(new SuccessCallback(){
-
             @Override
-            public void callback(JSObject error) {
-                if (JS.isUndefined(error) || error == null){
-                    callback.complete(null);
-                } else {
-                    callback.error(new IOException("Failed to clear forage "));
+            public void callback(JSObject err) {
+                synchronized(done) {
+                    if (err != null && !JS.isUndefined(err)) {
+                        error[0] = new IOException("Failed to clear forage");
+                    }
+                    done[0] = true;
+                    done.notifyAll();
                 }
             }
-            
         });
+        
+        synchronized(done) {
+            while (!done[0]) {
+                try {
+                    done.wait();
+                } catch (InterruptedException e) {
+                    throw new IOException("Interrupted", e);
+                }
+            }
+        }
+        
+        if (error[0] != null) {
+            throw error[0];
+        }
     }
     
-    @Async
-    private native static String[] keys(LocalForageImpl impl) throws IOException;
-    private static void keys(LocalForageImpl impl, final AsyncCallback<String[]> callback) {
+    private static String[] keys(LocalForageImpl impl) throws IOException {
+        final Object[] result = new Object[1];
+        final IOException[] error = new IOException[1];
+        final boolean[] done = new boolean[1];
+        
         impl.keys(new KeysCallback(){
-
             @Override
-            public void callback(JSObject error, JSArray<JSString> keys) {
-                if (JS.isUndefined(error) || error == null){
-                    callback.complete(JS.unwrapStringArray(keys));
-                } else {
-                    callback.error(new IOException("Failed to get keys"));
+            public void callback(JSObject err, JSArray<JSString> k) {
+                synchronized(done) {
+                    if (err != null && !JS.isUndefined(err)) {
+                        error[0] = new IOException("Failed to get keys");
+                    } else {
+                        result[0] = JS.unwrapStringArray(k);
+                    }
+                    done[0] = true;
+                    done.notifyAll();
                 }
             }
-            
         });
+        
+        synchronized(done) {
+            while (!done[0]) {
+                try {
+                    done.wait();
+                } catch (InterruptedException e) {
+                    throw new IOException("Interrupted", e);
+                }
+            }
+        }
+        
+        if (error[0] != null) {
+            throw error[0];
+        }
+        return (String[]) result[0];
     }
     
-    @Async
-    private native static int length(LocalForageImpl impl) throws IOException;
-    private static void length(LocalForageImpl impl, final AsyncCallback<Integer> callback) {
+    private static int length(LocalForageImpl impl) throws IOException {
+        final int[] result = new int[1];
+        final IOException[] error = new IOException[1];
+        final boolean[] done = new boolean[1];
+        
         impl.length(new LengthCallback(){
-
             @Override
-            public void callback(JSObject error, JSObject length) {
-                if (JS.isUndefined(error) || error == null){
-                    callback.complete(JS.unwrapInt(length));
-                } else {
-                    callback.error(new IOException("Failed to get length"));
+            public void callback(JSObject err, JSObject len) {
+                synchronized(done) {
+                    if (err != null && !JS.isUndefined(err)) {
+                        error[0] = new IOException("Failed to get length");
+                    } else {
+                        result[0] = JS.unwrapInt(len);
+                    }
+                    done[0] = true;
+                    done.notifyAll();
                 }
             }
-            
         });
+        
+        synchronized(done) {
+            while (!done[0]) {
+                try {
+                    done.wait();
+                } catch (InterruptedException e) {
+                    throw new IOException("Interrupted", e);
+                }
+            }
+        }
+        
+        if (error[0] != null) {
+            throw error[0];
+        }
+        return result[0];
     }
     
     

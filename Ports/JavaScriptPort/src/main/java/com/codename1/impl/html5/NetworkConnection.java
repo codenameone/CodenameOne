@@ -20,13 +20,13 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.ajax.ReadyStateChangeHandler;
-import org.teavm.jso.ajax.XMLHttpRequest;
-import org.teavm.jso.core.JSRegExp;
-import org.teavm.jso.typedarrays.ArrayBuffer;
-import org.teavm.jso.typedarrays.Uint8Array;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.ajax.ReadyStateChangeHandler;
+import com.codename1.html5.js.ajax.XMLHttpRequest;
+import com.codename1.html5.js.core.JSRegExp;
+import com.codename1.html5.js.typedarrays.ArrayBuffer;
+import com.codename1.html5.js.typedarrays.Uint8Array;
 
 /**
  *

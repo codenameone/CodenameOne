@@ -391,11 +391,11 @@ const jvm = {
     if (!className) {
       return false;
     }
-    if (className.indexOf("org_teavm_jso_") === 0 || className.indexOf("com_codename1_impl_html5_JSOImplementations_") === 0) {
+    if (className.indexOf("org_teavm_jso_") === 0 || className.indexOf("com_codename1_impl_html5_JSOImplementations_") === 0 || className.indexOf("com_codename1_html5_js_") === 0) {
       return true;
     }
     const cls = this.classes[className];
-    return !!(cls && cls.assignableTo && cls.assignableTo["org_teavm_jso_JSObject"]);
+    return !!(cls && cls.assignableTo && cls.assignableTo["com_codename1_html5_js_JSObject"]);
   },
   createJsoBridgeMethod(className, methodId) {
     const self = this;
@@ -598,10 +598,10 @@ const jvm = {
     if (value.__class === "java_lang_String" || value.__nativeString != null) {
       return this.toNativeString(value);
     }
-    if (this.instanceOf(value, "org_teavm_jso_dom_events_EventListener")) {
+    if (this.instanceOf(value, "com_codename1_html5_js_dom_EventListener")) {
       return this.toNativeEventListener(value);
     }
-    if (this.instanceOf(value, "org_teavm_jso_browser_AnimationFrameCallback")) {
+    if (this.instanceOf(value, "com_codename1_html5_js_browser_AnimationFrameCallback")) {
       return this.toNativeAnimationFrameCallback(value);
     }
     return value;
@@ -613,8 +613,8 @@ const jvm = {
     const self = this;
     listener.__nativeEventListener = function(event) {
       try {
-        const wrappedEvent = self.wrapJsResult(event, "org_teavm_jso_dom_events_Event");
-        const method = self.resolveVirtual(listener.__class, "cn1_org_teavm_jso_dom_events_EventListener_handleEvent_org_teavm_jso_dom_events_Event");
+        const wrappedEvent = self.wrapJsResult(event, "com_codename1_html5_js_dom_Event");
+        const method = self.resolveVirtual(listener.__class, "cn1_com_codename1_html5_js_dom_EventListener_handleEvent_com_codename1_html5_js_dom_Event");
         self.spawn(null, method(listener, wrappedEvent));
       } catch (err) {
         self.fail(err);
@@ -629,7 +629,7 @@ const jvm = {
     const self = this;
     callback.__nativeAnimationFrameCallback = function(time) {
       try {
-        const method = self.resolveVirtual(callback.__class, "cn1_org_teavm_jso_browser_AnimationFrameCallback_onAnimationFrame_double");
+        const method = self.resolveVirtual(callback.__class, "cn1_com_codename1_html5_js_browser_AnimationFrameCallback_onAnimationFrame_double");
         self.spawn(null, method(callback, +time));
       } catch (err) {
         self.fail(err);
@@ -740,55 +740,55 @@ const jvm = {
       return value.__class;
     }
     if (value === (global.window || global.self || global)) {
-      return "org_teavm_jso_browser_Window";
+      return "com_codename1_html5_js_browser_Window";
     }
     if (value && value.nodeType === 9) {
-      return "org_teavm_jso_dom_html_HTMLDocument";
+      return "com_codename1_html5_js_dom_HTMLDocument";
     }
     if (typeof global.ArrayBuffer !== "undefined" && value instanceof global.ArrayBuffer) {
-      return "org_teavm_jso_typedarrays_ArrayBuffer";
+      return "com_codename1_html5_js_typedarrays_ArrayBuffer";
     }
     if (typeof global.Uint8Array !== "undefined" && value instanceof global.Uint8Array) {
-      return "org_teavm_jso_typedarrays_Uint8Array";
+      return "com_codename1_html5_js_typedarrays_Uint8Array";
     }
     if (value && value.canvas && typeof value.drawImage === "function" && typeof value.fillRect === "function") {
-      return "org_teavm_jso_canvas_CanvasRenderingContext2D";
+      return "com_codename1_html5_js_canvas_CanvasRenderingContext2D";
     }
     if (value && value.data && value.width !== undefined && value.height !== undefined && typeof value.data.length === "number") {
-      return "org_teavm_jso_canvas_ImageData";
+      return "com_codename1_html5_js_canvas_ImageData";
     }
     if (value && value.setProperty && value.removeProperty) {
-      return "org_teavm_jso_dom_css_CSSStyleDeclaration";
+      return "com_codename1_html5_js_dom_CSSStyleDeclaration";
     }
     if (value && value.href != null && value.assign && value.replace) {
       if (this.classes["com_codename1_impl_html5_JSOImplementations_WindowLocation"]) {
         return "com_codename1_impl_html5_JSOImplementations_WindowLocation";
       }
-      return expectedClass || "org_teavm_jso_browser_Location";
+      return expectedClass || "com_codename1_html5_js_browser_Location";
     }
     if (value && value.tagName) {
       const tagName = String(value.tagName).toUpperCase();
       switch (tagName) {
         case "CANVAS":
-          return "org_teavm_jso_dom_html_HTMLCanvasElement";
+          return "com_codename1_html5_js_dom_HTMLCanvasElement";
         case "IMG":
-          return "org_teavm_jso_dom_html_HTMLImageElement";
+          return "com_codename1_html5_js_dom_HTMLImageElement";
         case "INPUT":
-          return "org_teavm_jso_dom_html_HTMLInputElement";
+          return "com_codename1_html5_js_dom_HTMLInputElement";
         case "TEXTAREA":
-          return "org_teavm_jso_dom_html_HTMLTextAreaElement";
+          return "com_codename1_html5_js_dom_HTMLTextAreaElement";
         case "BODY":
-          return "org_teavm_jso_dom_html_HTMLBodyElement";
+          return "com_codename1_html5_js_dom_HTMLBodyElement";
         case "IFRAME":
-          return this.classes["com_codename1_impl_html5_JSOImplementations_HTMLIFrameElement"] ? "com_codename1_impl_html5_JSOImplementations_HTMLIFrameElement" : "org_teavm_jso_dom_html_HTMLElement";
+          return this.classes["com_codename1_impl_html5_JSOImplementations_HTMLIFrameElement"] ? "com_codename1_impl_html5_JSOImplementations_HTMLIFrameElement" : "com_codename1_html5_js_dom_HTMLElement";
         default:
-          return expectedClass || "org_teavm_jso_dom_html_HTMLElement";
+          return expectedClass || "com_codename1_html5_js_dom_HTMLElement";
       }
     }
     if (value && value.type !== undefined && value.target !== undefined) {
-      return expectedClass || "org_teavm_jso_dom_events_Event";
+      return expectedClass || "com_codename1_html5_js_dom_Event";
     }
-    return expectedClass || "org_teavm_jso_JSObject";
+    return expectedClass || "com_codename1_html5_js_JSObject";
   },
   log(message) {
     emitVmMessage({ type: this.protocol.messages.LOG, message: message });
@@ -1520,10 +1520,10 @@ function isIPadUserAgent() {
   const maxTouchPoints = Number(nav.maxTouchPoints || 0);
   return /iPad/i.test(ua) || (platform === "MacIntel" && maxTouchPoints > 1);
 }
-bindNative(["cn1_org_teavm_jso_core_JSArray_create_R_org_teavm_jso_core_JSArray", "cn1_org_teavm_jso_core_JSArray_create___R_org_teavm_jso_core_JSArray"], function*() {
+bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___R_com_codename1_html5_js_core_JSArray"], function*() {
   return [];
 });
-bindNative(["cn1_org_teavm_jso_core_JSArray_create_int_R_org_teavm_jso_core_JSArray", "cn1_org_teavm_jso_core_JSArray_create___int_R_org_teavm_jso_core_JSArray"], function*(length) {
+bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_int_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___int_R_com_codename1_html5_js_core_JSArray"], function*(length) {
   const size = Math.max(0, length | 0);
   const out = new Array(size);
   for (let i = 0; i < size; i++) {
@@ -1531,75 +1531,75 @@ bindNative(["cn1_org_teavm_jso_core_JSArray_create_int_R_org_teavm_jso_core_JSAr
   }
   return out;
 });
-bindNative(["cn1_org_teavm_jso_browser_Window_current_R_org_teavm_jso_browser_Window", "cn1_org_teavm_jso_browser_Window_current___R_org_teavm_jso_browser_Window"], function*() {
-  const wrapper = jvm.wrapJsObject(global.window || global.self || global, "org_teavm_jso_browser_Window");
+bindNative(["cn1_com_codename1_html5_js_browser_Window_current_R_com_codename1_html5_js_browser_Window", "cn1_com_codename1_html5_js_browser_Window_current___R_com_codename1_html5_js_browser_Window"], function*() {
+  const wrapper = jvm.wrapJsObject(global.window || global.self || global, "com_codename1_html5_js_browser_Window");
   jvm.enhanceJsWrapper(wrapper, "com_codename1_impl_html5_JSOImplementations_WindowExt");
   return wrapper;
 });
 bindNative([
-  "cn1_org_teavm_jso_ajax_XMLHttpRequest_create_R_org_teavm_jso_ajax_XMLHttpRequest",
-  "cn1_org_teavm_jso_ajax_XMLHttpRequest_create___R_org_teavm_jso_ajax_XMLHttpRequest"
+  "cn1_com_codename1_html5_js_ajax_XMLHttpRequest_create_R_com_codename1_html5_js_ajax_XMLHttpRequest",
+  "cn1_com_codename1_html5_js_ajax_XMLHttpRequest_create___R_com_codename1_html5_js_ajax_XMLHttpRequest"
 ], function*() {
   if (typeof global.XMLHttpRequest !== "function") {
     throw new Error("XMLHttpRequest is not available in this javascript runtime");
   }
-  return jvm.wrapJsObject(new global.XMLHttpRequest(), "org_teavm_jso_ajax_XMLHttpRequest");
+  return jvm.wrapJsObject(new global.XMLHttpRequest(), "com_codename1_html5_js_ajax_XMLHttpRequest");
 });
 bindNative([
-  "cn1_org_teavm_jso_typedarrays_ArrayBuffer_create_int_R_org_teavm_jso_typedarrays_ArrayBuffer",
-  "cn1_org_teavm_jso_typedarrays_ArrayBuffer_create___int_R_org_teavm_jso_typedarrays_ArrayBuffer"
+  "cn1_com_codename1_html5_js_typedarrays_ArrayBuffer_create_int_R_com_codename1_html5_js_typedarrays_ArrayBuffer",
+  "cn1_com_codename1_html5_js_typedarrays_ArrayBuffer_create___int_R_com_codename1_html5_js_typedarrays_ArrayBuffer"
 ], function*(size) {
-  return jvm.wrapJsObject(new global.ArrayBuffer(size | 0), "org_teavm_jso_typedarrays_ArrayBuffer");
+  return jvm.wrapJsObject(new global.ArrayBuffer(size | 0), "com_codename1_html5_js_typedarrays_ArrayBuffer");
 });
 bindNative([
-  "cn1_org_teavm_jso_typedarrays_Uint8Array_create_int_R_org_teavm_jso_typedarrays_Uint8Array",
-  "cn1_org_teavm_jso_typedarrays_Uint8Array_create___int_R_org_teavm_jso_typedarrays_Uint8Array"
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_int_R_com_codename1_html5_js_typedarrays_Uint8Array",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___int_R_com_codename1_html5_js_typedarrays_Uint8Array"
 ], function*(size) {
-  return jvm.wrapJsObject(new global.Uint8Array(size | 0), "org_teavm_jso_typedarrays_Uint8Array");
+  return jvm.wrapJsObject(new global.Uint8Array(size | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 bindNative([
-  "cn1_org_teavm_jso_typedarrays_Uint8Array_create_org_teavm_jso_typedarrays_ArrayBuffer_R_org_teavm_jso_typedarrays_Uint8Array",
-  "cn1_org_teavm_jso_typedarrays_Uint8Array_create___org_teavm_jso_typedarrays_ArrayBuffer_R_org_teavm_jso_typedarrays_Uint8Array"
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8Array",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8Array"
 ], function*(buffer) {
-  return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer)), "org_teavm_jso_typedarrays_Uint8Array");
+  return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer)), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 bindNative([
-  "cn1_org_teavm_jso_typedarrays_Uint8Array_create_org_teavm_jso_typedarrays_ArrayBufferView_R_org_teavm_jso_typedarrays_Uint8Array",
-  "cn1_org_teavm_jso_typedarrays_Uint8Array_create___org_teavm_jso_typedarrays_ArrayBufferView_R_org_teavm_jso_typedarrays_Uint8Array"
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBufferView_R_com_codename1_html5_js_typedarrays_Uint8Array",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBufferView_R_com_codename1_html5_js_typedarrays_Uint8Array"
 ], function*(bufferView) {
   const nativeView = jvm.unwrapJsValue(bufferView);
-  return jvm.wrapJsObject(new global.Uint8Array(nativeView.buffer, nativeView.byteOffset || 0, nativeView.byteLength || undefined), "org_teavm_jso_typedarrays_Uint8Array");
+  return jvm.wrapJsObject(new global.Uint8Array(nativeView.buffer, nativeView.byteOffset || 0, nativeView.byteLength || undefined), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 bindNative([
-  "cn1_org_teavm_jso_typedarrays_Uint8Array_create_org_teavm_jso_typedarrays_ArrayBuffer_int_R_org_teavm_jso_typedarrays_Uint8Array",
-  "cn1_org_teavm_jso_typedarrays_Uint8Array_create___org_teavm_jso_typedarrays_ArrayBuffer_int_R_org_teavm_jso_typedarrays_Uint8Array"
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8Array",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8Array"
 ], function*(buffer, offset) {
-  return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0), "org_teavm_jso_typedarrays_Uint8Array");
+  return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 bindNative([
-  "cn1_org_teavm_jso_typedarrays_Uint8Array_create_org_teavm_jso_typedarrays_ArrayBuffer_int_int_R_org_teavm_jso_typedarrays_Uint8Array",
-  "cn1_org_teavm_jso_typedarrays_Uint8Array_create___org_teavm_jso_typedarrays_ArrayBuffer_int_int_R_org_teavm_jso_typedarrays_Uint8Array"
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8Array",
+  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8Array"
 ], function*(buffer, offset, length) {
-  return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0, length | 0), "org_teavm_jso_typedarrays_Uint8Array");
+  return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0, length | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent_java_lang_String_int_R_org_teavm_jso_dom_events_Event",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent___java_lang_String_int_R_org_teavm_jso_dom_events_Event"
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent_java_lang_String_int_R_com_codename1_html5_js_dom_Event",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent___java_lang_String_int_R_com_codename1_html5_js_dom_Event"
 ], function*(message, code) {
   const win = global.window || global.self || global;
   const detail = message == null ? null : jvm.toNativeString(message);
   const event = new win.CustomEvent("cn1outbox", { detail: detail, code: code | 0 });
-  return jvm.wrapJsObject(event, "org_teavm_jso_dom_events_Event");
+  return jvm.wrapJsObject(event, "com_codename1_html5_js_dom_Event");
 });
 bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_createCustomEvent_java_lang_String_java_lang_String_int_R_org_teavm_jso_dom_events_Event",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_createCustomEvent___java_lang_String_java_lang_String_int_R_org_teavm_jso_dom_events_Event"
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createCustomEvent_java_lang_String_java_lang_String_int_R_com_codename1_html5_js_dom_Event",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createCustomEvent___java_lang_String_java_lang_String_int_R_com_codename1_html5_js_dom_Event"
 ], function*(type, message, code) {
   const win = global.window || global.self || global;
   const eventType = type == null ? "" : jvm.toNativeString(type);
   const detail = message == null ? null : jvm.toNativeString(message);
   const event = new win.CustomEvent(eventType, { detail: detail, code: code | 0 });
-  return jvm.wrapJsObject(event, "org_teavm_jso_dom_events_Event");
+  return jvm.wrapJsObject(event, "com_codename1_html5_js_dom_Event");
 });
 bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName_java_lang_String_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName___java_lang_String_R_java_lang_String"], function*(name) {
   const value = getQueryParameter(jvm.toNativeString(name));
@@ -1673,8 +1673,8 @@ bindNative([
   return 0;
 });
 bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl_org_teavm_jso_JSObject_R_org_teavm_jso_JSObject",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl___org_teavm_jso_JSObject_R_org_teavm_jso_JSObject"
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl_com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl___com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject"
 ], function*(objectRef) {
   if (typeof WeakMap !== "function") {
     return null;
@@ -1685,11 +1685,11 @@ bindNative([
   }
   const key = {};
   win.cn1GlobalWeakMap.set(key, jvm.unwrapJsObject(objectRef));
-  return jvm.wrapJsObject(key, "org_teavm_jso_JSObject");
+  return jvm.wrapJsObject(key, "com_codename1_html5_js_JSObject");
 });
 bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl_org_teavm_jso_JSObject_R_org_teavm_jso_JSObject",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl___org_teavm_jso_JSObject_R_org_teavm_jso_JSObject"
+  "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl_com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl___com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject"
 ], function*(keyRef) {
   if (typeof WeakMap !== "function") {
     return null;
@@ -1751,16 +1751,16 @@ bindNative([
   return null;
 });
 bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_getBeforeUnloadHandler_R_org_teavm_jso_JSObject",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_getBeforeUnloadHandler___R_org_teavm_jso_JSObject"
+  "cn1_com_codename1_impl_html5_HTML5Implementation_getBeforeUnloadHandler_R_com_codename1_html5_js_JSObject",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_getBeforeUnloadHandler___R_com_codename1_html5_js_JSObject"
 ], function*() {
   const win = global.window || global;
   const handler = win.onbeforeunload;
-  return handler == null ? null : jvm.wrapJsObject(handler, "org_teavm_jso_JSObject");
+  return handler == null ? null : jvm.wrapJsObject(handler, "com_codename1_html5_js_JSObject");
 });
 bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadHandler_org_teavm_jso_JSObject",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadHandler___org_teavm_jso_JSObject"
+  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadHandler_com_codename1_html5_js_JSObject",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadHandler___com_codename1_html5_js_JSObject"
 ], function*(handler) {
   const win = global.window || global;
   win.onbeforeunload = handler == null ? null : jvm.unwrapJsValue(handler);

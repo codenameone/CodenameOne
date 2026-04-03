@@ -17,13 +17,11 @@ import com.codename1.location.LocationListener;
 import com.codename1.location.LocationManager;
 import com.codename1.ui.Display;
 import java.io.IOException;
-import org.teavm.interop.Async;
 
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.browser.Window;
-import org.teavm.jso.core.JSString;
-import org.teavm.interop.AsyncCallback;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.browser.Window;
+import com.codename1.html5.js.core.JSString;
 
 /**
  *
@@ -39,7 +37,46 @@ public class HTML5LocationManager extends LocationManager {
     
     @Override
     public Location getCurrentLocation() throws IOException {
-        lastKnownLocation = nativeGetCurrentLocation();
+        final Location[] result = new Location[1];
+        final IOException[] error = new IOException[1];
+        final boolean[] complete = new boolean[1];
+        
+        nativeGetCurrentLocation(new LocationCallback() {
+            @Override
+            public void onLocation(Location loc) {
+                synchronized(complete) {
+                    result[0] = loc;
+                    complete[0] = true;
+                    complete.notifyAll();
+                }
+            }
+            
+            @Override
+            public void onError(IOException err) {
+                synchronized(complete) {
+                    error[0] = err;
+                    complete[0] = true;
+                    complete.notifyAll();
+                }
+            }
+        });
+        
+        // Wait for result
+        synchronized(complete) {
+            while (!complete[0]) {
+                try {
+                    complete.wait(10000);
+                } catch (InterruptedException ie) {
+                    throw new IOException("Interrupted while waiting for location", ie);
+                }
+            }
+        }
+        
+        if (error[0] != null) {
+            throw error[0];
+        }
+        
+        lastKnownLocation = result[0];
         return lastKnownLocation;
     }
     
@@ -50,11 +87,12 @@ public class HTML5LocationManager extends LocationManager {
         log(JSString.valueOf(str));
     }
     
-    @Async
-    private static native Location nativeGetCurrentLocation() throws IOException;
+    private interface LocationCallback {
+        void onLocation(Location loc);
+        void onError(IOException err);
+    }
     
-    private static void nativeGetCurrentLocation(final AsyncCallback<Location> callback){
-        //log("In nativeGetCurrentLocation");
+    private static void nativeGetCurrentLocation(final LocationCallback callback){
         PositionOptions opts = (PositionOptions)((WindowExt)Window.current()).createEmptyObject();
         opts.setTimeout(5000);
         Geolocation geo = ((WindowExt)Window.current()).getNavigator().getGeolocation();
@@ -62,33 +100,23 @@ public class HTML5LocationManager extends LocationManager {
 
             @Override
             public void onLocation(final Geolocation.Position position) {
-                //log("IN onLocation callback with position");
-                //log(position);
-                //new Thread(){
-                //    public void run(){
-                        Location loc = new Location();
-                        loc.setLatitude(position.getCoords().getLatitude());
-                        loc.setLongitude(position.getCoords().getLongitude());
-                        loc.setAccuracy((float)position.getCoords().getAccuracy());
-                        loc.setAltitude(position.getCoords().getAltitude());
-                        loc.setDirection((float)position.getCoords().getHeading());
-                        loc.setTimeStamp(position.getTimestamp());
-                        loc.setVelocity((float)position.getCoords().getSpeed());
-                        //log("Completing callback");
-                        callback.complete(loc);
-                //    }
-                //}.start();
-                
+                Location loc = new Location();
+                loc.setLatitude(position.getCoords().getLatitude());
+                loc.setLongitude(position.getCoords().getLongitude());
+                loc.setAccuracy((float)position.getCoords().getAccuracy());
+                loc.setAltitude(position.getCoords().getAltitude());
+                loc.setDirection((float)position.getCoords().getHeading());
+                loc.setTimeStamp(position.getTimestamp());
+                loc.setVelocity((float)position.getCoords().getSpeed());
+                callback.onLocation(loc);
             }
         };
         
         ErrorCallback onError = new ErrorCallback() {
 
             @Override
-            public void onError(JSOImplementations.JSError error) {
-                //log("Error getting location");
-                //log(error);
-                callback.error(new IOException(error.getMessage()));
+            public void onError(JSOImplementations.JSError err) {
+                callback.onError(new IOException(err.getMessage()));
             }
         
         };

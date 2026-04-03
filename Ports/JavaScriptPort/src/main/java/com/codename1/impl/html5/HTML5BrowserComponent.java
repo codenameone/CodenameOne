@@ -28,19 +28,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.swing.UIManager;
-import org.teavm.jso.JSBody;
-import org.teavm.jso.JSFunctor;
-import org.teavm.jso.JSObject;
-import org.teavm.jso.JSProperty;
-import org.teavm.jso.browser.Window;
-import org.teavm.jso.dom.css.CSSStyleDeclaration;
-import org.teavm.jso.dom.events.Event;
-import org.teavm.jso.dom.events.EventListener;
-import org.teavm.jso.dom.events.MessageEvent;
-import org.teavm.jso.dom.events.MouseEvent;
-import org.teavm.jso.dom.html.HTMLDocument;
-import org.teavm.jso.dom.html.HTMLElement;
-import org.teavm.jso.dom.html.TextRectangle;
+import com.codename1.html5.js.JSBody;
+import com.codename1.html5.js.JSFunctor;
+import com.codename1.html5.js.JSObject;
+import com.codename1.html5.js.JSProperty;
+import com.codename1.html5.js.browser.Window;
+import com.codename1.html5.js.dom.CSSStyleDeclaration;
+import com.codename1.html5.js.dom.Event;
+import com.codename1.html5.js.dom.EventListener;
+import com.codename1.html5.js.dom.MessageEvent;
+import com.codename1.html5.js.dom.MouseEvent;
+import com.codename1.html5.js.dom.HTMLDocument;
+import com.codename1.html5.js.dom.HTMLElement;
+import com.codename1.html5.js.dom.TextRectangle;
 
 /**
  *

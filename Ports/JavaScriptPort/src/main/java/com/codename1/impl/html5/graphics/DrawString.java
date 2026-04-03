@@ -10,7 +10,7 @@ package com.codename1.impl.html5.graphics;
 import com.codename1.impl.html5.HTML5Graphics;
 import com.codename1.impl.html5.HTML5Implementation;
 import com.codename1.impl.html5.HTML5Implementation.NativeFont;
-import org.teavm.jso.canvas.CanvasRenderingContext2D;
+import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
 /**
  *
