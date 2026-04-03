@@ -745,6 +745,12 @@ const jvm = {
     if (value && value.nodeType === 9) {
       return "org_teavm_jso_dom_html_HTMLDocument";
     }
+    if (typeof global.ArrayBuffer !== "undefined" && value instanceof global.ArrayBuffer) {
+      return "org_teavm_jso_typedarrays_ArrayBuffer";
+    }
+    if (typeof global.Uint8Array !== "undefined" && value instanceof global.Uint8Array) {
+      return "org_teavm_jso_typedarrays_Uint8Array";
+    }
     if (value && value.canvas && typeof value.drawImage === "function" && typeof value.fillRect === "function") {
       return "org_teavm_jso_canvas_CanvasRenderingContext2D";
     }
@@ -1232,6 +1238,58 @@ function* runtimeToNativeString(value) {
   }
   return String(value);
 }
+function runtimeBoxedPrimitiveValue(value) {
+  if (value == null || typeof value !== "object" || !value.__class) {
+    return null;
+  }
+  switch (value.__class) {
+    case "java_lang_Integer":
+      return value.cn1_java_lang_Integer_value | 0;
+    case "java_lang_Long":
+      return value.cn1_java_lang_Long_value == null ? 0 : value.cn1_java_lang_Long_value;
+    case "java_lang_Double":
+      return value.cn1_java_lang_Double_value == null ? 0 : Number(value.cn1_java_lang_Double_value);
+    case "java_lang_Float":
+      return value.cn1_java_lang_Float_value == null ? 0 : Number(value.cn1_java_lang_Float_value);
+    case "java_lang_Short":
+      return value.cn1_java_lang_Short_value | 0;
+    case "java_lang_Byte":
+      return value.cn1_java_lang_Byte_value | 0;
+    case "java_lang_Character":
+      return value.cn1_java_lang_Character_value | 0;
+    case "java_lang_Boolean":
+      return !!value.cn1_java_lang_Boolean_value;
+    default:
+      return null;
+  }
+}
+function* runtimeFormatTokenValue(token, value) {
+  if (token === "%s") {
+    return yield* runtimeToNativeString(value);
+  }
+  if (token === "%c") {
+    const primitive = runtimeBoxedPrimitiveValue(value);
+    if (primitive != null) {
+      return String.fromCharCode(primitive | 0);
+    }
+    return String.fromCharCode((value == null ? 0 : value) | 0);
+  }
+  if (token === "%d" || token === "%i") {
+    const primitive = runtimeBoxedPrimitiveValue(value);
+    if (primitive != null) {
+      return String(Math.trunc(Number(primitive)));
+    }
+    return String(Math.trunc(Number(value == null ? 0 : value)));
+  }
+  if (token === "%f") {
+    const primitive = runtimeBoxedPrimitiveValue(value);
+    if (primitive != null) {
+      return String(Number(primitive));
+    }
+    return String(Number(value == null ? 0 : value));
+  }
+  return yield* runtimeToNativeString(value);
+}
 function sbEnsureCapacity(sb, size) {
   let data = sb[CN1_SB_VALUE];
   if (!data) {
@@ -1488,6 +1546,43 @@ bindNative([
   return jvm.wrapJsObject(new global.XMLHttpRequest(), "org_teavm_jso_ajax_XMLHttpRequest");
 });
 bindNative([
+  "cn1_org_teavm_jso_typedarrays_ArrayBuffer_create_int_R_org_teavm_jso_typedarrays_ArrayBuffer",
+  "cn1_org_teavm_jso_typedarrays_ArrayBuffer_create___int_R_org_teavm_jso_typedarrays_ArrayBuffer"
+], function*(size) {
+  return jvm.wrapJsObject(new global.ArrayBuffer(size | 0), "org_teavm_jso_typedarrays_ArrayBuffer");
+});
+bindNative([
+  "cn1_org_teavm_jso_typedarrays_Uint8Array_create_int_R_org_teavm_jso_typedarrays_Uint8Array",
+  "cn1_org_teavm_jso_typedarrays_Uint8Array_create___int_R_org_teavm_jso_typedarrays_Uint8Array"
+], function*(size) {
+  return jvm.wrapJsObject(new global.Uint8Array(size | 0), "org_teavm_jso_typedarrays_Uint8Array");
+});
+bindNative([
+  "cn1_org_teavm_jso_typedarrays_Uint8Array_create_org_teavm_jso_typedarrays_ArrayBuffer_R_org_teavm_jso_typedarrays_Uint8Array",
+  "cn1_org_teavm_jso_typedarrays_Uint8Array_create___org_teavm_jso_typedarrays_ArrayBuffer_R_org_teavm_jso_typedarrays_Uint8Array"
+], function*(buffer) {
+  return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer)), "org_teavm_jso_typedarrays_Uint8Array");
+});
+bindNative([
+  "cn1_org_teavm_jso_typedarrays_Uint8Array_create_org_teavm_jso_typedarrays_ArrayBufferView_R_org_teavm_jso_typedarrays_Uint8Array",
+  "cn1_org_teavm_jso_typedarrays_Uint8Array_create___org_teavm_jso_typedarrays_ArrayBufferView_R_org_teavm_jso_typedarrays_Uint8Array"
+], function*(bufferView) {
+  const nativeView = jvm.unwrapJsValue(bufferView);
+  return jvm.wrapJsObject(new global.Uint8Array(nativeView.buffer, nativeView.byteOffset || 0, nativeView.byteLength || undefined), "org_teavm_jso_typedarrays_Uint8Array");
+});
+bindNative([
+  "cn1_org_teavm_jso_typedarrays_Uint8Array_create_org_teavm_jso_typedarrays_ArrayBuffer_int_R_org_teavm_jso_typedarrays_Uint8Array",
+  "cn1_org_teavm_jso_typedarrays_Uint8Array_create___org_teavm_jso_typedarrays_ArrayBuffer_int_R_org_teavm_jso_typedarrays_Uint8Array"
+], function*(buffer, offset) {
+  return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0), "org_teavm_jso_typedarrays_Uint8Array");
+});
+bindNative([
+  "cn1_org_teavm_jso_typedarrays_Uint8Array_create_org_teavm_jso_typedarrays_ArrayBuffer_int_int_R_org_teavm_jso_typedarrays_Uint8Array",
+  "cn1_org_teavm_jso_typedarrays_Uint8Array_create___org_teavm_jso_typedarrays_ArrayBuffer_int_int_R_org_teavm_jso_typedarrays_Uint8Array"
+], function*(buffer, offset, length) {
+  return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0, length | 0), "org_teavm_jso_typedarrays_Uint8Array");
+});
+bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent_java_lang_String_int_R_org_teavm_jso_dom_events_Event",
   "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent___java_lang_String_int_R_org_teavm_jso_dom_events_Event"
 ], function*(message, code) {
@@ -1571,6 +1666,46 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage
   const value = nav.language || nav.browserLanguage || "";
   return jvm.createStringLiteral(String(value));
 });
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isWeakMapSupported_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_isWeakMapSupported___R_boolean"
+], function*() {
+  return 0;
+});
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl_org_teavm_jso_JSObject_R_org_teavm_jso_JSObject",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl___org_teavm_jso_JSObject_R_org_teavm_jso_JSObject"
+], function*(objectRef) {
+  if (typeof WeakMap !== "function") {
+    return null;
+  }
+  const win = global.window || global;
+  if (!(win.cn1GlobalWeakMap instanceof WeakMap)) {
+    win.cn1GlobalWeakMap = new WeakMap();
+  }
+  const key = {};
+  win.cn1GlobalWeakMap.set(key, jvm.unwrapJsObject(objectRef));
+  return jvm.wrapJsObject(key, "org_teavm_jso_JSObject");
+});
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl_org_teavm_jso_JSObject_R_org_teavm_jso_JSObject",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl___org_teavm_jso_JSObject_R_org_teavm_jso_JSObject"
+], function*(keyRef) {
+  if (typeof WeakMap !== "function") {
+    return null;
+  }
+  const win = global.window || global;
+  const weakMap = win.cn1GlobalWeakMap;
+  if (!(weakMap instanceof WeakMap)) {
+    return null;
+  }
+  const key = jvm.unwrapJsObject(keyRef);
+  if (key == null || !weakMap.has(key)) {
+    return null;
+  }
+  const value = weakMap.get(key);
+  return value == null ? null : jvm.wrapJsObject(value, inferJsObjectClass(value));
+});
 bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag___java_lang_String_R_boolean"], function*(name) {
   const win = global.window || global;
   const flags = win.cn1_debug_flags;
@@ -1590,6 +1725,20 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_
     }
   }
   return jvm.createStringLiteral(String(value));
+});
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_notifyProgressLoaderThatResourceIsLoaded_java_lang_String",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_notifyProgressLoaderThatResourceIsLoaded___java_lang_String"
+], function*(resource) {
+  const win = global.window || global;
+  const handler = win.cn1LoadedFile;
+  if (typeof handler === "function") {
+    try {
+      handler(String(jvm.toNativeString(resource)));
+    } catch (e) {
+    }
+  }
+  return null;
 });
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_installBeforeUnload",
@@ -1879,68 +2028,53 @@ bindNative(["cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1A
   return out;
 });
 bindNative(["cn1_java_lang_String_format_java_lang_String_java_lang_Object_1ARRAY_R_java_lang_String"], function*(format, args) {
-  const text = jvm.toNativeString(format);
+  let index = 0;
   const values = [];
   if (args && args.__array) {
     for (let i = 0; i < args.length; i++) {
       values.push(args[i]);
     }
   }
-
-  const nextArgString = function*(token) {
-    const arg = values.length ? values.shift() : null;
-    if (token === "c") {
-      const native = yield* runtimeToNativeString(arg);
-      if (native == null || native.length === 0) {
-        return "";
+  const result = jvm.toNativeString(format).replace(/%[%sdifc]/g, function(token) {
+    if (token === "%%") {
+      return "%";
+    }
+    const value = values[index++];
+    return {
+      __token: token,
+      __value: value
+    };
+  }).replace(/\[object Object\]/g, function() {
+    return "";
+  });
+  let expanded = "";
+  let start = 0;
+  const pattern = /(\{\}|\[object Object\])/g;
+  const placeholderMatches = [];
+  jvm.toNativeString(format).replace(/%[%sdifc]/g, function(token) {
+    if (token !== "%%") {
+      placeholderMatches.push(token);
+    }
+    return token;
+  });
+  const pieces = jvm.toNativeString(format).split(/%[%sdifc]/g);
+  const tokens = [];
+  jvm.toNativeString(format).replace(/%[%sdifc]/g, function(token) {
+    tokens.push(token);
+    return token;
+  });
+  for (let i = 0; i < pieces.length; i++) {
+    expanded += pieces[i];
+    if (i < tokens.length) {
+      const token = tokens[i];
+      if (token === "%%") {
+        expanded += "%";
+      } else {
+        expanded += yield* runtimeFormatTokenValue(token, values[start++]);
       }
-      if (native.length === 1) {
-        return native;
-      }
-      const asInt = parseInt(native, 10);
-      return isNaN(asInt) ? native.charAt(0) : String.fromCharCode(asInt);
-    }
-    return yield* runtimeToNativeString(arg);
-  };
-
-  let out = "";
-  for (let i = 0; i < text.length; i++) {
-    const ch = text.charAt(i);
-    if (ch !== "%" || i === text.length - 1) {
-      out += ch;
-      continue;
-    }
-
-    const next = text.charAt(i + 1);
-    if (next === "%") {
-      out += "%";
-      i++;
-      continue;
-    }
-
-    let j = i + 1;
-    while (j < text.length && "-#+ 0,(".indexOf(text.charAt(j)) >= 0) {
-      j++;
-    }
-    while (j < text.length && text.charAt(j) >= "0" && text.charAt(j) <= "9") {
-      j++;
-    }
-    if (j < text.length && text.charAt(j) === ".") {
-      j++;
-      while (j < text.length && text.charAt(j) >= "0" && text.charAt(j) <= "9") {
-        j++;
-      }
-    }
-    const token = j < text.length ? text.charAt(j) : "";
-    if ("sdifc".indexOf(token) >= 0) {
-      out += yield* nextArgString(token);
-      i = j;
-    } else {
-      out += "%";
     }
   }
-
-  return createJavaString(out);
+  return createJavaString(expanded);
 });
 bindNative(["cn1_java_lang_StringToReal_parseDblImpl_java_lang_String_int_R_double"], function*(value, exponentIndex) {
   const text = jvm.toNativeString(value);

@@ -10,6 +10,12 @@
   <p>Loading...</p>
 </div>
 <canvas id="codenameone-canvas" width="320" height="480"></canvas>
+<script>
+window.cn1LoadedFiles = window.cn1LoadedFiles || [];
+window.cn1LoadedFile = window.cn1LoadedFile || function(filename) {
+  window.cn1LoadedFiles.push(String(filename || ""));
+};
+</script>
 <script src="js/push.js"></script>
 <script src="js/jquery.min.js"></script>
 <script src="js/fontmetrics.js"></script>

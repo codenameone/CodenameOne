@@ -7264,7 +7264,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public Object createSoftWeakRef(Object o) {
-        if (Display.getInstance().getProperty("javascript.useES6WeakRefs", "true").equals("true") && isWeakMapSupported()) {
+        if (Display.getInstance().getProperty("javascript.useES6WeakRefs", "true").equals("true")
+                && isWeakMapSupported()
+                && (o == null || o instanceof JSObject)) {
             if (o == null) {
                 return new JSObjectWrapper();
             }
@@ -7473,10 +7475,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
             url = url + "?v=" + getBuildVersion();
         }
         req.open("get", url, false);
-        req.setResponseType("arraybuffer");
+        req.overrideMimeType("text/plain; charset=x-user-defined");
         req.send();
 
-        if (req.getResponse() == null  ){
+        Uint8Array responseBytes = toResponseBytes(req);
+        if (responseBytes == null) {
             System.out.println(req.getAllResponseHeaders());
             System.out.println(req.getStatusText());
             System.out.println("Failed to load resource "+url);
@@ -7484,7 +7487,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return null;
         }
         
-        ArrayBufferInputStream out = new ArrayBufferInputStream(Uint8Array.create((ArrayBuffer)req.getResponse()), req.getResponseType());
+        ArrayBufferInputStream out = new ArrayBufferInputStream(responseBytes, req.getResponseType());
+        return out;
+    }
+
+    private Uint8Array toResponseBytes(XMLHttpRequest req) {
+        if ("arraybuffer".equals(req.getResponseType()) && req.getResponse() != null) {
+            return Uint8Array.create((ArrayBuffer)req.getResponse());
+        }
+        String responseText = req.getResponseText();
+        if (responseText == null) {
+            return null;
+        }
+        Uint8Array out = Uint8Array.create(responseText.length());
+        for (int i = 0; i < responseText.length(); i++) {
+            out.set(i, (short)(responseText.charAt(i) & 0xff));
+        }
         return out;
     }
         

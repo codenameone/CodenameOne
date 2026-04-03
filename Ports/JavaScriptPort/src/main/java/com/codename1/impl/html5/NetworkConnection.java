@@ -73,7 +73,7 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
         if (!isOpen){
             isOpen = true;
             req.open(httpMethod, url, false);
-            req.setResponseType("arraybuffer");
+            req.overrideMimeType("text/plain; charset=x-user-defined");
         }
     }
 
@@ -99,12 +99,18 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
     }
 
     public int getContentLength(){
-        if (req.getResponse()==null){
-            return 0;
-        } else {
+        try {
+            InputStream stream = inputStream;
+            if (stream instanceof ArrayBufferInputStream) {
+                return ((ArrayBufferInputStream) stream).getBuffer().getByteLength();
+            }
+        } catch (Throwable ignored) {
+        }
+        if (req.getResponse() != null) {
             return ((ArrayBuffer)req.getResponse()).getByteLength();
         }
-        
+        String responseText = req.getResponseText();
+        return responseText == null ? 0 : responseText.length();
     }
 
 
@@ -138,7 +144,8 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
         }
 
         
-        if (req.getResponse() == null || req.getStatus() == 0 ){
+        Uint8Array responseBytes = toResponseBytes(req);
+        if (responseBytes == null || req.getStatus() == 0 ){
             System.out.println(req.getAllResponseHeaders());
             System.out.println(req.getStatusText());
             System.out.println("Failed to load url "+url);
@@ -146,11 +153,26 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
             throw new IOException("Failed to load "+url+".  Status "+req.getStatusText());
         }
         
-        inputStream = new ArrayBufferInputStream(Uint8Array.create((ArrayBuffer)req.getResponse()), req.getResponseType());
+        inputStream = new ArrayBufferInputStream(responseBytes, req.getResponseType());
         return inputStream;
 
 
         
+    }
+
+    private Uint8Array toResponseBytes(XMLHttpRequest req) {
+        if ("arraybuffer".equals(req.getResponseType()) && req.getResponse() != null) {
+            return Uint8Array.create((ArrayBuffer)req.getResponse());
+        }
+        String responseText = req.getResponseText();
+        if (responseText == null) {
+            return null;
+        }
+        Uint8Array out = Uint8Array.create(responseText.length());
+        for (int i = 0; i < responseText.length(); i++) {
+            out.set(i, (short)(responseText.charAt(i) & 0xff));
+        }
+        return out;
     }
 
      public OutputStream openOutputStream() throws IOException {
