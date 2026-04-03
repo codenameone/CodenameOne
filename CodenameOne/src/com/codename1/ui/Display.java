@@ -309,6 +309,7 @@ public final class Display extends CN1Constants {
     private int previousKeyPressed;
     private int lastKeyPressed;
     private int lastDragOffset;
+    private boolean disableScreenshots;
 
     // huge false positive from PMD...
     @SuppressWarnings("PMD.SingularField")
@@ -347,6 +348,11 @@ public final class Display extends CN1Constants {
             INSTANCE.codenameOneGraphics = new Graphics(impl.getNativeGraphics());
             INSTANCE.codenameOneGraphics.paintPeersBehind = impl.paintNativePeersBehind();
             impl.setCodenameOneGraphics(INSTANCE.codenameOneGraphics);
+
+            if (disableScreenshots) {
+                impl.setDisableScreenshots(true);
+                disableScreenshots = false;
+            }
 
             // only enable but never disable the third softbutton
             if (impl.isThirdSoftButton()) {
@@ -3660,6 +3666,11 @@ public final class Display extends CN1Constants {
             impl.blockCopyPaste("true".equals(value));
         }
         if ("DisableScreenshots".equals(key)) {
+            disableScreenshots = false;
+            if (impl == null) {
+                disableScreenshots = "true".equalsIgnoreCase(value);
+                return;
+            }
             impl.setDisableScreenshots("true".equalsIgnoreCase(value));
         }
         if ("Component.revalidateOnStyleChange".equals(key)) {
