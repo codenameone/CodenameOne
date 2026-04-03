@@ -45,6 +45,10 @@ public final class NativeInterfaceLanguageValidator {
             lastStatus = "MISMATCH expected=" + expected + " actual=" + actual + " diagnostics=" + diagnostics;
             throw new IllegalStateException("Expected " + expected + " implementation on " + platformName + " but got " + actual + ". diagnostics=" + diagnostics);
         }
+        if (isIos && !"ios-swift-native-impl".equals(diagnostics)) {
+            lastStatus = "SWIFT_BRIDGE_MISSING diagnostics=" + diagnostics;
+            throw new IllegalStateException("Swift implementation bridge not confirmed on iOS. diagnostics=" + diagnostics);
+        }
         lastStatus = "OK expected=" + expected + " actual=" + actual + " diagnostics=" + diagnostics;
     }
 }
