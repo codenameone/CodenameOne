@@ -747,7 +747,7 @@ include::../demos/common/src/main/java/com/mycompany/myapp/MyNativeImplStub.java
 
 The stub implementation always returns `false`, `null` or `0` by default. The `isSupported` also defaults to `false` thus allowing us to implement a `NativeInterface` on some platforms and leave the rest out without really knowing anything about these platforms.
 
-We can implement the Android version using code similar to this:
+We can implement the Android version in Java or Kotlin. Here is the Java version:
 
 [source,java]
 ----
@@ -768,7 +768,7 @@ Codename One doesn't include the native platforms in its bundle e.g. the full An
 
 TIP: When implementing a non-trivial native interface, send a server build with the "Include Source" option checked. Implement the native interface in the native IDE then copy and paste the native code back into Codename One
 
-The implementation of this interface is nearly identical for Android, J2ME & Java SE.
+The implementation of this interface is nearly identical for Android (Java/Kotlin), J2ME & Java SE.
 
 ===== Swift (iOS) and Kotlin (Android) options
 
@@ -854,9 +854,10 @@ android.sdkVersion=25
 Once those were defined the native code for the Android implementation became trivial to write and the library was easy as there were no jars to include.
 
 
-==== Objective-C (iOS)
+==== Objective-C and Swift (iOS)
 
-When generating the Objective-C code the "Generate Native Sources" tool produces two files: `com_mycompany_myapp_MyNativeImpl.h` & `com_mycompany_myapp_MyNativeImpl.m`.
+When generating the Objective-C code the "Generate Native Sources" tool produces two files by default: `com_mycompany_myapp_MyNativeImpl.h` & `com_mycompany_myapp_MyNativeImpl.m`.
+If you enable Swift stub generation in the Maven goal, it can also produce `com_mycompany_myapp_MyNativeImpl.swift`.
 
 The `.m` files are the Objective-C equivalent of `.c` files and `.h` files contain the header/include information. In this case the `com_mycompany_myapp_MyNativeImpl.h` contains:
 
@@ -882,6 +883,8 @@ Here is a simple implementation similar to above:
 ----
 include::../demos/ios/src/main/objectivec/com_mycompany_myapp_MyNativeImpl.m[tag=myNativeImplExample,indent=0]
 ----
+
+If you prefer Swift for iOS native interfaces, keep the same class naming convention (`com_mycompany_myapp_MyNativeImpl`) and annotate the class with `@objc(...)` so the runtime can discover it.
 
 ===== Using the iOS Main Thread (Native EDT)
 

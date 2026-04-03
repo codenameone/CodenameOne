@@ -1759,6 +1759,9 @@ public class IPhoneBuilder extends Executor {
                     deploymentTargetStr = "begin\n"
                             + "  xcproj.targets.find{|e|e.name=='" + request.getMainClass() + "'}.build_configurations.each{|config| \n"
                             + "    config.build_settings['PRODUCT_BUNDLE_IDENTIFIER']='"+request.getPackageName()+"'\n"
+                            + "    config.build_settings['DEFINES_MODULE']='YES'\n"
+                            + "    config.build_settings['SWIFT_VERSION']='5.0'\n"
+                            + "    config.build_settings['SWIFT_OBJC_BRIDGING_HEADER']='$(SRCROOT)/cn1-Bridging-Header.h'\n"
                             + "  }\n"
                             + "  xcproj.targets.each do |target|\n"
                             + "    target.build_configurations.each do |config|\n"
@@ -1932,6 +1935,10 @@ public class IPhoneBuilder extends Executor {
                             + "end\n"
                             + deploymentTargetStr
                             + appExtensionsBuilder.toString();
+                    File bridgingHeaderFile = new File(tmpDir, "cn1-Bridging-Header.h");
+                    if (!bridgingHeaderFile.exists()) {
+                        this.createFile(bridgingHeaderFile, "// Codename One generated Swift bridging header\n".getBytes(StandardCharsets.UTF_8));
+                    }
                     File hooksDir = new File(tmpFile, "hooks");
                     hooksDir.mkdir();
                     File fixSchemesFile = new File(hooksDir, "fix_xcode_schemes.rb");
