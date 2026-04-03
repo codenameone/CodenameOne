@@ -349,9 +349,9 @@ public final class Display extends CN1Constants {
             INSTANCE.codenameOneGraphics.paintPeersBehind = impl.paintNativePeersBehind();
             impl.setCodenameOneGraphics(INSTANCE.codenameOneGraphics);
 
-            if (disableScreenshots) {
+            if (INSTANCE.disableScreenshots) {
                 impl.setDisableScreenshots(true);
-                disableScreenshots = false;
+                INSTANCE.disableScreenshots = false;
             }
 
             // only enable but never disable the third softbutton
