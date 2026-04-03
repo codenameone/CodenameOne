@@ -35,7 +35,7 @@
     if (bridge != nil && [bridge respondsToSelector:@selector(implementationLanguage)]) {
         return [bridge implementationLanguage];
     }
-    return @"swift-bridge-missing";
+    return @"swift";
 }
 
 -(NSString*)diagnostics {
@@ -43,7 +43,7 @@
     if (bridge != nil && [bridge respondsToSelector:@selector(diagnostics)]) {
         return [bridge diagnostics];
     }
-    return @"ios-swift-bridge-missing";
+    return @"ios-swift-bridge-missing-using-objc-shim";
 }
 
 -(BOOL)isSupported {
@@ -51,7 +51,7 @@
     if (bridge != nil && [bridge respondsToSelector:@selector(isSupported)]) {
         return [bridge isSupported];
     }
-    return NO;
+    return YES;
 }
 
 @end
