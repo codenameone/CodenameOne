@@ -59,6 +59,56 @@ function vmTrace(line) {
     global.console.log("PARPAR:" + line);
   }
 }
+function printStreamValue(value) {
+  if (value == null) {
+    return "null";
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (value.__class === "java_lang_String" && jvm && typeof jvm.toNativeString === "function") {
+    return jvm.toNativeString(value);
+  }
+  if (value.__className) {
+    return String(value.__className);
+  }
+  if (value.__class) {
+    return String(value.__class);
+  }
+  try {
+    return JSON.stringify(value);
+  } catch (err) {
+    return String(value);
+  }
+}
+function printToConsole(line) {
+  if (global.console && typeof global.console.log === "function") {
+    global.console.log(line);
+  }
+}
+function createConsolePrintStream() {
+  try {
+    return jvm.newObject("java_io_PrintStream");
+  } catch (err) {
+    if (global.console && typeof global.console.warn === "function") {
+      global.console.warn("PARPAR:console-printstream-init-failed", err);
+    }
+    return null;
+  }
+}
+function ensureSystemPrintStreams() {
+  const systemClass = jvm.classes["java_lang_System"];
+  if (!systemClass) {
+    return;
+  }
+  const staticFields = systemClass.staticFields || (systemClass.staticFields = {});
+  if (staticFields.out == null) {
+    staticFields.out = createConsolePrintStream();
+  }
+  if (staticFields.err == null) {
+    staticFields.err = staticFields.out != null ? staticFields.out : createConsolePrintStream();
+  }
+}
 function threadDebugLabel(threadObject) {
   if (!threadObject) {
     return "thread:null";
@@ -72,6 +122,7 @@ function threadDebugLabel(threadObject) {
 }
 const jvm = {
   classes: {},
+  nativeMethods: Object.create(null),
   literalStrings: Object.create(null),
   methodTailCache: Object.create(null),
   remappedMethodIdCache: Object.create(null),
@@ -103,7 +154,8 @@ const jvm = {
     this.classes[def.name] = def;
   },
   addVirtualMethod(className, methodId, fn) {
-    this.classes[className].methods[methodId] = typeof this[methodId] === "function" ? this[methodId] : fn;
+    const nativeOverride = this.nativeMethods[methodId];
+    this.classes[className].methods[methodId] = typeof nativeOverride === "function" ? nativeOverride : fn;
   },
   setMain(className, methodName) {
     this.mainClass = className;
@@ -132,8 +184,10 @@ const jvm = {
       this.ensureClassInitialized(cls.baseClass);
     }
     cls.initialized = true;
-    if (cls.clinit) {
-      const gen = cls.clinit();
+    const clinitMethodId = "cn1_" + className + "___CLINIT__";
+    const clinit = this.nativeMethods[clinitMethodId] || cls.clinit;
+    if (clinit) {
+      const gen = clinit();
       let step = gen.next();
       while (!step.done) {
         if (step.value && (step.value.op === "sleep" || step.value.op === "wait")) {
@@ -299,6 +353,11 @@ const jvm = {
     let cached = this.resolvedVirtualCache[cacheKey];
     if (cached) {
       return cached;
+    }
+    const nativeOverride = this.nativeMethods[methodId];
+    if (typeof nativeOverride === "function") {
+      this.resolvedVirtualCache[cacheKey] = nativeOverride;
+      return nativeOverride;
     }
     const tail = this.methodTail(methodId);
     let current = className;
@@ -984,10 +1043,30 @@ const jvm = {
     const ctor = global["cn1_" + className + "___INIT__"];
     return { object: ex, ctor: ctor };
   },
+  applyNativeOverrides() {
+    const classNames = Object.keys(this.classes);
+    for (let i = 0; i < classNames.length; i++) {
+      const cls = this.classes[classNames[i]];
+      if (!cls || !cls.methods) {
+        continue;
+      }
+      const methodIds = Object.keys(cls.methods);
+      for (let j = 0; j < methodIds.length; j++) {
+        const methodId = methodIds[j];
+        const nativeOverride = this.nativeMethods[methodId];
+        if (typeof nativeOverride === "function" && cls.methods[methodId] !== nativeOverride) {
+          cls.methods[methodId] = nativeOverride;
+        }
+      }
+    }
+    this.resolvedVirtualCache = Object.create(null);
+  },
   start() {
     if (!this.mainClass || !this.mainMethod) {
       throw new Error("No main class configured for javascript backend");
     }
+    this.applyNativeOverrides();
+    ensureSystemPrintStreams();
     vmTrace("runtime.start.before-main-generator");
     const mainArgs = this.newArray(0, "java_lang_String", 1);
     const mainThreadObject = this.newObject("java_lang_Thread");
@@ -1312,7 +1391,9 @@ function* throwInterruptedException() {
 }
 function bindNative(names, fn) {
   for (let i = 0; i < names.length; i++) {
-    global[names[i]] = jvm[names[i]] = fn;
+    jvm.nativeMethods[names[i]] = fn;
+    global[names[i]] = fn;
+    jvm[names[i]] = fn;
   }
   return fn;
 }
@@ -1396,6 +1477,34 @@ bindNative(["cn1_org_teavm_jso_browser_Window_current_R_org_teavm_jso_browser_Wi
   const wrapper = jvm.wrapJsObject(global.window || global.self || global, "org_teavm_jso_browser_Window");
   jvm.enhanceJsWrapper(wrapper, "com_codename1_impl_html5_JSOImplementations_WindowExt");
   return wrapper;
+});
+bindNative([
+  "cn1_org_teavm_jso_ajax_XMLHttpRequest_create_R_org_teavm_jso_ajax_XMLHttpRequest",
+  "cn1_org_teavm_jso_ajax_XMLHttpRequest_create___R_org_teavm_jso_ajax_XMLHttpRequest"
+], function*() {
+  if (typeof global.XMLHttpRequest !== "function") {
+    throw new Error("XMLHttpRequest is not available in this javascript runtime");
+  }
+  return jvm.wrapJsObject(new global.XMLHttpRequest(), "org_teavm_jso_ajax_XMLHttpRequest");
+});
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent_java_lang_String_int_R_org_teavm_jso_dom_events_Event",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent___java_lang_String_int_R_org_teavm_jso_dom_events_Event"
+], function*(message, code) {
+  const win = global.window || global.self || global;
+  const detail = message == null ? null : jvm.toNativeString(message);
+  const event = new win.CustomEvent("cn1outbox", { detail: detail, code: code | 0 });
+  return jvm.wrapJsObject(event, "org_teavm_jso_dom_events_Event");
+});
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createCustomEvent_java_lang_String_java_lang_String_int_R_org_teavm_jso_dom_events_Event",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_createCustomEvent___java_lang_String_java_lang_String_int_R_org_teavm_jso_dom_events_Event"
+], function*(type, message, code) {
+  const win = global.window || global.self || global;
+  const eventType = type == null ? "" : jvm.toNativeString(type);
+  const detail = message == null ? null : jvm.toNativeString(message);
+  const event = new win.CustomEvent(eventType, { detail: detail, code: code | 0 });
+  return jvm.wrapJsObject(event, "org_teavm_jso_dom_events_Event");
 });
 bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName_java_lang_String_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName___java_lang_String_R_java_lang_String"], function*(name) {
   const value = getQueryParameter(jvm.toNativeString(name));
@@ -1573,7 +1682,28 @@ bindNative([
 bindNative(["cn1_java_lang_Object_notify", "cn1_java_lang_Object_notify__"], function*(__cn1ThisObject) { jvm.notifyOne(__cn1ThisObject); return null; });
 bindNative(["cn1_java_lang_Object_notifyAll", "cn1_java_lang_Object_notifyAll__"], function*(__cn1ThisObject) { jvm.notifyAll(__cn1ThisObject); return null; });
 bindNative(["cn1_java_lang_Object_hashCode_R_int", "cn1_java_lang_Object_hashCode___R_int"], function*(__cn1ThisObject) { return __cn1ThisObject == null ? 0 : (__cn1ThisObject.__id | 0); });
-bindNative(["cn1_java_lang_Object_getClassImpl_R_java_lang_Class", "cn1_java_lang_Object_getClassImpl___R_java_lang_Class"], function*(__cn1ThisObject) { return __cn1ThisObject && __cn1ThisObject.__classDef ? __cn1ThisObject.__classDef.classObject : jvm.getClassObject(__cn1ThisObject.__class); });
+bindNative([
+  "cn1_java_lang_Object_getClass_R_java_lang_Class",
+  "cn1_java_lang_Object_getClass___R_java_lang_Class",
+  "cn1_java_lang_Object_getClassImpl_R_java_lang_Class",
+  "cn1_java_lang_Object_getClassImpl___R_java_lang_Class"
+], function*(__cn1ThisObject) { return __cn1ThisObject && __cn1ThisObject.__classDef ? __cn1ThisObject.__classDef.classObject : jvm.getClassObject(__cn1ThisObject.__class); });
+bindNative(["cn1_java_io_PrintStream_print_java_lang_String"], function*(__cn1ThisObject, value) {
+  printToConsole(printStreamValue(value));
+  return null;
+});
+bindNative(["cn1_java_io_PrintStream_println_java_lang_String"], function*(__cn1ThisObject, value) {
+  printToConsole(printStreamValue(value));
+  return null;
+});
+bindNative(["cn1_java_io_PrintStream_println_java_lang_Object"], function*(__cn1ThisObject, value) {
+  printToConsole(printStreamValue(value));
+  return null;
+});
+bindNative(["cn1_java_lang_System___CLINIT__"], function*() {
+  ensureSystemPrintStreams();
+  return null;
+});
 bindNative(["cn1_java_lang_Object_toString_R_java_lang_String"], function*(__cn1ThisObject) {
   if (__cn1ThisObject == null) {
     return createJavaString("null");

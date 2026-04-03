@@ -1,6 +1,5 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
-import com.codename1.io.Util;
 import com.codename1.testing.DeviceRunner;
 import com.codename1.testing.TestReporting;
 import com.codename1.ui.CN;
@@ -39,6 +38,9 @@ import java.util.Arrays;
 import java.util.List;
 
 public final class Cn1ssDeviceRunner extends DeviceRunner {
+    private static final int TEST_TIMEOUT_MS = 30000;
+    private static final int TEST_POLL_INTERVAL_MS = 50;
+
     private static final List<BaseTest> TEST_CLASSES = new ArrayList<>(Arrays.asList(
             new MainScreenScreenshotTest(),
             new DrawLine(),
@@ -103,35 +105,59 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 }
             });
         });
-        for (BaseTest testClass : TEST_CLASSES) {
-            final String testName = testClass.getClass().getSimpleName();
-            CN.callSerially(() -> {
-                log("CN1SS:INFO:suite starting test=" + testName);
-                try {
-                    testClass.prepare();
-                    testClass.runTest();
-                } catch (Throwable t) {
-                    log("CN1SS:ERR:suite test=" + testName + " failed=" + t);
-                    t.printStackTrace();
-                }
-            });
-            int timeout = 30000;
-            while (!testClass.isDone() && timeout > 0) {
-                Util.sleep(3);
-                timeout -= 3;
+        runNextTest(0);
+    }
+
+    private void runNextTest(int index) {
+        if (index >= TEST_CLASSES.size()) {
+            finishSuite();
+            return;
+        }
+        BaseTest testClass = TEST_CLASSES.get(index);
+        String testName = testClass.getClass().getSimpleName();
+        CN.callSerially(() -> {
+            log("CN1SS:INFO:suite starting test=" + testName);
+            try {
+                testClass.prepare();
+                testClass.runTest();
+            } catch (Throwable t) {
+                log("CN1SS:ERR:suite test=" + testName + " failed=" + t);
+                t.printStackTrace();
+                testClass.fail(String.valueOf(t));
             }
+            awaitTestCompletion(index, testClass, testName, System.currentTimeMillis() + TEST_TIMEOUT_MS);
+        });
+    }
+
+    private void awaitTestCompletion(int index, BaseTest testClass, String testName, long deadline) {
+        if (testClass.isDone()) {
+            finalizeTest(index, testClass, testName, false);
+            return;
+        }
+        if (System.currentTimeMillis() >= deadline) {
+            finalizeTest(index, testClass, testName, true);
+            return;
+        }
+        CN.setTimeout(TEST_POLL_INTERVAL_MS, () -> awaitTestCompletion(index, testClass, testName, deadline));
+    }
+
+    private void finalizeTest(int index, BaseTest testClass, String testName, boolean timedOut) {
+        try {
             testClass.cleanup();
-            if(timeout == 0) {
+            if (timedOut) {
                 log("CN1SS:ERR:suite test=" + testName + " failed due to timeout waiting for DONE");
             } else if (testClass.isFailed()) {
                 log("CN1SS:ERR:suite test=" + testName + " failed: " + testClass.getFailMessage());
-            } else {
-                if (!testClass.shouldTakeScreenshot()) {
-                    log("CN1SS:INFO:test=" + testName + " screenshot=none");
-                }
+            } else if (!testClass.shouldTakeScreenshot()) {
+                log("CN1SS:INFO:test=" + testName + " screenshot=none");
             }
             log("CN1SS:INFO:suite finished test=" + testName);
+        } finally {
+            runNextTest(index + 1);
         }
+    }
+
+    private void finishSuite() {
         log("CN1SS:SUITE:FINISHED");
         TestReporting.getInstance().testExecutionFinished(getClass().getName());
         if (CN.isSimulator()) {

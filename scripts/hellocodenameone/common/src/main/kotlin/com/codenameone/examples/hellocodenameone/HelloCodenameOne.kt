@@ -2,6 +2,7 @@ package com.codenameone.examples.hellocodenameone
 
 import com.codename1.system.Lifecycle
 import com.codename1.testing.TestReporting
+import com.codename1.ui.CN
 import com.codename1.ui.Display
 import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunner
 import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunnerReporter
@@ -28,7 +29,7 @@ open class HelloCodenameOne : Lifecycle() {
             println("CN1JS:HelloCodenameOne.runner.end")
         }
         if (Display.getInstance().platformName == "HTML5") {
-            runner.run()
+            CN.callSerially(runner)
         } else {
             Thread(runner, "CN1SS-Runner").start()
         }

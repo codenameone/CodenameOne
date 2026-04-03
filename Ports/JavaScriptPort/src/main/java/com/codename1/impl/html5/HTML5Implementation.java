@@ -7469,43 +7469,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return out;
         }
         final XMLHttpRequest req = XMLHttpRequest.create();
-        final Object lock = new Object();
-        final boolean[] complete = new boolean[1];
         if (url.indexOf("assets/") == 0 && url.indexOf("?") == -1) {
             url = url + "?v=" + getBuildVersion();
         }
-        req.open("get", url, true);
-        req.setOnReadyStateChange(new ReadyStateChangeHandler() {
-
-            @Override
-            public void stateChanged() {
-                if ( req.getReadyState() == XMLHttpRequest.DONE ){
-                    
-                    new Thread() {
-                        @Override
-                        public void run() {
-                            complete[0]=true;
-                            synchronized(lock){
-                                lock.notifyAll();
-                            }
-                        }
-                    }.start();
-                }
-            }
-        });
+        req.open("get", url, false);
         req.setResponseType("arraybuffer");
-        
         req.send();
-
-        while (!complete[0]){
-            synchronized(lock){
-                try {
-                    lock.wait();
-                } catch (InterruptedException ex) {
-                    //Log.e(ex);
-                }
-            }
-        }
 
         if (req.getResponse() == null  ){
             System.out.println(req.getAllResponseHeaders());

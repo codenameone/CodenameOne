@@ -57,6 +57,12 @@ class JavascriptTargetIntegrationTest {
                 "Bundle should register the translated main entrypoint");
         assertTrue(runtime.contains("cn1_java_lang_Thread_start") || runtime.contains("cn1_java_lang_Thread_start__"),
                 "Runtime should provide JS native implementations for thread start");
+        assertTrue(runtime.contains("cn1_java_lang_Object_getClass_R_java_lang_Class")
+                        && runtime.contains("cn1_java_lang_Object_getClassImpl_R_java_lang_Class"),
+                "Runtime should bind both Object.getClass() and its native getClassImpl() helper");
+        assertTrue(runtime.contains("cn1_java_io_PrintStream_println_java_lang_String")
+                        && runtime.contains("cn1_java_io_PrintStream_println_java_lang_Object"),
+                "Runtime should bind PrintStream output methods so browser harness logs can observe CN1SS markers");
         assertTrue(runtime.contains("cn1_java_lang_Object_wait_long_int") || runtime.contains("cn1_java_lang_Object_wait___long_int"),
                 "Runtime should provide JS native implementations for wait()");
         assertTrue(!translatedApp.contains("Missing javascript native method cn1_java_lang_Object_wait_long_int"),

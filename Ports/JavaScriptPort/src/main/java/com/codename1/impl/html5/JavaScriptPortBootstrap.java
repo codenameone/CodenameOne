@@ -25,7 +25,7 @@ public final class JavaScriptPortBootstrap implements Runnable {
         com.codename1.impl.ImplementationFactory.setInstance(new com.codename1.impl.ImplementationFactory());
         JavaScriptPortBootstrap bootstrap = new JavaScriptPortBootstrap(lifecycle);
         Display.init(bootstrap);
-        Display.getInstance().callSerially(bootstrap);
+        bootstrap.run();
     }
 
     public static Lifecycle createLifecycle(String className) {

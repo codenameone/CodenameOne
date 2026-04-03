@@ -27,7 +27,7 @@ public final class ParparVMBootstrap implements Runnable {
         // For ParparVM, native bindings are provided by parparvm_runtime.js
         ParparVMBootstrap bootstrap = new ParparVMBootstrap(lifecycle);
         Display.init(bootstrap);
-        Display.getInstance().callSerially(bootstrap);
+        bootstrap.run();
     }
 
     @Override

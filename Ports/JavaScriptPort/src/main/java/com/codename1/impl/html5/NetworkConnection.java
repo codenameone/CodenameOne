@@ -72,7 +72,7 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
     private void open(){
         if (!isOpen){
             isOpen = true;
-            req.open(httpMethod, url, true);
+            req.open(httpMethod, url, false);
             req.setResponseType("arraybuffer");
         }
     }
@@ -124,32 +124,10 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
              return inputStream;
          }
          
-        final Object lock = new Object();
         open();
         for (Header h : headers) {
             req.setRequestHeader(h.name, h.value);
         }
-        final boolean[] complete = new boolean[1];
-        req.setOnReadyStateChange(new ReadyStateChangeHandler(){
-
-            @Override
-            public void stateChanged() {
-
-                if ( req.getReadyState() == XMLHttpRequest.DONE){
-                    new Thread() {
-                        @Override
-                        public void run() {
-                            
-                            complete[0] = true;
-                            synchronized (lock){
-                                lock.notifyAll();
-                            }
-                        }
-                    }.start();
-                }
-            }
-
-        });
         //req.setResponseType("arraybuffer");
         if ( body != null ){
             
@@ -157,15 +135,6 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
             ((XHRBlob)req).send(BlobUtil.createBlob(body.toByteArray(), "application/octet-stream"));
         } else {
             req.send();
-        }
-        if (!complete[0]){
-            synchronized(lock){
-                try {
-                    lock.wait(timeout);
-                } catch (InterruptedException ex) {
-                    Log.e(ex);
-                }
-            }
         }
 
         
