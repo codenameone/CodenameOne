@@ -246,6 +246,10 @@ final class JavascriptMethodGenerator {
         String jsMethodName = jsMethodIdentifier(cls, method);
         String jsMethodBodyName = jsMethodBodyIdentifier(cls, method);
         boolean wrappedStaticMethod = isWrappedStaticMethod(method);
+        if (wrappedStaticMethod) {
+            appendWrappedStaticMethod(out, cls, method, jsMethodName, jsMethodBodyName);
+            return;
+        }
         out.append("function* ").append(wrappedStaticMethod ? jsMethodBodyName : jsMethodName).append("(");
         boolean first = true;
         if (!method.isStatic()) {
@@ -1098,13 +1102,8 @@ final class JavascriptMethodGenerator {
         return JavascriptNameUtil.methodIdentifier(owner, name, desc) + "__impl";
     }
 
-    private static void appendNativeStubIfNeeded(StringBuilder out, ByteCodeClass cls, BytecodeMethod method) {
+private static void appendNativeStubIfNeeded(StringBuilder out, ByteCodeClass cls, BytecodeMethod method) {
         String jsMethodName = jsMethodIdentifier(cls, method);
-        JavascriptNativeRegistry.NativeCategory category = JavascriptNativeRegistry.categoryFor(jsMethodName);
-        if (category == JavascriptNativeRegistry.NativeCategory.RUNTIME_IMPLEMENTED) {
-            return;
-        }
-        String reason = JavascriptNativeRegistry.unsupportedReason(jsMethodName);
         out.append("if (typeof ").append(jsMethodName).append(" === \"undefined\") {\n");
         out.append("  ").append(jsMethodName).append(" = function*(");
         boolean first = true;
@@ -1120,32 +1119,7 @@ final class JavascriptMethodGenerator {
             first = false;
             out.append("__cn1Arg").append(i + 1);
         }
-        out.append(") { ");
-        if (category == JavascriptNativeRegistry.NativeCategory.HOST_HOOK) {
-            out.append("return yield jvm.invokeHostNative(\"").append(jsMethodName).append("\", [");
-            boolean firstArg = true;
-            if (!method.isStatic()) {
-                out.append("__cn1ThisObject");
-                firstArg = false;
-            }
-            for (int i = 0; i < arguments.size(); i++) {
-                if (!firstArg) {
-                    out.append(", ");
-                }
-                firstArg = false;
-                out.append("__cn1Arg").append(i + 1);
-            }
-            out.append("]);");
-        } else {
-            out.append("throw new Error(\"");
-            if (reason == null) {
-                out.append("Missing javascript native method ").append(jsMethodName);
-            } else {
-                out.append(JavascriptNameUtil.escapeJs(reason));
-            }
-            out.append("\");");
-        }
-        out.append(" };\n");
+        out.append(") { throw new Error(\"Missing javascript native method ").append(jsMethodName).append("\"); }\n");
         out.append("}\n");
     }
 

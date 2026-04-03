@@ -49,6 +49,11 @@ try {
   page.on('console', msg => append(`console:${msg.type()}:${msg.text()}`));
   page.on('pageerror', err => append(`pageerror:${String(err)}`));
   page.on('requestfailed', req => append(`requestfailed:${req.url()} ${req.failure()?.errorText || ''}`));
+  page.on('response', resp => {
+    if (resp.status() >= 400) {
+      append(`response:${resp.status()}:${resp.url()}`);
+    }
+  });
 
   append(`goto:${url}`);
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });

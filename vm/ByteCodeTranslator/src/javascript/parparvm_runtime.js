@@ -47,6 +47,11 @@ const PRIMITIVE_INFO = {
   JAVA_LONG: { javaName: "long", descriptor: "J" }
 };
 const jsObjectWrappers = typeof WeakMap === "function" ? new WeakMap() : null;
+const jsoRegistry = {
+  classPrefixes: [],
+  inferFn: null,
+  nativeArgConverters: []
+};
 function emitVmMessage(message) {
   if (typeof global.__cn1ParparDispatchMessage === "function") {
     global.__cn1ParparDispatchMessage(message);
@@ -391,8 +396,10 @@ const jvm = {
     if (!className) {
       return false;
     }
-    if (className.indexOf("org_teavm_jso_") === 0 || className.indexOf("com_codename1_impl_html5_JSOImplementations_") === 0 || className.indexOf("com_codename1_html5_js_") === 0) {
-      return true;
+    for (let i = 0; i < jsoRegistry.classPrefixes.length; i++) {
+      if (className.indexOf(jsoRegistry.classPrefixes[i]) === 0) {
+        return true;
+      }
     }
     const cls = this.classes[className];
     return !!(cls && cls.assignableTo && cls.assignableTo["com_codename1_html5_js_JSObject"]);
@@ -598,44 +605,13 @@ const jvm = {
     if (value.__class === "java_lang_String" || value.__nativeString != null) {
       return this.toNativeString(value);
     }
-    if (this.instanceOf(value, "com_codename1_html5_js_dom_EventListener")) {
-      return this.toNativeEventListener(value);
-    }
-    if (this.instanceOf(value, "com_codename1_html5_js_browser_AnimationFrameCallback")) {
-      return this.toNativeAnimationFrameCallback(value);
+    for (let i = 0; i < jsoRegistry.nativeArgConverters.length; i++) {
+      const converted = jsoRegistry.nativeArgConverters[i](value, this);
+      if (converted !== value) {
+        return converted;
+      }
     }
     return value;
-  },
-  toNativeEventListener(listener) {
-    if (listener.__nativeEventListener) {
-      return listener.__nativeEventListener;
-    }
-    const self = this;
-    listener.__nativeEventListener = function(event) {
-      try {
-        const wrappedEvent = self.wrapJsResult(event, "com_codename1_html5_js_dom_Event");
-        const method = self.resolveVirtual(listener.__class, "cn1_com_codename1_html5_js_dom_EventListener_handleEvent_com_codename1_html5_js_dom_Event");
-        self.spawn(null, method(listener, wrappedEvent));
-      } catch (err) {
-        self.fail(err);
-      }
-    };
-    return listener.__nativeEventListener;
-  },
-  toNativeAnimationFrameCallback(callback) {
-    if (callback.__nativeAnimationFrameCallback) {
-      return callback.__nativeAnimationFrameCallback;
-    }
-    const self = this;
-    callback.__nativeAnimationFrameCallback = function(time) {
-      try {
-        const method = self.resolveVirtual(callback.__class, "cn1_com_codename1_html5_js_browser_AnimationFrameCallback_onAnimationFrame_double");
-        self.spawn(null, method(callback, +time));
-      } catch (err) {
-        self.fail(err);
-      }
-    };
-    return callback.__nativeAnimationFrameCallback;
   },
   unwrapJsValue(value) {
     return value && value.__jsValue !== undefined ? value.__jsValue : value;
@@ -739,54 +715,11 @@ const jvm = {
     if (value && value.__classDef && value.__jsValue === undefined) {
       return value.__class;
     }
-    if (value === (global.window || global.self || global)) {
-      return "com_codename1_html5_js_browser_Window";
-    }
-    if (value && value.nodeType === 9) {
-      return "com_codename1_html5_js_dom_HTMLDocument";
-    }
-    if (typeof global.ArrayBuffer !== "undefined" && value instanceof global.ArrayBuffer) {
-      return "com_codename1_html5_js_typedarrays_ArrayBuffer";
-    }
-    if (typeof global.Uint8Array !== "undefined" && value instanceof global.Uint8Array) {
-      return "com_codename1_html5_js_typedarrays_Uint8Array";
-    }
-    if (value && value.canvas && typeof value.drawImage === "function" && typeof value.fillRect === "function") {
-      return "com_codename1_html5_js_canvas_CanvasRenderingContext2D";
-    }
-    if (value && value.data && value.width !== undefined && value.height !== undefined && typeof value.data.length === "number") {
-      return "com_codename1_html5_js_canvas_ImageData";
-    }
-    if (value && value.setProperty && value.removeProperty) {
-      return "com_codename1_html5_js_dom_CSSStyleDeclaration";
-    }
-    if (value && value.href != null && value.assign && value.replace) {
-      if (this.classes["com_codename1_impl_html5_JSOImplementations_WindowLocation"]) {
-        return "com_codename1_impl_html5_JSOImplementations_WindowLocation";
+    if (jsoRegistry.inferFn) {
+      const inferred = jsoRegistry.inferFn(value, expectedClass, this);
+      if (inferred) {
+        return inferred;
       }
-      return expectedClass || "com_codename1_html5_js_browser_Location";
-    }
-    if (value && value.tagName) {
-      const tagName = String(value.tagName).toUpperCase();
-      switch (tagName) {
-        case "CANVAS":
-          return "com_codename1_html5_js_dom_HTMLCanvasElement";
-        case "IMG":
-          return "com_codename1_html5_js_dom_HTMLImageElement";
-        case "INPUT":
-          return "com_codename1_html5_js_dom_HTMLInputElement";
-        case "TEXTAREA":
-          return "com_codename1_html5_js_dom_HTMLTextAreaElement";
-        case "BODY":
-          return "com_codename1_html5_js_dom_HTMLBodyElement";
-        case "IFRAME":
-          return this.classes["com_codename1_impl_html5_JSOImplementations_HTMLIFrameElement"] ? "com_codename1_impl_html5_JSOImplementations_HTMLIFrameElement" : "com_codename1_html5_js_dom_HTMLElement";
-        default:
-          return expectedClass || "com_codename1_html5_js_dom_HTMLElement";
-      }
-    }
-    if (value && value.type !== undefined && value.target !== undefined) {
-      return expectedClass || "com_codename1_html5_js_dom_Event";
     }
     return expectedClass || "com_codename1_html5_js_JSObject";
   },
@@ -1119,6 +1052,7 @@ const jvm = {
 };
 
 global.jvm = jvm;
+jvm.jsoRegistry = jsoRegistry;
 function lowerFirst(value) {
   if (!value) {
     return value;
@@ -1520,297 +1454,6 @@ function isIPadUserAgent() {
   const maxTouchPoints = Number(nav.maxTouchPoints || 0);
   return /iPad/i.test(ua) || (platform === "MacIntel" && maxTouchPoints > 1);
 }
-bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___R_com_codename1_html5_js_core_JSArray"], function*() {
-  return [];
-});
-bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_int_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___int_R_com_codename1_html5_js_core_JSArray"], function*(length) {
-  const size = Math.max(0, length | 0);
-  const out = new Array(size);
-  for (let i = 0; i < size; i++) {
-    out[i] = null;
-  }
-  return out;
-});
-bindNative(["cn1_com_codename1_html5_js_browser_Window_current_R_com_codename1_html5_js_browser_Window", "cn1_com_codename1_html5_js_browser_Window_current___R_com_codename1_html5_js_browser_Window"], function*() {
-  const wrapper = jvm.wrapJsObject(global.window || global.self || global, "com_codename1_html5_js_browser_Window");
-  jvm.enhanceJsWrapper(wrapper, "com_codename1_impl_html5_JSOImplementations_WindowExt");
-  return wrapper;
-});
-bindNative([
-  "cn1_com_codename1_html5_js_ajax_XMLHttpRequest_create_R_com_codename1_html5_js_ajax_XMLHttpRequest",
-  "cn1_com_codename1_html5_js_ajax_XMLHttpRequest_create___R_com_codename1_html5_js_ajax_XMLHttpRequest"
-], function*() {
-  if (typeof global.XMLHttpRequest !== "function") {
-    throw new Error("XMLHttpRequest is not available in this javascript runtime");
-  }
-  return jvm.wrapJsObject(new global.XMLHttpRequest(), "com_codename1_html5_js_ajax_XMLHttpRequest");
-});
-bindNative([
-  "cn1_com_codename1_html5_js_typedarrays_ArrayBuffer_create_int_R_com_codename1_html5_js_typedarrays_ArrayBuffer",
-  "cn1_com_codename1_html5_js_typedarrays_ArrayBuffer_create___int_R_com_codename1_html5_js_typedarrays_ArrayBuffer"
-], function*(size) {
-  return jvm.wrapJsObject(new global.ArrayBuffer(size | 0), "com_codename1_html5_js_typedarrays_ArrayBuffer");
-});
-bindNative([
-  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_int_R_com_codename1_html5_js_typedarrays_Uint8Array",
-  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___int_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(size) {
-  return jvm.wrapJsObject(new global.Uint8Array(size | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
-});
-bindNative([
-  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8Array",
-  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(buffer) {
-  return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer)), "com_codename1_html5_js_typedarrays_Uint8Array");
-});
-bindNative([
-  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBufferView_R_com_codename1_html5_js_typedarrays_Uint8Array",
-  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBufferView_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(bufferView) {
-  const nativeView = jvm.unwrapJsValue(bufferView);
-  return jvm.wrapJsObject(new global.Uint8Array(nativeView.buffer, nativeView.byteOffset || 0, nativeView.byteLength || undefined), "com_codename1_html5_js_typedarrays_Uint8Array");
-});
-bindNative([
-  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8Array",
-  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(buffer, offset) {
-  return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
-});
-bindNative([
-  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create_com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8Array",
-  "cn1_com_codename1_html5_js_typedarrays_Uint8Array_create___com_codename1_html5_js_typedarrays_ArrayBuffer_int_int_R_com_codename1_html5_js_typedarrays_Uint8Array"
-], function*(buffer, offset, length) {
-  return jvm.wrapJsObject(new global.Uint8Array(jvm.unwrapJsValue(buffer), offset | 0, length | 0), "com_codename1_html5_js_typedarrays_Uint8Array");
-});
-bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent_java_lang_String_int_R_com_codename1_html5_js_dom_Event",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_createCNOutboxEvent___java_lang_String_int_R_com_codename1_html5_js_dom_Event"
-], function*(message, code) {
-  const win = global.window || global.self || global;
-  const detail = message == null ? null : jvm.toNativeString(message);
-  const event = new win.CustomEvent("cn1outbox", { detail: detail, code: code | 0 });
-  return jvm.wrapJsObject(event, "com_codename1_html5_js_dom_Event");
-});
-bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_createCustomEvent_java_lang_String_java_lang_String_int_R_com_codename1_html5_js_dom_Event",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_createCustomEvent___java_lang_String_java_lang_String_int_R_com_codename1_html5_js_dom_Event"
-], function*(type, message, code) {
-  const win = global.window || global.self || global;
-  const eventType = type == null ? "" : jvm.toNativeString(type);
-  const detail = message == null ? null : jvm.toNativeString(message);
-  const event = new win.CustomEvent(eventType, { detail: detail, code: code | 0 });
-  return jvm.wrapJsObject(event, "com_codename1_html5_js_dom_Event");
-});
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName_java_lang_String_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getParameterByName___java_lang_String_R_java_lang_String"], function*(name) {
-  const value = getQueryParameter(jvm.toNativeString(name));
-  return value == null ? null : jvm.createStringLiteral(value);
-});
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio__R_double", "cn1_com_codename1_impl_html5_HTML5Implementation_getDevicePixelRatio___R_double"], function*() {
-  const ratioOverride = getQueryParameter("pixelRatio");
-  const win = global.window || global;
-  if (ratioOverride != null && ratioOverride !== "") {
-    const parsed = Number(ratioOverride);
-    if (!isNaN(parsed) && parsed > 0) {
-      win.overridePixelRatio = parsed;
-    } else {
-      win.overridePixelRatio = 0;
-    }
-  } else if (typeof win.overridePixelRatio === "undefined") {
-    win.overridePixelRatio = 0;
-  }
-  if (typeof win.cn1ScaleCoord === "undefined") {
-    win.cn1ScaleCoord = function(x) {
-      return x === -1 ? -1 : x / (win.overridePixelRatio || win.devicePixelRatio || 1.0);
-    };
-  }
-  if (typeof win.cn1UnscaleCoord === "undefined") {
-    win.cn1UnscaleCoord = function(x) {
-      return x === -1 ? -1 : x * (win.overridePixelRatio || win.devicePixelRatio || 1.0);
-    };
-  }
-  return Number(win.overridePixelRatio || win.devicePixelRatio || 1.0);
-});
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize_R_int", "cn1_com_codename1_impl_html5_HTML5Implementation_getBaseFontSize___R_int"], function*() {
-  const value = getQueryParameter("baseFont");
-  if (value == null || value === "") {
-    return 0;
-  }
-  const parsed = parseInt(value, 10);
-  return isNaN(parsed) ? 0 : parsed | 0;
-});
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride_R_int", "cn1_com_codename1_impl_html5_HTML5Implementation_getDensityOverride___R_int"], function*() {
-  const value = getQueryParameter("density");
-  if (value == null || value === "") {
-    return 0;
-  }
-  const parsed = parseInt(value, 10);
-  return isNaN(parsed) ? 0 : parsed | 0;
-});
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhone__R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isPhone___R_boolean"], function*() {
-  return isPhoneUserAgent() ? 1 : 0;
-});
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet__R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isPhoneOrTablet___R_boolean"], function*() {
-  return isPhoneOrTabletUserAgent() ? 1 : 0;
-});
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isIOS_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isIOS___R_boolean"], function*() {
-  return isIOSUserAgent() ? 1 : 0;
-});
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isMac_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isMac___R_boolean"], function*() {
-  return isMacUserAgent() ? 1 : 0;
-});
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_isIPad_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_isIPad___R_boolean"], function*() {
-  return isIPadUserAgent() ? 1 : 0;
-});
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getBrowserLanguage___R_java_lang_String"], function*() {
-  const nav = global.navigator || {};
-  const value = nav.language || nav.browserLanguage || "";
-  return jvm.createStringLiteral(String(value));
-});
-bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_isWeakMapSupported_R_boolean",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_isWeakMapSupported___R_boolean"
-], function*() {
-  return 0;
-});
-bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl_com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_createSoftWeakRefImpl___com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject"
-], function*(objectRef) {
-  if (typeof WeakMap !== "function") {
-    return null;
-  }
-  const win = global.window || global;
-  if (!(win.cn1GlobalWeakMap instanceof WeakMap)) {
-    win.cn1GlobalWeakMap = new WeakMap();
-  }
-  const key = {};
-  win.cn1GlobalWeakMap.set(key, jvm.unwrapJsObject(objectRef));
-  return jvm.wrapJsObject(key, "com_codename1_html5_js_JSObject");
-});
-bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl_com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_extractHardRefImpl___com_codename1_html5_js_JSObject_R_com_codename1_html5_js_JSObject"
-], function*(keyRef) {
-  if (typeof WeakMap !== "function") {
-    return null;
-  }
-  const win = global.window || global;
-  const weakMap = win.cn1GlobalWeakMap;
-  if (!(weakMap instanceof WeakMap)) {
-    return null;
-  }
-  const key = jvm.unwrapJsObject(keyRef);
-  if (key == null || !weakMap.has(key)) {
-    return null;
-  }
-  const value = weakMap.get(key);
-  return value == null ? null : jvm.wrapJsObject(value, inferJsObjectClass(value));
-});
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag___java_lang_String_R_boolean"], function*(name) {
-  const win = global.window || global;
-  const flags = win.cn1_debug_flags;
-  if (!flags) {
-    return 0;
-  }
-  return flags[jvm.toNativeString(name)] ? 1 : 0;
-});
-bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType_R_java_lang_String", "cn1_com_codename1_impl_html5_HTML5Implementation_getWheelEventType___R_java_lang_String"], function*() {
-  const win = global.window || global;
-  const normalizeWheel = win.cn1NormalizeWheel;
-  let value = "wheel";
-  if (normalizeWheel && typeof normalizeWheel.getEventType === "function") {
-    try {
-      value = normalizeWheel.getEventType() || value;
-    } catch (e) {
-    }
-  }
-  return jvm.createStringLiteral(String(value));
-});
-bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_notifyProgressLoaderThatResourceIsLoaded_java_lang_String",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_notifyProgressLoaderThatResourceIsLoaded___java_lang_String"
-], function*(resource) {
-  const win = global.window || global;
-  const handler = win.cn1LoadedFile;
-  if (typeof handler === "function") {
-    try {
-      handler(String(jvm.toNativeString(resource)));
-    } catch (e) {
-    }
-  }
-  return null;
-});
-bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_installBeforeUnload",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_installBeforeUnload__"
-], function*() {
-  const win = global.window || global;
-  win.onbeforeunload = function() {
-    return "Leaving or refreshing the page may cause you to lose unsaved data.";
-  };
-  return null;
-});
-bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_getBeforeUnloadHandler_R_com_codename1_html5_js_JSObject",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_getBeforeUnloadHandler___R_com_codename1_html5_js_JSObject"
-], function*() {
-  const win = global.window || global;
-  const handler = win.onbeforeunload;
-  return handler == null ? null : jvm.wrapJsObject(handler, "com_codename1_html5_js_JSObject");
-});
-bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadHandler_com_codename1_html5_js_JSObject",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadHandler___com_codename1_html5_js_JSObject"
-], function*(handler) {
-  const win = global.window || global;
-  win.onbeforeunload = handler == null ? null : jvm.unwrapJsValue(handler);
-  return null;
-});
-bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadMessage_java_lang_String",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_setBeforeUnloadMessage___java_lang_String"
-], function*(msg) {
-  const win = global.window || global;
-  const value = msg == null ? "" : jvm.toNativeString(msg);
-  win.onbeforeunload = function() {
-    return value;
-  };
-  return null;
-});
-bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_removeBeforeUnload",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_removeBeforeUnload__"
-], function*() {
-  const win = global.window || global;
-  win.onbeforeunload = function() {};
-  return null;
-});
-bindNative([
-  "cn1_com_codename1_teavm_io_BlobUtil_installNativeBlobToFileConverter_com_codename1_teavm_io_BlobUtil_BlobToFileFunc",
-  "cn1_com_codename1_teavm_io_BlobUtil_installNativeBlobToFileConverter___com_codename1_teavm_io_BlobUtil_BlobToFileFunc"
-], function*(_func) {
-  const win = global.window || global;
-  win.saveBlobToFile = function(_blob, _fileName, callback) {
-    if (callback && typeof callback.error === "function") {
-      callback.error("Blob-to-file conversion is not implemented in the ParparVM runtime yet.");
-    }
-  };
-  return null;
-});
-bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_requestAnimationFrameNative_com_codename1_impl_html5_JavaScriptAnimationFrameCallback_R_int",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_requestAnimationFrameNative___com_codename1_impl_html5_JavaScriptAnimationFrameCallback_R_int"
-], function*(handler) {
-  const win = global.window || global;
-  return (win.requestAnimationFrame || function(cb) { return win.setTimeout(function() { cb(Date.now()); }, 16); })(function(time) {
-    try {
-      const method = jvm.resolveVirtual(handler.__class, "cn1_com_codename1_impl_html5_JavaScriptAnimationFrameCallback_onAnimationFrame_double");
-      jvm.spawn(null, method(handler, +time));
-    } catch (err) {
-      jvm.fail(err);
-    }
-  }) | 0;
-});
 bindNative(["cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled_R_boolean", "cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled___R_boolean"], function*() {
   return 0;
 });

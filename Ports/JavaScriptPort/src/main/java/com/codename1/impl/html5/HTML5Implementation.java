@@ -6014,8 +6014,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
-        if (fontName.indexOf("native:") != 0 && !loadedFonts.contains(fontName)) {
-            ArrayBufferInputStream is = (ArrayBufferInputStream)this.getResourceAsStream(null, fileName);
+        String resolvedFontName = fontName == null || fontName.length() == 0 ? Font.NATIVE_MAIN_REGULAR : fontName;
+        String resolvedFileName = fileName;
+        if (resolvedFontName.indexOf("native:") != 0
+                && resolvedFileName != null
+                && resolvedFileName.length() > 0
+                && !"null".equals(resolvedFileName)
+                && !loadedFonts.contains(resolvedFontName)) {
+            ArrayBufferInputStream is = (ArrayBufferInputStream)this.getResourceAsStream(null, resolvedFileName);
+            if (is == null) {
+                return createFallbackTrueTypeFont(resolvedFontName, resolvedFileName);
+            }
             String dataURL = arrayBufferToDataURL(is.getBuffer().getBuffer(), "font/truetype");
             final boolean[] complete = new boolean[1];
             EventListener loadedListener = new EventListener() {
@@ -6048,16 +6057,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
             
             
             
-            loadedFonts.add(fontName);
+            loadedFonts.add(resolvedFontName);
         }
+        return createFallbackTrueTypeFont(resolvedFontName, resolvedFileName);
+        
+    }
+
+    private NativeFont createFallbackTrueTypeFont(String fontName, String fileName) {
         NativeFont out = (NativeFont)createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
         out.fontName = nativeFontName(fontName);
         out.fileName = fileName;
-        if (fontName.startsWith("native:") && fontName.contains("Italic")) {
+        if (fontName != null && fontName.startsWith("native:") && fontName.contains("Italic")) {
             out.style = Font.STYLE_ITALIC;
         }
         return out;
-        
     }
     
     private String nativeFontName(String fontName) {
@@ -7509,6 +7522,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public InputStream getResourceAsStream(Class cls, String resource)  {
+        if (resource == null || resource.length() == 0 || "null".equals(resource)) {
+            return null;
+        }
         int lastSlash = resource.lastIndexOf("/");
         if ( lastSlash >= 0 ){
             resource = resource.substring(lastSlash+1);

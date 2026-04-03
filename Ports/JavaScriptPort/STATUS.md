@@ -7,7 +7,7 @@ Implemented
 - [x] PolyForm Noncommercial 1.0.0 license boundary for `Ports/JavaScriptPort/**`
 - [x] Imported browser-port baseline into the repository as a working reference subtree
 - [x] ParparVM-side production host bridge in [JavaScriptPortHost.java](/Users/shai/dev/cn1/Ports/JavaScriptPort/src/main/java/com/codename1/impl/platform/js/JavaScriptPortHost.java)
-- [x] ParparVM translator registration for JavaScript-port host natives in [JavascriptNativeRegistry.java](/Users/shai/dev/cn1/vm/ByteCodeTranslator/src/com/codename1/tools/translator/JavascriptNativeRegistry.java)
+- [x] Native method bindings resolved at runtime via `bindNative()` in` parparvm_runtime.js` and `port.js` (no hardcoded registry needed)
 - [x] Browser bundle bootstrap shell and host bridge in `vm/ByteCodeTranslator`
 - [x] PolyForm smoke fixtures for the JavaScript port under `Ports/JavaScriptPort/tests/**`
 - [x] ParparVM smoke and browser-bundle integration coverage in `vm/tests`
