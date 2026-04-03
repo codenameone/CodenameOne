@@ -2028,53 +2028,68 @@ bindNative(["cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1A
   return out;
 });
 bindNative(["cn1_java_lang_String_format_java_lang_String_java_lang_Object_1ARRAY_R_java_lang_String"], function*(format, args) {
-  let index = 0;
+  const text = jvm.toNativeString(format);
   const values = [];
   if (args && args.__array) {
     for (let i = 0; i < args.length; i++) {
       values.push(args[i]);
     }
   }
-  const result = jvm.toNativeString(format).replace(/%[%sdifc]/g, function(token) {
-    if (token === "%%") {
-      return "%";
+
+  const nextArgString = function*(token) {
+    const arg = values.length ? values.shift() : null;
+    if (token === "c") {
+      const native = yield* runtimeToNativeString(arg);
+      if (native == null || native.length === 0) {
+        return "";
+      }
+      if (native.length === 1) {
+        return native;
+      }
+      const asInt = parseInt(native, 10);
+      return isNaN(asInt) ? native.charAt(0) : String.fromCharCode(asInt);
     }
-    const value = values[index++];
-    return {
-      __token: token,
-      __value: value
-    };
-  }).replace(/\[object Object\]/g, function() {
-    return "";
-  });
-  let expanded = "";
-  let start = 0;
-  const pattern = /(\{\}|\[object Object\])/g;
-  const placeholderMatches = [];
-  jvm.toNativeString(format).replace(/%[%sdifc]/g, function(token) {
-    if (token !== "%%") {
-      placeholderMatches.push(token);
+    return yield* runtimeToNativeString(arg);
+  };
+
+  let out = "";
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charAt(i);
+    if (ch !== "%" || i === text.length - 1) {
+      out += ch;
+      continue;
     }
-    return token;
-  });
-  const pieces = jvm.toNativeString(format).split(/%[%sdifc]/g);
-  const tokens = [];
-  jvm.toNativeString(format).replace(/%[%sdifc]/g, function(token) {
-    tokens.push(token);
-    return token;
-  });
-  for (let i = 0; i < pieces.length; i++) {
-    expanded += pieces[i];
-    if (i < tokens.length) {
-      const token = tokens[i];
-      if (token === "%%") {
-        expanded += "%";
-      } else {
-        expanded += yield* runtimeFormatTokenValue(token, values[start++]);
+
+    const next = text.charAt(i + 1);
+    if (next === "%") {
+      out += "%";
+      i++;
+      continue;
+    }
+
+    let j = i + 1;
+    while (j < text.length && "-#+ 0,(".indexOf(text.charAt(j)) >= 0) {
+      j++;
+    }
+    while (j < text.length && text.charAt(j) >= "0" && text.charAt(j) <= "9") {
+      j++;
+    }
+    if (j < text.length && text.charAt(j) === ".") {
+      j++;
+      while (j < text.length && text.charAt(j) >= "0" && text.charAt(j) <= "9") {
+        j++;
       }
     }
+    const token = j < text.length ? text.charAt(j) : "";
+    if ("sdifc".indexOf(token) >= 0) {
+      out += yield* nextArgString(token);
+      i = j;
+    } else {
+      out += "%";
+    }
   }
-  return createJavaString(expanded);
+
+  return createJavaString(out);
 });
 bindNative(["cn1_java_lang_StringToReal_parseDblImpl_java_lang_String_int_R_double"], function*(value, exponentIndex) {
   const text = jvm.toNativeString(value);
