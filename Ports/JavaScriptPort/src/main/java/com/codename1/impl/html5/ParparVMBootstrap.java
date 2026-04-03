@@ -9,11 +9,13 @@ package com.codename1.impl.html5;
 import com.codename1.io.Log;
 import com.codename1.system.Lifecycle;
 import com.codename1.ui.Display;
+import org.teavm.jso.JSBody;
+import org.teavm.jso.browser.Window;
+import org.teavm.jso.dom.events.Event;
 
 /**
  * Bootstrap for ParparVM JavaScript builds.
- * This is a minimal bootstrap that doesn't depend on TeaVM JSO classes.
- * The browser runtime handles JS interop via parparvm_runtime.js and browser_bridge.js.
+ * Uses parparvm_runtime.js for JS interop via native method bindings.
  */
 public final class ParparVMBootstrap implements Runnable {
     private final Lifecycle lifecycle;
@@ -23,20 +25,37 @@ public final class ParparVMBootstrap implements Runnable {
     }
 
     public static void bootstrap(Lifecycle lifecycle) {
-        // Note: ImplementationFactory is set by the translated app's static initializers
-        // For ParparVM, native bindings are provided by parparvm_runtime.js
+        com.codename1.impl.ImplementationFactory.setInstance(new com.codename1.impl.ImplementationFactory());
         ParparVMBootstrap bootstrap = new ParparVMBootstrap(lifecycle);
         Display.init(bootstrap);
         bootstrap.run();
     }
 
+    @JSBody(params = {}, script = "window.cn1Initialized = true;")
+    private static native void setInitialized();
+
+    @JSBody(params = {}, script = "window.cn1Started = true;")
+    private static native void setStarted();
+
     @Override
     public void run() {
         try {
+            HTML5Implementation.setMainClass(lifecycle);
+            dispatchEvent("beforecn1init", 201);
             lifecycle.init(this);
+            setInitialized();
+            dispatchEvent("aftercn1init", 202);
+            dispatchEvent("beforecn1start", 203);
             lifecycle.start();
+            setStarted();
+            dispatchEvent("aftercn1start", 204);
         } catch (Throwable t) {
             Log.e(t);
         }
+    }
+
+    private static void dispatchEvent(String type, int code) {
+        Event evt = HTML5Implementation.createCustomEvent(type, "", code);
+        Window.current().dispatchEvent(evt);
     }
 }

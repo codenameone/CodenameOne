@@ -123,8 +123,9 @@ if [ -d "$COMMON_DEPS_DIR" ]; then
   done < <(find "$COMMON_DEPS_DIR" -maxdepth 1 -type f -name '*.jar' -print0 | sort -z)
 fi
 
-# TeaVM is optional for ParparVM builds. The legacy JavaScript port requires it,
-# but ParparVM can build without TeaVM dependencies installed.
+# TeaVM is optional for ParparVM builds. The JavaScriptPort now includes JSO interfaces
+# in org.teavm.jso package, so it can compile without external TeaVM dependency.
+# TeaVM jars are only needed if the TeaVM compiler needs to run (which we don't use).
 TEAVM_VERSION=""
 TEAVM_AVAILABLE=0
 for candidate in 0.6.0-cn1-006 0.8.1; do
@@ -136,11 +137,11 @@ for candidate in 0.6.0-cn1-006 0.8.1; do
 done
 
 if [ "$TEAVM_AVAILABLE" -eq 0 ]; then
-  bj_log "WARNING: TeaVM JSO compile-time jars not found in ~/.m2/repository"
-  bj_log "Skipping TeaVM-dependent JavaScriptPort compilation (ParparVM-only build)"
+  bj_log "Note: Using built-in JSO interfaces (no external TeaVM dependency)"
 fi
 
 # Generate the appropriate launcher based on whether TeaVM is available
+# Both launchers work - they bootstrap the implementation factory before Display.init()
 bj_log "Preparing JavaScript-port launcher"
 if [ "$TEAVM_AVAILABLE" -eq 1 ]; then
   cat > "$LAUNCHER_SRC" <<'EOF'
@@ -166,22 +167,13 @@ public final class HelloCodenameOneJavaScriptMain {
 EOF
 fi
 
-# Build source list: JavaScriptPort sources (only if TeaVM available) plus the launcher
+# Build source list: JavaScriptPort sources plus launcher
+# JavaScriptPort now includes org.teavm.jso interfaces built-in
 SOURCE_LIST="$WORK_DIR/javascript-port-sources.txt"
-
-# When TeaVM is available: compile all JavaScriptPort sources including TeaVM-dependent ones
-# When TeaVM is not available: skip JavaScriptPort compilation - ParparVM runtime will handle JS interop
-if [ "$TEAVM_AVAILABLE" -eq 1 ]; then
-  bj_log "Building source list with TeaVM-dependent sources"
-  find "$PORT_ROOT/src/main/java" -type f -name '*.java' ! -name 'Stub.java' | sort > "$SOURCE_LIST"
-  # Add launcher
-  echo "$LAUNCHER_SRC" >> "$SOURCE_LIST"
-else
-  # For ParparVM-only builds, we don't compile JavaScriptPort sources
-  # The launcher uses ParparVMBootstrap which doesn't require TeaVM
-  bj_log "Building source list for ParparVM (no TeaVM)"
-  echo "$LAUNCHER_SRC" > "$SOURCE_LIST"
-fi
+bj_log "Building source list for JavaScriptPort"
+find "$PORT_ROOT/src/main/java" -type f -name '*.java' ! -name 'Stub.java' | sort > "$SOURCE_LIST"
+# Add launcher
+echo "$LAUNCHER_SRC" >> "$SOURCE_LIST"
 
 CLASSPATH_ENTRIES=("$STAGE_CLASSES")
 TEAVM_JARS=()
@@ -223,24 +215,10 @@ if [ "${#TEAVM_JARS[@]}" -gt 0 ]; then
 fi
 
 # Compile JavaScriptPort sources
-# When TeaVM is available: compile all JavaScriptPort sources (legacy JavaScript port)
-# When TeaVM is not available: compile only the launcher (ParparVM uses runtime JS interop)
-if [ "$TEAVM_AVAILABLE" -eq 1 ]; then
-  bj_log "Compiling JavaScript-port runtime sources (legacy TeaVM)"
-  "$JAVAC_BIN" -source 8 -target 8 -cp "$CLASSPATH" -d "$PORT_CLASSES" @"$SOURCE_LIST"
-  cp -R "$PORT_CLASSES"/. "$STAGE_CLASSES"/
-else
-  bj_log "Skipping JavaScriptPort source compilation (ParparVM-only build)"
-  # For ParparVM,compile only ParparVMBootstrap and the launcher
-  # Note: ParparVMBootstrap doesn't depend on HTML5Implementation or TeaVM classes
-  PARPARVM_BOOTSTRAP="$PORT_ROOT/src/main/java/com/codename1/impl/html5/ParparVMBootstrap.java"
-  PARPARVM_SOURCE_LIST="$WORK_DIR/parparvm-sources.txt"
-  echo "$PARPARVM_BOOTSTRAP" > "$PARPARVM_SOURCE_LIST"
-  echo "$LAUNCHER_SRC" >> "$PARPARVM_SOURCE_LIST"
-  bj_log "Compiling ParparVM bootstrap and launcher"
-  "$JAVAC_BIN" -source 8 -target 8 -cp "$CLASSPATH" -d "$PORT_CLASSES" @"$PARPARVM_SOURCE_LIST"
-  cp -R "$PORT_CLASSES"/. "$STAGE_CLASSES"/
-fi
+# JavaScriptPort includes org.teavm.jso interfaces, so it compiles without TeaVM jars
+bj_log "Compiling JavaScript-port runtime sources"
+"$JAVAC_BIN" -source 8 -target 8 -cp "$CLASSPATH" -d "$PORT_CLASSES" @"$SOURCE_LIST"
+cp -R "$PORT_CLASSES"/. "$STAGE_CLASSES"/
 
 bj_log "Running ByteCodeTranslator for HelloCodenameOne"
 "$JAVA_BIN" -cp "$PARPARVM_COMPILER" com.codename1.tools.translator.ByteCodeTranslator \
