@@ -19,6 +19,7 @@ open class HelloCodenameOne : Lifecycle() {
         } catch (t: Throwable) {
             System.out.println("CN1SS:SWIFT_DIAG:VALIDATION_EXCEPTION " + t.javaClass.name + ": " + t.message)
             t.printStackTrace()
+            throw RuntimeException("Native interface language validation failed", t)
         }
         Cn1ssDeviceRunner.addTest(KotlinUiTest())
         TestReporting.setInstance(Cn1ssDeviceRunnerReporter())
