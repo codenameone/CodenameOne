@@ -1925,6 +1925,10 @@ public class IPhoneBuilder extends Executor {
                             + "      unless main_target.source_build_phase.files_references.include?(ref)\n"
                             + "        main_target.source_build_phase.add_file_reference(ref, true)\n"
                             + "      end\n"
+                            + "      begin\n"
+                            + "        main_target.resources_build_phase.remove_file_reference(ref)\n"
+                            + "      rescue\n"
+                            + "      end\n"
                             + "    end\n"
                             + "    swift_resource_files = main_target.resources_build_phase.files.select do |bf|\n"
                             + "      ref = bf.file_ref\n"
@@ -1932,12 +1936,7 @@ public class IPhoneBuilder extends Executor {
                             + "      file_name && file_name.downcase.end_with?('.swift')\n"
                             + "    end\n"
                             + "    swift_resource_files.each do |bf|\n"
-                            + "      ref = bf.file_ref\n"
                             + "      main_target.resources_build_phase.files.delete(bf)\n"
-                            + "      bf.remove_from_project\n"
-                            + "      if ref\n"
-                            + "        main_target.resources_build_phase.remove_file_reference(ref) if main_target.resources_build_phase.files_references.include?(ref)\n"
-                            + "      end\n"
                             + "    end\n"
                             + "  end\n"
                             + "rescue => e\n"
@@ -1946,7 +1945,7 @@ public class IPhoneBuilder extends Executor {
                             + "end\n"
                             + deploymentTargetStr
                             + appExtensionsBuilder.toString();
-                    File bridgingHeaderFile = new File(tmpDir, "cn1-Bridging-Header.h");
+                    File bridgingHeaderFile = new File(new File(tmpDir, "dist"), "cn1-Bridging-Header.h");
                     if (!bridgingHeaderFile.exists()) {
                         this.createFile(bridgingHeaderFile, "// Codename One generated Swift bridging header\n".getBytes(StandardCharsets.UTF_8));
                     }
