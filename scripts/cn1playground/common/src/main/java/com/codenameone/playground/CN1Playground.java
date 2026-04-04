@@ -460,6 +460,7 @@ public class CN1Playground extends Lifecycle {
             return;
         }
         restoreThemeDefaults();
+        applySideMenuPalette(websiteDarkMode);
         List<PlaygroundRunner.Diagnostic> diagnostics = new ArrayList<PlaygroundRunner.Diagnostic>();
         List<PlaygroundRunner.InlineMessage> messages = new ArrayList<PlaygroundRunner.InlineMessage>();
         try {
@@ -476,6 +477,7 @@ public class CN1Playground extends Lifecycle {
         cssEditor.setMarkers(diagnostics);
         cssEditor.setInlineMessages(messages);
         cssEditor.setUiidCompletions(PlaygroundCssSupport.collectVisibleUiids(previewRoot));
+        applyTabsTheme(websiteDarkMode);
         appForm.refreshTheme();
     }
 
