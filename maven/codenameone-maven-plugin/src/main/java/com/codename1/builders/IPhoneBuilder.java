@@ -1901,6 +1901,7 @@ public class IPhoneBuilder extends Executor {
 
                     String createSchemesScript = "#!/usr/bin/env ruby\n" +
                             "require 'xcodeproj'\n" +
+                            "require 'pathname'\n" +
                             "main_class_name = \"" + request.getMainClass() + "\"\n" +
                             "project_file = \"" +
                                 tmpDir.getAbsolutePath() + "/dist/" +
@@ -1917,6 +1918,19 @@ public class IPhoneBuilder extends Executor {
                             + "begin\n"
                             + "  main_target = xcproj.targets.find{|e| e.name==main_class_name}\n"
                             + "  if main_target\n"
+                            + "    project_root = File.dirname(project_file)\n"
+                            + "    swift_paths = Dir.glob(File.join(project_root, main_class_name + '-src', '**', '*.swift'))\n"
+                            + "    swift_paths.each do |swift_path|\n"
+                            + "      rel_path = Pathname.new(swift_path).relative_path_from(Pathname.new(project_root)).to_s\n"
+                            + "      ref = xcproj.files.find{|f| f.path == rel_path} || xcproj.main_group.new_file(rel_path)\n"
+                            + "      unless main_target.source_build_phase.files_references.include?(ref)\n"
+                            + "        main_target.source_build_phase.add_file_reference(ref, true)\n"
+                            + "      end\n"
+                            + "      begin\n"
+                            + "        main_target.resources_build_phase.remove_file_reference(ref)\n"
+                            + "      rescue\n"
+                            + "      end\n"
+                            + "    end\n"
                             + "    swift_refs = xcproj.files.select do |f|\n"
                             + "      file_name = f.path || f.name || f.display_name\n"
                             + "      file_name && file_name.downcase.end_with?('.swift')\n"
@@ -1936,6 +1950,15 @@ public class IPhoneBuilder extends Executor {
                             + "      file_name && file_name.downcase.end_with?('.swift')\n"
                             + "    end\n"
                             + "    swift_resource_files.each do |bf|\n"
+                            + "      main_target.resources_build_phase.files.delete(bf)\n"
+                            + "    end\n"
+                            + "    source_folder_resources = main_target.resources_build_phase.files.select do |bf|\n"
+                            + "      ref = bf.file_ref\n"
+                            + "      next false unless ref && ref.path\n"
+                            + "      dir_path = File.join(project_root, ref.path)\n"
+                            + "      File.directory?(dir_path) && !Dir.glob(File.join(dir_path, '**', '*.swift')).empty?\n"
+                            + "    end\n"
+                            + "    source_folder_resources.each do |bf|\n"
                             + "      main_target.resources_build_phase.files.delete(bf)\n"
                             + "    end\n"
                             + "  end\n"
