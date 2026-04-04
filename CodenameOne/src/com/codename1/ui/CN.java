@@ -848,7 +848,7 @@ public class CN extends CN1Constants {
     ///
     /// true if orientation is currently marked as locked
     public static boolean isLockOrientation() {
-        return Display.lockOrientation;
+        return Display.impl.isLockOrientation();
     }
 
     /// This is the reverse method for lock orientation allowing orientation lock to be disabled
