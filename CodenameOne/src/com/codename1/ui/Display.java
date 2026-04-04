@@ -4062,6 +4062,18 @@ public final class Display extends CN1Constants {
         return impl.isPortrait();
     }
 
+
+    static boolean lockOrientation;
+
+    /// Returns true if orientation was locked using #lockOrientation(boolean) and not yet unlocked via #unlockOrientation().
+    ///
+    /// #### Returns
+    ///
+    /// true if orientation is currently marked as locked
+    public boolean isLockOrientation() {
+        return lockOrientation;
+    }
+
     /// Returns true if the device allows forcing the orientation via code, feature phones do not allow this
     /// although some include a jad property allowing for this feature
     ///
@@ -4104,6 +4116,7 @@ public final class Display extends CN1Constants {
     /// - #canForceOrientation()
     public void lockOrientation(boolean portrait) {
         impl.lockOrientation(portrait);
+        lockOrientation = true;
     }
 
     /// This is the reverse method for lock orientation allowing orientation lock to be disabled
@@ -4121,6 +4134,7 @@ public final class Display extends CN1Constants {
     /// - #canForceOrientation()
     public void unlockOrientation() {
         impl.unlockOrientation();
+        lockOrientation = false;
     }
 
     /// Indicates whether the device is a tablet, notice that this is often a guess

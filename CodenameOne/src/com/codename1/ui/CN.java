@@ -840,11 +840,22 @@ public class CN extends CN1Constants {
     /// - `portrait`: true to lock to portrait mode, false to lock to landscape mode
     public static void lockOrientation(boolean portrait) {
         Display.impl.lockOrientation(portrait);
+        Display.lockOrientation = true;
+    }
+
+    /// Returns true if orientation was locked using #lockOrientation(boolean) and not yet unlocked via #unlockOrientation().
+    ///
+    /// #### Returns
+    ///
+    /// true if orientation is currently marked as locked
+    public static boolean isLockOrientation() {
+        return Display.lockOrientation;
     }
 
     /// This is the reverse method for lock orientation allowing orientation lock to be disabled
     public static void unlockOrientation() {
         Display.impl.unlockOrientation();
+        Display.lockOrientation = false;
     }
 
     /// Indicates whether the device is a tablet, notice that this is often a guess
