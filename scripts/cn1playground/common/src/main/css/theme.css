@@ -399,6 +399,18 @@ TabDark {
     text-align: center;
 }
 
+TabSelected {
+    background: #ffffff;
+    color: #111827;
+    border: 1px solid #94a3b8;
+}
+
+TabSelectedDark {
+    background: #1f2937;
+    color: #f8fafc;
+    border: 1px solid #64748b;
+}
+
 TabsContainer {
     background: #e5e7eb;
 }
