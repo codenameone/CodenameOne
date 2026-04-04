@@ -19,7 +19,6 @@ import com.codename1.ui.Tabs;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 import com.codename1.ui.util.UITimer;
@@ -155,12 +154,19 @@ public class CN1Playground extends Lifecycle {
     }
 
     private Component createMainContent(Tabs tabs, Container previewPanel) {
-        if (CN.getDisplayWidth() >= 900) {
+        if (isDesktopLayout()) {
             return new SplitPane(SplitPane.HORIZONTAL_SPLIT, tabs, previewPanel, "25%", "50%", "75%");
         }
-        Container stacked = new Container(new GridLayout(2, 1));
-        stacked.addAll(tabs, previewPanel);
-        return stacked;
+        Tabs mobileTabs = new Tabs();
+        mobileTabs.setUIID(websiteDarkMode ? "PlaygroundEditorTabsDark" : "PlaygroundEditorTabs");
+        mobileTabs.setTabUIID(websiteDarkMode ? "TabDark" : "Tab");
+        mobileTabs.addTab("Editor", tabs);
+        mobileTabs.addTab("Preview", previewPanel);
+        return mobileTabs;
+    }
+
+    private boolean isDesktopLayout() {
+        return CN.getDisplayWidth() >= 900 && !Display.getInstance().isTouchScreenDevice();
     }
 
     private void runScript(Form form) {
@@ -242,6 +248,7 @@ public class CN1Playground extends Lifecycle {
     }
 
     private void installSideMenu(Toolbar toolbar) {
+        Toolbar.setEnableSideMenuSwipe(false);
         PlaygroundMenuSection shareSection = new PlaygroundMenuSection("Share");
         toolbar.addComponentToSideMenu(shareSection);
         toolbar.addComponentToSideMenu(createSideMenuButton(SHARE_BUTTON_LABEL, () -> {
@@ -710,6 +717,15 @@ public class CN1Playground extends Lifecycle {
             case "PlaygroundTitle":
             case "PlaygroundPanel":
             case "PlaygroundPreview":
+            case "SideNavigationPanel":
+            case "StatusBarSideMenu":
+            case "PlaygroundSideCommand":
+            case "PlaygroundSideCommandLine1":
+            case "PlaygroundSideCommandLine2":
+            case "PlaygroundMenuSection":
+            case "PlaygroundMenuSectionTitle":
+            case "PlaygroundMenuEmpty":
+            case "PlaygroundMenuContainer":
             case "PlaygroundEmbeddedForm":
             case "PlaygroundEmbeddedTitleArea":
             case "PlaygroundInspectorRoot":
