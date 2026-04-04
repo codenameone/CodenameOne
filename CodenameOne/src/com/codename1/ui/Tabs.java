@@ -583,7 +583,10 @@ public class Tabs extends Container {
     /// component instance
     protected Component createTab(String title, Font font, char icon, float size) {
         RadioButton b = new RadioButton(title != null ? title : "");
-        FontImage.setIcon(b, font, icon, size);
+        if (tabUIID != null) {
+            b.setUIID(tabUIID);
+        }
+        b.setFontIcon(font, icon, size);
         createTabImpl(b);
         return b;
     }

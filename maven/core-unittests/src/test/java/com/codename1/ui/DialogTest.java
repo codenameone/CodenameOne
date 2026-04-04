@@ -95,8 +95,6 @@ class DialogTest extends UITestBase {
         boolean originalCommandsAsButtons = Dialog.isCommandsAsButtons();
         boolean originalDispose = Dialog.isDefaultDisposeWhenPointerOutOfBounds();
         float originalBlurRadius = Dialog.getDefaultBlurBackgroundRadius();
-        boolean originalInteractionMode = Dialog.isDefaultInteractionDialogMode();
-
         try {
             Dialog.setAutoAdjustDialogSize(false);
             Dialog.setDefaultDialogPosition(BorderLayout.SOUTH);
@@ -104,7 +102,6 @@ class DialogTest extends UITestBase {
             Dialog.setCommandsAsButtons(false);
             Dialog.setDefaultDisposeWhenPointerOutOfBounds(true);
             Dialog.setDefaultBlurBackgroundRadius(4.5f);
-            Dialog.setDefaultInteractionDialogMode(true);
 
             Dialog dialog = new Dialog("Configured", new BorderLayout());
             dialog.getContentPane().addComponent(BorderLayout.CENTER, new Label("Body"));
@@ -116,7 +113,6 @@ class DialogTest extends UITestBase {
             assertEquals(BorderLayout.SOUTH, dialog.getDialogPosition());
             assertTrue(dialog.isDisposeWhenPointerOutOfBounds());
             assertEquals(4.5f, dialog.getBlurBackgroundRadius(), 0.01f);
-            assertTrue(dialog.isInteractionDialogMode());
         } finally {
             Dialog.setAutoAdjustDialogSize(originalAutoAdjust);
             Dialog.setDefaultDialogPosition(originalPosition);
@@ -124,7 +120,61 @@ class DialogTest extends UITestBase {
             Dialog.setCommandsAsButtons(originalCommandsAsButtons);
             Dialog.setDefaultDisposeWhenPointerOutOfBounds(originalDispose);
             Dialog.setDefaultBlurBackgroundRadius(originalBlurRadius);
-            Dialog.setDefaultInteractionDialogMode(originalInteractionMode);
+        }
+    }
+
+    @FormTest
+    void staticShowStringOverloadUsesLegacyDialogModeByDefault() throws Exception {
+        implementation.setBuiltinSoundsEnabled(false);
+        final boolean[] showResult = new boolean[1];
+        final Throwable[] error = new Throwable[1];
+        final Dialog[] currentDialog = new Dialog[1];
+        boolean originalMode = Dialog.isDefaultInteractionDialogMode();
+        Dialog.setDefaultInteractionDialogMode(false);
+        Thread showThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    showResult[0] = Dialog.show("Interaction", "Body", "OK", "Cancel");
+                } catch (Throwable t) {
+                    error[0] = t;
+                }
+            }
+        });
+        try {
+            showThread.start();
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    long deadline = System.currentTimeMillis() + 1500L;
+                    while (System.currentTimeMillis() < deadline && currentDialog[0] == null) {
+                        Display.getInstance().callSeriallyAndWait(new Runnable() {
+                            @Override
+                            public void run() {
+                                Form shown = Display.getInstance().getCurrent();
+                                if (shown instanceof Dialog) {
+                                    currentDialog[0] = (Dialog) shown;
+                                    currentDialog[0].dispose();
+                                }
+                            }
+                        });
+                        if (currentDialog[0] == null) {
+                            try {
+                                Thread.sleep(20L);
+                            } catch (InterruptedException ignored) {
+                            }
+                        }
+                    }
+                }
+            });
+            showThread.join(1500L);
+
+            assertNotNull(currentDialog[0], "Static show(String, String, String, String) must display a Dialog form");
+            assertFalse(showThread.isAlive(), "Static dialog show thread should exit once dialog is disposed");
+            assertNull(error[0], "Static dialog show should not throw");
+            assertFalse(showResult[0], "Disposing without choosing command should return false");
+        } finally {
+            Dialog.setDefaultInteractionDialogMode(originalMode);
         }
     }
 
@@ -137,6 +187,27 @@ class DialogTest extends UITestBase {
             Command result = Dialog.show("Interaction", "Body", new Command[0], Dialog.TYPE_INFO, null, 10);
             assertNull(result, "Timeout without commands should return null");
         } finally {
+            Dialog.setDefaultInteractionDialogMode(originalMode);
+        }
+    }
+
+    @FormTest
+    void staticShowWithCommandsAsButtonsKeepsLegacyBorderLayout() {
+        implementation.setBuiltinSoundsEnabled(false);
+        boolean originalMode = Dialog.isDefaultInteractionDialogMode();
+        boolean originalCommandsAsButtons = Dialog.isCommandsAsButtons();
+        try {
+            Dialog.setDefaultInteractionDialogMode(false);
+            Dialog.setCommandsAsButtons(true);
+            Command ok = new Command("OK");
+            assertDoesNotThrow(new org.junit.jupiter.api.function.Executable() {
+                @Override
+                public void execute() {
+                    Dialog.show("Legacy Buttons", "Body", new Command[]{ok}, Dialog.TYPE_INFO, null, 10);
+                }
+            }, "Static show() with command buttons should not fail due to FlowLayout constraints");
+        } finally {
+            Dialog.setCommandsAsButtons(originalCommandsAsButtons);
             Dialog.setDefaultInteractionDialogMode(originalMode);
         }
     }

@@ -610,7 +610,45 @@ public class Dialog extends Form implements AbstractDialog {
     ///
     /// the command pressed by the user
     public static Command show(String title, Component body, Command defaultCommand, Command[] cmds, int type, Image icon, long timeout, Transition transition) {
-        AbstractDialog dialog = isDefaultInteractionDialogMode() ? new InteractionDialog(title, new BorderLayout()) : new Dialog(title);
+        if (!isDefaultInteractionDialogMode()) {
+            Dialog dialog = new Dialog(title);
+            dialog.dialogType = type;
+            dialog.setTransitionInAnimator(transition);
+            dialog.setTransitionOutAnimator(transition);
+            dialog.lastCommandPressed = null;
+            dialog.setLayout(new BorderLayout());
+            if (cmds != null) {
+                if (commandsAsButtons) {
+                    dialog.placeButtonCommands(cmds);
+                } else {
+                    for (Command cmd : cmds) {
+                        dialog.addCommand(cmd);
+                    }
+                }
+
+                // maps the first command to back
+                if (cmds.length == 1 || cmds.length == 2) {
+                    dialog.setBackCommand(cmds[0]);
+                }
+            }
+            if (defaultCommand != null) {
+                dialog.setDefaultCommand(defaultCommand);
+            }
+            dialog.addComponent(BorderLayout.CENTER, body);
+            if (icon != null) {
+                dialog.addComponent(BorderLayout.EAST, new Label(icon));
+            }
+            if (timeout != 0) {
+                dialog.setTimeout(timeout);
+            }
+            if (body.isScrollable() || disableStaticDialogScrolling) {
+                dialog.setScrollable(false);
+            }
+            dialog.show();
+            return dialog.lastCommandPressed;
+        }
+
+        AbstractDialog dialog = new InteractionDialog(title, new BorderLayout());
         dialog.setDialogType(type);
         dialog.setTransitions(transition);
         dialog.configureCommands(cmds, commandsAsButtons);

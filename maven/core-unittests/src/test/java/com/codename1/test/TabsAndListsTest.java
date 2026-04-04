@@ -4,9 +4,14 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.ComboBox;
 import com.codename1.ui.Component;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.List;
 import com.codename1.ui.Tabs;
+import com.codename1.ui.Button;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
 
@@ -32,6 +37,35 @@ public class TabsAndListsTest extends UITestBase {
         tabs.setSelectedIndex(1);
         assertEquals(1, tabs.getSelectedIndex());
         assertSame(second, tabs.getSelectedComponent());
+    }
+
+    @FormTest
+    void materialTabIconUsesTabPressedStyle() {
+        String customTabUIID = "MaterialTestTab";
+        Style tabStyle = new Style(UIManager.getInstance().getComponentStyle(customTabUIID));
+        tabStyle.setFgColor(0xff0000);
+        tabStyle.setFgAlpha(255);
+        UIManager.getInstance().setComponentStyle(customTabUIID, tabStyle);
+
+        Style pressedStyle = new Style(tabStyle);
+        pressedStyle.setFgColor(0x00aa00);
+        UIManager.getInstance().setComponentStyle(customTabUIID, pressedStyle, "press");
+        UIManager.getInstance().setComponentSelectedStyle(customTabUIID, pressedStyle);
+
+        Tabs tabs = new Tabs();
+        tabs.setTabUIID(customTabUIID);
+        tabs.addTab("MatIcn", FontImage.MATERIAL_10MP, 8, new Label("material"));
+
+        Image icon = tabs.getTabIcon(0);
+        Image pressedIcon = tabs.getTabSelectedIcon(0);
+
+        assertNotNull(icon, "Material tabs should create an icon");
+        assertNotNull(pressedIcon, "Material tabs should create a pressed icon when Tab.press style differs");
+        assertNotSame(icon, pressedIcon, "Pressed icon should be a distinct image when style differs");
+
+        Button tabButton = (Button) tabs.getTabsContainer().getComponentAt(0);
+        assertNotNull(tabButton.getRolloverIcon(), "Material tabs should create a selected icon when selected style differs");
+        assertNotSame(icon, tabButton.getRolloverIcon(), "Selected icon should be a distinct image when style differs");
     }
 
     @Test
