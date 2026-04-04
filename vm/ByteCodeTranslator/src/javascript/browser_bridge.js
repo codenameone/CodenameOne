@@ -1,8 +1,53 @@
 (function(global) {
+  function shouldEnableDiag() {
+    if (global.__parparDiagEnabled != null) {
+      return !!global.__parparDiagEnabled;
+    }
+    var loc = (global.window || global).location;
+    if (!loc || !loc.search) {
+      return false;
+    }
+    var search = String(loc.search).charAt(0) === '?' ? String(loc.search).substring(1) : String(loc.search);
+    if (!search) {
+      return false;
+    }
+    var pairs = search.split('&');
+    for (var i = 0; i < pairs.length; i++) {
+      var entry = pairs[i];
+      if (!entry) {
+        continue;
+      }
+      var eq = entry.indexOf('=');
+      var key = decodeURIComponent((eq >= 0 ? entry.substring(0, eq) : entry).replace(/\+/g, ' '));
+      if (key !== 'parparDiag') {
+        continue;
+      }
+      var rawValue = decodeURIComponent((eq >= 0 ? entry.substring(eq + 1) : '1').replace(/\+/g, ' '));
+      var normalized = String(rawValue).toLowerCase();
+      return !(normalized === '0' || normalized === 'false' || normalized === 'off' || normalized === 'no');
+    }
+    return false;
+  }
+
+  var diagEnabled = shouldEnableDiag();
+
+  function diagValue(value) {
+    if (value == null) {
+      return 'null';
+    }
+    return String(value).replace(/\s+/g, '_');
+  }
+
   function log(line) {
     if (global.console && typeof global.console.log === 'function') {
       global.console.log('PARPAR:' + line);
     }
+  }
+  function diag(phase, key, value) {
+    if (!diagEnabled) {
+      return;
+    }
+    log('DIAG:' + phase + ':' + key + '=' + diagValue(value));
   }
 
   function postHostCallback(target, id, value, errorMessage) {
@@ -74,11 +119,30 @@
     }
     if (data.type === 'error') {
       global.__parparError = data;
+      var failure = data.virtualFailure || null;
+      if (failure) {
+        diag('FIRST_FAILURE', 'category', failure.category || 'runtime_error');
+        diag('FIRST_FAILURE', 'methodId', failure.methodId || 'none');
+        diag('FIRST_FAILURE', 'receiverClass', failure.receiverClass || 'none');
+      } else {
+        diag('FIRST_FAILURE', 'category', 'runtime_error');
+        diag('FIRST_FAILURE', 'message', data.message || 'unknown');
+      }
+      return;
+    }
+    if (data.type === 'log' && data.message) {
+      if (global.console && typeof global.console.log === 'function') {
+        global.console.log(String(data.message));
+      }
+      if (String(data.message).indexOf('CN1SS:INFO:suite starting test=') >= 0) {
+        diag('SCREENSHOT_START', 'source', 'vm_log');
+      }
     }
   }
 
   function installWorkerMode() {
     log('worker-mode');
+    diag('BOOT', 'bridgeMode', 'worker');
     var worker = new Worker('worker.js');
     global.__parparWorker = worker;
     worker.onmessage = function(event) {
@@ -108,6 +172,7 @@
 
   function installMainThreadMode(onReady) {
     log('main-thread-mode');
+    diag('BOOT', 'bridgeMode', 'main-thread');
     global.__cn1ParparDispatchMessage = function(data) {
       handleVmMessage(data, null);
     };
@@ -123,6 +188,7 @@
         }
         if (typeof global.__parparInstallNativeBindings === 'function') {
           global.__parparInstallNativeBindings();
+          diag('INIT', 'nativeRebind', 'applied');
         }
         loadScript('port.js', function(portErr) {
           if (portErr) {
@@ -139,6 +205,7 @@
 
   global.startParparVmApp = function() {
     log('startParparVmApp');
+    diag('INIT', 'startParparVmApp', 'entered');
     global.cn1Initialized = true;
     if (appStarter) {
       log('appStarter-present');
@@ -156,6 +223,7 @@
       appStarter = function() {
         if (global.jvm && typeof global.jvm.start === 'function') {
           log('jvm.start.begin');
+          diag('LIFECYCLE_START', 'jvm.start', 'begin');
           global.jvm.start();
           log('jvm.start.end');
         }
@@ -172,4 +240,5 @@
   } else {
     global.startParparVmApp();
   }
+  diag('BOOT', 'bridge', 'loaded');
 })(self);

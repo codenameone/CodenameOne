@@ -45,11 +45,20 @@ PROBE_JS = r"""
     }).catch(function() {});
   }
 
+  var screenshotStartSent = false;
+  function detectPhaseMarkerFromConsole(line) {
+    if (line.indexOf('CN1SS:INFO:suite starting test=') >= 0 && !screenshotStartSent) {
+      screenshotStartSent = true;
+      send('PARPAR:DIAG:SCREENSHOT_START:source=cn1ss_suite_start');
+    }
+  }
+
   ['log', 'warn', 'error'].forEach(function(level) {
     var original = console[level];
     console[level] = function() {
       var line = Array.prototype.map.call(arguments, stringify).join(' ');
       send(line);
+      detectPhaseMarkerFromConsole(line);
       if (original) {
         original.apply(console, arguments);
       }
@@ -79,6 +88,7 @@ PROBE_JS = r"""
   }, 1000);
 
   send('BROWSER:READY');
+  send('PARPAR:DIAG:BOOT:probe=ready');
 })();
 """
 

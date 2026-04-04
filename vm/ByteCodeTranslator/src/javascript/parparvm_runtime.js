@@ -64,6 +64,63 @@ function vmTrace(line) {
     global.console.log("PARPAR:" + line);
   }
 }
+function shouldEnableDiag() {
+  if (global.__parparDiagEnabled != null) {
+    return !!global.__parparDiagEnabled;
+  }
+  const loc = (global.window || global).location;
+  if (!loc || !loc.search) {
+    return false;
+  }
+  const search = String(loc.search).charAt(0) === "?" ? String(loc.search).substring(1) : String(loc.search);
+  if (!search) {
+    return false;
+  }
+  const pairs = search.split("&");
+  for (let i = 0; i < pairs.length; i++) {
+    const entry = pairs[i];
+    if (!entry) {
+      continue;
+    }
+    const eq = entry.indexOf("=");
+    const key = decodeURIComponent((eq >= 0 ? entry.substring(0, eq) : entry).replace(/\+/g, " "));
+    if (key !== "parparDiag") {
+      continue;
+    }
+    const rawValue = decodeURIComponent((eq >= 0 ? entry.substring(eq + 1) : "1").replace(/\+/g, " "));
+    const normalized = String(rawValue).toLowerCase();
+    return !(normalized === "0" || normalized === "false" || normalized === "off" || normalized === "no");
+  }
+  return false;
+}
+const VM_DIAG_ENABLED = shouldEnableDiag();
+const VM_TRACE_THREAD_LIMIT = 12;
+function diagValue(value) {
+  if (value == null) {
+    return "null";
+  }
+  return String(value).replace(/\s+/g, "_");
+}
+function vmDiag(phase, key, value) {
+  if (!VM_DIAG_ENABLED) {
+    return;
+  }
+  vmTrace("DIAG:" + phase + ":" + key + "=" + diagValue(value));
+}
+function shouldTraceThread(thread) {
+  return VM_DIAG_ENABLED && !!thread && (thread.id | 0) <= VM_TRACE_THREAD_LIMIT;
+}
+function parseMissingVirtualMessage(error) {
+  const message = error == null ? "" : String(error);
+  const match = message.match(/Missing virtual method ([^\s]+) on ([^\s]+)/);
+  if (!match) {
+    return null;
+  }
+  return {
+    methodId: match[1],
+    receiverClass: match[2]
+  };
+}
 function printStreamValue(value) {
   if (value == null) {
     return "null";
@@ -143,6 +200,9 @@ const jvm = {
   mainClass: null,
   mainMethod: null,
   protocol: VM_PROTOCOL,
+  diagEnabled: VM_DIAG_ENABLED,
+  lastVirtualFailure: null,
+  firstFailure: null,
   defineClass(def) {
     def.staticFields = def.staticFields || {};
     def.instanceFields = def.instanceFields || [];
@@ -221,10 +281,26 @@ const jvm = {
     }
     for (const field of cls.instanceFields) {
       obj[field.prop || (field.owner + "_" + field.name)] = null;
-      if (field.desc && field.desc.length && field.desc.charAt(0) !== "L" && field.desc.charAt(0) !== "[") {
+      if (this.isPrimitiveFieldDescriptor(field.desc)) {
         obj[field.prop || (field.owner + "_" + field.name)] = 0;
       }
     }
+  },
+  isPrimitiveFieldDescriptor(desc) {
+    if (desc == null) {
+      return false;
+    }
+    const normalized = String(desc);
+    if (!normalized) {
+      return true;
+    }
+    if (normalized.length === 1 && "ZCBSIFJD".indexOf(normalized) >= 0) {
+      return true;
+    }
+    if (normalized.indexOf("JAVA_") === 0 && normalized.indexOf("[]") < 0) {
+      return true;
+    }
+    return false;
   },
   initFieldAliases(obj, className) {
     const hierarchy = [];
@@ -354,6 +430,18 @@ const jvm = {
     return componentClass.indexOf("JAVA_") === 0;
   },
   resolveVirtual(className, methodId) {
+    if (className == null || className === "undefined") {
+      const missingReceiver = {
+        category: "missing_receiver",
+        methodId: methodId,
+        receiverClass: className == null ? "null" : String(className)
+      };
+      this.lastVirtualFailure = missingReceiver;
+      vmDiag("VIRTUAL_FAIL", "category", missingReceiver.category);
+      vmDiag("VIRTUAL_FAIL", "methodId", missingReceiver.methodId);
+      vmDiag("VIRTUAL_FAIL", "receiverClass", missingReceiver.receiverClass);
+      throw new Error("Missing virtual method " + methodId + " on " + className);
+    }
     const cacheKey = className + "|" + methodId;
     let cached = this.resolvedVirtualCache[cacheKey];
     if (cached) {
@@ -365,9 +453,14 @@ const jvm = {
       return nativeOverride;
     }
     const tail = this.methodTail(methodId);
+    let remapAttempted = false;
+    let visitedClassHierarchy = false;
     let current = className;
     while (current) {
       const cls = this.classes[current];
+      if (cls) {
+        visitedClassHierarchy = true;
+      }
       if (cls && cls.methods) {
         if (cls.methods[methodId]) {
           cached = cls.methods[methodId];
@@ -376,6 +469,9 @@ const jvm = {
         }
         if (tail) {
           const remappedId = this.remappedMethodId(current, methodId, tail);
+          if (remappedId && remappedId !== methodId) {
+            remapAttempted = true;
+          }
           if (cls.methods[remappedId]) {
             cached = cls.methods[remappedId];
             this.resolvedVirtualCache[cacheKey] = cached;
@@ -385,11 +481,75 @@ const jvm = {
       }
       current = cls ? cls.baseClass : null;
     }
+    const visitedInterfaces = Object.create(null);
+    const pendingInterfaces = [];
+    let visitedAnyInterface = false;
+    current = className;
+    while (current) {
+      const cls = this.classes[current];
+      if (cls && cls.interfaces) {
+        for (let i = 0; i < cls.interfaces.length; i++) {
+          pendingInterfaces.push(cls.interfaces[i]);
+        }
+      }
+      current = cls ? cls.baseClass : null;
+    }
+    while (pendingInterfaces.length) {
+      const ifaceName = pendingInterfaces.shift();
+      if (!ifaceName || visitedInterfaces[ifaceName]) {
+        continue;
+      }
+      visitedInterfaces[ifaceName] = true;
+      const iface = this.classes[ifaceName];
+      if (!iface) {
+        continue;
+      }
+      visitedAnyInterface = true;
+      if (iface.methods) {
+        if (iface.methods[methodId]) {
+          cached = iface.methods[methodId];
+          this.resolvedVirtualCache[cacheKey] = cached;
+          return cached;
+        }
+        if (tail) {
+          const remappedId = this.remappedMethodId(ifaceName, methodId, tail);
+          if (remappedId && remappedId !== methodId) {
+            remapAttempted = true;
+          }
+          if (iface.methods[remappedId]) {
+            cached = iface.methods[remappedId];
+            this.resolvedVirtualCache[cacheKey] = cached;
+            return cached;
+          }
+        }
+      }
+      if (iface.interfaces) {
+        for (let i = 0; i < iface.interfaces.length; i++) {
+          pendingInterfaces.push(iface.interfaces[i]);
+        }
+      }
+    }
     if (this.isJsoBridgeClass(className)) {
       cached = this.createJsoBridgeMethod(className, methodId);
       this.resolvedVirtualCache[cacheKey] = cached;
       return cached;
     }
+    let virtualFailureCategory = "missing_class_method";
+    if (visitedAnyInterface) {
+      virtualFailureCategory = "missing_interface_default_method";
+    } else if (remapAttempted) {
+      virtualFailureCategory = "unresolved_remap_tail";
+    } else if (!visitedClassHierarchy) {
+      virtualFailureCategory = "missing_receiver";
+    }
+    this.lastVirtualFailure = {
+      category: virtualFailureCategory,
+      methodId: methodId,
+      receiverClass: className == null ? "null" : String(className)
+    };
+    vmDiag("VIRTUAL_FAIL", "category", virtualFailureCategory);
+    vmDiag("VIRTUAL_FAIL", "methodId", methodId);
+    vmDiag("VIRTUAL_FAIL", "receiverClass", className == null ? "null" : String(className));
     throw new Error("Missing virtual method " + methodId + " on " + className);
   },
   isJsoBridgeClass(className) {
@@ -730,7 +890,36 @@ const jvm = {
     emitVmMessage({ type: this.protocol.messages.RESULT, result: result });
   },
   fail(error) {
-    emitVmMessage({ type: this.protocol.messages.ERROR, message: "" + error, stack: error && error.stack ? error.stack : null });
+    const message = "" + error;
+    let virtualFailure = this.lastVirtualFailure;
+    if (!virtualFailure) {
+      const parsed = parseMissingVirtualMessage(message);
+      if (parsed) {
+        virtualFailure = {
+          category: parsed.receiverClass === "undefined" || parsed.receiverClass === "null"
+            ? "missing_receiver"
+            : "missing_class_method",
+          methodId: parsed.methodId,
+          receiverClass: parsed.receiverClass
+        };
+      }
+    }
+    if (!this.firstFailure) {
+      this.firstFailure = {
+        category: virtualFailure && virtualFailure.category ? virtualFailure.category : "runtime_error",
+        methodId: virtualFailure && virtualFailure.methodId ? virtualFailure.methodId : "",
+        receiverClass: virtualFailure && virtualFailure.receiverClass ? virtualFailure.receiverClass : ""
+      };
+      vmDiag("FIRST_FAILURE", "category", this.firstFailure.category);
+      vmDiag("FIRST_FAILURE", "methodId", this.firstFailure.methodId || "none");
+      vmDiag("FIRST_FAILURE", "receiverClass", this.firstFailure.receiverClass || "none");
+    }
+    emitVmMessage({
+      type: this.protocol.messages.ERROR,
+      message: message,
+      stack: error && error.stack ? error.stack : null,
+      virtualFailure: virtualFailure || null
+    });
   },
   invokeHostNative(symbol, args) {
     return { op: this.protocol.messages.HOST_CALL, id: this.nextHostCallId++, symbol: symbol, args: args || [] };
@@ -754,8 +943,10 @@ const jvm = {
   spawn(threadObject, generator) {
     const thread = { id: this.nextThreadId++, object: threadObject, generator: generator, waiting: null, interrupted: false, done: false };
     this.threads.push(thread);
-    vmTrace("runtime.spawn.thread-" + thread.id + ":" + threadDebugLabel(threadObject));
-    if (thread.id > 1) {
+    if (shouldTraceThread(thread)) {
+      vmTrace("runtime.spawn.thread-" + thread.id + ":" + threadDebugLabel(threadObject));
+    }
+    if (VM_DIAG_ENABLED && (thread.id | 0) > 1 && (thread.id | 0) <= 4) {
       vmTrace("runtime.spawn.stack.thread-" + thread.id + ":" + String(new Error().stack || ""));
     }
     this.enqueue(thread);
@@ -803,7 +994,7 @@ const jvm = {
           continue;
         }
         this.currentThread = thread;
-        if (!thread.__cn1LoggedFirstStep) {
+        if (!thread.__cn1LoggedFirstStep && shouldTraceThread(thread)) {
           thread.__cn1LoggedFirstStep = true;
           vmTrace("runtime.drain.first-step.thread-" + thread.id + ":" + threadDebugLabel(thread.object));
         }
@@ -834,9 +1025,11 @@ const jvm = {
     }
   },
   handleYield(thread, yielded) {
-    vmTrace("runtime.handleYield.thread-" + thread.id + ":" +
-            threadDebugLabel(thread.object) +
-            ":" + (yielded && yielded.op ? yielded.op : "requeue"));
+    if (shouldTraceThread(thread)) {
+      vmTrace("runtime.handleYield.thread-" + thread.id + ":" +
+              threadDebugLabel(thread.object) +
+              ":" + (yielded && yielded.op ? yielded.op : "requeue"));
+    }
     if (!yielded || !yielded.op) {
       this.enqueue(thread, yielded);
       return;
@@ -1004,6 +1197,7 @@ const jvm = {
     if (!this.mainClass || !this.mainMethod) {
       throw new Error("No main class configured for javascript backend");
     }
+    vmDiag("LIFECYCLE_START", "mainClass", this.mainClass);
     this.applyNativeOverrides();
     ensureSystemPrintStreams();
     vmTrace("runtime.start.before-main-generator");
@@ -1057,6 +1251,7 @@ jvm.jsoRegistry = jsoRegistry;
 global.bindNative = bindNative;
 global.global = global;
 global.__parparInstallNativeBindings = installNativeBindings;
+vmDiag("BOOT", "runtime", "loaded");
 function lowerFirst(value) {
   if (!value) {
     return value;
@@ -1386,10 +1581,22 @@ function* throwInterruptedException() {
   throw ex.object;
 }
 function bindNative(names, fn) {
+  function installVirtualOverride(name) {
+    const classes = jvm.classes || {};
+    const classNames = Object.keys(classes);
+    for (let i = 0; i < classNames.length; i++) {
+      const cls = classes[classNames[i]];
+      if (!cls || !cls.methods || !Object.prototype.hasOwnProperty.call(cls.methods, name)) {
+        continue;
+      }
+      cls.methods[name] = fn;
+    }
+  }
   function registerNative(name) {
     jvm.nativeMethods[name] = fn;
     global[name] = fn;
     jvm[name] = fn;
+    installVirtualOverride(name);
   }
   for (let i = 0; i < names.length; i++) {
     const name = names[i];
@@ -1399,6 +1606,24 @@ function bindNative(names, fn) {
     }
   }
   return fn;
+}
+function installCompatibilityClasses() {
+  if (!jvm.classes["kotlin_jvm_internal_Intrinsics"]) {
+    jvm.defineClass({
+      name: "kotlin_jvm_internal_Intrinsics",
+      baseClass: "java_lang_Object",
+      interfaces: [],
+      isInterface: false,
+      isAbstract: false,
+      assignableTo: {
+        kotlin_jvm_internal_Intrinsics: true,
+        java_lang_Object: true
+      },
+      instanceFields: [],
+      staticFields: {},
+      methods: {}
+    });
+  }
 }
 function installNativeBindings() {
   const names = Object.keys(jvm.nativeMethods || {});
@@ -1416,6 +1641,7 @@ function installNativeBindings() {
     }
   }
 }
+installCompatibilityClasses();
 function getQueryParameter(name) {
   const loc = (global.window || global).location;
   if (!loc || !loc.search) {
@@ -1483,6 +1709,22 @@ function isIPadUserAgent() {
 }
 bindNative(["cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled_R_boolean", "cn1_org_teavm_classlib_impl_tz_DateTimeZoneProvider_timeZoneDetectionEnabled___R_boolean"], function*() {
   return 0;
+});
+bindNative([
+  "cn1_kotlin_jvm_internal_Intrinsics_areEqual_java_lang_Object_java_lang_Object_R_boolean",
+  "cn1_kotlin_jvm_internal_Intrinsics_areEqual___java_lang_Object_java_lang_Object_R_boolean"
+], function*(a, b) {
+  if (a == b) {
+    return 1;
+  }
+  if (a == null || b == null) {
+    return 0;
+  }
+  if (a && a.__class) {
+    const equalsMethod = jvm.resolveVirtual(a.__class, "cn1_java_lang_Object_equals_java_lang_Object_R_boolean");
+    return yield* equalsMethod(a, b);
+  }
+  return a === b ? 1 : 0;
 });
 bindNative([
   "cn1_java_lang_Object_wait",

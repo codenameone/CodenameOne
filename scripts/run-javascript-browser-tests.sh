@@ -29,6 +29,8 @@ REFERENCE_DIR="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/javascript/scr
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TIMEOUT_SECONDS="${CN1_JS_TIMEOUT_SECONDS:-120}"
+PARPAR_DIAG_ENABLED="${CN1_PARPAR_DIAG:-1}"
+CLASSIFIER="$SCRIPT_DIR/classify-javascript-parpar-blocker.py"
 
 TMPDIR="${TMPDIR:-/tmp}"
 TMPDIR="${TMPDIR%/}"
@@ -49,6 +51,20 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$SERVE_DIR" "$ARTIFACTS_DIR" "$BUNDLE_DIR"
+
+write_top_blocker() {
+  local source_log="$1"
+  if [ ! -f "$source_log" ]; then
+    echo "TOP_BLOCKER=missing_log|none|none" >"$ARTIFACTS_DIR/top-blocker.txt"
+    return 0
+  fi
+  if [ -x "$CLASSIFIER" ]; then
+    "$CLASSIFIER" "$source_log" >"$ARTIFACTS_DIR/top-blocker.txt" 2>"$ARTIFACTS_DIR/top-blocker.stderr.log" || \
+      echo "TOP_BLOCKER=classifier_error|none|none" >"$ARTIFACTS_DIR/top-blocker.txt"
+  else
+    echo "TOP_BLOCKER=classifier_missing|none|none" >"$ARTIFACTS_DIR/top-blocker.txt"
+  fi
+}
 
 materialize_bundle() {
   local input="$1"
@@ -139,6 +155,13 @@ if [ ! -s "$URL_FILE" ]; then
 fi
 
 URL="$(cat "$URL_FILE")"
+if [ "$PARPAR_DIAG_ENABLED" != "0" ]; then
+  if [[ "$URL" == *\?* ]]; then
+    URL="${URL}&parparDiag=1"
+  else
+    URL="${URL}?parparDiag=1"
+  fi
+fi
 rjb_log "Browser harness serving $URL"
 
 if [ -n "${BROWSER_CMD:-}" ]; then
@@ -161,6 +184,8 @@ while true; do
   if [ $((NOW - START_TIME)) -ge "$TIMEOUT_SECONDS" ]; then
     rjb_log "Timed out waiting for CN1SS:SUITE:FINISHED" >&2
     cp -f "$LOG_FILE" "$ARTIFACTS_DIR/browser.log" 2>/dev/null || true
+    write_top_blocker "$ARTIFACTS_DIR/browser.log"
+    rjb_log "Top blocker: $(cat "$ARTIFACTS_DIR/top-blocker.txt" 2>/dev/null || echo 'TOP_BLOCKER=unavailable|none|none')"
     exit 5
   fi
   sleep 1
@@ -168,5 +193,7 @@ done
 
 wait "$BROWSER_PID" 2>/dev/null || true
 cp -f "$LOG_FILE" "$ARTIFACTS_DIR/browser.log" 2>/dev/null || true
+write_top_blocker "$ARTIFACTS_DIR/browser.log"
+rjb_log "Top blocker: $(cat "$ARTIFACTS_DIR/top-blocker.txt" 2>/dev/null || echo 'TOP_BLOCKER=unavailable|none|none')"
 
 "$SCRIPT_DIR/run-javascript-screenshot-tests.sh" "$LOG_FILE" "$REFERENCE_DIR"
