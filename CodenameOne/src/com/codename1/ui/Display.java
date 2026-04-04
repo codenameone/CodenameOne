@@ -309,6 +309,7 @@ public final class Display extends CN1Constants {
     private int previousKeyPressed;
     private int lastKeyPressed;
     private int lastDragOffset;
+    private boolean lockOrientation;
 
     // huge false positive from PMD...
     @SuppressWarnings("PMD.SingularField")
@@ -4062,8 +4063,6 @@ public final class Display extends CN1Constants {
         return impl.isPortrait();
     }
 
-
-    static boolean lockOrientation;
 
     /// Returns true if orientation was locked using #lockOrientation(boolean) and not yet unlocked via #unlockOrientation().
     ///
