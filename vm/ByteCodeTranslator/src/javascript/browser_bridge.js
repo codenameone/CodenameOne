@@ -121,8 +121,16 @@
           global.__parparError = { type: 'error', message: String(appErr) };
           return;
         }
-        log('translated-app-ready');
-        onReady();
+        if (typeof global.__parparInstallNativeBindings === 'function') {
+          global.__parparInstallNativeBindings();
+        }
+        loadScript('port.js', function(portErr) {
+          if (portErr) {
+            log('optional-script-missing:port.js');
+          }
+          log('translated-app-ready');
+          onReady();
+        });
       });
     });
   }

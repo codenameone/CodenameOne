@@ -1011,6 +1011,7 @@ const jvm = {
     const mainThreadObject = this.newObject("java_lang_Thread");
     mainThreadObject[CN1_THREAD_ALIVE] = 1;
     mainThreadObject[CN1_THREAD_NAME] = this.createStringLiteral("main");
+    this.mainThreadObject = mainThreadObject;
     const mainGenerator = global[this.mainMethod](mainArgs);
     vmTrace("runtime.start.after-main-generator");
     const mainThread = this.spawn(mainThreadObject, mainGenerator);
@@ -1053,6 +1054,9 @@ const jvm = {
 
 global.jvm = jvm;
 jvm.jsoRegistry = jsoRegistry;
+global.bindNative = bindNative;
+global.global = global;
+global.__parparInstallNativeBindings = installNativeBindings;
 function lowerFirst(value) {
   if (!value) {
     return value;
@@ -1382,12 +1386,35 @@ function* throwInterruptedException() {
   throw ex.object;
 }
 function bindNative(names, fn) {
+  function registerNative(name) {
+    jvm.nativeMethods[name] = fn;
+    global[name] = fn;
+    jvm[name] = fn;
+  }
   for (let i = 0; i < names.length; i++) {
-    jvm.nativeMethods[names[i]] = fn;
-    global[names[i]] = fn;
-    jvm[names[i]] = fn;
+    const name = names[i];
+    registerNative(name);
+    if (!name.endsWith("__impl")) {
+      registerNative(name + "__impl");
+    }
   }
   return fn;
+}
+function installNativeBindings() {
+  const names = Object.keys(jvm.nativeMethods || {});
+  for (let i = 0; i < names.length; i++) {
+    const name = names[i];
+    const nativeFn = jvm.nativeMethods[name];
+    if (typeof nativeFn !== "function") {
+      continue;
+    }
+    global[name] = nativeFn;
+    jvm[name] = nativeFn;
+    if (!name.endsWith("__impl")) {
+      global[name + "__impl"] = nativeFn;
+      jvm[name + "__impl"] = nativeFn;
+    }
+  }
 }
 function getQueryParameter(name) {
   const loc = (global.window || global).location;
@@ -1502,7 +1529,12 @@ bindNative(["cn1_java_lang_Object_toString_R_java_lang_String"], function*(__cn1
   }
   return createJavaString(javaClassName(__cn1ThisObject.__class) + "@" + ((__cn1ThisObject.__id | 0).toString(16)));
 });
-bindNative(["cn1_java_lang_Thread_currentThread_R_java_lang_Thread", "cn1_java_lang_Thread_currentThread___R_java_lang_Thread"], function*() { return jvm.currentThread ? jvm.currentThread.object : null; });
+bindNative(["cn1_java_lang_Thread_currentThread_R_java_lang_Thread", "cn1_java_lang_Thread_currentThread___R_java_lang_Thread"], function*() {
+  if (jvm.currentThread && jvm.currentThread.object) {
+    return jvm.currentThread.object;
+  }
+  return jvm.mainThreadObject || null;
+});
 bindNative(["cn1_java_lang_Thread_sleep_long", "cn1_java_lang_Thread_sleep___long"], function*(millis) {
   const resumed = yield { op: "sleep", millis: millis || 0 };
   if (resumed && resumed.interrupted) {
