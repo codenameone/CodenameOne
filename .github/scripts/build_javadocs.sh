@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CN1_DIR="$ROOT_DIR/CodenameOne"
 
-JDK_HOME="${JDK_25_HOME:-${JAVA_HOME:-}}"
+JDK_HOME="${JDK_26_HOME:-${JAVA_HOME:-}}"
 if [ -n "$JDK_HOME" ] && [ -x "$JDK_HOME/bin/javadoc" ]; then
   JAVADOC_CMD="$JDK_HOME/bin/javadoc"
 else

@@ -76,11 +76,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Set up Java 25 for website build
+      - name: Set up Java 26 for website build
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: '26'
 
       - name: Build website
         run: |

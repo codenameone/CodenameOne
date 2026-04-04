@@ -34,39 +34,7 @@ body.cn1-javadoc-page .main:has(> .post-single--api-javadoc) {
   border: 1px solid var(--border);
   border-radius: 0;
   padding: 0.7rem;
-  background: var(--entry);
-  color: var(--content);
   overflow: visible;
-  --code-bg: color-mix(in srgb, var(--entry) 90%, var(--theme) 10%);
-  --body-text-color: var(--content) !important;
-  --block-text-color: var(--content) !important;
-  --body-background-color: var(--entry) !important;
-  --section-background-color: var(--entry) !important;
-  --detail-background-color: var(--entry) !important;
-  --code-background-color: var(--code-bg);
-  --pre-background-color: var(--code-bg);
-  --pre-text-color: var(--content);
-  --snippet-background-color: var(--code-bg);
-  --snippet-text-color: var(--content);
-  --table-header-color: color-mix(in srgb, var(--entry) 70%, var(--theme) 30%) !important;
-  --even-row-color: var(--entry) !important;
-  --odd-row-color: color-mix(in srgb, var(--entry) 90%, var(--theme) 10%) !important;
-  --border-color: var(--border) !important;
-  --title-color: var(--primary) !important;
-  --link-color: var(--primary) !important;
-  --link-color-active: var(--primary) !important;
-  --toc-background-color: var(--theme) !important;
-  --toc-hover-color: color-mix(in srgb, var(--entry) 80%, var(--theme) 20%) !important;
-  --toc-highlight-color: color-mix(in srgb, var(--entry) 70%, var(--theme) 30%) !important;
-  --navbar-background-color: color-mix(in srgb, var(--entry) 70%, #1f4a75 30%) !important;
-  --navbar-text-color: var(--primary) !important;
-  --subnav-background-color: color-mix(in srgb, var(--entry) 78%, var(--theme) 22%) !important;
-  --subnav-link-color: var(--primary) !important;
-  --selected-background-color: color-mix(in srgb, var(--primary) 26%, var(--entry) 74%) !important;
-  --selected-text-color: var(--content) !important;
-  --search-input-background-color: var(--entry) !important;
-  --search-input-text-color: var(--content) !important;
-  --search-input-placeholder-color: var(--secondary) !important;
 }
 
 .cn1-javadoc .main-grid {
@@ -128,42 +96,4 @@ body.cn1-javadoc-page .main:has(> .post-single--api-javadoc) {
   background: color-mix(in srgb, var(--primary) 22%, var(--entry) 78%) !important;
   border-color: var(--border) !important;
   color: var(--content) !important;
-}
-
-.cn1-javadoc pre,
-.cn1-javadoc code,
-.cn1-javadoc pre code,
-.cn1-javadoc .snippet-container,
-.cn1-javadoc .snippet-container pre,
-.cn1-javadoc .block pre,
-.cn1-javadoc .block code {
-  background: var(--code-bg) !important;
-  color: var(--content) !important;
-}
-
-.cn1-javadoc a {
-  color: var(--primary);
-}
-
-body.dark .cn1-javadoc {
-  background: var(--theme);
-  --code-bg: #141f31;
-  --body-background-color: var(--theme) !important;
-  --section-background-color: var(--theme) !important;
-  --detail-background-color: var(--theme) !important;
-  --table-header-color: color-mix(in srgb, var(--theme) 70%, #1b2b40 30%) !important;
-  --even-row-color: var(--theme) !important;
-  --odd-row-color: color-mix(in srgb, var(--theme) 86%, #0d1726 14%) !important;
-  --toc-background-color: #101a2a !important;
-  --toc-hover-color: #172439 !important;
-  --toc-highlight-color: #1d2d45 !important;
-  --navbar-background-color: #1b2d45 !important;
-  --subnav-background-color: #152235 !important;
-  --subnav-link-color: #cfe2ff !important;
-  --link-color: #b7d2ff !important;
-  --link-color-active: #d6e6ff !important;
-  --title-color: #e3edff !important;
-  --search-input-background-color: #111b2b !important;
-  --search-input-text-color: #e9eef7 !important;
-  --search-input-placeholder-color: #8ea1bc !important;
 }
