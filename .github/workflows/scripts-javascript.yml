@@ -84,7 +84,9 @@ jobs:
 
       - name: Install Playwright Chromium
         run: |
-          npm install -g playwright
+          cd scripts
+          npm init -y 2>/dev/null || true
+          npm install playwright
           npx playwright install --with-deps chromium
 
       - name: Install Xvfb for headless Java AWT

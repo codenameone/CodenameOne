@@ -108,6 +108,8 @@ public class BytecodeMethod implements SignatureSet {
     private String desc;
     private boolean eliminated;
     private boolean barebone;
+    private String jsBodyScript;
+    private String[] jsBodyParams;
 
     
     static boolean optimizerOn;
@@ -2366,6 +2368,26 @@ public class BytecodeMethod implements SignatureSet {
     @Override
     public SignatureSet nextSignature() {
         return null;
+    }
+
+    public String getJsBodyScript() {
+        return jsBodyScript;
+    }
+
+    public void setJsBodyScript(String jsBodyScript) {
+        this.jsBodyScript = jsBodyScript;
+    }
+
+    public String[] getJsBodyParams() {
+        return jsBodyParams;
+    }
+
+    public void setJsBodyParams(String[] jsBodyParams) {
+        this.jsBodyParams = jsBodyParams;
+    }
+
+    public boolean isJsBodyMethod() {
+        return jsBodyScript != null;
     }
 
 

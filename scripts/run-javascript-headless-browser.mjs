@@ -8,8 +8,8 @@ try {
     ({ chromium } = await import('@playwright/test'));
   } catch (playwrightTestError) {
     console.error('Unable to load Playwright. Install either "playwright" or "@playwright/test".');
-    console.error(String(playwrightError));
-    console.error(String(playwrightTestError));
+    console.error('Import from "playwright" failed:', String(playwrightError));
+    console.error('Import from "@playwright/test" failed:', String(playwrightTestError));
     process.exit(2);
   }
 }

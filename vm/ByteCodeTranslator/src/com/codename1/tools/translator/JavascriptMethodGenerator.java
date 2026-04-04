@@ -246,10 +246,6 @@ final class JavascriptMethodGenerator {
         String jsMethodName = jsMethodIdentifier(cls, method);
         String jsMethodBodyName = jsMethodBodyIdentifier(cls, method);
         boolean wrappedStaticMethod = isWrappedStaticMethod(method);
-        if (wrappedStaticMethod) {
-            appendWrappedStaticMethod(out, cls, method, jsMethodName, jsMethodBodyName);
-            return;
-        }
         out.append("function* ").append(wrappedStaticMethod ? jsMethodBodyName : jsMethodName).append("(");
         boolean first = true;
         if (!method.isStatic()) {
@@ -1104,14 +1100,48 @@ final class JavascriptMethodGenerator {
 
 private static void appendNativeStubIfNeeded(StringBuilder out, ByteCodeClass cls, BytecodeMethod method) {
         String jsMethodName = jsMethodIdentifier(cls, method);
+        if (method.isJsBodyMethod()) {
+            appendJsBodyMethod(out, cls, method, jsMethodName);
+        } else {
+            out.append("if (typeof ").append(jsMethodName).append(" === \"undefined\") {\n");
+            out.append("  ").append(jsMethodName).append(" = function*(");
+            boolean first = true;
+            if (!method.isStatic()) {
+                out.append("__cn1ThisObject");
+                first = false;
+            }
+            List<ByteCodeMethodArg> arguments = method.getArguments();
+            for (int i = 0; i < arguments.size(); i++) {
+                if (!first) {
+                    out.append(", ");
+                }
+                first = false;
+                out.append("__cn1Arg").append(i + 1);
+            }
+            out.append(") { throw new Error(\"Missing javascript native method ").append(jsMethodName).append("\"); }\n");
+            out.append("}\n");
+        }
+    }
+
+private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, BytecodeMethod method, String jsMethodName) {
+        String script = method.getJsBodyScript();
+        String[] params = method.getJsBodyParams();
+        ByteCodeMethodArg returnType = method.getReturnType();
+        boolean isVoid = returnType == null || returnType.isVoid();
+        
         out.append("if (typeof ").append(jsMethodName).append(" === \"undefined\") {\n");
         out.append("  ").append(jsMethodName).append(" = function*(");
+        
+        java.util.List<ByteCodeMethodArg> arguments = method.getArguments();
+        int paramOffset = 0;
         boolean first = true;
+        
         if (!method.isStatic()) {
             out.append("__cn1ThisObject");
             first = false;
+            paramOffset = 1;
         }
-        List<ByteCodeMethodArg> arguments = method.getArguments();
+        
         for (int i = 0; i < arguments.size(); i++) {
             if (!first) {
                 out.append(", ");
@@ -1119,7 +1149,58 @@ private static void appendNativeStubIfNeeded(StringBuilder out, ByteCodeClass cl
             first = false;
             out.append("__cn1Arg").append(i + 1);
         }
-        out.append(") { throw new Error(\"Missing javascript native method ").append(jsMethodName).append("\"); }\n");
+        out.append(") {\n");
+        
+        out.append("    ");
+        
+        if (params != null && params.length > 0) {
+            for (int i = 0; i < params.length; i++) {
+                String paramName = params[i];
+                int argIndex = paramOffset + i;
+                ByteCodeMethodArg argType = i < arguments.size() ? arguments.get(i) : null;
+                if (argType != null && argType.isObject()) {
+                    out.append("let ").append(paramName).append(" = jvm.unwrapJsValue(__cn1Arg").append(argIndex + 1).append("); ");
+                } else {
+                    out.append("let ").append(paramName).append(" = __cn1Arg").append(argIndex + 1).append("; ");
+                }
+            }
+            out.append("\n    ");
+        }
+        
+        if (!isVoid) {
+            out.append("const __jsBodyResult = (function() { ").append(script).append(" }).call(this);\n");
+            String returnTypeName = returnType.getTypeName();
+            String jsReturnType;
+            if (returnTypeName != null) {
+                jsReturnType = JavascriptNameUtil.sanitizeClassName(returnTypeName);
+            } else {
+                Class primitiveType = returnType.getPrimitiveType();
+                if (primitiveType == Integer.TYPE) {
+                    jsReturnType = "int";
+                } else if (primitiveType == Long.TYPE) {
+                    jsReturnType = "long";
+                } else if (primitiveType == Double.TYPE) {
+                    jsReturnType = "double";
+                } else if (primitiveType == Float.TYPE) {
+                    jsReturnType = "float";
+                } else if (primitiveType == Boolean.TYPE) {
+                    jsReturnType = "boolean";
+                } else if (primitiveType == Byte.TYPE) {
+                    jsReturnType = "byte";
+                } else if (primitiveType == Short.TYPE) {
+                    jsReturnType = "short";
+                } else if (primitiveType == Character.TYPE) {
+                    jsReturnType = "char";
+                } else {
+                    jsReturnType = "java_lang_Object";
+                }
+            }
+            out.append("    return jvm.wrapJsResult(__jsBodyResult, \"").append(jsReturnType).append("\");\n");
+        } else {
+            out.append(script).append("\n");
+        }
+        
+        out.append("  }\n");
         out.append("}\n");
     }
 

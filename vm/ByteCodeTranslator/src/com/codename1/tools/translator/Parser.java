@@ -1197,8 +1197,11 @@ public class Parser extends ClassVisitor {
 
         @Override
         public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+            if ("Lcom/codename1/html5/js/JSBody;".equals(desc) || "Lorg/teavm/jso/JSBody;".equals(desc)) {
+                return new JSBodyAnnotationVisitor(mtd);
+            }
             if (mv == null) return null;
-            return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible)); 
+            return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible));
         }
 
         @Override
@@ -1278,5 +1281,46 @@ public class Parser extends ClassVisitor {
         
         
     
+    }
+    
+    static class JSBodyAnnotationVisitor extends AnnotationVisitor {
+        private final BytecodeMethod method;
+        private String script;
+        private java.util.List<String> params = new java.util.ArrayList<>();
+
+        public JSBodyAnnotationVisitor(BytecodeMethod method) {
+            super(Opcodes.ASM9);
+            this.method = method;
+        }
+
+        @Override
+        public void visit(String name, Object value) {
+            if ("script".equals(name)) {
+                script = (String) value;
+            }
+            super.visit(name, value);
+        }
+
+        @Override
+        public AnnotationVisitor visitArray(String name) {
+            if ("params".equals(name)) {
+                return new AnnotationVisitor(Opcodes.ASM9) {
+                    @Override
+                    public void visit(String name, Object value) {
+                        params.add((String) value);
+                    }
+                };
+            }
+            return super.visitArray(name);
+        }
+
+        @Override
+        public void visitEnd() {
+            if (script != null) {
+                method.setJsBodyScript(script);
+                method.setJsBodyParams(params.toArray(new String[0]));
+            }
+            super.visitEnd();
+        }
     }
 }
