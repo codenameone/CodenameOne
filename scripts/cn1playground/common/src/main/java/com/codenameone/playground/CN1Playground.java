@@ -645,6 +645,7 @@ public class CN1Playground extends Lifecycle {
         if (!websiteThemeInitialized || dark != websiteDarkMode) {
             websiteDarkMode = dark;
             websiteThemeInitialized = true;
+            applySideMenuPalette(dark);
             applyWebsiteTheme(form, dark);
             applyTabsTheme(dark);
             form.refreshTheme();
@@ -662,6 +663,27 @@ public class CN1Playground extends Lifecycle {
                 applyWebsiteTheme(cmp, dark);
             }
         }
+    }
+
+    private void applySideMenuPalette(boolean dark) {
+        Hashtable sideMenuPalette = new Hashtable();
+        int bgColor = dark ? 0x0f172a : 0xffffff;
+        int borderColor = dark ? 0x1f2937 : 0xcccccc;
+
+        sideMenuPalette.put("SideNavigationPanel.bgColor", bgColor);
+        sideMenuPalette.put("SideNavigationPanel.bgTransparency", 255);
+        sideMenuPalette.put("SideNavigationPanelDark.bgColor", bgColor);
+        sideMenuPalette.put("SideNavigationPanelDark.bgTransparency", 255);
+
+        sideMenuPalette.put("StatusBarSideMenu.bgColor", bgColor);
+        sideMenuPalette.put("StatusBarSideMenu.bgTransparency", 255);
+        sideMenuPalette.put("StatusBarSideMenuDark.bgColor", bgColor);
+        sideMenuPalette.put("StatusBarSideMenuDark.bgTransparency", 255);
+
+        sideMenuPalette.put("SideCommand.bgColor", bgColor);
+        sideMenuPalette.put("SideCommand.bgTransparency", 255);
+        sideMenuPalette.put("SideCommand.border", com.codename1.ui.plaf.Border.createLineBorder(2, borderColor));
+        UIManager.getInstance().addThemeProps(sideMenuPalette);
     }
 
     private void applyWebsiteTheme(Component component, boolean dark) {
@@ -751,8 +773,14 @@ public class CN1Playground extends Lifecycle {
 
     private void applyTabsTheme(boolean dark) {
         if (editorTabs != null) {
-            editorTabs.setUIID(dark ? "PlaygroundEditorTabsDark" : "PlaygroundEditorTabs");
-            editorTabs.setTabUIID(dark ? "TabDark" : "Tab");
+            String tabsUiid = dark ? "PlaygroundEditorTabsDark" : "PlaygroundEditorTabs";
+            String tabUiid = dark ? "TabDark" : "Tab";
+            editorTabs.setUIID(tabsUiid);
+            editorTabs.setTabUIID(tabUiid);
+            Container tabsContainer = editorTabs.getTabsContainer();
+            for (int i = 0; i < tabsContainer.getComponentCount(); i++) {
+                tabsContainer.getComponentAt(i).setUIID(tabUiid);
+            }
             editorTabs.refreshTheme();
             editorTabs.revalidate();
         }
