@@ -208,8 +208,13 @@ def transform_selector(sel):
         return sel
     if PREFIX in sel:
         return sel
-    if sel in ("html", "body", ":root"):
-        return PREFIX
+    for root_sel in ("html", "body", ":root"):
+        if sel == root_sel:
+            return PREFIX
+        if sel.startswith(root_sel):
+            suffix = sel[len(root_sel):]
+            if not suffix or suffix[0] in ".#:[ >+~":
+                return f"{PREFIX}{suffix}"
     return f"{PREFIX} {sel}"
 
 def extract_block(text, start):

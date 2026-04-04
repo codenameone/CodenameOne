@@ -8,6 +8,22 @@
   }
 
   let currentDocPath = "/javadoc/_index-raw.html";
+  let bodyThemeObserver = null;
+
+  const syncEmbeddedTheme = () => {
+    const dark = document.body.classList.contains("dark");
+    root.classList.toggle("dark-mode", dark);
+    root.classList.toggle("theme-dark", dark);
+    root.classList.toggle("theme-light", !dark);
+    root.dataset.theme = dark ? "dark" : "light";
+    root.style.colorScheme = dark ? "dark" : "light";
+  };
+
+  const observeThemeChanges = () => {
+    if (bodyThemeObserver) return;
+    bodyThemeObserver = new MutationObserver(syncEmbeddedTheme);
+    bodyThemeObserver.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  };
 
   const reviveSearchUi = () => {
     const inputs = root.querySelectorAll('input[type="search"], input#search-input, #search-input');
@@ -134,6 +150,8 @@
   window.addEventListener("resize", clampSearchPopup);
   root.addEventListener("input", clampSearchPopup, true);
   root.addEventListener("focusin", clampSearchPopup, true);
+  observeThemeChanges();
+  syncEmbeddedTheme();
 
   ensureSearchAssets(currentDocPath);
 })();
