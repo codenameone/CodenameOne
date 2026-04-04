@@ -46,6 +46,7 @@ public class CN1Playground extends Lifecycle {
     private PlaygroundInspector inspector;
     private Container previewRoot;
     private Container historyMenu;
+    private final List<Component> sideMenuComponents = new ArrayList<>();
     private Resources theme;
     private boolean websiteDarkMode = DEFAULT_DARK_MODE;
     private String currentScript;
@@ -154,19 +155,12 @@ public class CN1Playground extends Lifecycle {
     }
 
     private Component createMainContent(Tabs tabs, Container previewPanel) {
-        if (isDesktopLayout()) {
+        tabs.setSwipeActivated(false);
+        if (!Display.getInstance().isPortrait()) {
             return new SplitPane(SplitPane.HORIZONTAL_SPLIT, tabs, previewPanel, "25%", "50%", "75%");
         }
-        Tabs mobileTabs = new Tabs();
-        mobileTabs.setUIID(websiteDarkMode ? "PlaygroundEditorTabsDark" : "PlaygroundEditorTabs");
-        mobileTabs.setTabUIID(websiteDarkMode ? "TabDark" : "Tab");
-        mobileTabs.addTab("Editor", tabs);
-        mobileTabs.addTab("Preview", previewPanel);
-        return mobileTabs;
-    }
-
-    private boolean isDesktopLayout() {
-        return CN.getDisplayWidth() >= 900 && !Display.getInstance().isTouchScreenDevice();
+        tabs.addTab("Preview", previewPanel);
+        return tabs;
     }
 
     private void runScript(Form form) {
@@ -250,26 +244,32 @@ public class CN1Playground extends Lifecycle {
     private void installSideMenu(Toolbar toolbar) {
         Toolbar.setEnableSideMenuSwipe(false);
         PlaygroundMenuSection shareSection = new PlaygroundMenuSection("Share");
-        toolbar.addComponentToSideMenu(shareSection);
-        toolbar.addComponentToSideMenu(createSideMenuButton(SHARE_BUTTON_LABEL, () -> {
+        addSideMenuComponent(toolbar, shareSection);
+        addSideMenuComponent(toolbar, createSideMenuButton(SHARE_BUTTON_LABEL, () -> {
             copyCurrentSourceUrl();
             toolbar.closeSideMenu();
         }));
 
         PlaygroundMenuSection samplesSection = new PlaygroundMenuSection("Samples");
-        toolbar.addComponentToSideMenu(samplesSection);
+        addSideMenuComponent(toolbar, samplesSection);
         for (PlaygroundExamples.Sample sample : PlaygroundExamples.SAMPLES) {
-            toolbar.addComponentToSideMenu(createSideMenuButton(sample.title, () -> {
+            addSideMenuComponent(toolbar, createSideMenuButton(sample.title, () -> {
                 setScript(sample.script, true);
                 toolbar.closeSideMenu();
             }));
         }
 
         PlaygroundMenuSection historySection = new PlaygroundMenuSection("History");
-        toolbar.addComponentToSideMenu(historySection);
-        toolbar.addComponentToSideMenu(historyMenu);
+        addSideMenuComponent(toolbar, historySection);
+        addSideMenuComponent(toolbar, historyMenu);
 
         refreshHistoryMenu(toolbar, PlaygroundStateStore.loadHistory());
+    }
+
+    private void addSideMenuComponent(Toolbar toolbar, Component component) {
+        applyWebsiteTheme(component, websiteDarkMode);
+        sideMenuComponents.add(component);
+        toolbar.addComponentToSideMenu(component);
     }
 
     private void refreshHistoryMenu(Toolbar toolbar, List<PlaygroundStateStore.HistoryEntry> history) {
@@ -301,6 +301,7 @@ public class CN1Playground extends Lifecycle {
             setScript(entry.script, true);
             toolbar.closeSideMenu();
         });
+        applyWebsiteTheme(button, websiteDarkMode);
         return button;
     }
 
@@ -308,6 +309,7 @@ public class CN1Playground extends Lifecycle {
         Button button = new Button(text);
         button.setUIID("PlaygroundSideCommand");
         button.addActionListener(e -> action.run());
+        applyWebsiteTheme(button, websiteDarkMode);
         return button;
     }
 
@@ -655,6 +657,9 @@ public class CN1Playground extends Lifecycle {
             }
             if (inspector != null) {
                 inspector.applyTheme(dark);
+            }
+            for (Component cmp : sideMenuComponents) {
+                applyWebsiteTheme(cmp, dark);
             }
         }
     }
