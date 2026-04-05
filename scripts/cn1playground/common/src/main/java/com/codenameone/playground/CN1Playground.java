@@ -37,8 +37,8 @@ public class CN1Playground extends Lifecycle {
     private static final String ROLE_EMBEDDED_FORM = "embeddedForm";
     private static final String ROLE_EMBEDDED_TITLE_AREA = "embeddedTitleArea";
     private static final String SHARE_BUTTON_LABEL = "Copy Shareable Playground URL";
-
     private final PlaygroundRunner runner = new PlaygroundRunner();
+    private final PlaygroundProjectExporter projectExporter = new PlaygroundProjectExporter();
 
     private Form appForm;
     private PlaygroundBrowserEditor editor;
@@ -75,6 +75,8 @@ public class CN1Playground extends Lifecycle {
         if (toolbar.getTitleComponent() != null) {
             toolbar.getTitleComponent().setUIID("PlaygroundTitle");
         }
+
+        toolbar.addMaterialCommandToRightBar("Download", com.codename1.ui.FontImage.MATERIAL_DOWNLOAD, e -> projectExporter.export(currentScript, currentCss));
 
         editor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.JAVA, currentScript, websiteDarkMode, this::handleSourceChanged);
         cssEditor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.CSS, currentCss, websiteDarkMode, this::handleCssChanged);
