@@ -34,6 +34,10 @@ final class PlaygroundProjectExporter {
     private void writeZip(OutputStream out, ExportModel model) throws IOException {
         try (ZipOutputStream zos = new ZipOutputStream(out)) {
             addText(zos, "pom.xml", rootPom(model.appName));
+            addText(zos, ".gitignore", "**/target/\n.idea/\n*.iml\n.DS_Store\nThumbs.db\n");
+            addText(zos, ".mvn/jvm.config", "-Xmx1024M\n");
+            addText(zos, "mvnw", "#!/bin/sh\nmvn \"$@\"\n");
+            addText(zos, "mvnw.cmd", "@echo off\r\nmvn %*\r\n");
             addText(zos, "build.sh", "#!/bin/sh\ncd \"$(dirname \"$0\")\" || exit 1\nmvn -DskipTests package\n");
             addText(zos, "run.sh", "#!/bin/sh\ncd \"$(dirname \"$0\")\" || exit 1\nmvn -pl javase -am cn1:java -Dcodename1.platform=javase\n");
             addText(zos, "build.bat", "@echo off\r\ncd /d %~dp0\r\nmvn package\r\n");
@@ -65,11 +69,14 @@ final class PlaygroundProjectExporter {
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                 + "<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n"
                 + "  <modelVersion>4.0.0</modelVersion>\n"
-                + "  <groupId>com.cn1.playground</groupId>\n"
+                + "  <groupId>com.cn1.playground.snippet</groupId>\n"
                 + "  <artifactId>" + appName.toLowerCase() + "</artifactId>\n"
                 + "  <version>1.0-SNAPSHOT</version>\n"
                 + "  <packaging>pom</packaging>\n"
-                + "  <name>" + appName + "</name>\n"
+                + "  <name>" + appName.toLowerCase() + "</name>\n"
+                + "  <description>" + appName.toLowerCase() + "</description>\n"
+                + "  <url>https://www.codenameone.com</url>\n"
+                + "  <licenses><license><name>GPL v2 With Classpath Exception</name><url>https://openjdk.java.net/legal/gplv2+ce.html</url><distribution>repo</distribution><comments>A business-friendly OSS license</comments></license></licenses>\n"
                 + "  <properties>\n"
                 + "    <cn1.version>7.0.230</cn1.version>\n"
                 + "    <cn1.plugin.version>${cn1.version}</cn1.plugin.version>\n"
@@ -89,11 +96,11 @@ final class PlaygroundProjectExporter {
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                 + "<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n"
                 + "  <modelVersion>4.0.0</modelVersion>\n"
-                + "  <parent><groupId>com.cn1.playground</groupId><artifactId>" + appName.toLowerCase() + "</artifactId><version>1.0-SNAPSHOT</version></parent>\n"
+                + "  <parent><groupId>com.cn1.playground.snippet</groupId><artifactId>" + appName.toLowerCase() + "</artifactId><version>1.0-SNAPSHOT</version></parent>\n"
                 + "  <artifactId>" + appName.toLowerCase() + "-common</artifactId>\n"
                 + "  <dependencies>\n"
                 + "    <dependency><groupId>com.codenameone</groupId><artifactId>codenameone-core</artifactId><version>${cn1.version}</version></dependency>\n"
-                + "    <dependency><groupId>com.cn1.playground</groupId><artifactId>" + zipArtifact + "</artifactId><version>1.0-SNAPSHOT</version><classifier>common</classifier><type>jar</type></dependency>\n"
+                + "    <dependency><groupId>com.cn1.playground.snippet</groupId><artifactId>" + zipArtifact + "</artifactId><version>1.0-SNAPSHOT</version><classifier>common</classifier><type>jar</type></dependency>\n"
                 + "  </dependencies>\n"
                 + "  <profiles>\n"
                 + "    <profile><id>simulator</id><properties><codename1.targetPlatform>javase</codename1.targetPlatform></properties></profile>\n"
@@ -105,7 +112,7 @@ final class PlaygroundProjectExporter {
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                 + "<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n"
                 + "  <modelVersion>4.0.0</modelVersion>\n"
-                + "  <parent><groupId>com.cn1.playground</groupId><artifactId>" + appName.toLowerCase() + "</artifactId><version>1.0-SNAPSHOT</version></parent>\n"
+                + "  <parent><groupId>com.cn1.playground.snippet</groupId><artifactId>" + appName.toLowerCase() + "</artifactId><version>1.0-SNAPSHOT</version></parent>\n"
                 + "  <artifactId>" + appName.toLowerCase() + "-" + module + "</artifactId>\n"
                 + "  <packaging>pom</packaging>\n"
                 + "</project>\n";
@@ -115,9 +122,9 @@ final class PlaygroundProjectExporter {
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                 + "<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n"
                 + "  <modelVersion>4.0.0</modelVersion>\n"
-                + "  <parent><groupId>com.cn1.playground</groupId><artifactId>" + appName.toLowerCase() + "</artifactId><version>1.0-SNAPSHOT</version></parent>\n"
+                + "  <parent><groupId>com.cn1.playground.snippet</groupId><artifactId>" + appName.toLowerCase() + "</artifactId><version>1.0-SNAPSHOT</version></parent>\n"
                 + "  <artifactId>" + appName.toLowerCase() + "-javase</artifactId>\n"
-                + "  <dependencies><dependency><groupId>com.cn1.playground</groupId><artifactId>" + appName.toLowerCase() + "-common</artifactId><version>1.0-SNAPSHOT</version></dependency></dependencies>\n"
+                + "  <dependencies><dependency><groupId>com.cn1.playground.snippet</groupId><artifactId>" + appName.toLowerCase() + "-common</artifactId><version>1.0-SNAPSHOT</version></dependency></dependencies>\n"
                 + "</project>\n";
     }
 
@@ -179,7 +186,19 @@ final class PlaygroundProjectExporter {
     }
 
     private String readme(String appName, String mainClassName) {
-        return "# " + appName + "\n\nGenerated from CN1 Playground.\n\nMain class: `" + PACKAGE_NAME + "." + mainClassName + "`\n";
+        return "# Codename One Project\n\n"
+                + "This is a multi-module Maven project for a Codename One app.\n"
+                + "You can write the app in Java and/or Kotlin, and build for Android, iOS, desktop, and web.\n\n"
+                + "## Getting Started\n\n"
+                + "You selected a Java template. Start here:\n"
+                + "https://shannah.github.io/cn1-maven-archetypes/cn1app-archetype-tutorial/getting-started.html\n\n"
+                + "## IntelliJ Users\n\n"
+                + "This project should work in IntelliJ out of the box.\n"
+                + "You usually don't need to copy or tweak any project files.\n\n"
+                + "## Help and Support\n\n"
+                + "- Codename One website: https://www.codenameone.com\n"
+                + "- Codename One GitHub: https://github.com/codenameone/CodenameOne\n\n"
+                + "Main class: `" + PACKAGE_NAME + "." + mainClassName + "`\n";
     }
 
     private static final class ExportModel {
