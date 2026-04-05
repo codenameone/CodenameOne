@@ -2138,9 +2138,13 @@ public class IPhoneBuilder extends Executor {
 
             File postPodsFixSchemesFile = new File(new File(tmpFile, "hooks"), "fix_xcode_schemes.rb");
             if (postPodsFixSchemesFile.exists()) {
-                if (!exec(postPodsFixSchemesFile.getParentFile(), postPodsFixSchemesFile.getAbsolutePath())) {
-                    log("Failed to re-run xcode project Swift/resource phase fixups after dependency integration.");
-                    return false;
+                try {
+                    if (!exec(postPodsFixSchemesFile.getParentFile(), postPodsFixSchemesFile.getAbsolutePath())) {
+                        log("Failed to re-run xcode project Swift/resource phase fixups after dependency integration.");
+                        return false;
+                    }
+                } catch (Exception ex) {
+                    throw new BuildException("Failed to re-run xcode project Swift/resource phase fixups after dependency integration.", ex);
                 }
             }
 
