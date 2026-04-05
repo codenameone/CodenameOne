@@ -1961,6 +1961,25 @@ public class IPhoneBuilder extends Executor {
                             + "    source_folder_resources.each do |bf|\n"
                             + "      main_target.resources_build_phase.files.delete(bf)\n"
                             + "    end\n"
+                            + "    remaining_swift_resources = main_target.resources_build_phase.files.select do |bf|\n"
+                            + "      ref = bf.file_ref\n"
+                            + "      file_name = (ref && (ref.path || ref.name || ref.display_name)) || bf.display_name\n"
+                            + "      if file_name && file_name.downcase.end_with?('.swift')\n"
+                            + "        true\n"
+                            + "      elsif ref && ref.path\n"
+                            + "        dir_path = File.join(project_root, ref.path)\n"
+                            + "        File.directory?(dir_path) && !Dir.glob(File.join(dir_path, '**', '*.swift')).empty?\n"
+                            + "      else\n"
+                            + "        false\n"
+                            + "      end\n"
+                            + "    end\n"
+                            + "    unless remaining_swift_resources.empty?\n"
+                            + "      names = remaining_swift_resources.map do |bf|\n"
+                            + "        ref = bf.file_ref\n"
+                            + "        (ref && (ref.path || ref.name || ref.display_name)) || bf.display_name || '<unknown>'\n"
+                            + "      end\n"
+                            + "      raise \"Swift files/resources still present in Copy Bundle Resources: #{names.join(', ')}\"\n"
+                            + "    end\n"
                             + "  end\n"
                             + "rescue => e\n"
                             + "  puts \"Error while correcting Swift build phases: #{$!}\"\n"
@@ -2115,6 +2134,14 @@ public class IPhoneBuilder extends Executor {
                     ensureTopLevelWorkspace(request);
                 }
                 stopwatch.split("SwiftPM");
+            }
+
+            File postPodsFixSchemesFile = new File(new File(tmpFile, "hooks"), "fix_xcode_schemes.rb");
+            if (postPodsFixSchemesFile.exists()) {
+                if (!exec(postPodsFixSchemesFile.getParentFile(), postPodsFixSchemesFile.getAbsolutePath())) {
+                    log("Failed to re-run xcode project Swift/resource phase fixups after dependency integration.");
+                    return false;
+                }
             }
 
             try {
