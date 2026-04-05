@@ -32,8 +32,7 @@ package java.util;
 /// A deque can also remove interior elements by removeFirstOccurrence and
 /// removeLastOccurrence methods. A deque can not access elements by index.
 ///
-/// @param
-/// the type of elements in this collection
+/// Type parameter `E`: the type of elements in this collection
 ///
 /// #### Since
 ///

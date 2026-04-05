@@ -2665,8 +2665,7 @@ public class Collections {
     /// Answers a set backed by a map. And the map must be empty when this method
     /// is called.
     ///
-    /// @param
-    /// type of elements in set
+    /// Type parameter `E`: type of elements in set
     ///
     /// #### Parameters
     ///
@@ -2693,8 +2692,7 @@ public class Collections {
     /// Answers a LIFO Queue as a view of a Deque. Methods in the returned Queue
     /// need to be re-written to implement the LIFO feature.
     ///
-    /// @param
-    /// type of elements
+    /// Type parameter `T`: type of elements
     ///
     /// #### Parameters
     ///

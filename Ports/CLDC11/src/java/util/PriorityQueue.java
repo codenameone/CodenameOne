@@ -313,8 +313,7 @@ public class PriorityQueue<E> extends AbstractQueue<E> {
     /// will return a new array with the size of the argument array and size of
     /// the queue.
     ///
-    /// @param
-    /// the type of elements in the array
+    /// Type parameter `T`: the type of elements in the array
     ///
     /// #### Parameters
     ///

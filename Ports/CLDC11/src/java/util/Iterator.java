@@ -26,8 +26,7 @@ package java.util;
 /// `hasNext()` may throw a `ConcurrentModificationException`.
 /// Iterators with this behavior are called fail-fast iterators.
 ///
-/// @param
-/// the type of object returned by the iterator.
+/// Type parameter `E`: the type of object returned by the iterator.
 public interface Iterator<E> {
     /// Returns whether there are more elements to iterate, i.e. whether the
     /// iterator is positioned in front of an element.

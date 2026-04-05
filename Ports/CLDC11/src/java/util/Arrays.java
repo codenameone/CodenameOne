@@ -277,8 +277,7 @@ public class Arrays {
     /// Performs a binary search for the specified element in the specified
     /// sorted array using the Comparator to compare elements.
     ///
-    /// @param
-    /// type of object
+    /// Type parameter `T`: type of object
     ///
     /// #### Parameters
     ///
@@ -726,8 +725,7 @@ public class Arrays {
     /// Performs a binary search for the specified element in a part of the
     /// specified sorted array using the Comparator to compare elements.
     ///
-    /// @param
-    /// type of object
+    /// Type parameter `T`: type of object
     ///
     /// #### Parameters
     ///
@@ -3865,7 +3863,7 @@ public class Arrays {
 
     /// Copies elements in original array to a new array, from index
     /// start(inclusive) to end(exclusive). The first element (if any) in the new
-    /// array is original[from], and other elements in the new array are in the
+    /// array is original[`from`], and other elements in the new array are in the
     /// original order. The padding value whose index is bigger than or equal to
     /// original.length - start is false.
     ///
@@ -3908,7 +3906,7 @@ public class Arrays {
 
     /// Copies elements in original array to a new array, from index
     /// start(inclusive) to end(exclusive). The first element (if any) in the new
-    /// array is original[from], and other elements in the new array are in the
+    /// array is original[`from`], and other elements in the new array are in the
     /// original order. The padding value whose index is bigger than or equal to
     /// original.length - start is (byte)0.
     ///
@@ -3951,7 +3949,7 @@ public class Arrays {
 
     /// Copies elements in original array to a new array, from index
     /// start(inclusive) to end(exclusive). The first element (if any) in the new
-    /// array is original[from], and other elements in the new array are in the
+    /// array is original[`from`], and other elements in the new array are in the
     /// original order. The padding value whose index is bigger than or equal to
     /// original.length - start is '\\u000'.
     ///
@@ -3994,7 +3992,7 @@ public class Arrays {
 
     /// Copies elements in original array to a new array, from index
     /// start(inclusive) to end(exclusive). The first element (if any) in the new
-    /// array is original[from], and other elements in the new array are in the
+    /// array is original[`from`], and other elements in the new array are in the
     /// original order. The padding value whose index is bigger than or equal to
     /// original.length - start is 0d.
     ///
@@ -4037,7 +4035,7 @@ public class Arrays {
 
     /// Copies elements in original array to a new array, from index
     /// start(inclusive) to end(exclusive). The first element (if any) in the new
-    /// array is original[from], and other elements in the new array are in the
+    /// array is original[`from`], and other elements in the new array are in the
     /// original order. The padding value whose index is bigger than or equal to
     /// original.length - start is 0f.
     ///
@@ -4080,7 +4078,7 @@ public class Arrays {
 
     /// Copies elements in original array to a new array, from index
     /// start(inclusive) to end(exclusive). The first element (if any) in the new
-    /// array is original[from], and other elements in the new array are in the
+    /// array is original[`from`], and other elements in the new array are in the
     /// original order. The padding value whose index is bigger than or equal to
     /// original.length - start is 0.
     ///
@@ -4123,7 +4121,7 @@ public class Arrays {
 
     /// Copies elements in original array to a new array, from index
     /// start(inclusive) to end(exclusive). The first element (if any) in the new
-    /// array is original[from], and other elements in the new array are in the
+    /// array is original[`from`], and other elements in the new array are in the
     /// original order. The padding value whose index is bigger than or equal to
     /// original.length - start is 0L.
     ///
@@ -4166,7 +4164,7 @@ public class Arrays {
 
     /// Copies elements in original array to a new array, from index
     /// start(inclusive) to end(exclusive). The first element (if any) in the new
-    /// array is original[from], and other elements in the new array are in the
+    /// array is original[`from`], and other elements in the new array are in the
     /// original order. The padding value whose index is bigger than or equal to
     /// original.length - start is (short)0.
     ///

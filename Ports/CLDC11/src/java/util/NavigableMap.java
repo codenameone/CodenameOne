@@ -19,10 +19,8 @@ package java.util;
 /// NavigableMap is a SortedMap with navigation methods answering the closest
 /// matches for specified item.
 ///
-/// @param
-/// the type of key
-/// @param
-/// the type of value
+/// Type parameter `K`: the type of key
+/// Type parameter `V`: the type of value
 ///
 /// #### Since
 ///

@@ -34,10 +34,8 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
 
     /// An immutable key-value mapping.
     ///
-    /// @param
-    /// the type of key
-    /// @param
-    /// the type of value
+    /// Type parameter `K`: the type of key
+    /// Type parameter `V`: the type of value
     ///
     /// #### Since
     ///
@@ -157,10 +155,8 @@ public abstract class AbstractMap<K, V> implements Map<K, V> {
 
     /// A key-value mapping.
     ///
-    /// @param
-    /// the type of key
-    /// @param
-    /// the type of value
+    /// Type parameter `K`: the type of key
+    /// Type parameter `V`: the type of value
     ///
     /// #### Since
     ///

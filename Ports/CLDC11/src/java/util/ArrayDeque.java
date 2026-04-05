@@ -24,8 +24,7 @@ package java.util;
 ///
 /// All optional operations are supported, and the elements can be any objects.
 ///
-/// @param
-/// the type of elements in this collection
+/// Type parameter `E`: the type of elements in this collection
 ///
 /// #### Since
 ///

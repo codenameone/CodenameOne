@@ -68,7 +68,7 @@ public class DateFormat extends Format {
 
 	/// Format a given object.
 	///
-	/// @obj object to be formatted.
+	/// Parameter `obj`: object to be formatted.
 	///
 	/// #### Returns
 	///

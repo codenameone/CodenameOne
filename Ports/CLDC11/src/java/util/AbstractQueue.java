@@ -22,8 +22,7 @@ package java.util;
 /// that they throw exceptions to indicate some error instead of returning true
 /// or false.
 ///
-/// @param
-/// the type of the element in the collection.
+/// Type parameter `E`: the type of the element in the collection.
 public abstract class AbstractQueue<E> extends AbstractCollection<E> implements
         Queue<E> {
 

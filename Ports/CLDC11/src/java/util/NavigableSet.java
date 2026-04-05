@@ -20,8 +20,7 @@ package java.util;
 /// NavigableSet is a SortedSet with navigation methods answering the closest
 /// matches for specified item.
 ///
-/// @param
-/// the type of element
+/// Type parameter `E`: the type of element
 ///
 /// #### Since
 ///

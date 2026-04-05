@@ -21,10 +21,8 @@ package java.util;
 /// and removing) are supported. The values can be any objects. The keys can be
 /// any objects which are comparable to each other either using their natural
 ///
-/// @param
-/// type of key
-/// @param
-/// type of value
+/// Type parameter `K`: type of key
+/// Type parameter `V`: type of value
 ///
 /// #### Since
 ///
