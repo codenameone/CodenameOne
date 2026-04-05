@@ -34,10 +34,19 @@ final class PlaygroundProjectExporter {
     private void writeZip(OutputStream out, ExportModel model) throws IOException {
         try (ZipOutputStream zos = new ZipOutputStream(out)) {
             addText(zos, "pom.xml", rootPom(model.appName));
+            addText(zos, "build.sh", "#!/bin/sh\ncd \"$(dirname \"$0\")\" || exit 1\nmvn package\n");
+            addText(zos, "run.sh", "#!/bin/sh\ncd \"$(dirname \"$0\")\" || exit 1\nmvn -f javase/pom.xml exec:java\n");
+            addText(zos, "build.bat", "@echo off\r\ncd /d %~dp0\r\nmvn package\r\n");
+            addText(zos, "run.bat", "@echo off\r\ncd /d %~dp0\r\nmvn -f javase/pom.xml exec:java\r\n");
             addText(zos, "common/pom.xml", commonPom(model.appName));
             addText(zos, "common/codenameone_settings.properties", codenameOneSettings(model.appName));
             addText(zos, "common/src/main/css/theme.css", themeCss(model.css));
             addText(zos, "common/src/main/java/" + PACKAGE_NAME.replace('.', '/') + "/" + model.mainClassName + ".java", model.javaSource);
+            addText(zos, "android/pom.xml", platformPom(model.appName, "android"));
+            addText(zos, "ios/pom.xml", platformPom(model.appName, "ios"));
+            addText(zos, "javascript/pom.xml", platformPom(model.appName, "javascript"));
+            addText(zos, "javase/pom.xml", javasePom(model.appName));
+            addText(zos, "win/pom.xml", platformPom(model.appName, "win"));
             addText(zos, "README.md", readme(model.appName, model.mainClassName));
         }
     }
@@ -65,7 +74,7 @@ final class PlaygroundProjectExporter {
                 + "    <maven.compiler.source>1.8</maven.compiler.source>\n"
                 + "    <maven.compiler.target>1.8</maven.compiler.target>\n"
                 + "  </properties>\n"
-                + "  <modules><module>common</module></modules>\n"
+                + "  <modules><module>common</module><module>javase</module><module>android</module><module>ios</module><module>javascript</module><module>win</module></modules>\n"
                 + "  <build><pluginManagement><plugins>\n"
                 + "    <plugin><groupId>com.codenameone</groupId><artifactId>codenameone-maven-plugin</artifactId><version>${cn1.plugin.version}</version></plugin>\n"
                 + "  </plugins></pluginManagement></build>\n"
@@ -81,8 +90,28 @@ final class PlaygroundProjectExporter {
                 + "  <artifactId>" + appName.toLowerCase() + "-common</artifactId>\n"
                 + "  <dependencies>\n"
                 + "    <dependency><groupId>com.codenameone</groupId><artifactId>codenameone-core</artifactId><version>${cn1.version}</version></dependency>\n"
-                + "    <dependency><groupId>com.cn1.playground</groupId><artifactId>" + zipArtifact + "</artifactId><version>1.0-SNAPSHOT</version><type>pom</type></dependency>\n"
+                + "    <dependency><groupId>com.cn1.playground</groupId><artifactId>" + zipArtifact + "</artifactId><version>1.0-SNAPSHOT</version><classifier>common</classifier><type>jar</type></dependency>\n"
                 + "  </dependencies>\n"
+                + "</project>\n";
+    }
+
+    private String platformPom(String appName, String module) {
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n"
+                + "  <modelVersion>4.0.0</modelVersion>\n"
+                + "  <parent><groupId>com.cn1.playground</groupId><artifactId>" + appName.toLowerCase() + "</artifactId><version>1.0-SNAPSHOT</version></parent>\n"
+                + "  <artifactId>" + appName.toLowerCase() + "-" + module + "</artifactId>\n"
+                + "  <packaging>pom</packaging>\n"
+                + "</project>\n";
+    }
+
+    private String javasePom(String appName) {
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n"
+                + "  <modelVersion>4.0.0</modelVersion>\n"
+                + "  <parent><groupId>com.cn1.playground</groupId><artifactId>" + appName.toLowerCase() + "</artifactId><version>1.0-SNAPSHOT</version></parent>\n"
+                + "  <artifactId>" + appName.toLowerCase() + "-javase</artifactId>\n"
+                + "  <dependencies><dependency><groupId>com.cn1.playground</groupId><artifactId>" + appName.toLowerCase() + "-common</artifactId><version>1.0-SNAPSHOT</version></dependency></dependencies>\n"
                 + "</project>\n";
     }
 
